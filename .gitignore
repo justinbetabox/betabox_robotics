@@ -12,6 +12,13 @@ build/
 dist/
 *.egg-info/
 
+# Type/checker caches
+.mypy_cache/
+.pyright_cache/
+
+# Ruff/lint cache, if used later
+.ruff_cache/
+
 # IDE
 .vscode/
 .idea/

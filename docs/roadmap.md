@@ -1,4 +1,4 @@
-# ROADMAP
+# Betabox Platform Roadmap
 
 ## Foundation
 
@@ -8,13 +8,14 @@
 
 ## Core Robot Services
 
--   [ ] Vision
+-   [X] Vision
 -   [ ] Audio
 -   [ ] System
 
 ## Robot Platform
 
--   [ ] Car
+-   [X] Car
+-   [ ] Robot API
 
 ## Applications
 

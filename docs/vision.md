@@ -1,6 +1,6 @@
-# Betabox Vision Platform Design
+# Betabox Vision Platform Architecture
 
-**Status:** Draft Architecture (Pre-Implementation)\
+**Status:** Stable Architecture Specification\
 **Project:** Betabox Robot Platform\
 **Phase:** Vision Platform
 
@@ -9,130 +9,142 @@
 # Purpose
 
 This document defines the long-term architecture of the Betabox Vision
-Platform. It is intended to be the stable design specification before
-implementation begins.
+Platform.
 
-The goal is to create a vision subsystem that is transport-independent,
-modular, and scalable while providing low-latency video streaming,
-computer vision, recording, snapshots, and future AI capabilities.
+It intentionally describes the architectural contracts of the Vision
+subsystem rather than specific implementation details. Internal
+implementations may evolve, but the architecture, responsibilities, and
+public interfaces described here should remain stable.
+
+The Vision Platform is designed to provide a modular,
+transport-independent foundation for camera access, streaming, computer
+vision, recording, snapshots, and future AI capabilities.
 
 ------------------------------------------------------------------------
 
-# Goals
+# Architectural Goals
 
--   Single owner of the camera hardware
+-   Single owner of camera hardware
 -   Stable public Vision API
--   Streaming independent from processing
--   Detection independent from streaming
--   Modular pipeline
--   Hardware-accelerated video when available
--   Easy future expansion
+-   Transport-independent streaming
+-   Detection independent from transport
+-   Modular frame pipeline
+-   Metadata independent from rendered video
+-   Support multiple simultaneous consumers
+-   Safe resource management
+-   Straightforward future expansion
 
 ------------------------------------------------------------------------
 
-# Current Architecture
+# Core Principles
 
-``` text
-Pi Camera
-    │
-OpenCV / Vilib
-    │
-JPEG Encoding
-    │
-Flask MJPEG
-    │
-Browser
-```
-
-## Current Issues
-
--   MJPEG consumes significant bandwidth.
--   JPEG encoding is CPU intensive.
--   High latency.
--   No adaptive bitrate.
--   Camera ownership is difficult to manage.
--   Streaming and processing are tightly coupled.
-
-------------------------------------------------------------------------
-
-# Design Principles
-
-1.  One camera owner.
-2.  Everything communicates through stable interfaces.
-3.  Processing never depends on transport.
+1.  The camera has exactly one owner.
+2.  Components communicate through stable interfaces.
+3.  Processing is independent of transport.
 4.  Streaming never owns the camera.
-5.  Detection publishes metadata instead of drawing directly.
-6.  Future detectors should plug into the pipeline.
+5.  Consumers subscribe to frames rather than requesting them directly.
+6.  Detection publishes metadata rather than modifying frames.
+7.  New capabilities should integrate by subscribing to the existing
+    pipeline instead of introducing parallel pipelines.
 
 ------------------------------------------------------------------------
 
-# High-Level Architecture
+# Architectural Overview
 
 ``` text
-Vision
-   │
-┌─────────────────┴─────────────────┐
-│                                   │
-FrameSource                         MetadataBus
-│
-CameraManager
-│
-Picamera2
-│
-▼
-FrameConsumers
-│
-┌────────┼──────────────┬──────────────┐
-│        │              │              │
-│        Streamer       Recorder       Detector
-│        │                             │
-│        WebRTC                        Metadata
-│                                      │
-└──────────────────────────────────────┘
+                 Vision
+                    │
+      ┌─────────────┴─────────────┐
+      │                           │
+   Camera                    Metadata Bus
+      │
+      ▼
+  Frame Source
+      │
+      ▼
+ Frame Consumers
+      │
+ ┌────┼─────────┬─────────┬─────────┐
+ │    │         │         │
+WebRTC Detection Recording Snapshot
 ```
+
+The Vision subsystem is organized around a single frame pipeline.
+
+The camera produces frames exactly once. Those frames are distributed to
+any number of independent consumers. Consumers should not communicate
+directly with one another unless required by a separate interface.
 
 ------------------------------------------------------------------------
 
-# Camera Manager
+# Camera Layer
 
-Responsibilities:
+Responsibilities include:
 
--   Own Picamera2
--   Configure camera
--   Start/stop capture
--   Deliver frames
--   Manage camera settings
--   Prevent multiple consumers from opening the camera
+-   Exclusive ownership of camera hardware
+-   Camera configuration
+-   Lifecycle management
+-   Frame acquisition
+-   Safe startup and shutdown
+-   Recovery from failures
 
-Public responsibilities:
-
--   start()
--   stop()
--   configure()
--   latest_frame()
+Higher layers should never depend directly on the underlying camera
+library.
 
 ------------------------------------------------------------------------
 
-# Frame Pipeline
+# Frame Source
 
-``` text
-Camera
-   │
-FrameSource
-   │
-Raw Frame
-   │
-Consumers
-```
+The Frame Source distributes frames to registered consumers.
 
-Consumers include:
+Responsibilities include:
 
--   Streamer
--   Recorder
--   Snapshot
--   Detection
+-   Consumer registration
+-   Consumer removal
+-   Frame distribution
+-   Thread-safe operation
+-   Multiple simultaneous consumers
 
-No consumer opens the camera directly.
+The Frame Source is intentionally unaware of what consumers do with the
+frames they receive.
+
+------------------------------------------------------------------------
+
+# Frame Consumers
+
+Frame consumers perform work using frames supplied by the Frame Source.
+
+Typical consumers include:
+
+-   Live streaming
+-   Computer vision
+-   Recording
+-   Snapshot generation
+-   Future AI inference
+
+Consumers should remain independent so that they can be enabled,
+disabled, replaced, or tested individually.
+
+------------------------------------------------------------------------
+
+# Metadata Bus
+
+The Metadata Bus provides structured information that accompanies video
+without becoming part of the video itself.
+
+Examples include:
+
+-   detections
+-   bounding boxes
+-   labels
+-   confidence values
+-   tracking IDs
+-   timestamps
+-   stream statistics
+-   camera state
+
+Separating metadata from video allows different clients to present
+information differently while preserving the original image.
 
 ------------------------------------------------------------------------
 
@@ -141,67 +153,46 @@ No consumer opens the camera directly.
 ``` text
 Frame
    │
+   ▼
 Detectors
-   ├── Color
-   ├── Face
-   ├── Objects
-   ├── Traffic Signs
-   └── Future AI Models
    │
-Metadata
+   ▼
+Metadata Bus
 ```
 
-Metadata examples:
+Detectors consume frames and publish metadata.
 
--   bounding boxes
--   confidence
--   labels
--   tracking IDs
--   timestamps
-
-The detector should not render overlays.
+They should not own the camera, depend on the streaming transport, or
+permanently modify captured frames.
 
 ------------------------------------------------------------------------
 
-# Streaming Layer
+# Streaming
 
-The platform defines a generic streaming interface.
+Streaming is treated as a transport implementation rather than part of
+the camera pipeline.
+
+All streaming implementations should present a consistent conceptual
+interface:
 
 ``` text
-Streamer Interface
-
 start()
 stop()
 clients()
 statistics()
 ```
 
-The first implementation will be WebRTC.
+The initial transport is WebRTC.
 
-Future implementations may include:
+Future transports may include:
 
 -   RTSP
 -   Local preview
 -   File output
 -   SRT
 
-The rest of the platform should not require modification to support
-alternate transports.
-
-------------------------------------------------------------------------
-
-# Why WebRTC
-
-Benefits:
-
--   Lower latency
--   Adaptive bitrate
--   Congestion control
--   Browser native
--   Hardware H.264 support
--   Better scalability than MJPEG
-
-WebRTC replaces only the transport layer.
+Changing transports should not require architectural changes elsewhere
+in the Vision subsystem.
 
 ------------------------------------------------------------------------
 
@@ -209,42 +200,41 @@ WebRTC replaces only the transport layer.
 
 Recording subscribes to the frame pipeline.
 
-Capabilities:
-
--   MP4 recording
--   Timestamped filenames
--   User directories
--   Future scheduled recording
+Recording should never require opening a second camera instance.
 
 ------------------------------------------------------------------------
 
 # Snapshots
 
-Snapshot service receives the latest frame from the Camera Manager.
+Snapshots are generated from the existing frame pipeline.
 
-Capabilities:
-
--   PNG/JPEG
--   User storage
--   Timestamp metadata
+Capturing a snapshot should not interrupt streaming, recording, or
+detection.
 
 ------------------------------------------------------------------------
 
 # Resource Management
 
-The Camera Manager is responsible for:
+The Vision subsystem is responsible for:
 
--   Exclusive camera ownership
--   Consumer registration
--   Safe startup/shutdown
--   Failure recovery
--   Camera state monitoring
+-   exclusive camera ownership
+-   consumer lifecycle
+-   safe shutdown
+-   failure recovery
+-   camera state monitoring
+-   prevention of resource conflicts
+
+These guarantees are particularly important for classroom environments
+where multiple applications may interact with Vision.
 
 ------------------------------------------------------------------------
 
 # Public Vision API
 
-Example capability groups:
+The public API is organized around capabilities rather than
+implementations.
+
+Capability groups include:
 
 -   Camera
 -   Stream
@@ -253,16 +243,21 @@ Example capability groups:
 -   Snapshots
 -   Configuration
 -   Statistics
+-   Metadata
 
-The API should remain stable even if internal implementations change.
+The public API should remain stable even when internal implementations
+change.
 
 ------------------------------------------------------------------------
 
-# Future Extensions
+# Future Expansion
 
-Potential additions:
+The architecture is intended to support future capabilities without
+redesign.
 
--   QR code detection
+Examples include:
+
+-   QR codes
 -   AprilTags
 -   Pose estimation
 -   OCR
@@ -270,36 +265,24 @@ Potential additions:
 -   Multi-object tracking
 -   Depth cameras
 -   Stereo vision
--   AI inference acceleration
-
-------------------------------------------------------------------------
-
-# Initial Implementation Plan
-
-1.  Create Camera Manager.
-2.  Create Frame Source.
-3.  Create Streamer interface.
-4.  Implement WebRTC streamer.
-5.  Move existing detectors to the new pipeline.
-6.  Move recording.
-7.  Move snapshots.
-8.  Add resource management.
-9.  Remove Flask MJPEG.
-10. Optimize performance.
+-   AI acceleration
+-   Browser overlays
+-   Additional streaming transports
 
 ------------------------------------------------------------------------
 
 # Success Criteria
 
-The finished Vision Platform should provide:
+A successful Vision Platform provides:
 
--   One camera owner
--   Multiple simultaneous consumers
--   Stable Vision API
--   Transport-independent architecture
--   Low-latency streaming
--   Easy extensibility
--   Reliable classroom operation
+-   one camera owner
+-   multiple concurrent consumers
+-   transport-independent architecture
+-   stable public API
+-   low-latency streaming
+-   independent metadata
+-   straightforward extensibility
+-   reliable classroom operation
 
-This document serves as the architectural foundation for all future
-Betabox Vision development.
+This document is the architectural reference for future Betabox Vision
+development.

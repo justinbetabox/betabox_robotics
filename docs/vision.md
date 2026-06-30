@@ -83,6 +83,8 @@ The camera produces frames exactly once. Those frames are distributed to
 any number of independent consumers. Consumers should not communicate
 directly with one another unless required by a separate interface.
 
+The current implementation has been validated with simultaneous WebRTC streaming and recording using a single camera instance.
+
 ------------------------------------------------------------------------
 
 # Camera Layer
@@ -206,9 +208,20 @@ in the Vision subsystem.
 
 # Recording
 
-Recording consumes frames through the shared FrameProvider interface and never opens a second camera instance.
+The Recording Service captures video from the shared Vision frame
+pipeline.
 
-Recording should never require opening a second camera instance.
+Recording does not own or open the camera. Instead, it subscribes to the
+Frame Source as a `FrameConsumer`, allowing recording to operate
+simultaneously with streaming, snapshots, and future detectors.
+
+Capabilities:
+
+- MP4 recording
+- Timestamped filenames
+- Per-user storage (`~/media/videos`)
+- Shared camera pipeline
+- Concurrent operation with other consumers
 
 ------------------------------------------------------------------------
 

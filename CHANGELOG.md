@@ -23,12 +23,22 @@
 -   Snapshot validation test.
 -   Snapshot developer example.
 -   FrameProvider protocol for Vision services.
+-   Vision recording service.
+-   Recording data model.
+-   Thread-safe recording service.
+-   MP4 recording support.
+-   Recording validation test.
+-   Recording developer example.
+-   Validated concurrent WebRTC streaming and recording from a shared frame pipeline.
+- Per-user media storage for snapshots and recordings.
 
 #### Documentation
 
 -   Vision architecture specification.
--   Updated platform architecture documentation.
--   Updated public API specification.
+-   Public Robot API specification.
+-   Platform architecture specification.
+-   Platform design principles.
+-   Roadmap updates.
 
 ### Changed
 

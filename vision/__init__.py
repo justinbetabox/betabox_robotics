@@ -5,6 +5,7 @@ from .frame_source import FrameSource, FrameSourceError
 from .interfaces import FrameProvider
 from .metadata import Detection, Metadata
 from .metadata_bus import MetadataBus
+from .recording import Recording, RecordingError, RecordingService
 from .signaling import WebRTCSignalingServer
 from .snapshot import Snapshot, SnapshotError, SnapshotService
 from .stream import Streamer
@@ -29,4 +30,7 @@ __all__ = [
     "SnapshotError",
     "SnapshotService",
     "FrameProvider",
+    "Recording",
+    "RecordingError",
+    "RecordingService",
 ]

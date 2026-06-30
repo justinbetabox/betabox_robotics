@@ -126,29 +126,43 @@ Capability groups include:
 -   Configuration
 -   Statistics
 
-Illustrative examples:
+## Snapshots
 
-``` python
-robot.vision.start()
-robot.vision.stop()
-
+```python
 snapshot = robot.vision.snapshot.capture()
 print(snapshot.path)
-
-robot.vision.record.start()
-robot.vision.record.stop()
-
-robot.vision.stream.start()
-robot.vision.stream.stop()
-
-robot.vision.detect.color.enable("red")
-robot.vision.detect.color.disable()
-
-robot.vision.metadata.latest()
 ```
 
-These examples illustrate the intended public interface. Exact method
-names may expand over time while preserving the overall API structure.
+## Recording
+
+```python
+robot.vision.recording.start()
+
+# ...
+
+recording = robot.vision.recording.stop()
+
+print(recording.path)
+print(recording.duration)
+```
+
+## Streaming
+
+```python
+robot.vision.stream.start()
+robot.vision.stream.stop()
+```
+
+## Detection
+
+Detection capabilities will be documented as they are implemented.
+
+Planned capabilities include:
+
+- Color
+- Face
+- Object
+- Traffic Sign
 
 ------------------------------------------------------------------------
 
@@ -216,7 +230,10 @@ Examples:
 
 Applications should never need to coordinate shared hardware directly.
 
-Applications should not instantiate multiple subsystem objects to access shared hardware. Shared resources are coordinated internally by the SDK.
+Applications should not instantiate multiple subsystem objects to access
+shared hardware.
+
+Shared resources are coordinated internally by the SDK.
 
 ------------------------------------------------------------------------
 
@@ -277,7 +294,19 @@ snapshot = robot.vision.snapshot.capture()
 print(snapshot.path)
 ```
 
-``` python
+```python
+from time import sleep
+
+robot.vision.recording.start()
+
+sleep(5)
+
+recording = robot.vision.recording.stop()
+
+print(recording.path)
+```
+
+```python
 if robot.sensors.battery.is_low():
     print("Battery is low.")
 ```
@@ -318,7 +347,8 @@ Students should think in terms of robot behavior:
 
 ``` python
 robot.drive.forward(50)
-robot.vision.snapshot()
+robot.vision.snapshot.capture()
+robot.vision.recording.start()
 robot.sensors.battery.voltage()
 robot.audio.say("Hello")
 ```

@@ -124,5 +124,10 @@ class WebRTCSignalingServer:
     async def stats(self, request):
         return web.json_response(self.streamer.statistics())
 
-    def run(self) -> None:
-        web.run_app(self.app, host=self.host, port=self.port)
+    def run(self, *, handle_signals: bool = True) -> None:
+        web.run_app(
+            self.app,
+            host=self.host,
+            port=self.port,
+            handle_signals=handle_signals,
+        )

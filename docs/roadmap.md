@@ -12,7 +12,7 @@
 
 -   [x] Foundation
 -   [x] Snapshots
--   [ ] Recording
+-   [x] Recording
 -   [ ] Detection
 -   [ ] Public Vision API
 

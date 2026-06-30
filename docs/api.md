@@ -89,6 +89,7 @@ Public APIs should:
 -   return meaningful Python objects when practical
 -   raise Betabox-specific exceptions
 -   remain backward compatible whenever possible
+-   prefer capability objects over large monolithic classes
 
 ------------------------------------------------------------------------
 
@@ -118,12 +119,12 @@ Capability groups include:
 
 -   Camera
 -   Streaming
--   Detection
--   Recording
 -   Snapshots
+-   Recording
+-   Detection
+-   Metadata
 -   Configuration
 -   Statistics
--   Metadata
 
 Illustrative examples:
 
@@ -131,7 +132,8 @@ Illustrative examples:
 robot.vision.start()
 robot.vision.stop()
 
-robot.vision.snapshot()
+snapshot = robot.vision.snapshot.capture()
+print(snapshot.path)
 
 robot.vision.record.start()
 robot.vision.record.stop()
@@ -214,6 +216,8 @@ Examples:
 
 Applications should never need to coordinate shared hardware directly.
 
+Applications should not instantiate multiple subsystem objects to access shared hardware. Shared resources are coordinated internally by the SDK.
+
 ------------------------------------------------------------------------
 
 # Thread Safety
@@ -269,7 +273,8 @@ robot.drive.stop()
 ```
 
 ``` python
-photo = robot.vision.snapshot()
+snapshot = robot.vision.snapshot.capture()
+print(snapshot.path)
 ```
 
 ``` python

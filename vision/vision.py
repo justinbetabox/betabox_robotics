@@ -1,6 +1,7 @@
 from betabox_car.vision.frame import Frame
 from betabox_car.vision.frame_source import FrameSource
 from betabox_car.vision.metadata_bus import MetadataBus
+from betabox_car.vision.snapshot import SnapshotService
 
 
 class Vision:
@@ -19,6 +20,7 @@ class Vision:
     ) -> None:
         self.frame_source = frame_source or FrameSource()
         self.metadata = metadata_bus or MetadataBus()
+        self.snapshot = SnapshotService(self.frame_source)
 
     def start(self) -> None:
         self.frame_source.start()

@@ -52,24 +52,32 @@ vision, recording, snapshots, and future AI capabilities.
 # Architectural Overview
 
 ``` text
-                 Vision
-                    │
-      ┌─────────────┴─────────────┐
-      │                           │
-   Camera                    Metadata Bus
-      │
-      ▼
-  Frame Source
-      │
-      ▼
- Frame Consumers
-      │
- ┌────┼─────────┬─────────┬─────────┐
- │    │         │         │
-WebRTC Detection Recording Snapshot
+Vision
+   │
+   ▼
+Camera
+   │
+   ▼
+Frame Source
+   │
+   ▼
+Frame Consumers
+   │
+┌────┼──────────┬─────────────┬────────────┐
+│    │          │             │
+▼    ▼          ▼             ▼
+WebRTC Recording Snapshot Detection
+                              │
+                              ▼
+                         Metadata Bus
 ```
 
 The Vision subsystem is organized around a single frame pipeline.
+
+SnapshotService is implemented as a consumer of the Vision frame
+pipeline through the `FrameProvider` protocol. This allows future
+services such as recording to reuse the same interface without depending
+on a concrete `FrameSource` implementation.
 
 The camera produces frames exactly once. Those frames are distributed to
 any number of independent consumers. Consumers should not communicate
@@ -95,7 +103,7 @@ library.
 
 # Frame Source
 
-The Frame Source distributes frames to registered consumers.
+The Frame Source exposes the latest available frame through the FrameProvider protocol. Components that only require access to the most recent frame should depend on this protocol rather than the concrete FrameSource implementation.
 
 Responsibilities include:
 
@@ -198,7 +206,7 @@ in the Vision subsystem.
 
 # Recording
 
-Recording subscribes to the frame pipeline.
+Recording consumes frames through the shared FrameProvider interface and never opens a second camera instance.
 
 Recording should never require opening a second camera instance.
 
@@ -206,10 +214,21 @@ Recording should never require opening a second camera instance.
 
 # Snapshots
 
-Snapshots are generated from the existing frame pipeline.
+The Snapshot Service captures still images from the existing Vision frame
+pipeline.
 
-Capturing a snapshot should not interrupt streaming, recording, or
-detection.
+Snapshots do not open or own the camera. Instead, the service retrieves
+the latest available frame from the shared `FrameProvider` interface,
+allowing snapshots to coexist with streaming, recording, and future
+detectors.
+
+Capabilities:
+
+- JPEG and PNG output
+- Timestamped filenames
+- Per-user storage (`~/media/pictures`)
+- Shared camera pipeline
+- Timestamp metadata
 
 ------------------------------------------------------------------------
 
@@ -254,6 +273,8 @@ change.
 
 The architecture is intended to support future capabilities without
 redesign.
+
+Future capabilities should integrate by implementing existing interfaces whenever possible rather than introducing new architectural patterns.
 
 Examples include:
 

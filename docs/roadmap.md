@@ -2,19 +2,31 @@
 
 ## Foundation
 
--   [X] Hardware
--   [X] Drive
--   [X] Sensors
+-   [x] Hardware
+-   [x] Drive
+-   [x] Sensors
 
 ## Core Robot Services
 
--   [X] Vision
--   [ ] Audio
--   [ ] System
+### Vision
+
+-   [x] Foundation
+-   [x] Snapshots
+-   [ ] Recording
+-   [ ] Detection
+-   [ ] Public Vision API
+
+### Audio
+
+-   [ ] Foundation
+
+### System
+
+-   [ ] Foundation
 
 ## Robot Platform
 
--   [X] Car
+-   [x] Car
 -   [ ] Robot API
 
 ## Applications
@@ -22,3 +34,14 @@
 -   [ ] Portal
 -   [ ] Curriculum
 -   [ ] Teacher Tools
+
+## Release Milestones
+
+-   [x] 0.1 Project Initialization
+-   [x] 0.2 Hardware Foundation
+-   [x] 0.3 Drive & Sensors
+-   [x] 0.4 Vision Foundation
+-   [ ] 0.5 Vision Capabilities
+-   [ ] 0.6 System & Audio
+-   [ ] 0.7 Stable Robot API
+-   [ ] 1.0 Betabox Platform

@@ -18,6 +18,11 @@
 -   WebRTC signaling.
 -   Vision test suite.
 -   WebRTC example application.
+-   Vision snapshot service.
+-   Snapshot data model.
+-   Snapshot validation test.
+-   Snapshot developer example.
+-   FrameProvider protocol for Vision services.
 
 #### Documentation
 

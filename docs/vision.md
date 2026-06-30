@@ -69,19 +69,26 @@ Browser
 # High-Level Architecture
 
 ``` text
-                Camera Manager
-                      │
-                 Frame Source
-                      │
-    ┌─────────────────┼──────────────────┐
-    │                 │                  │
-Detection        Recorder          Snapshot
-    │
-Metadata
-    │
-Streamer
-    │
-Browser
+Vision
+   │
+┌─────────────────┴─────────────────┐
+│                                   │
+FrameSource                         MetadataBus
+│
+CameraManager
+│
+Picamera2
+│
+▼
+FrameConsumers
+│
+┌────────┼──────────────┬──────────────┐
+│        │              │              │
+│        Streamer       Recorder       Detector
+│        │                             │
+│        WebRTC                        Metadata
+│                                      │
+└──────────────────────────────────────┘
 ```
 
 ------------------------------------------------------------------------

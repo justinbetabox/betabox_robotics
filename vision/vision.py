@@ -1,4 +1,5 @@
 from betabox_car.vision.consumer import FrameConsumer
+from betabox_car.vision.detection import DetectionManager
 from betabox_car.vision.frame import Frame
 from betabox_car.vision.frame_source import FrameSource
 from betabox_car.vision.metadata_bus import MetadataBus
@@ -23,9 +24,11 @@ class Vision:
     ) -> None:
         self.frame_source = frame_source or FrameSource()
         self.metadata = metadata_bus or MetadataBus()
+        self.detection = DetectionManager(self.metadata)
         self.snapshot = SnapshotService(self.frame_source)
         self.recording = RecordingService()
         self.register_consumer(self.recording)
+        self.register_consumer(self.detection)
 
     def start(self) -> None:
         self.frame_source.start()

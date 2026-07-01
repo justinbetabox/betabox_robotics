@@ -30,7 +30,14 @@
 -   Recording validation test.
 -   Recording developer example.
 -   Validated concurrent WebRTC streaming and recording from a shared frame pipeline.
-- Per-user media storage for snapshots and recordings.
+-   Per-user media storage for snapshots and recordings.
+-   Detector abstraction.
+-   Detection manager.
+-   Built-in detector architecture.
+-   Color detection.
+-   Multi-color detection.
+-   Color detection validation test.
+-   Color detection developer example.
 
 #### Documentation
 
@@ -47,6 +54,7 @@
 -   Adopted a modular frame pipeline for future recording, snapshots,
     and AI inference.
 -   Separated metadata from video transport.
+-   Adopted a capability-oriented detection API for built-in Vision detectors.
 
 ------------------------------------------------------------------------
 

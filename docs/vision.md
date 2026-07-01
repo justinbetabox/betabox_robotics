@@ -8,8 +8,7 @@
 
 # Purpose
 
-This document defines the long-term architecture of the Betabox Vision
-Platform.
+This document defines the long-term architecture of the Betabox Vision Platform.
 
 It intentionally describes the architectural contracts of the Vision
 subsystem rather than specific implementation details. Internal
@@ -63,27 +62,27 @@ Frame Source
    ▼
 Frame Consumers
    │
-┌────┼──────────┬─────────────┬────────────┐
+┌────┼──────────┬─────────────┬──────────────────┐
 │    │          │             │
 ▼    ▼          ▼             ▼
-WebRTC Recording Snapshot Detection
-                              │
-                              ▼
-                         Metadata Bus
+WebRTC Recording Snapshot Detection Manager
+                                  │
+                                  ▼
+                              Detectors
+                                  │
+                                  ▼
+                             Metadata Bus
 ```
 
 The Vision subsystem is organized around a single frame pipeline.
 
-SnapshotService is implemented as a consumer of the Vision frame
-pipeline through the `FrameProvider` protocol. This allows future
-services such as recording to reuse the same interface without depending
-on a concrete `FrameSource` implementation.
+SnapshotService retrieves the latest available frame through the FrameProvider protocol. This allows still images to be captured without subscribing as a frame consumer or depending on a concrete FrameSource implementation.
 
 The camera produces frames exactly once. Those frames are distributed to
 any number of independent consumers. Consumers should not communicate
 directly with one another unless required by a separate interface.
 
-The current implementation has been validated with simultaneous WebRTC streaming and recording using a single camera instance.
+The architecture has been validated with simultaneous WebRTC streaming, recording, snapshots, and detection operating from a single camera instance without requiring additional camera ownership.
 
 ------------------------------------------------------------------------
 
@@ -130,6 +129,9 @@ Typical consumers include:
 -   Computer vision
 -   Recording
 -   Snapshot generation
+-   Live Streaming
+-   Detection
+-   Recording
 -   Future AI inference
 
 Consumers should remain independent so that they can be enabled,
@@ -164,6 +166,9 @@ information differently while preserving the original image.
 Frame
    │
    ▼
+Detection Manager
+   │
+   ▼
 Detectors
    │
    ▼
@@ -172,8 +177,10 @@ Metadata Bus
 
 Detectors consume frames and publish metadata.
 
-They should not own the camera, depend on the streaming transport, or
-permanently modify captured frames.
+The Detection Manager owns the built-in detector implementations and coordinates execution of all registered detectors. Built-in detectors are exposed as capabilities of the Vision subsystem, while additional detectors may be registered programmatically to extend the platform.
+
+Detectors consume frames and publish structured metadata. They should not own the camera, depend on the streaming transport, or permanently modify captured frames.
+
 
 ------------------------------------------------------------------------
 
@@ -263,22 +270,7 @@ where multiple applications may interact with Vision.
 
 # Public Vision API
 
-The public API is organized around capabilities rather than
-implementations.
-
-Capability groups include:
-
--   Camera
--   Stream
--   Detection
--   Recording
--   Snapshots
--   Configuration
--   Statistics
--   Metadata
-
-The public API should remain stable even when internal implementations
-change.
+The public Vision API is organized around capabilities rather than implementations. Details of the public programming interface are defined in api.md. The architecture described in this document is intended to support a stable API even as internal implementations evolve.
 
 ------------------------------------------------------------------------
 

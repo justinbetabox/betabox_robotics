@@ -155,14 +155,27 @@ robot.vision.stream.stop()
 
 ## Detection
 
-Detection capabilities will be documented as they are implemented.
+```python
+robot.vision.detection.color.enable("red")
+
+robot.vision.detection.color.enable(
+    ["red", "green", "blue"]
+)
+
+metadata = robot.vision.metadata.latest("color")
+
+robot.vision.detection.color.disable()
+```
+
+Detection capabilities are exposed as capability objects rather than
+requiring applications to create or register detector instances.
 
 Planned capabilities include:
 
-- Color
 - Face
 - Object
 - Traffic Sign
+
 
 ------------------------------------------------------------------------
 
@@ -233,7 +246,7 @@ Applications should never need to coordinate shared hardware directly.
 Applications should not instantiate multiple subsystem objects to access
 shared hardware.
 
-Shared resources are coordinated internally by the SDK.
+Applications should enable capabilities rather than creating additional subsystem instances. The SDK manages the lifecycle of shared resources such as the camera.
 
 ------------------------------------------------------------------------
 
@@ -307,6 +320,14 @@ print(recording.path)
 ```
 
 ```python
+robot.vision.detection.color.enable(["red", "green"])
+
+metadata = robot.vision.metadata.latest("color")
+
+print(metadata.data["counts"])
+```
+
+```python
 if robot.sensors.battery.is_low():
     print("Battery is low.")
 ```
@@ -349,6 +370,7 @@ Students should think in terms of robot behavior:
 robot.drive.forward(50)
 robot.vision.snapshot.capture()
 robot.vision.recording.start()
+robot.vision.detection.color.enable("red")
 robot.sensors.battery.voltage()
 robot.audio.say("Hello")
 ```

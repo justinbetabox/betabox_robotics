@@ -13,7 +13,12 @@
 -   [x] Foundation
 -   [x] Snapshots
 -   [x] Recording
--   [ ] Detection
+-   Detection
+    -   [x] Framework
+    -   [x] Color
+    -   [ ] Face
+    -   [ ] Object
+    -   [ ] Traffic Sign
 -   [ ] Public Vision API
 
 ### Audio

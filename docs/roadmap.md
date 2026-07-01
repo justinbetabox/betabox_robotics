@@ -41,18 +41,33 @@
 
 ### System
 
--   [ ] Foundation
+-   [x] Foundation
+-   [ ] Status
+-   [ ] Health
+-   [ ] Diagnostics
 
 ## Robot Platform
 
 -   [x] Car
 -   [ ] Robot API
+-   [ ] Robot Resource Management
+-   [ ] Robot Lifecycle
 
 ## Applications
 
 -   [ ] Portal
 -   [ ] Curriculum
 -   [ ] Teacher Tools
+
+## Deployment
+
+- [ ] Fresh Raspberry Pi setup script
+- [ ] System dependencies
+- [ ] Service files
+- [ ] Camera/audio/I2C configuration
+- [ ] Jupyter kernel setup
+- [ ] Media directory setup
+- [ ] Verification command
 
 ## Release Milestones
 

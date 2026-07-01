@@ -13,13 +13,27 @@
 -   [x] Foundation
 -   [x] Snapshots
 -   [x] Recording
--   Detection
+-   [ ] Detection
     -   [x] Framework
     -   [x] Color
     -   [x] Face
     -   [ ] Object
+        - [ ] Evaluate object detection inference backends
+        - [ ] Select long-term inference runtime
+        - [ ] Build Betabox object detection dataset
+        - [ ] Train first classroom object detection model
+        - [ ] Integrate custom object detection runtime
+        - [ ] Add validation tests
+        - [ ] Add developer example
+        - [ ] Update public API documentation
     -   [ ] Traffic Sign
--   [ ] Public Vision API
+        - [ ] Collect U.S. traffic sign dataset
+        - [ ] Train Betabox traffic sign model
+        - [ ] Integrate traffic sign detector
+        - [ ] Add validation tests
+        - [ ] Add developer example
+        - [ ] Update public API documentation
+-   [x] Public Vision API
 
 ### Audio
 

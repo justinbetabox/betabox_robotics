@@ -41,6 +41,10 @@
 -   Face detection.
 -   Face detection validation test.
 -   Face detection developer example.
+-   Object detection architecture foundation.
+-   Object detection runtime abstraction.
+-   TensorFlow Lite runtime foundation.
+-   Object detection validation tests.
 
 #### Documentation
 

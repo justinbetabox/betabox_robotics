@@ -4,6 +4,30 @@
 
 ### Added
 
+#### Audio
+
+##### Foundation
+
+- Audio subsystem foundation.
+- Speech abstraction.
+- Pluggable speech backend architecture.
+- Pico speech backend.
+- espeak-ng speech backend.
+- Optional Piper speech backend.
+- Speech backend factory.
+- Speech backend diagnostics.
+- Sound playback.
+- Tone generation.
+- Melody playback.
+- Speech pronunciation preprocessing.
+- Speech post-processing pipeline.
+- Speech volume processing.
+- Audio format conversion.
+- Built-in sound lookup.
+- Speaker amplifier management.
+- Audio validation tests.
+- Audio developer example.
+
 #### System
 
 ##### Foundation
@@ -13,6 +37,12 @@
 - Media path management.
 - System validation test.
 - System developer example.
+
+### Changed
+
+- Introduced a backend-independent audio architecture.
+- Separated speech synthesis from audio playback.
+- Standardized speech backend selection across supported speech engines.
 
 ------------------------------------------------------------------------
 
@@ -32,7 +62,7 @@
 - Metadata model.
 - Metadata bus.
 - FrameProvider protocol for Vision services.
-- Vision test framework.
+- Vision validation framework.
 
 ##### Streaming
 
@@ -70,7 +100,7 @@
 - Face detection.
 - Object detection architecture foundation.
 - Object detection runtime abstraction.
-- TensorFlow Lite runtime foundation.
+- TensorFlow Lite inference backend foundation.
 - Detection validation tests.
 - Detection developer examples.
 

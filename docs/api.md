@@ -211,11 +211,83 @@ robot.sensors.<sensor>.<action>()
 
 # Audio API
 
-``` python
-robot.audio.say("Hello")
-robot.audio.play("sound.wav")
+The Audio subsystem provides speech synthesis, sound playback, tone
+generation, and melody playback.
+
+## Speech
+
+```python
+robot.audio.say("Hello from Betabox")
+```
+
+Optional speech configuration is available when using `Audio` directly:
+
+```python
+from betabox_car.audio import Audio
+
+audio = Audio(
+    speech_engine="pico",
+    speech_volume=1.8,
+)
+```
+
+Piper is supported as an optional high-quality speech backend:
+
+```python
+audio = Audio(
+    speech_engine="piper",
+    piper_voice="en_US-amy-low",
+)
+```
+
+## Sound Playback
+
+```python
+robot.audio.play_sound("car-honk")
+```
+
+Alias:
+
+```python
+robot.audio.play("car-honk")
+```
+
+## Tone Playback
+
+```python
+robot.audio.play_note("C5", 0.5)
+robot.audio.play_note(440.0, 0.5)
+```
+
+## Melody Playback
+
+```python
+robot.audio.play_melody(
+    [
+        ("C5", 0.2),
+        ("D5", 0.2),
+        ("E5", 0.2),
+        ("G5", 0.4),
+    ],
+    gap=0.05,
+)
+```
+
+## Playback Control
+
+```python
 robot.audio.stop()
 ```
+
+## Diagnostics
+
+```python
+robot.audio.speech_backend_name
+robot.audio.available_speech_backends()
+```
+
+Audio hides implementation details such as PyAudio, ALSA, speech engines,
+audio conversion tools, and amplifier GPIO control.
 
 ------------------------------------------------------------------------
 
@@ -348,8 +420,21 @@ if robot.sensors.battery.is_low():
     print("Battery is low.")
 ```
 
-``` python
-robot.audio.say("Hello, I am Betabox.")
+
+
+```python
+robot.audio.say("Hello from Betabox")
+robot.audio.play_sound("car-honk")
+robot.audio.play_note("C5", 0.5)
+robot.audio.play_melody(
+    [
+        ("C5", 0.2),
+        ("D5", 0.2),
+        ("E5", 0.2),
+        ("G5", 0.4),
+    ],
+    gap=0.05,
+)
 ```
 
 ------------------------------------------------------------------------
@@ -366,6 +451,10 @@ Applications should not depend on:
 -   Streaming protocols
 -   Web server internals
 -   Calibration files
+-   Audio driver objects
+-   Speech engine commands
+-   Audio conversion tools
+-   Speaker amplifier GPIO control
 
 Packages under `hardware/`, `vision/`, `drive/`, `sensors/`, and other
 implementation modules are internal unless explicitly documented as

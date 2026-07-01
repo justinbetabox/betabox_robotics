@@ -45,6 +45,7 @@ paths = robot.system.media_paths()
 
 print(paths.pictures)
 print(paths.videos)
+print(paths.sounds)
 
 robot.system.ensure_media_paths()
 ```

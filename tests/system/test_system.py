@@ -33,11 +33,14 @@ def test_system_ensure_media_paths():
     print("=======================")
     print(f"pictures_exists={paths.pictures.exists()}")
     print(f"videos_exists={paths.videos.exists()}")
+    print(f"sounds_exists={paths.sounds.exists()}")
 
     assert paths.pictures.exists()
     assert paths.videos.exists()
+    assert paths.sounds.exists()
     assert paths.pictures.is_dir()
     assert paths.videos.is_dir()
+    assert paths.sounds.is_dir()
 
 
 if __name__ == "__main__":

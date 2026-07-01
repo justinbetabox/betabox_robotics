@@ -7,6 +7,7 @@ from pathlib import Path
 class MediaPaths:
     pictures: Path
     videos: Path
+    sounds: Path
 
 
 @dataclass(frozen=True)
@@ -29,10 +30,17 @@ class System:
 
         try:
             hostname = socket.gethostname()
+
             for info in socket.getaddrinfo(hostname, None):
                 address = info[4][0]
 
-                if address not in addresses and not address.startswith("127."):
+                if not isinstance(address, str):
+                    continue
+
+                if address.startswith("127."):
+                    continue
+
+                if address not in addresses:
                     addresses.append(address)
 
         except socket.gaierror:
@@ -46,6 +54,7 @@ class System:
         return MediaPaths(
             pictures=base / "pictures",
             videos=base / "videos",
+            sounds=base / "sounds",
         )
 
     def ensure_media_paths(self) -> MediaPaths:
@@ -53,6 +62,7 @@ class System:
 
         paths.pictures.mkdir(parents=True, exist_ok=True)
         paths.videos.mkdir(parents=True, exist_ok=True)
+        paths.sounds.mkdir(parents=True, exist_ok=True)
 
         return paths
 

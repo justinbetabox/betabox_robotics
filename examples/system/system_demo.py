@@ -28,6 +28,7 @@ def main() -> None:
     print("\nMedia Paths:")
     print(f"  Pictures: {status.media.pictures}")
     print(f"  Videos:   {status.media.videos}")
+    print(f"  Sounds:   {status.media.sounds}")
 
     print()
     print("Ensuring media directories exist...")

@@ -38,6 +38,9 @@
 -   Multi-color detection.
 -   Color detection validation test.
 -   Color detection developer example.
+-   Face detection.
+-   Face detection validation test.
+-   Face detection developer example.
 
 #### Documentation
 

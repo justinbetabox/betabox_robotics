@@ -3,7 +3,7 @@ from typing import Dict
 
 from betabox_car.vision.consumer import FrameConsumer
 from betabox_car.vision.detector import Detector
-from betabox_car.vision.detectors import ColorDetector
+from betabox_car.vision.detectors import ColorDetector, FaceDetector
 from betabox_car.vision.frame import Frame
 from betabox_car.vision.metadata_bus import MetadataBus
 
@@ -26,7 +26,9 @@ class DetectionManager(FrameConsumer):
         self._lock = threading.Lock()
 
         self.color = ColorDetector()
+        self.face = FaceDetector()
         self.register(self.color)
+        self.register(self.face)
 
     def register(self, detector: Detector) -> None:
         with self._lock:

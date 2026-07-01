@@ -16,7 +16,7 @@
 -   Detection
     -   [x] Framework
     -   [x] Color
-    -   [ ] Face
+    -   [x] Face
     -   [ ] Object
     -   [ ] Traffic Sign
 -   [ ] Public Vision API

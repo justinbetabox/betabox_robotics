@@ -155,26 +155,34 @@ robot.vision.stream.stop()
 
 ## Detection
 
+### Color
+
 ```python
 robot.vision.detection.color.enable("red")
 
-robot.vision.detection.color.enable(
-    ["red", "green", "blue"]
-)
-
 metadata = robot.vision.metadata.latest("color")
-
-robot.vision.detection.color.disable()
 ```
+
+### Face
+
+```python
+robot.vision.detection.face.enable()
+
+metadata = robot.vision.metadata.latest("face")
+```
+
+Implemented capabilities:
+
+- Color
+- Face
+
+Planned capabilities:
+
+- Object
+- Traffic Sign
 
 Detection capabilities are exposed as capability objects rather than
 requiring applications to create or register detector instances.
-
-Planned capabilities include:
-
-- Face
-- Object
-- Traffic Sign
 
 
 ------------------------------------------------------------------------
@@ -325,6 +333,14 @@ robot.vision.detection.color.enable(["red", "green"])
 metadata = robot.vision.metadata.latest("color")
 
 print(metadata.data["counts"])
+```
+
+```python
+robot.vision.detection.face.enable()
+
+metadata = robot.vision.metadata.latest("face")
+
+print(metadata.data["count"])
 ```
 
 ```python

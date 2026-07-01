@@ -2,7 +2,7 @@ from .camera import CameraError, CameraManager
 from .consumer import FrameConsumer
 from .detection import DetectionError, DetectionManager
 from .detector import Detector
-from .detectors import ColorDetector
+from .detectors import ColorDetector, FaceDetector
 from .frame import Frame
 from .frame_source import FrameSource, FrameSourceError
 from .interfaces import FrameProvider
@@ -37,7 +37,8 @@ __all__ = [
     "RecordingError",
     "RecordingService",
     "Detector",
-    "DetectionManager",
     "ColorDetector",
+    "FaceDetector",
+    "DetectionManager",
     "DetectionError",
 ]

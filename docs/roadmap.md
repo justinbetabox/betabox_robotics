@@ -66,11 +66,11 @@
 -    [x] Robot-specific platform wiring
 -    [ ] Shared Robot base class
 -    [ ] Public Robot API
+-    [ ] Robot capability discovery
 -    [ ] Robot lifecycle management
 -    [ ] Robot health reporting
--    [ ] Subsystem factory pattern (.default())
+-    [x] Subsystem factory pattern (.default())
 -    [ ] Robot composition framework
--    [ ] Robot capability discovery
 
 ### Robot Configuration
 
@@ -160,9 +160,9 @@
 
 ### Subsystems
 
--    [ ] Drive validation
--    [ ] Sensors validation
--    [ ] Vision validation
+-    [ ] Hardware validation
+-    [ ] Subsystem validation
+-    [ ] Robot validation
 -    [ ] Audio validation
 -    [ ] System validation
 
@@ -187,7 +187,7 @@
 -    [x] 0.2 Hardware Foundation
 -    [x] 0.3 Drive & Sensors
 -    [x] 0.4 Vision Foundation
--    [ ] 0.5 Vision Capabilities
+-    [ ] 0.5 Vision Platform
 -    [x] 0.6 Audio Foundation
 -    [ ] 0.7 System Services
 -    [ ] 0.8 Robot Platform

@@ -27,6 +27,7 @@
 - Speaker amplifier management.
 - Audio validation tests.
 - Audio developer example.
+- Audio subsystem default factory.
 
 #### System
 
@@ -37,12 +38,25 @@
 - Media path management.
 - System validation test.
 - System developer example.
+- System subsystem default factory.
+
+#### Documentation
+
+- Audio architecture specification.
+- System architecture specification.
+- Drive architecture specification.
+- Sensors architecture specification.
+- Hardware architecture specification.
+- Standardized platform architecture documentation.
 
 ### Changed
 
 - Introduced a backend-independent audio architecture.
 - Separated speech synthesis from audio playback.
 - Standardized speech backend selection across supported speech engines.
+- Standardized subsystem construction using default factories.
+- Aligned subsystem implementations with the reusable robot composition architecture.
+- Updated platform documentation to reflect the finalized subsystem architecture.
 
 ------------------------------------------------------------------------
 

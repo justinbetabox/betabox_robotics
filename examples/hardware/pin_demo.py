@@ -1,23 +1,38 @@
 #!/usr/bin/env python3
+"""
+Developer demo for the Betabox Pin hardware abstraction.
+"""
 
 from time import sleep
 
 from betabox_car.hardware import Pin, Pins
 
-with Pin(Pins.D0, mode=Pin.OUT) as pin:
-    print("Pin on")
-    pin.on()
-    sleep(1)
 
-    print("Pin off")
-    pin.off()
-    sleep(1)
+def main() -> None:
+    print()
+    print("Betabox Pin Demo")
+    print("================")
+    print()
 
-    print("Toggle")
-    pin.toggle()
-    sleep(1)
+    with Pin(Pins.D0, mode=Pin.OUT) as pin:
+        print("Turning pin on...")
+        pin.on()
+        sleep(1)
 
-    print("Pin off")
-    pin.off()
+        print("Turning pin off...")
+        pin.off()
+        sleep(1)
 
-print("Pin demo complete.")
+        print("Toggling pin...")
+        pin.toggle()
+        sleep(1)
+
+        print("Turning pin off...")
+        pin.off()
+
+    print()
+    print("Pin demo complete.")
+
+
+if __name__ == "__main__":
+    main()

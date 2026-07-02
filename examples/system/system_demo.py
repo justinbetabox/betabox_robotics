@@ -3,29 +3,32 @@
 Developer demo for the Betabox System subsystem.
 """
 
+from betabox_car.robots import BETABOX_CAR
 from betabox_car.system import System
 
 
 def main() -> None:
-    system = System()
-
     print()
     print("Betabox System Demo")
     print("===================")
     print()
 
+    system = System.default(BETABOX_CAR)
+
     status = system.status()
 
     print(f"Hostname: {status.hostname}")
 
-    print("\nIP Addresses:")
+    print()
+    print("IP Addresses:")
     if status.ip_addresses:
         for address in status.ip_addresses:
             print(f"  {address}")
     else:
         print("  None")
 
-    print("\nMedia Paths:")
+    print()
+    print("Media Paths:")
     print(f"  Pictures: {status.media.pictures}")
     print(f"  Videos:   {status.media.videos}")
     print(f"  Sounds:   {status.media.sounds}")
@@ -34,7 +37,8 @@ def main() -> None:
     print("Ensuring media directories exist...")
     system.ensure_media_paths()
 
-    print("Done.")
+    print()
+    print("System demo complete.")
 
 
 if __name__ == "__main__":

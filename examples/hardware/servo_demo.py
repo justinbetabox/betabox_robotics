@@ -1,36 +1,46 @@
 #!/usr/bin/env python3
+"""
+Developer demo for the Betabox Servo hardware abstraction.
+"""
 
 from time import sleep
 
 from betabox_car.hardware import Pins, Servo
 
-servo = Servo(Pins.P0)
 
-try:
-    print("Center")
-    servo.center()
-    sleep(1)
+def main() -> None:
+    print()
+    print("Betabox Servo Demo")
+    print("==================")
+    print()
 
-    print("Move to -45°")
-    servo.move_to(-45)
-    sleep(1)
+    with Servo(Pins.P0) as servo:
+        print("Centering servo...")
+        servo.center()
+        sleep(1)
 
-    print("Move to 45°")
-    servo.move_to(45)
-    sleep(1)
+        print("Moving to -45°...")
+        servo.move_to(-45)
+        sleep(1)
 
-    print("Return to center")
-    servo.center()
-    sleep(1)
+        print("Moving to 45°...")
+        servo.move_to(45)
+        sleep(1)
 
-    print("Immediate move to 30°")
-    servo.move_to(30, smooth=False)
-    sleep(1)
+        print("Returning to center...")
+        servo.center()
+        sleep(1)
 
-    print("Center")
-    servo.center()
+        print("Moving immediately to 30°...")
+        servo.move_to(30, smooth=False)
+        sleep(1)
 
-finally:
-    servo.close()
+        print("Centering servo...")
+        servo.center()
 
-print("Servo demo complete.")
+    print()
+    print("Servo demo complete.")
+
+
+if __name__ == "__main__":
+    main()

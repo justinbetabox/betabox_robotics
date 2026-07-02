@@ -39,6 +39,22 @@ class Grayscale:
         self._floor: Optional[List[float]] = None
         self._line: Optional[List[float]] = None
 
+    @classmethod
+    def default(
+        cls,
+        robot_config,
+        *,
+        reference: Optional[List[int]] = None,
+    ) -> "Grayscale":
+        cfg = robot_config.grayscale
+
+        return cls(
+            left=ADC(cfg.left),
+            middle=ADC(cfg.middle),
+            right=ADC(cfg.right),
+            reference=reference,
+        )
+
     def read(self, channel: Optional[int] = None) -> List[int]:
         if channel is None:
             return [adc.read() for adc in self.channels]
@@ -153,8 +169,8 @@ class Grayscale:
     def _clamp(self, value: float, minimum: float, maximum: float) -> float:
         return max(minimum, min(maximum, value))
 
-    def __enter__(self):
+    def __enter__(self) -> "Grayscale":
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
         self.close()

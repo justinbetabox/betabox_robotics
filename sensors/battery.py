@@ -32,6 +32,26 @@ class Battery:
         self.low_voltage = low_voltage
         self.critical_voltage = critical_voltage
 
+    @classmethod
+    def default(
+        cls,
+        robot_config,
+        *,
+        scale: float | None = None,
+        low_voltage: float | None = None,
+        critical_voltage: float | None = None,
+    ) -> "Battery":
+        cfg = robot_config.battery
+
+        return cls(
+            ADC(cfg.channel),
+            scale=cfg.scale if scale is None else scale,
+            low_voltage=cfg.low_voltage if low_voltage is None else low_voltage,
+            critical_voltage=(
+                cfg.critical_voltage if critical_voltage is None else critical_voltage
+            ),
+        )
+
     def voltage(self) -> float:
         """
         Return battery voltage in volts.
@@ -39,9 +59,7 @@ class Battery:
         return round(self.adc.read_voltage() * self.scale, 2)
 
     def read(self) -> float:
-        """
-        Compatibility alias.
-        """
+        """Compatibility alias."""
         return self.voltage()
 
     def is_low(self) -> bool:
@@ -67,8 +85,8 @@ class Battery:
     def deinit(self) -> None:
         self.close()
 
-    def __enter__(self):
+    def __enter__(self) -> "Battery":
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
         self.close()

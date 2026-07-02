@@ -1,81 +1,82 @@
 #!/usr/bin/env python3
 """
-Betabox Motor Demo
-
-Demonstrates one motor at a time and both motors together.
-
-Press Ctrl+C at any time to stop.
+Developer demo for the Betabox Motor hardware abstraction.
 """
 
 from time import sleep
 
-from betabox_car.hardware import PWM, Motor, Pin, Pins
+from betabox_car.hardware import PWM, Motor, Pin
+from betabox_car.robots import BETABOX_CAR
 
 
-def pause(seconds=1):
+def pause(seconds: float = 1.0) -> None:
     sleep(seconds)
 
 
-def main():
+def main() -> None:
+    print()
+    print("Betabox Motor Demo")
+    print("==================")
+    print()
+
+    left_cfg = BETABOX_CAR.left_motor
+    right_cfg = BETABOX_CAR.right_motor
+
     left = Motor(
-        PWM(Pins.P13),
-        Pin(Pins.D4, mode=Pin.OUT),
-        reversed=True,
+        PWM(left_cfg.pwm),
+        Pin(left_cfg.direction, mode=Pin.OUT),
+        reversed=left_cfg.reversed,
     )
 
     right = Motor(
-        PWM(Pins.P12),
-        Pin(Pins.D5, mode=Pin.OUT),
-        reversed=False,
+        PWM(right_cfg.pwm),
+        Pin(right_cfg.direction, mode=Pin.OUT),
+        reversed=right_cfg.reversed,
     )
 
     try:
-        print("Motor demo starting...")
-
-        print("Left motor forward")
+        print("Left motor forward...")
         left.forward(40)
         pause()
         left.stop()
 
-        print("Left motor backward")
+        print("Left motor backward...")
         left.backward(40)
         pause()
         left.stop()
 
-        print("Right motor forward")
+        print("Right motor forward...")
         right.forward(40)
         pause()
         right.stop()
 
-        print("Right motor backward")
+        print("Right motor backward...")
         right.backward(40)
         pause()
         right.stop()
 
-        print("Both motors forward")
+        print("Both motors forward...")
         left.forward(40)
         right.forward(40)
         pause(2)
 
-        print("Both motors backward")
+        print("Both motors backward...")
         left.backward(40)
         right.backward(40)
         pause(2)
-
-        print("Stopping")
-        left.stop()
-        right.stop()
-
-        print("Demo complete.")
 
     except KeyboardInterrupt:
-        print("\nInterrupted. Stopping motors.")
-        left.stop()
-        right.stop()
+        print()
+        print("Interrupted. Stopping motors...")
 
     finally:
+        left.stop()
+        right.stop()
         left.close()
         right.close()
+
+    print()
+    print("Motor demo complete.")
 
 
 if __name__ == "__main__":

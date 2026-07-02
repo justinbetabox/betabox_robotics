@@ -2,17 +2,22 @@
 """
 Developer demo for the Betabox Vision WebRTC pipeline.
 
-This example shows how to connect the Vision frame pipeline to the
-WebRTC signaling server.
+This example connects a FrameSource to a WebRTCStreamer and publishes
+live camera frames through the WebRTC signaling server.
 
-It is intended for developers working on the Vision subsystem. Student
-and curriculum code should prefer the public Robot API example instead.
+It demonstrates the lower-level Vision streaming pipeline rather than
+the public Vision subsystem.
 """
 
 from betabox_car.vision import FrameSource, WebRTCSignalingServer, WebRTCStreamer
 
 
 def main() -> None:
+    print()
+    print("Betabox Vision WebRTC Demo")
+    print("==========================")
+    print()
+
     # Produce camera frames.
     frame_source = FrameSource(fps=20)
 
@@ -26,10 +31,6 @@ def main() -> None:
         frame_source.start()
         streamer.start()
 
-        print()
-        print("Betabox Vision WebRTC Demo")
-        print("==========================")
-        print()
         print("Open this URL in a browser:")
         print("    http://<robot-ip>:8080")
         print()
@@ -39,14 +40,20 @@ def main() -> None:
         print("Press Ctrl+C to stop.")
         print()
 
-        # Start the signaling server. This blocks until interrupted.
         server = WebRTCSignalingServer(streamer, port=8080)
         server.run()
+
+    except KeyboardInterrupt:
+        print()
+        print("Stopping...")
 
     finally:
         streamer.stop()
         frame_source.unregister_consumer(streamer)
         frame_source.stop()
+
+    print()
+    print("Vision WebRTC demo complete.")
 
 
 if __name__ == "__main__":

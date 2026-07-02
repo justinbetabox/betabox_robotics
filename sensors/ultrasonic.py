@@ -33,6 +33,21 @@ class Ultrasonic:
         self.trigger = self._make_output_pin(trigger)
         self.echo = self._make_input_pin(echo)
 
+    @classmethod
+    def default(
+        cls,
+        robot_config,
+        *,
+        timeout: float = 0.02,
+    ) -> "Ultrasonic":
+        cfg = robot_config.ultrasonic
+
+        return cls(
+            trigger=cfg.trigger,
+            echo=cfg.echo,
+            timeout=timeout,
+        )
+
     def _make_output_pin(self, pin) -> Pin:
         if isinstance(pin, Pin):
             pin.output()
@@ -106,8 +121,8 @@ class Ultrasonic:
     def deinit(self) -> None:
         self.close()
 
-    def __enter__(self):
+    def __enter__(self) -> "Ultrasonic":
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
         self.close()

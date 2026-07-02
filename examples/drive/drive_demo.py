@@ -1,24 +1,49 @@
 #!/usr/bin/env python3
+"""
+Developer demo for the Betabox Drive subsystem.
+"""
 
 from time import sleep
 
 from betabox_car.drive import Drive
+from betabox_car.robots import BETABOX_CAR
 
-with Drive.default() as drive:
-    drive.center()
-    sleep(1)
 
-    drive.forward(40)
-    sleep(2)
+def main() -> None:
+    print()
+    print("Betabox Drive Demo")
+    print("==================")
+    print()
 
-    drive.stop()
-    sleep(1)
+    with Drive.default(BETABOX_CAR) as drive:
+        try:
+            print("Centering steering...")
+            drive.center()
+            sleep(1)
 
-    drive.left(20)
-    sleep(1)
+            print("Driving forward...")
+            drive.forward(40)
+            sleep(2)
 
-    drive.forward(30)
-    sleep(2)
+            print("Stopping...")
+            drive.stop()
+            sleep(1)
 
-    drive.stop()
-    drive.center()
+            print("Turning left...")
+            drive.left(20)
+            sleep(1)
+
+            print("Driving forward...")
+            drive.forward(30)
+            sleep(2)
+        finally:
+            print("Stopping and centering...")
+            drive.stop()
+            drive.center()
+
+    print()
+    print("Drive demo complete.")
+
+
+if __name__ == "__main__":
+    main()

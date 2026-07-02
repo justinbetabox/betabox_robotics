@@ -31,6 +31,10 @@ class System:
     System information and platform paths.
     """
 
+    @classmethod
+    def default(cls, robot_config=None) -> "System":
+        return cls()
+
     def hostname(self) -> str:
         return socket.gethostname()
 
@@ -107,7 +111,3 @@ class System:
             ok=len(messages) == 0,
             messages=messages,
         )
-
-    @classmethod
-    def default(cls, robot_config=None) -> "System":
-        return cls()

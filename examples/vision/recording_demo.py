@@ -1,25 +1,21 @@
 #!/usr/bin/env python3
 """
-Developer demo for recording video from the Betabox Vision pipeline.
-
-This example uses the Vision subsystem directly. It starts the frame
-pipeline, records a short video, saves it to the user's media videos
-directory, and then cleans up the camera.
+Developer demo for recording video with the Betabox Vision subsystem.
 """
 
 from time import sleep
 
+from betabox_car.robots import BETABOX_CAR
 from betabox_car.vision import Vision
 
 
 def main() -> None:
-    vision = Vision()
+    print()
+    print("Betabox Vision Recording Demo")
+    print("=============================")
+    print()
 
-    try:
-        print()
-        print("Betabox Vision Recording Demo")
-        print("=============================")
-        print()
+    with Vision.default(BETABOX_CAR) as vision:
         print("Starting Vision...")
         vision.start()
 
@@ -41,11 +37,8 @@ def main() -> None:
         print(f"Duration: {recording.duration:.2f} seconds")
         print(f"FPS: {recording.fps}")
 
-    finally:
-        if vision.recording.is_recording():
-            vision.recording.stop()
-
-        vision.stop()
+    print()
+    print("Vision recording demo complete.")
 
 
 if __name__ == "__main__":

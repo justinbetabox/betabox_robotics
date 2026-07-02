@@ -10,23 +10,19 @@ Vision consumers.
 import threading
 from time import sleep
 
+from betabox_car.robots import BETABOX_CAR
 from betabox_car.vision import Vision, WebRTCSignalingServer, WebRTCStreamer
 
 
 def main() -> None:
-    vision = Vision()
-    streamer = WebRTCStreamer(fps=20)
+    print()
+    print("Betabox Vision WebRTC + Recording Demo")
+    print("======================================")
+    print()
 
-    vision.register_consumer(streamer)
-
-    try:
-        print()
-        print("Betabox Vision WebRTC + Recording Demo")
-        print("======================================")
-        print()
-
-        vision.start()
-        streamer.start()
+    with Vision.default(BETABOX_CAR) as vision:
+        streamer = WebRTCStreamer(fps=20)
+        vision.register_consumer(streamer)
 
         server = WebRTCSignalingServer(streamer, port=8080)
         server_thread = threading.Thread(
@@ -34,41 +30,56 @@ def main() -> None:
             name="BetaboxWebRTCSignaling",
             daemon=True,
         )
-        server_thread.start()
 
-        print("Open this URL in a browser:")
-        print("    http://<robot-ip>:8080")
-        print()
-        print("Starting recording in 5 seconds...")
-        sleep(5)
+        try:
+            print("Starting Vision...")
+            vision.start()
 
-        print("Recording for 5 seconds...")
-        vision.recording.start()
-        sleep(5)
-        recording = vision.recording.stop()
+            print("Starting WebRTC streamer...")
+            streamer.start()
 
-        print()
-        print("Recording saved while WebRTC was running.")
-        print(f"Path: {recording.path}")
-        print(f"Frames: {recording.frame_count}")
-        print(f"Duration: {recording.duration:.2f} seconds")
-        print()
-        print("Press Ctrl+C to stop the WebRTC demo.")
+            print("Starting signaling server...")
+            server_thread.start()
 
-        while True:
-            sleep(1)
+            print()
+            print("Open this URL in a browser:")
+            print("    http://<robot-ip>:8080")
+            print()
 
-    except KeyboardInterrupt:
-        print()
-        print("Stopping...")
+            print("Starting recording in 5 seconds...")
+            sleep(5)
 
-    finally:
-        if vision.recording.is_recording():
-            vision.recording.stop()
+            print("Recording for 5 seconds...")
+            vision.recording.start()
+            sleep(5)
 
-        vision.unregister_consumer(streamer)
-        streamer.stop()
-        vision.stop()
+            print("Stopping recording...")
+            recording = vision.recording.stop()
+
+            print()
+            print("Recording saved while WebRTC was running.")
+            print(f"Path: {recording.path}")
+            print(f"Frames: {recording.frame_count}")
+            print(f"Duration: {recording.duration:.2f} seconds")
+            print()
+            print("Press Ctrl+C to stop the WebRTC demo.")
+
+            while True:
+                sleep(1)
+
+        except KeyboardInterrupt:
+            print()
+            print("Stopping...")
+
+        finally:
+            if vision.recording.is_recording():
+                vision.recording.stop()
+
+            vision.unregister_consumer(streamer)
+            streamer.stop()
+
+    print()
+    print("Vision WebRTC + recording demo complete.")
 
 
 if __name__ == "__main__":

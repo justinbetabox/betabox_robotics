@@ -1,25 +1,21 @@
 #!/usr/bin/env python3
 """
-Developer demo for capturing a snapshot from the Betabox Vision pipeline.
-
-This example uses the Vision subsystem directly. It starts the frame
-pipeline, captures one still image from the latest frame, and then
-cleans up the camera.
+Developer demo for capturing a snapshot with the Betabox Vision subsystem.
 """
 
 from time import sleep
 
+from betabox_car.robots import BETABOX_CAR
 from betabox_car.vision import Vision
 
 
 def main() -> None:
-    vision = Vision()
+    print()
+    print("Betabox Vision Snapshot Demo")
+    print("============================")
+    print()
 
-    try:
-        print()
-        print("Betabox Vision Snapshot Demo")
-        print("============================")
-        print()
+    with Vision.default(BETABOX_CAR) as vision:
         print("Starting Vision...")
         vision.start()
 
@@ -34,8 +30,8 @@ def main() -> None:
         print(f"Format: {snapshot.format}")
         print(f"Timestamp: {snapshot.timestamp}")
 
-    finally:
-        vision.stop()
+    print()
+    print("Vision snapshot demo complete.")
 
 
 if __name__ == "__main__":

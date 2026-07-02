@@ -1,7 +1,4 @@
-from typing import Optional
-
 from betabox_car.hardware import ADC, HardwareError
-from betabox_car.robots import ROBOT
 
 
 class BatteryError(HardwareError):
@@ -19,43 +16,21 @@ class Battery:
     """
 
     DEFAULT_SCALE = 3.0
+    DEFAULT_LOW_VOLTAGE = 6.6
+    DEFAULT_CRITICAL_VOLTAGE = 6.2
 
     def __init__(
         self,
-        adc: Optional[ADC] = None,
+        adc: ADC,
         *,
-        scale: Optional[float] = None,
-        low_voltage: Optional[float] = None,
-        critical_voltage: Optional[float] = None,
+        scale: float = DEFAULT_SCALE,
+        low_voltage: float = DEFAULT_LOW_VOLTAGE,
+        critical_voltage: float = DEFAULT_CRITICAL_VOLTAGE,
     ) -> None:
-        scale_value = ROBOT.battery.scale if scale is None else scale
-        low_voltage_value = (
-            ROBOT.battery.low_voltage if low_voltage is None else low_voltage
-        )
-        critical_voltage_value = (
-            ROBOT.battery.critical_voltage
-            if critical_voltage is None
-            else critical_voltage
-        )
-
-        if scale_value <= 0:
-            raise BatteryError("scale must be greater than 0")
-
-        if low_voltage_value <= 0:
-            raise BatteryError("low_voltage must be greater than 0")
-
-        if critical_voltage_value <= 0:
-            raise BatteryError("critical_voltage must be greater than 0")
-
-        if critical_voltage_value > low_voltage_value:
-            raise BatteryError(
-                "critical_voltage must be less than or equal to low_voltage"
-            )
-
-        self.adc = adc or ADC(ROBOT.battery.channel)
-        self.scale = float(scale_value)
-        self.low_voltage = float(low_voltage_value)
-        self.critical_voltage = float(critical_voltage_value)
+        self.adc = adc
+        self.scale = scale
+        self.low_voltage = low_voltage
+        self.critical_voltage = critical_voltage
 
     def voltage(self) -> float:
         """

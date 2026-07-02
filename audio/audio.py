@@ -58,6 +58,10 @@ class Audio:
         if self.keep_amp_enabled:
             enable_speaker()
 
+    @classmethod
+    def default(cls, robot_config=None) -> "Audio":
+        return cls()
+
     def say(self, text: str) -> None:
         if not text:
             raise AudioError("speech text cannot be empty")

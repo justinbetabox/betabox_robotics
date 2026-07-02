@@ -1,5 +1,4 @@
 from betabox_car.hardware import PWM, Motor, Pin, Servo
-from betabox_car.robots import ROBOT
 
 
 class Drive:
@@ -29,8 +28,8 @@ class Drive:
     @classmethod
     def default(
         cls,
+        robot_config,
         *,
-        robot_config=ROBOT,
         left_reversed: bool | None = None,
         right_reversed: bool | None = None,
         left_trim: float | None = None,

@@ -30,6 +30,10 @@ class Vision:
         self.register_consumer(self.recording)
         self.register_consumer(self.detection)
 
+    @classmethod
+    def default(cls, robot_config=None) -> "Vision":
+        return cls()
+
     def start(self) -> None:
         self.frame_source.start()
 

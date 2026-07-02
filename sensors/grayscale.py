@@ -1,7 +1,6 @@
 from typing import List, Optional, Tuple
 
 from betabox_car.hardware import ADC, HardwareError
-from betabox_car.robots import ROBOT
 
 
 class GrayscaleError(HardwareError):
@@ -23,15 +22,15 @@ class Grayscale:
 
     def __init__(
         self,
-        left: ADC | None = None,
-        middle: ADC | None = None,
-        right: ADC | None = None,
+        left: ADC,
+        middle: ADC,
+        right: ADC,
         reference: Optional[List[int]] = None,
     ) -> None:
         self.channels = (
-            left or ADC(ROBOT.grayscale.left),
-            middle or ADC(ROBOT.grayscale.middle),
-            right or ADC(ROBOT.grayscale.right),
+            left,
+            middle,
+            right,
         )
 
         self._reference = (

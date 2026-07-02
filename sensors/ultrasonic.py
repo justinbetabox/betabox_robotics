@@ -2,7 +2,6 @@ import time
 from typing import Union
 
 from betabox_car.hardware import DigitalPin, HardwareError, Pin
-from betabox_car.robots import ROBOT
 
 
 class UltrasonicError(HardwareError):
@@ -21,8 +20,8 @@ class Ultrasonic:
 
     def __init__(
         self,
-        trigger: Union[Pin, DigitalPin, str, int] = ROBOT.ultrasonic.trigger,
-        echo: Union[Pin, DigitalPin, str, int] = ROBOT.ultrasonic.echo,
+        trigger: Union[Pin, DigitalPin, str, int],
+        echo: Union[Pin, DigitalPin, str, int],
         *,
         timeout: float = 0.02,
     ) -> None:

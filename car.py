@@ -1,18 +1,7 @@
-from .audio import Audio
-from .drive import Drive
-from .sensors import Sensors
-from .system import System
-from .vision import Vision
+from betabox_car.robots.car import BetaboxCar
 
 
-class Car:
+class Car(BetaboxCar):
     """
-    Main interface to a Betabox robotic car.
+    Compatibility alias for the Betabox Car platform.
     """
-
-    def __init__(self):
-        self.drive = Drive()
-        self.sensors = Sensors()
-        self.vision = Vision()
-        self.audio = Audio()
-        self.system = System()

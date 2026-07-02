@@ -1,5 +1,6 @@
+from .base import RobotBase
 from .betabox_car import (
-    ROBOT,
+    BETABOX_CAR,
     BatteryConfig,
     GrayscaleConfig,
     MotorConfig,
@@ -7,13 +8,16 @@ from .betabox_car import (
     SteeringConfig,
     UltrasonicConfig,
 )
+from .car import BetaboxCar
 
 __all__ = [
+    "RobotBase",
+    "BetaboxCar",
     "MotorConfig",
     "SteeringConfig",
     "UltrasonicConfig",
     "GrayscaleConfig",
     "BatteryConfig",
     "RobotConfig",
-    "ROBOT",
+    "BETABOX_CAR",
 ]

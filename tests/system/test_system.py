@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from betabox_car.system import MediaPaths, System, SystemStatus
+from betabox_car.system import MediaPaths, System, SystemHealth, SystemStatus
 
 
 def test_system_status():
@@ -13,9 +13,13 @@ def test_system_status():
     print("==================")
     print(f"hostname={status.hostname}")
     print(f"ip_addresses={status.ip_addresses}")
+    print(f"version={status.version}")
+    print(f"sounds={status.media.sounds}")
     print(f"pictures={status.media.pictures}")
     print(f"videos={status.media.videos}")
 
+    assert isinstance(status.version, str)
+    assert status.version != ""
     assert isinstance(status, SystemStatus)
     assert isinstance(status.hostname, str)
     assert status.hostname != ""
@@ -23,6 +27,7 @@ def test_system_status():
     assert isinstance(status.media, MediaPaths)
     assert status.media.pictures == Path.home() / "media" / "pictures"
     assert status.media.videos == Path.home() / "media" / "videos"
+    assert status.media.sounds == Path.home() / "media" / "sounds"
 
 
 def test_system_ensure_media_paths():
@@ -43,8 +48,25 @@ def test_system_ensure_media_paths():
     assert paths.sounds.is_dir()
 
 
+def test_system_health():
+    system = System()
+    system.ensure_media_paths()
+
+    health = system.health()
+
+    print("\nSystem health test")
+    print("==================")
+    print(f"ok={health.ok}")
+    print(f"messages={health.messages}")
+
+    assert isinstance(health, SystemHealth)
+    assert health.ok is True
+    assert health.messages == []
+
+
 if __name__ == "__main__":
     test_system_status()
     test_system_ensure_media_paths()
+    test_system_health()
 
     print("\nSystem tests complete.")

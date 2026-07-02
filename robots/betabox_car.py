@@ -49,7 +49,7 @@ class RobotConfig:
     battery: BatteryConfig
 
 
-ROBOT = RobotConfig(
+BETABOX_CAR = RobotConfig(
     left_motor=MotorConfig(
         pwm=Pins.P13,
         direction=Pins.D4,

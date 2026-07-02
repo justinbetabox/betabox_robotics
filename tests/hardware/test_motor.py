@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
-
 """
-Betabox Motor Hardware Test
+Betabox Motor hardware test.
 
 Tests:
 - Forward
@@ -13,135 +12,137 @@ Tests:
 
 from time import sleep
 
-from betabox_car.hardware import (
-    PWM,
-    Motor,
-    Pin,
-    Pins,
-)
-
-LEFT = Motor(
-    PWM(Pins.P13),
-    Pin(Pins.D4, mode=Pin.OUT),
-    reversed=True,
-)
-
-RIGHT = Motor(
-    PWM(Pins.P12),
-    Pin(Pins.D5, mode=Pin.OUT),
-)
+from betabox_car.hardware import PWM, Motor, Pin
+from betabox_car.robots import BETABOX_CAR
 
 
-def pause():
-    sleep(1)
+def pause(seconds: float = 1.0) -> None:
+    sleep(seconds)
 
 
-try:
-    print("\n==============================")
-    print(" Left Motor")
-    print("==============================")
+def main() -> None:
+    left_cfg = BETABOX_CAR.left_motor
+    right_cfg = BETABOX_CAR.right_motor
 
-    print("Forward 30%")
-    LEFT.forward(30)
-    pause()
+    left = Motor(
+        PWM(left_cfg.pwm),
+        Pin(left_cfg.direction, mode=Pin.OUT),
+        reversed=left_cfg.reversed,
+    )
 
-    print("Stop")
-    LEFT.stop()
-    pause()
+    right = Motor(
+        PWM(right_cfg.pwm),
+        Pin(right_cfg.direction, mode=Pin.OUT),
+        reversed=right_cfg.reversed,
+    )
 
-    print("Backward 30%")
-    LEFT.backward(30)
-    pause()
+    try:
+        print("\nMotor hardware test")
+        print("===================")
 
-    print("Stop")
-    LEFT.stop()
-    pause()
+        print("\nLeft motor")
+        print("----------")
 
-    print("\n==============================")
-    print(" Right Motor")
-    print("==============================")
+        print("Forward 30%")
+        left.forward(30)
+        pause()
 
-    print("Forward 30%")
-    RIGHT.forward(30)
-    pause()
+        print("Stop")
+        left.stop()
+        pause()
 
-    print("Stop")
-    RIGHT.stop()
-    pause()
+        print("Backward 30%")
+        left.backward(30)
+        pause()
 
-    print("Backward 30%")
-    RIGHT.backward(30)
-    pause()
+        print("Stop")
+        left.stop()
+        pause()
 
-    print("Stop")
-    RIGHT.stop()
-    pause()
+        print("\nRight motor")
+        print("-----------")
 
-    print("\n==============================")
-    print(" Both Motors Forward")
-    print("==============================")
+        print("Forward 30%")
+        right.forward(30)
+        pause()
 
-    LEFT.forward(30)
-    RIGHT.forward(30)
-    pause()
+        print("Stop")
+        right.stop()
+        pause()
 
-    LEFT.stop()
-    RIGHT.stop()
-    pause()
+        print("Backward 30%")
+        right.backward(30)
+        pause()
 
-    print("\n==============================")
-    print(" Both Motors Backward")
-    print("==============================")
+        print("Stop")
+        right.stop()
+        pause()
 
-    LEFT.backward(30)
-    RIGHT.backward(30)
-    pause()
+        print("\nBoth motors forward")
+        print("-------------------")
 
-    LEFT.stop()
-    RIGHT.stop()
-    pause()
+        left.forward(30)
+        right.forward(30)
+        pause()
 
-    print("\n==============================")
-    print(" Counter Rotation")
-    print("==============================")
+        left.stop()
+        right.stop()
+        pause()
 
-    LEFT.forward(30)
-    RIGHT.backward(30)
-    pause()
+        print("\nBoth motors backward")
+        print("--------------------")
 
-    LEFT.stop()
-    RIGHT.stop()
-    pause()
+        left.backward(30)
+        right.backward(30)
+        pause()
 
-    LEFT.backward(30)
-    RIGHT.forward(30)
-    pause()
+        left.stop()
+        right.stop()
+        pause()
 
-    LEFT.stop()
-    RIGHT.stop()
-    pause()
+        print("\nCounter rotation")
+        print("----------------")
 
-    print("\n==============================")
-    print(" Ramp Test")
-    print("==============================")
+        left.forward(30)
+        right.backward(30)
+        pause()
 
-    for speed in range(0, 101, 10):
-        print(f"{speed}%")
-        LEFT.forward(speed)
-        RIGHT.forward(speed)
-        sleep(0.25)
+        left.stop()
+        right.stop()
+        pause()
 
-    for speed in range(100, -1, -10):
-        print(f"{speed}%")
-        LEFT.forward(speed)
-        RIGHT.forward(speed)
-        sleep(0.25)
+        left.backward(30)
+        right.forward(30)
+        pause()
 
-    LEFT.stop()
-    RIGHT.stop()
+        left.stop()
+        right.stop()
+        pause()
 
-finally:
-    LEFT.close()
-    RIGHT.close()
+        print("\nRamp test")
+        print("---------")
 
-print("\nMotor hardware test complete.")
+        for speed in range(0, 101, 10):
+            print(f"{speed}%")
+            left.forward(speed)
+            right.forward(speed)
+            sleep(0.25)
+
+        for speed in range(100, -1, -10):
+            print(f"{speed}%")
+            left.forward(speed)
+            right.forward(speed)
+            sleep(0.25)
+
+        left.stop()
+        right.stop()
+
+    finally:
+        left.close()
+        right.close()
+
+    print("\nMotor hardware test complete.")
+
+
+if __name__ == "__main__":
+    main()

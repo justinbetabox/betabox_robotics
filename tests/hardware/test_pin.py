@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Betabox Pin Hardware Test
+Betabox Pin hardware test.
 
 Toggles a digital output pin.
 """
@@ -9,23 +9,29 @@ from time import sleep
 
 from betabox_car.hardware import Pin, Pins
 
-print("Pin hardware test")
-print("=================")
 
-with Pin(Pins.D0, mode=Pin.OUT) as pin:
-    print("ON")
-    pin.on()
-    sleep(1)
+def main() -> None:
+    print("\nPin hardware test")
+    print("=================")
 
-    print("OFF")
-    pin.off()
-    sleep(1)
+    with Pin(Pins.D0, mode=Pin.OUT) as pin:
+        print("ON")
+        pin.on()
+        sleep(1)
 
-    print("TOGGLE")
-    pin.toggle()
-    sleep(1)
+        print("OFF")
+        pin.off()
+        sleep(1)
 
-    pin.off()
+        print("TOGGLE")
+        pin.toggle()
+        sleep(1)
 
-print()
-print("Pin hardware test complete.")
+        pin.off()
+
+    print()
+    print("Pin hardware test complete.")
+
+
+if __name__ == "__main__":
+    main()

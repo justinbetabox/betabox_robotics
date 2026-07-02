@@ -1,25 +1,31 @@
 #!/usr/bin/env python3
 """
-Betabox I2C Hardware Test
+Betabox I2C hardware test.
 
-Scans the I2C bus and lists connected devices.
+Scans the I²C bus and lists connected devices.
 """
 
 from betabox_car.hardware import I2C
 
-print("I2C hardware test")
-print("=================")
 
-with I2C() as bus:
-    devices = bus.scan()
+def main() -> None:
+    print("\nI2C hardware test")
+    print("=================")
 
-if devices:
-    print("Detected devices:")
+    with I2C() as bus:
+        devices = bus.scan()
 
-    for address in devices:
-        print(f"  0x{address:02X}")
-else:
-    print("No I2C devices detected.")
+    if devices:
+        print("Detected devices:")
 
-print()
-print("I2C hardware test complete.")
+        for address in devices:
+            print(f"  0x{address:02X}")
+    else:
+        print("No I2C devices detected.")
+
+    print()
+    print("I2C hardware test complete.")
+
+
+if __name__ == "__main__":
+    main()

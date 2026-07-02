@@ -6,7 +6,7 @@
 
 ------------------------------------------------------------------------
 
-# Purpose
+## Purpose
 
 The Hardware Layer provides a stable interface between the Betabox
 platform and the physical robot hardware.
@@ -21,24 +21,43 @@ implementation details.
 
 ------------------------------------------------------------------------
 
-# Architecture
+## Position in the Platform
+
+The Hardware Layer forms the reusable foundation beneath the Betabox
+subsystems.
+
+Robot implementations never interact with Linux hardware directly.
+Instead, they compose reusable subsystems, which in turn compose reusable
+hardware abstractions.
+
+Applications should never access the Hardware Layer directly.
+
+------------------------------------------------------------------------
+
+## Hardware Layer Architecture
 
 ``` text
-Applications
-      │
-      ▼
-Subsystems
-      │
-      ▼
-Physical Components
-      │
-      ▼
-Hardware Devices
-      │
-      ▼
-Hardware Interfaces
-      │
-      ▼
+    Applications
+         │
+         ▼
+    Robot API
+         │
+         ▼
+ Robot Implementations
+         │
+         ▼
+ Reusable Subsystems
+         │
+         ▼
+ Physical Components
+         │
+         ▼
+  Hardware Devices
+         │
+         ▼
+ Hardware Interfaces
+         │
+         ▼
 Linux / Physical Hardware
 ```
 
@@ -46,141 +65,142 @@ Each layer communicates only with the layer immediately below it.
 
 ------------------------------------------------------------------------
 
-# Responsibilities
+## Responsibilities
 
 The Hardware Layer is responsible for:
 
--   Abstracting physical hardware
--   Hiding operating system interfaces
--   Managing hardware resources
--   Converting hardware values into physical units
--   Applying hardware calibration
--   Providing safe default behavior
--   Exposing stable hardware APIs
+-    Abstracting physical hardware
+-    Hiding operating system interfaces
+-    Managing hardware resources
+-    Converting hardware values into physical units
+-    Applying hardware calibration
+-    Providing safe default behavior
+-    Exposing stable hardware APIs
+-    Providing reusable hardware abstractions
 
 ------------------------------------------------------------------------
 
-# Non-Responsibilities
+## Non-Responsibilities
 
 The Hardware Layer is **not** responsible for:
 
--   Vehicle behavior
--   Autonomous navigation
--   Obstacle avoidance
--   Line following
--   Vision processing
--   Camera streaming
--   Audio playback
--   User interfaces
--   Curriculum logic
+-    Vehicle behavior
+-    Autonomous navigation
+-    Obstacle avoidance
+-    Line following
+-    Vision processing
+-    Camera streaming
+-    Audio playback
+-    User interfaces
+-    Curriculum logic
 
 Those responsibilities belong to higher-level subsystems.
 
 ------------------------------------------------------------------------
 
-# Hardware Layers
+## Hardware Layers
 
 The hardware package is organized into three logical layers.
 
-## Layer 1 --- Hardware Interfaces
+### Layer 1 --- Hardware Interfaces
 
 These classes communicate directly with Linux or the underlying hardware
 platform.
 
 Examples:
 
--   Pin
--   I2C
--   SPI (future)
--   UART (future)
+-    Pin
+-    I2C
+-    SPI (future)
+-    UART (future)
 
 Responsibilities:
 
--   GPIO access
--   Bus communication
--   Resource cleanup
--   Driver interaction
--   Error handling
+-    GPIO access
+-    Bus communication
+-    Resource cleanup
+-    Driver interaction
+-    Error handling
 
 These classes know nothing about motors, servos, sensors, or robot
 behavior.
 
-------------------------------------------------------------------------
-
-## Layer 2 --- Hardware Devices
+### Layer 2 --- Hardware Devices
 
 These classes understand specific hardware controllers.
 
 Examples:
 
--   PWM
--   ADC
+-    PWM
+-    ADC
 
 Responsibilities:
 
--   Register access
--   Timer configuration
--   Controller-specific behavior
--   Low-level device management
+-    Register access
+-    Timer configuration
+-    Controller-specific behavior
+-    Low-level device management
 
 These classes hide controller implementation details from the rest of
 the platform.
 
-------------------------------------------------------------------------
-
-## Layer 3 --- Physical Components
+### Layer 3 --- Physical Components
 
 These classes represent actual robot hardware.
 
 Examples:
 
--   Servo
--   Motor
--   Ultrasonic
--   Grayscale
--   Battery
--   Encoder (future)
--   IMU (future)
+-    Servo
+-    Motor
+-    Ultrasonic
+-    Grayscale
+-    Battery
+-    Encoder (future)
+-    IMU (future)
 
 Responsibilities:
 
--   Physical units
--   Calibration
--   Safety limits
--   Device-specific behavior
+-    Physical units
+-    Calibration
+-    Safety limits
+-    Device-specific behavior
 
 Public APIs should expose concepts such as:
 
--   Degrees
--   Percent speed
--   Centimeters
--   Volts
+-    Degrees
+-    Percent speed
+-    Centimeters
+-    Volts
 
 rather than pulse widths, registers, or timing calculations.
 
 ------------------------------------------------------------------------
 
-# Hardware Independence
+## Hardware Independence
 
 Higher layers should never assume a particular hardware implementation.
 
 Today:
 
 ``` text
-Drive
-    │
- Motor
-    │
+    Drive
+      │
+      ▼
+    Motor
+      │
+      ▼
  PWM (Robot HAT)
 ```
 
 Tomorrow:
 
 ``` text
-Drive
-    │
- Motor
-    │
+    Drive
+      │
+      ▼
+    Motor
+      │
+      ▼
  PWM (RP2040)
 ```
 
@@ -192,9 +212,9 @@ platforms while maintaining a stable public API.
 
 ------------------------------------------------------------------------
 
-# Hardware API
+## Hardware API
 
-## Pin
+### Pin
 
 Purpose: Digital GPIO access.
 
@@ -207,7 +227,7 @@ pin.read()
 pin.write(True)
 ```
 
-## I2C
+### I2C
 
 Purpose: Communicate with I²C devices.
 
@@ -219,7 +239,7 @@ bus.read(...)
 bus.mem_read(...)
 ```
 
-## PWM
+### PWM
 
 Purpose: Generate PWM outputs using the underlying hardware controller.
 
@@ -230,7 +250,7 @@ pwm.set_frequency(50)
 pwm.set_duty_cycle(50)
 ```
 
-## ADC
+### ADC
 
 Purpose: Read analog sensor values.
 
@@ -244,7 +264,7 @@ voltage = adc.read_voltage()
 The ADC class handles channel selection, register mapping, raw readings,
 and voltage conversion.
 
-## Servo
+### Servo
 
 Purpose: Control standard RC servos using degrees.
 
@@ -259,7 +279,7 @@ servo.move_to(-30)
 Internally the Servo class manages calibration, angle limits, smooth
 movement, pulse conversion, and PWM configuration.
 
-## Motor
+### Motor
 
 Purpose: Control a single DC motor.
 
@@ -272,10 +292,10 @@ motor.stop()
 Internally the Motor class manages speed, direction, safe ramping, and
 PWM output.
 
-Motor calibration belongs to the Drive subsystem rather than the Motor
-class.
+Motor configuration belongs to the robot implementation and Drive
+subsystem rather than the Motor class.
 
-## Ultrasonic
+### Ultrasonic
 
 Purpose: Measure distance.
 
@@ -286,7 +306,7 @@ distance = ultrasonic.distance()
 The Ultrasonic class manages trigger generation, echo timing, timeout
 handling, and distance conversion.
 
-## Grayscale
+### Grayscale
 
 Purpose: Read the three-channel line sensor.
 
@@ -300,45 +320,49 @@ normalization, and line detection.
 
 ------------------------------------------------------------------------
 
-# Safe Defaults
+## Safe Defaults
 
 The Hardware Layer should favor predictable, safe behavior.
 
 Examples:
 
--   Servos move smoothly.
--   Motors ramp speed changes.
--   Resources are released cleanly.
--   Invalid parameters raise exceptions.
--   Hardware limits are enforced automatically.
+-    Servos move smoothly.
+-    Motors ramp speed changes.
+-    Resources are released cleanly.
+-    Invalid parameters raise exceptions.
+-    Hardware limits are enforced automatically.
 
 Applications may opt into lower-level behavior when appropriate, but the
 default API should protect both the hardware and the user.
 
 ------------------------------------------------------------------------
 
-# Resource Ownership
+## Resource Ownership
 
-Ownership always flows downward.
+Ownership always flows downward. Ownership is established through composition.
 
 Example:
 
 ``` text
-Drive
+  Drive
     │
-Motor
+    ▼
+  Motor
     │
-PWM
+    ▼
+   PWM
     │
-I2C
+    ▼
+   I2C
 ```
 
 Likewise:
 
 ``` text
-Vision
+  Vision
     │
-Camera
+    ▼
+  Camera
 ```
 
 Each layer owns the resources immediately below it.
@@ -348,47 +372,74 @@ independent components.
 
 ------------------------------------------------------------------------
 
-# Design Principles
+## Design Principles
 
 The Hardware Layer follows the Betabox Platform Design Principles:
 
--   Single Responsibility
--   Composition over Inheritance
--   Stable Public API
--   Hardware Independence
--   Explicit Behavior
--   Physical Units
--   Exclusive Resource Ownership
--   Safe by Default
+-    Single Responsibility
+-    Composition over Inheritance
+-    Stable Public API
+-    Hardware Independence
+-    Explicit Behavior
+-    Physical Units
+-    Exclusive Resource Ownership
+-    Safe by Default
 
 ------------------------------------------------------------------------
 
-# Future Hardware
+## Robot Independence
+
+The Hardware Layer should never depend on a particular robot platform.
+
+Robot-specific wiring, calibration, and configuration belong to robot
+implementations.
+
+The same Servo, Motor, PWM, ADC, Pin, I2C, and other hardware abstractions should be reusable across multiple Betabox robots without modification.
+
+------------------------------------------------------------------------
+
+## Future Hardware
 
 Future hardware components may include:
 
--   Encoder
--   RGB LED
--   IMU
+-    Encoder
+-    RGB LED
+-    IMU
+-    Camera
+-    Microphone
 
 Future hardware interfaces may include:
 
--   SPI
--   UART
+-    SPI
+-    UART
 
 Each new component should include:
 
--   Documentation
--   Example program
--   API documentation
--   Hardware validation
+-    Documentation
+-    Example program
+-    API documentation
+-    Hardware validation
 
 No hardware abstraction is considered complete until it is documented,
 tested, and safe to use.
 
 ------------------------------------------------------------------------
 
-# Summary
+## Testing and Validation
+
+The hardware validation scripts under tests `/hardware/` validate the reusable hardware abstractions on a physical Betabox robot implementation.
+
+These scripts are intended to run on a physical Betabox Car and may use
+`BETABOX_CAR` to validate the robot’s configured wiring.
+
+Reusable source modules under `hardware/`, `drive/`, `sensors/`, `vision/`,
+`audio/`, and `system/` should not import robot-specific configuration.
+
+Future pure unit tests may be separated from hardware validation tests.
+
+------------------------------------------------------------------------
+
+## Summary
 
 The Hardware Layer forms the foundation of the Betabox platform.
 

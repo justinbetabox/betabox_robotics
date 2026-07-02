@@ -3,9 +3,9 @@
 **Status:** Foundation  
 **Project:** Betabox Robot Platform
 
----
+------------------------------------------------------------------------
 
-# Purpose
+## Purpose
 
 The Audio subsystem provides speech output, sound playback, tone generation,
 and melody playback for the Betabox Robot Platform.
@@ -17,73 +17,117 @@ and playback implementation.
 The goal is to provide a consistent audio experience across all Betabox robots
 without exposing Linux-specific implementation details to applications.
 
----
+------------------------------------------------------------------------
 
-# Responsibilities
+## Robot Composition
+
+The Audio subsystem is a reusable subsystem implementation.
+
+Robot implementations provide the configuration required to initialize the
+Audio subsystem.
+
+Applications should normally access audio through:
+
+```python
+from betabox_car import Robot
+
+robot = Robot()
+
+robot.audio.say("Hello from Betabox")
+```
+
+rather than constructing `Audio` directly.
+
+Constructing `Audio` directly remains appropriate for testing, validation,
+and advanced configuration.
+
+------------------------------------------------------------------------
+
+## Responsibilities
 
 The Audio subsystem is responsible for:
 
-- Speech synthesis
-- Sound playback
-- Tone generation
-- Melody playback
-- Speaker amplifier management
-- Audio device selection
-- Speech backend selection
-- Speech pronunciation preprocessing
-- Speech post-processing
-- Audio format conversion
+-    Speech synthesis
+-    Sound playback
+-    Tone generation
+-    Melody playback
+-    Speaker amplifier management
+-    Audio output management
+-    Speech backend selection
+-    Speech pronunciation preprocessing
+-    Speech post-processing
+-    Audio format conversion
+------------------------------------------------------------------------
 
----
+## Non-Responsibilities
 
-# Public API
+The Audio subsystem is **not** responsible for:
+
+-    Robot movement
+-    Sensor acquisition
+-    Vision processing
+-    Camera control
+-    Platform status
+-    User interface behavior
+
+The Audio subsystem produces audio.
+
+Higher-level systems decide **when** audio should be played.
+
+------------------------------------------------------------------------
+
+## Public API
 
 ```python
-from betabox_car.audio import Audio
+from betabox_car import Robot
 
-with Audio() as audio:
-    audio.say("Hello from Betabox")
+robot = Robot()
 
-    audio.play_sound("car-honk")
+robot.audio.say("Hello from Betabox")
 
-    audio.play_note("C5", 0.5)
+robot.audio.play_sound("car-honk")
 
-    audio.play_melody(
-        [
-            ("C5", 0.2),
-            ("D5", 0.2),
-            ("E5", 0.2),
-            ("G5", 0.4),
-        ],
-        gap=0.05,
-    )
+robot.audio.play_note("C5", 0.5)
 
-    audio.stop()
+robot.audio.play_melody(
+    [
+        ("C5", 0.2),
+        ("D5", 0.2),
+        ("E5", 0.2),
+        ("G5", 0.4),
+    ],
+    gap=0.05,
+)
+
+robot.audio.stop()
 ```
 
 `play()` is provided as a convenience alias:
 
 ```python
-audio.play("car-honk")
+robot.audio.play("car-honk")
 ```
 
----
+------------------------------------------------------------------------
 
-# Speech
+## Speech
 
 Speech output is implemented using pluggable speech backends.
 
+Applications interact with a stable speech API regardless of the selected backend.
+
 Supported speech engines include:
 
-- pico2wave
-- espeak-ng
-- Piper
+-    pico2wave
+-    espeak-ng
+-    Piper
 
 The default automatic backend selection is:
 
-```
+```text
 pico2wave
-    ↓
+    │
+    ▼
 espeak-ng
 ```
 
@@ -100,9 +144,9 @@ audio = Audio(
 audio.say("Hello from Betabox")
 ```
 
----
+------------------------------------------------------------------------
 
-# Speech Pronunciation
+## Speech Pronunciation
 
 Before speech synthesis, text is passed through a pronunciation preprocessing
 stage.
@@ -119,9 +163,9 @@ audio.say("Hello from Betabox")
 The Audio subsystem internally applies pronunciation replacements where
 necessary.
 
----
+------------------------------------------------------------------------
 
-# Speech Volume
+## Speech Volume
 
 Speech output may be amplified during post-processing.
 
@@ -137,15 +181,15 @@ speech is modified.
 This avoids unintentionally changing the loudness of sound effects or generated
 tones.
 
----
+------------------------------------------------------------------------
 
-# Sound Playback
+## Sound Playback
 
 Sound playback uses the same playback pipeline as speech.
 
 The preferred audio format is:
 
-```
+```text
 16-bit PCM WAV
 44.1 kHz
 ```
@@ -153,27 +197,27 @@ The preferred audio format is:
 When available, FFmpeg or SoX may automatically convert common audio formats
 including:
 
-- MP3
-- OGG
-- FLAC
-- M4A
-- AAC
+-    MP3
+-    OGG
+-    FLAC
+-    M4A
+-    AAC
 
 Using native WAV files provides the fastest playback and avoids conversion
 overhead.
 
----
+------------------------------------------------------------------------
 
-# Sound Lookup
+## Sound Lookup
 
 When a filename is supplied, Audio searches multiple locations.
 
 Search order:
 
-1. Explicit file path
-2. Current working directory
-3. `~/media/sounds`
-4. Built-in Betabox sounds
+-    Explicit file path
+-    Current working directory
+-    `~/media/sounds`
+-    Built-in Betabox sounds
 
 Example:
 
@@ -184,9 +228,9 @@ audio.play_sound("car-honk")
 This allows applications to use either project-specific assets or shared
 Betabox sounds.
 
----
+------------------------------------------------------------------------
 
-# Tone Generation
+## Tone Generation
 
 Single tones may be generated using note names or frequencies.
 
@@ -202,7 +246,7 @@ audio.play_note(440.0, 0.5)
 
 Supported note names include:
 
-```
+```text
 C
 C#
 Db
@@ -222,9 +266,9 @@ Bb
 B
 ```
 
----
+------------------------------------------------------------------------
 
-# Melody Playback
+## Melody Playback
 
 Sequences of notes can be played using `play_melody()`.
 
@@ -244,11 +288,11 @@ audio.play_melody(
 
 Melodies are played synchronously.
 
----
+------------------------------------------------------------------------
 
-# Speaker Amplifier
+## Speaker Amplifier
 
-Betabox robots include a software-controlled speaker amplifier.
+Some Betabox robot platforms include a software-controlled speaker amplifier.
 
 By default, the amplifier is enabled only while audio is playing.
 
@@ -264,9 +308,50 @@ with Audio(
 
 This reduces repeated amplifier toggling during continuous playback.
 
----
+------------------------------------------------------------------------
 
-# Diagnostics
+## Resource Ownership
+
+The Audio subsystem owns all resources required for audio playback.
+
+Examples include:
+
+- Audio output device
+- Speech backend
+- Playback pipeline
+- Speaker amplifier (when present)
+
+Other subsystems should not directly control audio hardware.
+
+Robot implementations provide any platform-specific configuration required
+to initialize these resources.
+
+------------------------------------------------------------------------
+
+## Interaction with Other Subsystems
+
+Applications request audio through the Robot API.
+
+```text
+Applications
+     │
+     ▼
+ Robot API
+     │
+     ▼
+   Audio
+     │
+     ▼
+Audio Hardware
+```
+
+The Audio subsystem performs audio playback.
+
+Higher-level systems determine when audio should be produced.
+
+------------------------------------------------------------------------
+
+## Diagnostics
 
 Applications can inspect the currently selected speech backend.
 
@@ -292,45 +377,60 @@ Example:
 ["pico2wave", "espeak-ng", "piper"]
 ```
 
----
+------------------------------------------------------------------------
 
-# Design Principles
+## Implementation Boundaries
 
 The Audio subsystem intentionally hides implementation details.
 
 Applications should not directly depend upon:
 
-- PyAudio
-- ALSA
-- pico2wave
-- espeak-ng
-- Piper
-- FFmpeg
-- SoX
-- amplifier GPIO control
-- Linux audio device names
+-    PyAudio
+-    ALSA
+-    pico2wave
+-    espeak-ng
+-    Piper
+-    FFmpeg
+-    SoX
+-    amplifier GPIO control
+-    Linux audio device names
 
 These remain internal implementation details that may evolve over time.
 
 The public API is designed to remain stable even if the underlying
 implementation changes.
 
----
+------------------------------------------------------------------------
 
-# Future Expansion
+## Future Expansion
 
 Potential future capabilities include:
 
-- Asynchronous playback
-- Pause and resume
-- Speech caching
-- Audio playlists
-- Built-in sound libraries
-- Configurable audio profiles
-- Microphone support
-- Audio recording
-- Voice activity detection
-- Streaming audio
+-    Asynchronous playback
+-    Pause and resume
+-    Speech caching
+-    Audio playlists
+-    Built-in sound libraries
+-    Configurable audio profiles
+-    Microphone support
+-    Audio recording
+-    Voice activity detection
+-    Streaming audio
+-    Robot-specific audio configurations
 
 These additions should extend the existing API without requiring changes to
 student applications.
+
+------------------------------------------------------------------------
+
+## Summary
+
+The Audio subsystem provides a stable interface for speech synthesis,
+sound playback, and tone generation.
+
+It owns the robot's audio resources while hiding platform-specific
+implementation details behind a consistent public API.
+
+Higher-level systems determine when audio should be played.
+
+The Audio subsystem determines how that audio is produced.

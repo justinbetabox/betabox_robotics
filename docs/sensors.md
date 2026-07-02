@@ -4,9 +4,9 @@
 **Project:** Betabox Robot Platform  
 **Document:** `sensors.md`
 
----
+------------------------------------------------------------------------
 
-# Purpose
+## Purpose
 
 The Sensors subsystem provides a stable interface for reading information from the physical robot environment.
 
@@ -14,67 +14,91 @@ It groups individual sensor components under one subsystem so student code can a
 
 Student code should describe **what information it needs**, not how the sensor hardware is wired.
 
----
+------------------------------------------------------------------------
 
-# Responsibilities
+## Robot Composition
+
+The Sensors subsystem is a reusable subsystem implementation.
+
+Robot implementations provide the sensor configuration required to
+initialize the subsystem.
+
+Applications should normally access sensors through:
+
+```python
+from betabox_car import Robot
+
+robot = Robot()
+
+distance = robot.sensors.ultrasonic.distance()
+```
+
+rather than constructing sensor components directly.
+
+Constructing individual sensor components remains appropriate for
+validation, testing, and advanced configuration.
+
+------------------------------------------------------------------------
+
+## Responsibilities
 
 The Sensors subsystem is responsible for:
 
-## Sensor Access
+### Sensor Access
 
-- Provide access to supported robot sensors
-- Hide default pin and channel mappings
-- Expose sensor readings through stable APIs
+-    Provide access to supported robot sensors
+-    Hide default pin and channel mappings
+-    Expose sensor readings through stable APIs
 
-## Sensor Ownership
+### Sensor Ownership
 
-- Own sensor component instances
-- Manage sensor lifecycle
-- Release sensor hardware resources during cleanup
+-    Own sensor component instances
+-    Manage sensor lifecycle
+-    Release sensor hardware resources during cleanup
 
-## Calibration
+### Calibration
 
-- Support sensor-specific calibration where needed
-- Keep calibration logic close to the sensor that uses it
-- Hide raw calibration details from high-level code when possible
+-    Support sensor-specific calibration where needed
+-    Keep calibration logic close to the sensor that uses it
+-    Hide raw calibration details from high-level code when possible
 
-## Physical Units
+### Physical Units
 
-- Return readings in student-friendly units
-- Prefer real-world concepts over raw hardware values where practical
+-    Return readings in student-friendly units
+-    Prefer real-world concepts over raw hardware values where practical
 
 Examples:
 
-- Centimeters for ultrasonic distance
-- Left/middle/right channel values for grayscale readings
-- Normalized grayscale values when calibrated
-- Volts for battery monitoring
+-    Centimeters for ultrasonic distance
+-    Left/middle/right channel values for grayscale readings
+-    Normalized grayscale values when calibrated
+-    Volts for battery monitoring
 
----
+------------------------------------------------------------------------
 
-# Non-Responsibilities
+## Non-Responsibilities
 
 The Sensors subsystem is **not** responsible for:
 
-- Driving the robot
-- Obstacle avoidance behavior
-- Line following behavior
-- Autonomous navigation
-- Path planning
-- Vision processing
-- Camera control
-- Audio output
-- User interface behavior
+-    Driving the robot
+-    Obstacle avoidance behavior
+-    Line following behavior
+-    Autonomous navigation
+-    Path planning
+-    Vision processing
+-    Camera control
+-    Audio output
+-    User interface behavior
 
 Sensors provide information.
 
 Higher-level logic decides what to do with that information.
 
----
+------------------------------------------------------------------------
 
-# Public API
+## Public API
 
-The Sensors subsystem is accessed through the Robot API:
+Individual sensor components may also be used directly by robot implementations, validation programs, or advanced applications that provide the required hardware dependencies.
 
 ```python
 from betabox_car import Robot
@@ -84,40 +108,24 @@ robot = Robot()
 distance = robot.sensors.ultrasonic.distance()
 
 values = robot.sensors.grayscale.read()
-status = robot.sensors.grayscale.status()
 
 voltage = robot.sensors.battery.voltage()
-battery_status = robot.sensors.battery.status()
 ```
 
-Individual sensor classes may still be used directly for advanced or internal code:
+------------------------------------------------------------------------
 
-```python
-from betabox_car.sensors import Battery, Grayscale, Ultrasonic
-
-battery = Battery()
-ultrasonic = Ultrasonic()
-grayscale = Grayscale()
-```
-
-Student-facing curriculum should prefer access through `robot.sensors`.
-
----
-
-# Current Sensors
+## Components
 
 The current Sensors subsystem includes:
 
 ```text
 Sensors
- ├── ultrasonic
- ├── grayscale
- └── battery
+ ├── Ultrasonic
+ ├── Grayscale
+ └── Battery
 ```
 
----
-
-## Ultrasonic Sensor
+### Ultrasonic Sensor
 
 The Ultrasonic sensor measures distance using a trigger pin and echo pin.
 
@@ -135,19 +143,17 @@ distance = robot.sensors.ultrasonic.read()
 
 Expected behavior:
 
-- Distance is returned in centimeters.
-- Timeout behavior is handled internally.
-- Default trigger and echo pins are provided by the robot configuration.
-- Invalid sample counts raise a clear sensor error.
+-    Distance is returned in centimeters.
+-    Timeout behavior is handled internally.
+-    Trigger and echo pins are supplied by the robot implementation through robot configuration.
+-    Invalid sample counts raise a clear sensor error.
 
 The Ultrasonic component owns:
 
-- Trigger pin
-- Echo pin
+-    Trigger pin
+-    Echo pin
 
----
-
-## Grayscale Sensor
+### Grayscale Sensor
 
 The Grayscale sensor reads a three-channel line sensor.
 
@@ -181,21 +187,19 @@ normalized = robot.sensors.grayscale.get_grayscale_normalized()
 
 Expected behavior:
 
-- Raw values are read from three ADC channels.
-- Status returns `0` for floor and `1` for line.
-- If floor/line calibration is available, normalized values are used.
-- If calibration is not available, legacy reference thresholds are used.
-- Invalid channel or calibration input raises a clear sensor error.
+-    Raw values are read from three ADC channels.
+-    Status returns `0` for floor and `1` for line.
+-    If floor/line calibration is available, normalized values are used.
+-    If calibration is not available, legacy reference thresholds are used.
+-    Invalid channel or calibration input raises a clear sensor error.
 
 The Grayscale component owns:
 
-- Left ADC channel
-- Middle ADC channel
-- Right ADC channel
+-    Left ADC channel
+-    Middle ADC channel
+-    Right ADC channel
 
----
-
-## Battery Sensor
+### Battery Sensor
 
 The Battery sensor measures battery voltage using the configured ADC channel.
 
@@ -217,18 +221,18 @@ voltage = robot.sensors.battery.read()
 
 Expected behavior:
 
-- Voltage is returned in volts.
-- The configured voltage-divider scale factor is applied automatically.
-- Low and critical battery thresholds are configurable.
-- Battery state is reported as `ok`, `low`, or `critical`.
+-    Voltage is returned in volts.
+-    The robot-configured voltage-divider scale factor is applied automatically.
+-    Low and critical battery thresholds are configurable.
+-    Battery state is reported as `ok`, `low`, or `critical`.
 
 The Battery component owns:
 
-- Battery ADC channel
+-    Battery ADC channel
 
----
+------------------------------------------------------------------------
 
-# Internal Architecture
+## Internal Architecture
 
 ```text
 Sensors
@@ -251,9 +255,9 @@ Each sensor component owns the hardware resources it requires.
 
 Dependencies always point downward.
 
----
+------------------------------------------------------------------------
 
-# Resource Ownership
+## Resource Ownership
 
 The Sensors subsystem owns sensor components and is responsible for closing them.
 
@@ -265,16 +269,16 @@ robot.sensors.close()
 
 Expected cleanup behavior:
 
-- Ultrasonic trigger and echo pins are closed.
-- Grayscale ADC channels are closed.
-- Battery ADC channel is closed.
-- Releasing sensors should not affect unrelated subsystems.
+-    Ultrasonic trigger and echo pins are closed.
+-    Grayscale ADC channels are closed.
+-    Battery ADC channel is closed.
+-    Releasing sensors should not affect unrelated subsystems.
 
 Sensors should not control hardware owned by Drive, Vision, Audio, or System.
 
----
+------------------------------------------------------------------------
 
-# Error Handling
+## Error Handling
 
 Sensor-specific errors should inherit from a Betabox hardware or sensor error type.
 
@@ -290,64 +294,77 @@ Errors should be clear and actionable.
 
 Examples:
 
-- Invalid channel
-- Invalid calibration values
-- Invalid timeout
-- Invalid sample count
-- Invalid battery thresholds
+-    Invalid channel
+-    Invalid calibration values
+-    Invalid timeout
+-    Invalid sample count
+-    Invalid battery thresholds
 
 Low-level hardware exceptions should be wrapped or presented in a student-readable way where possible.
 
----
+------------------------------------------------------------------------
 
-# Calibration
+## Calibration
 
 Calibration belongs to the sensor component that uses it.
 
 Examples:
 
-- Grayscale handles floor/line calibration.
-- Ultrasonic handles timeout behavior and sample attempts.
-- Battery handles voltage scaling and threshold evaluation.
+-    Grayscale handles floor/line calibration.
+-    Ultrasonic handles timeout behavior and sample attempts.
+-    Battery handles voltage scaling and threshold evaluation.
 
 Higher-level behaviors such as line following or obstacle avoidance should use calibrated sensor data rather than duplicating calibration logic.
 
----
+------------------------------------------------------------------------
 
-# Interaction with Other Subsystems
+## Interaction with Other Subsystems
 
 Sensors provide information to higher-level code.
 
+```text
+   Applications
+        │
+        ▼
+     Robot API
+        │
+        ▼
+     Sensors
+        │
+        ▼
+Sensor Components
+```
+
 Example:
 
 ```text
-Ultrasonic
-    │
-    ▼
+   Ultrasonic
+       │
+       ▼
 Obstacle Avoidance Logic
-    │
-    ▼
-Drive
+       │
+       ▼
+     Drive
 ```
 
 Example:
 
 ```text
-Grayscale
-    │
-    ▼
+    Grayscale
+       │
+       ▼
 Line Following Logic
-    │
-    ▼
-Drive
+       │
+       ▼
+     Drive
 ```
 
 Example:
 
 ```text
-Battery
-    │
-    ▼
+    Battery
+       │
+       ▼
 System Monitoring
 ```
 
@@ -355,16 +372,18 @@ Sensors do not directly command Drive.
 
 This keeps sensor reading separate from robot behavior.
 
----
+------------------------------------------------------------------------
 
-# Future Sensors
+## Future Sensors
 
 Future sensors may include:
 
-- Wheel encoders
-- IMU
-- Temperature sensor
-- Additional distance sensors
+-    Wheel encoders
+-    IMU
+-    GPS
+-    Magnetometer
+-    Temperature sensor
+-    Additional distance sensors
 
 Future sensors should follow the same pattern:
 
@@ -381,30 +400,31 @@ robot.sensors.imu.orientation()
 
 Each new sensor should include:
 
-- Documentation
-- Example program
-- Public API
-- Hardware validation
-- Clear cleanup behavior
+-    Documentation
+-    Example program
+-    Public API
+-    Hardware validation
+-    Clear cleanup behavior
 
----
+------------------------------------------------------------------------
 
-# Design Principles
+## Design Principles
 
 The Sensors subsystem follows the Betabox Platform Design Principles:
 
-- Student First
-- Stable Public API
-- Hardware Independence
-- Single Responsibility
-- Physical Units
-- Exclusive Resource Ownership
-- Safe by Default
-- Test Everything
+-    Student First
+-    Stable Public API
+-    Reusable Subsystems
+-    Hardware Independence
+-    Single Responsibility
+-    Physical Units
+-    Exclusive Resource Ownership
+-    Safe by Default
+-    Test Everything
 
----
+------------------------------------------------------------------------
 
-# Summary
+## Summary
 
 The Sensors subsystem provides the robot with access to physical environment data.
 

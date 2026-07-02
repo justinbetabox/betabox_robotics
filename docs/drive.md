@@ -6,7 +6,7 @@
 
 ------------------------------------------------------------------------
 
-# Purpose
+## Purpose
 
 The Drive subsystem is responsible for controlled movement of the robot.
 
@@ -19,45 +19,70 @@ individual motors are driven.
 
 ------------------------------------------------------------------------
 
-# Responsibilities
+## Robot Composition
+
+The Drive subsystem is a reusable subsystem implementation.
+
+Robot implementations provide the configuration required to initialize
+the Drive subsystem.
+
+Applications should normally access movement through:
+
+```python
+from betabox_car import Robot
+
+robot = Robot()
+
+robot.drive.forward(50)
+```
+
+Constructing the Drive subsystem directly remains appropriate for
+validation, testing, and advanced configuration.
+
+Applications should normally interact with Drive through the Robot API.
+
+------------------------------------------------------------------------
+
+## Responsibilities
 
 The Drive subsystem is responsible for:
 
-## Movement
+### Movement
 
 -   Forward movement
 -   Backward movement
 -   Stopping
 -   Controlled speed changes
 
-## Steering
+### Steering
 
 -   Turn left
 -   Turn right
 -   Center steering
 -   Enforce steering limits
 
-## Safety
+### Safety
 
 -   Safe stopping
 -   Safe direction changes
 -   Speed validation
 -   Steering validation
 
-## Calibration
+### Robot Configuration
 
--   Apply steering calibration
+-   Apply robot-specific motor configuration
+-   Apply steering limits
 -   Apply motor orientation
--   Apply hardware-specific adjustments
+-   Apply trim values
 
-## State
+### State
 
 The Drive subsystem manages the robot's movement state, including
 current motion and steering commands.
 
 ------------------------------------------------------------------------
 
-# Non-Responsibilities
+## Non-Responsibilities
 
 The Drive subsystem is **not** responsible for:
 
@@ -78,7 +103,7 @@ Drive is responsible only for *executing movement safely*.
 
 ------------------------------------------------------------------------
 
-# Public API
+## Public API
 
 The public interface is exposed through the Robot API:
 
@@ -102,7 +127,7 @@ controller or steering hardware.
 
 ------------------------------------------------------------------------
 
-# Resource Ownership
+## Resource Ownership
 
 The Drive subsystem owns all hardware required for movement.
 
@@ -124,14 +149,14 @@ Other subsystems should never control drive hardware directly.
 
 ------------------------------------------------------------------------
 
-# Internal Architecture
+## Internal Architecture
 
 ``` text
 Drive
- ├── Motion Controller
- ├── Steering Controller
- ├── Calibration
- └── Hardware Interface
+ ├── Motion
+ ├── Steering
+ ├── Robot Configuration
+ └── Hardware Abstractions
 ```
 
 Each component has a single responsibility.
@@ -140,7 +165,7 @@ Hardware-specific details remain below the public API.
 
 ------------------------------------------------------------------------
 
-# Safety Guarantees
+## Behavior Guarantees
 
 The Drive subsystem should always provide predictable behavior.
 
@@ -155,7 +180,7 @@ Expected guarantees include:
 
 ------------------------------------------------------------------------
 
-# Interaction with Other Subsystems
+## Interaction with Other Subsystems
 
 The Drive subsystem accepts movement requests from higher-level
 software.
@@ -163,13 +188,16 @@ software.
 Example interaction:
 
 ``` text
-Vision
-    │
-Navigation
-    │
-Drive
-    │
-Hardware
+     Applications
+         │
+         ▼
+      Robot API
+         │
+         ▼
+       Drive
+         │
+         ▼
+Hardware Abstractions
 ```
 
 Vision and sensors provide information.
@@ -180,7 +208,9 @@ This separation keeps the subsystem focused and reusable.
 
 ------------------------------------------------------------------------
 
-# Hardware Independence
+## Hardware Independence
+
+Robot-specific wiring and configuration are supplied by the robot implementation rather than the Drive subsystem itself.
 
 The Drive subsystem should not assume any particular implementation.
 
@@ -197,7 +227,7 @@ hardware.
 
 ------------------------------------------------------------------------
 
-# Implementation Notes
+## Implementation Boundary
 
 Implementation details such as:
 
@@ -207,13 +237,29 @@ Implementation details such as:
 -   Servo drivers
 -   I²C communication
 -   Board layout
+-   Robot configuration objects
 
 belong below the Drive subsystem and should never be exposed through the
 public API.
 
 ------------------------------------------------------------------------
 
-# Summary
+# Design Principles
+
+The Drive subsystem follows the Betabox Platform Design Principles:
+
+- Student First
+- Stable Public API
+- Reusable Subsystems
+- Hardware Independence
+- Single Responsibility
+- Exclusive Resource Ownership
+- Safe by Default
+- Test Everything
+
+------------------------------------------------------------------------
+
+## Summary
 
 The Drive subsystem provides a stable interface for robot movement.
 

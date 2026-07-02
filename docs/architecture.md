@@ -6,7 +6,7 @@
 
 ------------------------------------------------------------------------
 
-# Philosophy
+## Philosophy
 
 The Betabox Platform is designed around a stable public Robot API that
 is independent of the underlying hardware implementation.
@@ -23,32 +23,29 @@ the public Robot API.
 
 ------------------------------------------------------------------------
 
-# Architecture
+## Architecture
 
 ``` text
-Applications
-(Student Notebooks, Curriculum,
-Teacher Tools, Future Portal)
+           Applications
                 │
                 ▼
         Betabox Robot API
                 │
                 ▼
-         Robot Subsystems
-    ┌─────┬──────┬────────┬──────┬──────┐
-    │     │      │        │      │
- Drive Vision Sensors Audio System
+      Robot Implementations
+     (Car, Arm, Tank, Drone)
+                │
+                ▼
+       Reusable Subsystems
+ ┌────────┬───────┬────────┬──────┐
+ │        │       │        │      │
+Drive   Vision  Sensors  Audio  System
                 │
                 ▼
         Platform Services
-     • Resource Management
-     • Configuration
-     • Event System
-     • Background Services
                 │
                 ▼
      Hardware Abstractions
- Motor Servo PWM Pin I2C ADC
                 │
                 ▼
      Linux / Device Drivers
@@ -58,84 +55,97 @@ Each layer communicates only with the layer immediately below it.
 
 ------------------------------------------------------------------------
 
-# Design Goals
+## Design Goals
 
--   Stable public API
--   Backend-independent implementation
--   Composition over inheritance
--   One responsibility per class
--   Student-friendly programming interface
--   Physical concepts over hardware registers
--   Explicit behavior over implicit behavior
--   Exclusive ownership of shared hardware resources
--   Modular subsystem design
--   Straightforward extensibility
+-    Stable public API
+-    Backend-independent implementation
+-    Composition over inheritance
+-    One responsibility per class
+-    Student-friendly programming interface
+-    Physical concepts over hardware registers
+-    Explicit behavior over implicit behavior
+-    Exclusive ownership of shared hardware resources
+-    Modular subsystem design
+-    Straightforward extensibility
+-    Robot-independent subsystem implementations
 
 ------------------------------------------------------------------------
 
-# Layer Responsibilities
+## Architectural Layers
 
-## Applications
+### Applications
 
 Applications include:
 
--   Student notebooks
--   Curriculum
--   Teacher tools
--   Future Betabox Portal
--   Internal Betabox applications
+-    Student notebooks
+-    Curriculum
+-    Teacher tools
+-    Future Betabox Portal
+-    Internal Betabox applications
 
 Applications interact with the robot exclusively through the Robot API.
 
-------------------------------------------------------------------------
-
-## Robot API
+### Robot API
 
 The Robot API is the stable programming interface presented to users.
 
 Responsibilities include:
 
--   Coordinating subsystem access
--   Providing a consistent programming model
--   Hiding implementation details
--   Remaining stable across platform evolution
+-    Coordinating subsystem access
+-    Providing a consistent programming model
+-    Hiding implementation details
+-    Remaining stable across platform evolution
 
-------------------------------------------------------------------------
+### Robot Implementations
 
-## Robot Subsystems
+Each physical robot platform composes reusable subsystem
+implementations into a complete robot.
+
+Examples include:
+
+-    Betabox Car
+-    Betabox Arm
+-    Betabox Tank
+-    Betabox Drone
+
+Robot implementations provide platform-specific configuration while
+reusing common subsystem implementations whenever practical.
+
+Applications should normally construct a Robot rather than individual subsystem implementations.
+
+### Reusable Subsystems
 
 The platform is organized into major subsystems:
 
--   Drive
--   Vision
--   Sensors
--   Audio
--   System
+-    Drive
+-    Vision
+-    Sensors
+-    Audio
+-    System
 
-Each subsystem owns a single area of robot functionality and exposes a
-cohesive public interface.
+Each subsystem owns a single area of robot functionality and is designed
+to be reusable across multiple robot implementations.
 
-------------------------------------------------------------------------
+Subsystems should not depend on robot-specific configuration.
 
-## Platform Services
+### Platform Services
 
 Platform services provide shared capabilities used across multiple
 subsystems.
 
 Examples include:
 
--   Resource management
--   Configuration
--   Event distribution
--   Background services
--   Future scheduling and monitoring
+-    Resource management
+-    Configuration
+-    Robot lifecycle
+-    Event distribution
+-    Background services
+-    Future scheduling and monitoring
 
 These services coordinate platform behavior while remaining invisible to
 student-facing code.
 
-------------------------------------------------------------------------
-
-## Hardware Abstractions
+### Hardware Abstractions
 
 The hardware layer provides low-level interfaces for physical devices
 including:
@@ -149,14 +159,13 @@ including:
 -   Sensors
 -   Future hardware peripherals
 
-Higher layers should never communicate directly with Linux hardware
-interfaces.
+Higher layers should never communicate directly with Linux hardware interfaces.
 
 ------------------------------------------------------------------------
 
-# Resource Ownership
+## Resource Ownership
 
-Each shared hardware resource has a single owner.
+Each subsystem owns the hardware resources it manages.
 
 Examples:
 
@@ -171,7 +180,7 @@ by user code.
 
 ------------------------------------------------------------------------
 
-# Extensibility
+## Extensibility
 
 New robot capabilities should extend existing subsystem interfaces
 whenever practical.
@@ -189,10 +198,36 @@ the platform to evolve internally.
 
 ------------------------------------------------------------------------
 
-# Long-Term Goal
+## Dependency Direction
 
-The Betabox Robot API is intended to become the stable programming
-interface for all Betabox robotic platforms.
+Dependencies flow from robot-specific implementations toward reusable
+subsystems.
+
+Reusable subsystem implementations should not depend on robot-specific
+configuration.
+
+    Applications
+        │
+        ▼
+    Robot API
+        │
+        ▼
+Robot Implementation
+        │
+        ▼
+Reusable Subsystems
+        │
+        ▼
+Hardware Abstractions
+
+This allows new robot platforms to reuse existing subsystem
+implementations without modification.
+
+------------------------------------------------------------------------
+
+## Long-Term Goal
+
+The Betabox Robot API, together with reusable subsystem implementations, is intended to become the stable foundation for all Betabox robotic platforms.
 
 Applications, curriculum, notebooks, teacher tools, and future web
 interfaces should continue to function even as hardware implementations,
@@ -204,7 +239,16 @@ replaced or expanded without requiring changes to user-facing software.
 
 ------------------------------------------------------------------------
 
-# Summary
+## Architectural Principles
+
+-    Layers communicate only with the layer below.
+-    Robot implementations compose reusable subsystems.
+-    Reusable subsystems never depend on robot implementations.
+-    Applications interact exclusively through the Robot API.
+
+------------------------------------------------------------------------
+
+## Summary
 
 The Betabox Platform is organized into clear architectural layers with
 well-defined responsibilities.

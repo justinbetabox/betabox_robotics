@@ -13,11 +13,11 @@ Betabox Car SDK.
 
 The public API is the contract used by:
 
--   Student notebooks
--   Curriculum examples
--   Teacher demonstrations
--   Future web interfaces
--   Internal Betabox applications
+-    Student notebooks
+-    Curriculum examples
+-    Teacher demonstrations
+-    Future web interfaces
+-    Internal Betabox applications
 
 Code outside the SDK should interact with the robot through this API
 instead of directly using hardware libraries, Linux interfaces, or
@@ -32,14 +32,14 @@ student-facing code.
 
 The Betabox API should be:
 
--   Stable
--   Student-friendly
--   Hardware-independent
--   Easy to read
--   Easy to teach
--   Explicit in behavior
--   Based on physical robot concepts
--   Safe by default
+-    Stable
+-    Student-friendly
+-    Hardware-independent
+-    Easy to read
+-    Easy to teach
+-    Explicit in behavior
+-    Based on physical robot concepts
+-    Safe by default
 
 The API should describe **what** the robot does, not **how** the
 hardware accomplishes it.
@@ -54,7 +54,7 @@ is preferred over exposing motors, PWM, GPIO, or other hardware details.
 
 ------------------------------------------------------------------------
 
-## Top-Level Robot Object
+## Robot API
 
 The primary entry point is:
 
@@ -79,21 +79,44 @@ The Robot object is the primary public interface to the platform.
 
 ------------------------------------------------------------------------
 
+# Programming Model
+
+The `Robot` object composes reusable subsystem implementations into a
+complete robot platform.
+
+Subsystem implementations are independent of any specific robot.
+
+Robot-specific classes are responsible for wiring subsystem
+implementations using robot configuration.
+
+This allows future robot platforms (such as robotic arms, tanks, or
+drones) to reuse existing subsystem implementations without modifying the
+subsystems themselves.
+
+Applications should interact with the `Robot` object rather than
+instantiating subsystem implementations directly whenever practical.
+
+------------------------------------------------------------------------
+
 # API Design Rules
 
 Public APIs should:
 
--   use descriptive names
--   avoid abbreviations
--   avoid exposing hardware details
--   return meaningful Python objects when practical
--   raise Betabox-specific exceptions
--   remain backward compatible whenever possible
--   prefer capability objects over large monolithic classes
+-    Use descriptive names
+-    Avoid abbreviations
+-    Avoid exposing hardware details
+-    Return meaningful Python objects when practical
+-    Raise Betabox-specific exceptions
+-    Remain backward compatible whenever possible
+-    Prefer capability objects over large monolithic classes
+-    Compose reusable subsystem implementations
+-    Separate robot configuration from subsystem implementation
 
 ------------------------------------------------------------------------
 
-# Drive API
+# Subsystem APIs
+
+## Drive API
 
 ``` python
 robot.drive.forward(speed)
@@ -110,30 +133,30 @@ The SDK manages steering calibration and limits internally.
 
 ------------------------------------------------------------------------
 
-# Vision API
+## Vision API
 
 Vision provides capabilities rather than exposing camera implementation
 details.
 
 Capability groups include:
 
--   Camera
--   Streaming
--   Snapshots
--   Recording
--   Detection
--   Metadata
--   Configuration
--   Statistics
+-    Camera
+-    Streaming
+-    Snapshots
+-    Recording
+-    Detection
+-    Metadata
+-    Configuration
+-    Statistics
 
-## Snapshots
+### Snapshots
 
 ```python
 snapshot = robot.vision.snapshot.capture()
 print(snapshot.path)
 ```
 
-## Recording
+### Recording
 
 ```python
 robot.vision.recording.start()
@@ -146,16 +169,16 @@ print(recording.path)
 print(recording.duration)
 ```
 
-## Streaming
+### Streaming
 
 ```python
 robot.vision.stream.start()
 robot.vision.stream.stop()
 ```
 
-## Detection
+### Detection
 
-### Color
+#### Color
 
 ```python
 robot.vision.detection.color.enable("red")
@@ -163,7 +186,7 @@ robot.vision.detection.color.enable("red")
 metadata = robot.vision.metadata.latest("color")
 ```
 
-### Face
+#### Face
 
 ```python
 robot.vision.detection.face.enable()
@@ -173,21 +196,18 @@ metadata = robot.vision.metadata.latest("face")
 
 Implemented capabilities:
 
-- Color
-- Face
+-    Color
+-    Face
 
 Planned capabilities:
 
-- Object
-- Traffic Sign
+-    Object
+-    Traffic Sign
 
 Detection capabilities are exposed as capability objects rather than
 requiring applications to create or register detector instances.
 
-
-------------------------------------------------------------------------
-
-# Sensors API
+## Sensors API
 
 ``` python
 robot.sensors.ultrasonic.distance()
@@ -207,14 +227,12 @@ Future sensors should follow:
 robot.sensors.<sensor>.<action>()
 ```
 
-------------------------------------------------------------------------
-
-# Audio API
+## Audio API
 
 The Audio subsystem provides speech synthesis, sound playback, tone
 generation, and melody playback.
 
-## Speech
+### Speech
 
 ```python
 robot.audio.say("Hello from Betabox")
@@ -240,7 +258,7 @@ audio = Audio(
 )
 ```
 
-## Sound Playback
+### Sound Playback
 
 ```python
 robot.audio.play_sound("car-honk")
@@ -252,14 +270,14 @@ Alias:
 robot.audio.play("car-honk")
 ```
 
-## Tone Playback
+### Tone Playback
 
 ```python
 robot.audio.play_note("C5", 0.5)
 robot.audio.play_note(440.0, 0.5)
 ```
 
-## Melody Playback
+### Melody Playback
 
 ```python
 robot.audio.play_melody(
@@ -273,13 +291,13 @@ robot.audio.play_melody(
 )
 ```
 
-## Playback Control
+### Playback Control
 
 ```python
 robot.audio.stop()
 ```
 
-## Diagnostics
+### Diagnostics
 
 ```python
 robot.audio.speech_backend_name
@@ -289,9 +307,7 @@ robot.audio.available_speech_backends()
 Audio hides implementation details such as PyAudio, ALSA, speech engines,
 audio conversion tools, and amplifier GPIO control.
 
-------------------------------------------------------------------------
-
-# System API
+## System API
 
 ``` python
 status = robot.system.status()
@@ -311,20 +327,23 @@ services
 
 # Resource Management
 
-Subsystems own their hardware resources.
+Robot implementations compose reusable subsystem implementations and provide the configuration required to initialize them.
+
+Subsystems own the hardware resources they manage.
 
 Examples:
 
--   Vision owns the camera.
--   Drive owns motors and steering.
--   Sensors own sensor devices.
--   Audio owns audio hardware.
--   System manages robot services.
+-    Vision owns the camera.
+-    Drive owns motors and steering.
+-    Sensors own sensor devices.
+-    Audio owns audio hardware.
+-    System owns platform services and status information.
 
 Applications should never need to coordinate shared hardware directly.
 
-Applications should not instantiate multiple subsystem objects to access
-shared hardware.
+Applications should normally interact with subsystem instances provided
+by the `Robot` object rather than constructing additional subsystem
+instances directly.
 
 Applications should enable capabilities rather than creating additional subsystem instances. The SDK manages the lifecycle of shared resources such as the camera.
 
@@ -347,14 +366,14 @@ Public APIs should raise Betabox-specific exceptions.
 
 Examples:
 
--   BetaboxError
--   HardwareError
--   ConfigurationError
--   ResourceError
--   VisionError
--   DriveError
--   SensorError
--   AudioError
+-    BetaboxError
+-    HardwareError
+-    ConfigurationError
+-    ResourceError
+-    VisionError
+-    DriveError
+-    SensorError
+-    AudioError
 
 Errors should explain what happened and, when possible, how the user can
 resolve the issue.
@@ -380,6 +399,26 @@ from betabox_car import Robot
 robot = Robot()
 robot.drive.forward(50)
 robot.drive.stop()
+```
+
+```python
+if robot.sensors.battery.is_low():
+    print("Battery is low.")
+```
+
+```python
+robot.audio.say("Hello from Betabox")
+robot.audio.play_sound("car-honk")
+robot.audio.play_note("C5", 0.5)
+robot.audio.play_melody(
+    [
+        ("C5", 0.2),
+        ("D5", 0.2),
+        ("E5", 0.2),
+        ("G5", 0.4),
+    ],
+    gap=0.05,
+)
 ```
 
 ``` python
@@ -416,45 +455,40 @@ print(metadata.data["count"])
 ```
 
 ```python
-if robot.sensors.battery.is_low():
-    print("Battery is low.")
-```
+from betabox_car import Robot
 
+robot = Robot()
 
+robot.drive.forward(40)
 
-```python
-robot.audio.say("Hello from Betabox")
-robot.audio.play_sound("car-honk")
-robot.audio.play_note("C5", 0.5)
-robot.audio.play_melody(
-    [
-        ("C5", 0.2),
-        ("D5", 0.2),
-        ("E5", 0.2),
-        ("G5", 0.4),
-    ],
-    gap=0.05,
-)
+distance = robot.sensors.ultrasonic.distance()
+
+if distance < 20:
+    robot.drive.stop()
+    robot.audio.say("Obstacle detected.")
 ```
 
 ------------------------------------------------------------------------
 
-# Internal Implementation Boundary
+# Implementation Boundary
+
+Robot-specific configuration is an implementation detail and should not be accessed directly by applications.
 
 Applications should not depend on:
 
--   GPIO
--   PWM
--   I²C implementation details
--   Camera driver objects
--   Linux device paths
--   Streaming protocols
--   Web server internals
--   Calibration files
--   Audio driver objects
--   Speech engine commands
--   Audio conversion tools
--   Speaker amplifier GPIO control
+-    GPIO
+-    PWM
+-    I²C implementation details
+-    Camera driver objects
+-    Linux device paths
+-    Streaming protocols
+-    Web server internals
+-    Calibration files
+-    Audio driver objects
+-    Speech engine commands
+-    Audio conversion tools
+-    Speaker amplifier GPIO control
+-    Robot configuration objects
 
 Packages under `hardware/`, `vision/`, `drive/`, `sensors/`, and other
 implementation modules are internal unless explicitly documented as

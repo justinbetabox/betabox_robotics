@@ -1,23 +1,38 @@
 #!/usr/bin/env python3
+"""
+Betabox Ultrasonic validation test.
+
+Validates distance measurement using the Ultrasonic sensor subsystem.
+"""
 
 from time import sleep
 
+from betabox_car.robots import BETABOX_CAR
 from betabox_car.sensors import Ultrasonic
 
-with Ultrasonic() as sensor:
-    print("\nUltrasonic hardware test")
-    print("========================")
 
-    for _ in range(10):
-        distance = sensor.distance()
+def main() -> None:
+    with Ultrasonic(
+        trigger=BETABOX_CAR.ultrasonic.trigger,
+        echo=BETABOX_CAR.ultrasonic.echo,
+    ) as sensor:
+        print("\nUltrasonic validation test")
+        print("==========================")
 
-        if distance == -1:
-            print("timeout")
-        elif distance == -2:
-            print("invalid pulse")
-        else:
-            print(f"{distance:.2f} cm")
+        for _ in range(10):
+            distance = sensor.distance()
 
-        sleep(0.3)
+            if distance == -1:
+                print("Status  : timeout")
+            elif distance == -2:
+                print("Status  : invalid pulse")
+            else:
+                print(f"Distance: {distance:.2f} cm")
 
-print("\nUltrasonic hardware test complete.")
+            sleep(0.3)
+
+    print("\nUltrasonic validation test complete.")
+
+
+if __name__ == "__main__":
+    main()

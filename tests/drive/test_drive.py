@@ -1,44 +1,63 @@
 #!/usr/bin/env python3
+"""
+Betabox Drive validation test.
+
+Validates:
+- Forward
+- Backward
+- Steering
+- Stop
+"""
 
 from time import sleep
 
 from betabox_car.drive import Drive
+from betabox_car.robots import BETABOX_CAR
 
-drive = Drive.default()
 
-try:
-    print("Center steering")
-    drive.center()
-    sleep(1)
+def main() -> None:
+    drive = Drive.default(BETABOX_CAR)
 
-    print("Forward")
-    drive.forward(30)
-    sleep(2)
+    try:
+        print("\nDrive validation test")
+        print("=====================")
 
-    print("Stop")
-    drive.stop()
-    sleep(1)
+        print("Center steering")
+        drive.center()
+        sleep(1)
 
-    print("Backward")
-    drive.backward(30)
-    sleep(2)
+        print("Forward")
+        drive.forward(30)
+        sleep(2)
 
-    print("Stop")
-    drive.stop()
-    sleep(1)
+        print("Stop")
+        drive.stop()
+        sleep(1)
 
-    print("Left")
-    drive.left(20)
-    sleep(1)
+        print("Backward")
+        drive.backward(30)
+        sleep(2)
 
-    print("Right")
-    drive.right(20)
-    sleep(1)
+        print("Stop")
+        drive.stop()
+        sleep(1)
 
-    print("Center")
-    drive.center()
+        print("Left")
+        drive.left(20)
+        sleep(1)
 
-finally:
-    drive.close()
+        print("Right")
+        drive.right(20)
+        sleep(1)
 
-print("Drive test complete.")
+        print("Center")
+        drive.center()
+
+    finally:
+        drive.close()
+
+    print("\nDrive validation test complete.")
+
+
+if __name__ == "__main__":
+    main()

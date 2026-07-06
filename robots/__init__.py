@@ -9,6 +9,7 @@ from .betabox_car import (
     SteeringConfig,
     UltrasonicConfig,
 )
+from .capabilities import RobotCapability
 from .car import CarRobot
 from .robot import Robot
 
@@ -24,4 +25,5 @@ __all__ = [
     "BatteryConfig",
     "RobotConfig",
     "BETABOX_CAR",
+    "RobotCapability",
 ]

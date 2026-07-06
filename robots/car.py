@@ -1,5 +1,6 @@
 from typing import Any
 
+from .capabilities import RobotCapability
 from .robot import Robot
 
 
@@ -13,6 +14,14 @@ class CarRobot(Robot):
     This class also provides beginner-friendly convenience methods that
     delegate to the underlying subsystem APIs.
     """
+
+    capabilities = {
+        RobotCapability.DRIVE,
+        RobotCapability.SENSORS,
+        RobotCapability.VISION,
+        RobotCapability.AUDIO,
+        RobotCapability.SYSTEM,
+    }
 
     drive: Any
     sensors: Any
@@ -123,7 +132,7 @@ class CarRobot(Robot):
         return self.system.health()
 
     def stop_all(self) -> None:
-        self.stop()
+        self.drive.stop()
 
         try:
             if self.is_recording():
@@ -145,3 +154,5 @@ class CarRobot(Robot):
         system_stop_all = getattr(self.system, "stop_all", None)
         if callable(system_stop_all):
             system_stop_all()
+
+        self._started = False

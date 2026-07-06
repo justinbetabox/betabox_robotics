@@ -64,8 +64,8 @@
 -    [x] Robot hardware configuration model
 -    [x] Dependency injection into reusable subsystems
 -    [x] Robot-specific platform wiring
--    [ ] Shared Robot base class
--    [ ] Public Robot API
+-    [x] Shared Robot base class
+-    [x] Public Robot API
 -    [ ] Robot capability discovery
 -    [ ] Robot lifecycle management
 -    [ ] Robot health reporting
@@ -160,11 +160,11 @@
 
 ### Subsystems
 
--    [ ] Hardware validation
--    [ ] Subsystem validation
--    [ ] Robot validation
--    [ ] Audio validation
--    [ ] System validation
+-    [x] Hardware validation
+-    [x] Subsystem validation
+-    [x] Robot validation
+-    [x] Audio validation
+-    [x] System validation
 
 ### Robot
 
@@ -172,12 +172,12 @@
 
 ### Examples
 
--    [ ] Hardware examples
--    [ ] Drive examples
--    [ ] Sensors examples
--    [ ] Vision examples
--    [ ] Audio examples
--    [ ] System examples
+-    [x] Hardware examples
+-    [x] Drive examples
+-    [x] Sensors examples
+-    [x] Vision examples
+-    [x] Audio examples
+-    [x] System examples
 
 ------------------------------------------------------------------------
 
@@ -190,7 +190,7 @@
 -    [ ] 0.5 Vision Platform
 -    [x] 0.6 Audio Foundation
 -    [ ] 0.7 System Services
--    [ ] 0.8 Robot Platform
+-    [x] 0.8 Robot Platform
 -    [ ] 0.9 Applications
 -    [ ] 1.0 Betabox Platform
 

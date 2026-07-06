@@ -3,6 +3,13 @@ class RobotBase:
     Base class for Betabox robot platforms.
     """
 
+    def __init__(self):
+        self._closed = False
+
+    @property
+    def closed(self) -> bool:
+        return self._closed
+
     def close(self) -> None:
         return None
 

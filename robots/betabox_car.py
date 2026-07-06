@@ -98,6 +98,7 @@ class BetaboxCar(CarRobot):
     """
 
     def __init__(self, config: RobotConfig = BETABOX_CAR):
+        super().__init__()
         self.config = config
 
         self.drive = Drive.default(config)
@@ -105,6 +106,7 @@ class BetaboxCar(CarRobot):
         self.vision = Vision.default(config)
         self.audio = Audio.default(config)
         self.system = System.default(config)
+        self._closed = False
 
     def close(self) -> None:
         for subsystem in (
@@ -114,6 +116,10 @@ class BetaboxCar(CarRobot):
             self.sensors,
             self.system,
         ):
+            if self._closed:
+                self.stop()
+                return
+
             close = getattr(subsystem, "close", None)
 
             if callable(close):

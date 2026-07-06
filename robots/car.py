@@ -1,6 +1,7 @@
 from typing import Any
 
 from .capabilities import RobotCapability
+from .health import HealthCheck, RobotHealth
 from .robot import Robot
 
 
@@ -129,7 +130,32 @@ class CarRobot(Robot):
         return self.system.status()
 
     def health(self):
-        return self.system.health()
+        checks = []
+
+        system_health = self.system.health()
+        checks.append(
+            HealthCheck(
+                name="system",
+                ok=system_health.ok,
+                message="; ".join(system_health.messages),
+            )
+        )
+
+        battery_critical = self.is_battery_critical()
+        battery_status = self.battery_status()
+
+        checks.append(
+            HealthCheck(
+                name="battery",
+                ok=not battery_critical,
+                message=f"battery status: {battery_status}" if battery_critical else "",
+            )
+        )
+
+        return RobotHealth(
+            ok=all(check.ok for check in checks),
+            checks=checks,
+        )
 
     def stop_all(self) -> None:
         self.drive.stop()

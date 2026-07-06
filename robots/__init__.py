@@ -11,6 +11,7 @@ from .betabox_car import (
 )
 from .capabilities import RobotCapability
 from .car import CarRobot
+from .health import HealthCheck, RobotHealth
 from .robot import Robot
 
 __all__ = [
@@ -26,4 +27,6 @@ __all__ = [
     "RobotConfig",
     "BETABOX_CAR",
     "RobotCapability",
+    "HealthCheck",
+    "RobotHealth",
 ]

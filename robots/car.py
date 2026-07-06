@@ -121,3 +121,27 @@ class CarRobot(Robot):
 
     def health(self):
         return self.system.health()
+
+    def stop_all(self) -> None:
+        self.stop()
+
+        try:
+            if self.is_recording():
+                self.stop_recording()
+        except Exception:
+            pass
+
+        try:
+            if self.is_vision_running():
+                self.stop_vision()
+        except Exception:
+            pass
+
+        try:
+            self.stop_audio()
+        except Exception:
+            pass
+
+        system_stop_all = getattr(self.system, "stop_all", None)
+        if callable(system_stop_all):
+            system_stop_all()

@@ -112,7 +112,7 @@ class BetaboxCar(CarRobot):
         if self.closed:
             return
 
-        self.stop()
+        self.stop_all()
 
         for subsystem in (
             self.audio,

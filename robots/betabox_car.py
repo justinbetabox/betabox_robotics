@@ -1,6 +1,13 @@
 from dataclasses import dataclass
 
+from betabox_robotics.audio import Audio
+from betabox_robotics.drive import Drive
 from betabox_robotics.hardware import AnalogChannel, DigitalPin, Pins, PWMChannel
+from betabox_robotics.sensors import Sensors
+from betabox_robotics.system import System
+from betabox_robotics.vision import Vision
+
+from .car import CarRobot
 
 
 @dataclass(frozen=True)
@@ -83,3 +90,31 @@ BETABOX_CAR = RobotConfig(
         critical_voltage=6.2,
     ),
 )
+
+
+class BetaboxCar(CarRobot):
+    """
+    Concrete Betabox Car robot platform.
+    """
+
+    def __init__(self, config: RobotConfig = BETABOX_CAR):
+        self.config = config
+
+        self.drive = Drive.default(config)
+        self.sensors = Sensors.default(config)
+        self.vision = Vision.default(config)
+        self.audio = Audio.default(config)
+        self.system = System.default(config)
+
+    def close(self) -> None:
+        for subsystem in (
+            self.audio,
+            self.vision,
+            self.drive,
+            self.sensors,
+            self.system,
+        ):
+            close = getattr(subsystem, "close", None)
+
+            if callable(close):
+                close()

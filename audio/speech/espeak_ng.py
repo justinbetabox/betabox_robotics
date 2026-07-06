@@ -2,8 +2,8 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from betabox_car.audio.exceptions import AudioError
-from betabox_car.audio.speech.base import SpeechBackend
+from betabox_robotics.audio.exceptions import AudioError
+from betabox_robotics.audio.speech.base import SpeechBackend
 
 
 class EspeakNgSpeech(SpeechBackend):

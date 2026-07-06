@@ -3,8 +3,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
-from betabox_car.vision.frame import Frame
-from betabox_car.vision.model_runtime import ModelDetection
+from betabox_robotics.vision.frame import Frame
+from betabox_robotics.vision.model_runtime import ModelDetection
 
 
 class TFLiteObjectDetectionRuntime:

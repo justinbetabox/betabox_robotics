@@ -5,8 +5,8 @@ Developer demo for the Betabox Grayscale sensor.
 
 from time import sleep
 
-from betabox_car.robots import BETABOX_CAR
-from betabox_car.sensors import Grayscale
+from betabox_robotics.robots import BETABOX_CAR
+from betabox_robotics.sensors import Grayscale
 
 
 def main() -> None:

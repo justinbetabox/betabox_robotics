@@ -4,7 +4,7 @@ import tempfile
 
 import numpy as np
 
-from betabox_car.vision import Frame, SnapshotService
+from betabox_robotics.vision import Frame, SnapshotService
 
 
 class FakeFrameSource:

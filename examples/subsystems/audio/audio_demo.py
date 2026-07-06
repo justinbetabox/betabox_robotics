@@ -3,7 +3,7 @@
 Developer demo for the Betabox Audio subsystem.
 """
 
-from betabox_car.audio import Audio
+from betabox_robotics.audio import Audio
 
 
 def main() -> None:

@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from betabox_car.system import MediaPaths, System, SystemHealth, SystemStatus
+from betabox_robotics.system import MediaPaths, System, SystemHealth, SystemStatus
 
 
 def test_system_status():

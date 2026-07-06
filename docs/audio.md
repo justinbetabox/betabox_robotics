@@ -29,7 +29,7 @@ Audio subsystem.
 Applications should normally access audio through:
 
 ```python
-from betabox_car import Robot
+from betabox_robotics import Robot
 
 robot = Robot()
 
@@ -79,7 +79,7 @@ Higher-level systems decide **when** audio should be played.
 ## Public API
 
 ```python
-from betabox_car import Robot
+from betabox_robotics import Robot
 
 robot = Robot()
 

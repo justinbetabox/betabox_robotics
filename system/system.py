@@ -2,7 +2,7 @@ import socket
 from dataclasses import dataclass
 from pathlib import Path
 
-from betabox_car.version import __version__
+from betabox_robotics.version import __version__
 
 
 @dataclass(frozen=True)

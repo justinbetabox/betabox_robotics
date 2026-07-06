@@ -6,8 +6,8 @@ from typing import Any, Dict, Optional, Set
 from aiortc import MediaStreamTrack, RTCPeerConnection, RTCSessionDescription
 from av.video.frame import VideoFrame
 
-from betabox_car.vision.frame import Frame
-from betabox_car.vision.stream import Streamer
+from betabox_robotics.vision.frame import Frame
+from betabox_robotics.vision.stream import Streamer
 
 
 class VisionVideoTrack(MediaStreamTrack):

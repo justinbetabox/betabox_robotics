@@ -9,7 +9,7 @@ It demonstrates the lower-level Vision streaming pipeline rather than
 the public Vision subsystem.
 """
 
-from betabox_car.vision import FrameSource, WebRTCSignalingServer, WebRTCStreamer
+from betabox_robotics.vision import FrameSource, WebRTCSignalingServer, WebRTCStreamer
 
 
 def main() -> None:

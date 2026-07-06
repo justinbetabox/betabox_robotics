@@ -2,7 +2,7 @@
 
 from time import sleep
 
-from betabox_car.vision import FrameSource, WebRTCStreamer
+from betabox_robotics.vision import FrameSource, WebRTCStreamer
 
 streamer = WebRTCStreamer()
 

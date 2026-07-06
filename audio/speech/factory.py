@@ -1,11 +1,11 @@
 import os
 from pathlib import Path
 
-from betabox_car.audio.exceptions import AudioError
-from betabox_car.audio.speech.base import SpeechBackend
-from betabox_car.audio.speech.espeak_ng import EspeakNgSpeech
-from betabox_car.audio.speech.pico import PicoSpeech
-from betabox_car.audio.speech.piper import PiperSpeech
+from betabox_robotics.audio.exceptions import AudioError
+from betabox_robotics.audio.speech.base import SpeechBackend
+from betabox_robotics.audio.speech.espeak_ng import EspeakNgSpeech
+from betabox_robotics.audio.speech.pico import PicoSpeech
+from betabox_robotics.audio.speech.piper import PiperSpeech
 
 
 def create_backend(

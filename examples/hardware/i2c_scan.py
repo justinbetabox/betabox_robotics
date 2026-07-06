@@ -3,7 +3,7 @@
 Developer demo for the Betabox I2C hardware abstraction.
 """
 
-from betabox_car.hardware import I2C
+from betabox_robotics.hardware import I2C
 
 
 def main() -> None:

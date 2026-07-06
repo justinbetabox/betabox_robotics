@@ -1,4 +1,4 @@
-from betabox_car.robots.car import BetaboxCar
+from betabox_robotics.robots.car import BetaboxCar
 
 
 class Car(BetaboxCar):

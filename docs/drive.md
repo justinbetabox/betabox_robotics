@@ -29,7 +29,7 @@ the Drive subsystem.
 Applications should normally access movement through:
 
 ```python
-from betabox_car import Robot
+from betabox_robotics import Robot
 
 robot = Robot()
 
@@ -108,7 +108,7 @@ Drive is responsible only for *executing movement safely*.
 The public interface is exposed through the Robot API:
 
 ``` python
-from betabox_car import Robot
+from betabox_robotics import Robot
 
 robot = Robot()
 

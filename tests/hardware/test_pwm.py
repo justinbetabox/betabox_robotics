@@ -7,7 +7,7 @@ Exercises one PWM output.
 
 from time import sleep
 
-from betabox_car.hardware import PWM, Pins
+from betabox_robotics.hardware import PWM, Pins
 
 
 def main() -> None:

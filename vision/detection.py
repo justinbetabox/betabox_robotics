@@ -1,11 +1,15 @@
 import threading
 from typing import Dict
 
-from betabox_car.vision.consumer import FrameConsumer
-from betabox_car.vision.detector import Detector
-from betabox_car.vision.detectors import ColorDetector, FaceDetector, ObjectDetector
-from betabox_car.vision.frame import Frame
-from betabox_car.vision.metadata_bus import MetadataBus
+from betabox_robotics.vision.consumer import FrameConsumer
+from betabox_robotics.vision.detector import Detector
+from betabox_robotics.vision.detectors import (
+    ColorDetector,
+    FaceDetector,
+    ObjectDetector,
+)
+from betabox_robotics.vision.frame import Frame
+from betabox_robotics.vision.metadata_bus import MetadataBus
 
 
 class DetectionError(Exception):

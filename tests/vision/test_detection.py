@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from betabox_car.vision import (
+from betabox_robotics.vision import (
     Detection,
     DetectionManager,
     Detector,

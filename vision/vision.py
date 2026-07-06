@@ -1,10 +1,10 @@
-from betabox_car.vision.consumer import FrameConsumer
-from betabox_car.vision.detection import DetectionManager
-from betabox_car.vision.frame import Frame
-from betabox_car.vision.frame_source import FrameSource
-from betabox_car.vision.metadata_bus import MetadataBus
-from betabox_car.vision.recording import RecordingService
-from betabox_car.vision.snapshot import SnapshotService
+from betabox_robotics.vision.consumer import FrameConsumer
+from betabox_robotics.vision.detection import DetectionManager
+from betabox_robotics.vision.frame import Frame
+from betabox_robotics.vision.frame_source import FrameSource
+from betabox_robotics.vision.metadata_bus import MetadataBus
+from betabox_robotics.vision.recording import RecordingService
+from betabox_robotics.vision.snapshot import SnapshotService
 
 
 class Vision:

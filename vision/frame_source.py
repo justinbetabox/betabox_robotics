@@ -2,9 +2,9 @@ import threading
 import time
 from typing import Optional
 
-from betabox_car.vision.camera import CameraError, CameraManager
-from betabox_car.vision.consumer import FrameConsumer
-from betabox_car.vision.frame import Frame
+from betabox_robotics.vision.camera import CameraError, CameraManager
+from betabox_robotics.vision.consumer import FrameConsumer
+from betabox_robotics.vision.frame import Frame
 
 
 class FrameSourceError(CameraError):

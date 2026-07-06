@@ -5,7 +5,7 @@ Developer demo for the Betabox ADC hardware abstraction.
 
 from time import sleep
 
-from betabox_car.hardware import ADC, Pins
+from betabox_robotics.hardware import ADC, Pins
 
 
 def main() -> None:

@@ -10,8 +10,8 @@ Vision consumers.
 import threading
 from time import sleep
 
-from betabox_car.robots import BETABOX_CAR
-from betabox_car.vision import Vision, WebRTCSignalingServer, WebRTCStreamer
+from betabox_robotics.robots import BETABOX_CAR
+from betabox_robotics.vision import Vision, WebRTCSignalingServer, WebRTCStreamer
 
 
 def main() -> None:

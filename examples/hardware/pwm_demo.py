@@ -5,7 +5,7 @@ Developer demo for the Betabox PWM hardware abstraction.
 
 from time import sleep
 
-from betabox_car.hardware import PWM, Pins
+from betabox_robotics.hardware import PWM, Pins
 
 
 def main() -> None:

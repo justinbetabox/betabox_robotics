@@ -5,9 +5,9 @@ from typing import Literal
 
 import cv2
 
-from betabox_car.vision.frame import Frame
-from betabox_car.vision.frame_source import FrameSourceError
-from betabox_car.vision.interfaces import FrameProvider
+from betabox_robotics.vision.frame import Frame
+from betabox_robotics.vision.frame_source import FrameSourceError
+from betabox_robotics.vision.interfaces import FrameProvider
 
 ImageFormat = Literal["jpg", "jpeg", "png"]
 

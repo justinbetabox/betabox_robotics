@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from betabox_car.vision import CameraManager
+from betabox_robotics.vision import CameraManager
 
 with CameraManager() as camera:
     print("\nCamera hardware test")

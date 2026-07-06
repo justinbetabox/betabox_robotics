@@ -1,4 +1,4 @@
-from betabox_car.hardware import PWM, Motor, Pin, Servo
+from betabox_robotics.hardware import PWM, Motor, Pin, Servo
 
 
 class Drive:

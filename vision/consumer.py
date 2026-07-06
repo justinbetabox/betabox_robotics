@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 
-from betabox_car.vision.frame import Frame
+from betabox_robotics.vision.frame import Frame
 
 
 class FrameConsumer(ABC):

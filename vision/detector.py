@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 
-from betabox_car.vision.frame import Frame
-from betabox_car.vision.metadata import Metadata
+from betabox_robotics.vision.frame import Frame
+from betabox_robotics.vision.metadata import Metadata
 
 
 class Detector(ABC):

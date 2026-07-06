@@ -5,7 +5,7 @@ Developer demo for the Betabox Servo hardware abstraction.
 
 from time import sleep
 
-from betabox_car.hardware import Pins, Servo
+from betabox_robotics.hardware import Pins, Servo
 
 
 def main() -> None:

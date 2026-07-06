@@ -5,7 +5,7 @@ Betabox I2C hardware test.
 Scans the I²C bus and lists connected devices.
 """
 
-from betabox_car.hardware import I2C
+from betabox_robotics.hardware import I2C
 
 
 def main() -> None:

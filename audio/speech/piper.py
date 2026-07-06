@@ -3,9 +3,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-from betabox_car.audio.exceptions import AudioError
-from betabox_car.audio.quiet import suppress_stderr
-from betabox_car.audio.speech.base import SpeechBackend
+from betabox_robotics.audio.exceptions import AudioError
+from betabox_robotics.audio.quiet import suppress_stderr
+from betabox_robotics.audio.speech.base import SpeechBackend
 
 
 class PiperSpeech(SpeechBackend):

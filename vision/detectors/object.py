@@ -1,7 +1,7 @@
-from betabox_car.vision.detector import Detector
-from betabox_car.vision.frame import Frame
-from betabox_car.vision.metadata import Detection, Metadata
-from betabox_car.vision.model_runtime import ObjectDetectionRuntime
+from betabox_robotics.vision.detector import Detector
+from betabox_robotics.vision.frame import Frame
+from betabox_robotics.vision.metadata import Detection, Metadata
+from betabox_robotics.vision.model_runtime import ObjectDetectionRuntime
 
 
 class ObjectDetector(Detector):

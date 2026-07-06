@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from betabox_car.vision import FaceDetector, Frame
+from betabox_robotics.vision import FaceDetector, Frame
 
 
 def test_face_detector_handles_frame_without_faces():

@@ -7,8 +7,8 @@ Validates distance measurement using the Ultrasonic sensor subsystem.
 
 from time import sleep
 
-from betabox_car.robots import BETABOX_CAR
-from betabox_car.sensors import Ultrasonic
+from betabox_robotics.robots import BETABOX_CAR
+from betabox_robotics.sensors import Ultrasonic
 
 
 def main() -> None:

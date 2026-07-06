@@ -1,6 +1,6 @@
 from typing import Protocol
 
-from betabox_car.vision.frame import Frame
+from betabox_robotics.vision.frame import Frame
 
 
 class FrameProvider(Protocol):

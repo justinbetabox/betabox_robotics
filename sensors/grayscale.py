@@ -1,6 +1,6 @@
 from typing import List, Optional, Tuple
 
-from betabox_car.hardware import ADC, HardwareError
+from betabox_robotics.hardware import ADC, HardwareError
 
 
 class GrayscaleError(HardwareError):

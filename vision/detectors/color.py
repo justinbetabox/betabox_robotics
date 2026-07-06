@@ -1,8 +1,8 @@
 import cv2
 
-from betabox_car.vision.detector import Detector
-from betabox_car.vision.frame import Frame
-from betabox_car.vision.metadata import Detection, Metadata
+from betabox_robotics.vision.detector import Detector
+from betabox_robotics.vision.frame import Frame
+from betabox_robotics.vision.metadata import Detection, Metadata
 
 
 class ColorDetector(Detector):

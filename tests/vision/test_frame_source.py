@@ -2,7 +2,7 @@
 
 from time import sleep
 
-from betabox_car.vision import FrameSource
+from betabox_robotics.vision import FrameSource
 
 with FrameSource(fps=10) as source:
     print("\nFrameSource hardware test")

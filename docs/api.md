@@ -59,7 +59,7 @@ is preferred over exposing motors, PWM, GPIO, or other hardware details.
 The primary entry point is:
 
 ``` python
-from betabox_car import Robot
+from betabox_robotics import Robot
 
 robot = Robot()
 ```
@@ -241,7 +241,7 @@ robot.audio.say("Hello from Betabox")
 Optional speech configuration is available when using `Audio` directly:
 
 ```python
-from betabox_car.audio import Audio
+from betabox_robotics.audio import Audio
 
 audio = Audio(
     speech_engine="pico",
@@ -394,7 +394,7 @@ whenever practical.
 # Student Examples
 
 ``` python
-from betabox_car import Robot
+from betabox_robotics import Robot
 
 robot = Robot()
 robot.drive.forward(50)
@@ -455,7 +455,7 @@ print(metadata.data["count"])
 ```
 
 ```python
-from betabox_car import Robot
+from betabox_robotics import Robot
 
 robot = Robot()
 

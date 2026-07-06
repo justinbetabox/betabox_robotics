@@ -5,8 +5,8 @@ Developer demo for the Betabox Ultrasonic sensor.
 
 from time import sleep
 
-from betabox_car.robots import BETABOX_CAR
-from betabox_car.sensors import Ultrasonic
+from betabox_robotics.robots import BETABOX_CAR
+from betabox_robotics.sensors import Ultrasonic
 
 
 def main() -> None:

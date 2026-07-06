@@ -4,7 +4,7 @@ import tempfile
 
 import numpy as np
 
-from betabox_car.vision import Frame, RecordingService
+from betabox_robotics.vision import Frame, RecordingService
 
 
 def test_recording_service_writes_video():

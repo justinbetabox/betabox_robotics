@@ -25,7 +25,7 @@ required to initialize the System subsystem.
 Applications should normally access system information through:
 
 ```python
-from betabox_car import Robot
+from betabox_robotics import Robot
 
 robot = Robot()
 

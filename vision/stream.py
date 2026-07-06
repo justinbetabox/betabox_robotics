@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict
 
-from betabox_car.vision.consumer import FrameConsumer
+from betabox_robotics.vision.consumer import FrameConsumer
 
 
 class Streamer(FrameConsumer, ABC):

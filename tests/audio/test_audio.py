@@ -2,10 +2,10 @@
 
 from pathlib import Path
 
-from betabox_car.audio import Audio, AudioError
-from betabox_car.audio.pronunciation import prepare_speech_text
-from betabox_car.audio.speech import SpeechBackend, available_backends
-from betabox_car.audio.tones import note_frequency
+from betabox_robotics.audio import Audio, AudioError
+from betabox_robotics.audio.pronunciation import prepare_speech_text
+from betabox_robotics.audio.speech import SpeechBackend, available_backends
+from betabox_robotics.audio.tones import note_frequency
 
 
 class FakeSpeechBackend(SpeechBackend):

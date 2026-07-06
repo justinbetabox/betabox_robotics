@@ -12,8 +12,8 @@ Tests:
 
 from time import sleep
 
-from betabox_car.hardware import PWM, Motor, Pin
-from betabox_car.robots import BETABOX_CAR
+from betabox_robotics.hardware import PWM, Motor, Pin
+from betabox_robotics.robots import BETABOX_CAR
 
 
 def pause(seconds: float = 1.0) -> None:

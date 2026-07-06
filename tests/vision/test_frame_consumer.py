@@ -2,7 +2,7 @@
 
 from time import sleep
 
-from betabox_car.vision import Frame, FrameConsumer, FrameSource
+from betabox_robotics.vision import Frame, FrameConsumer, FrameSource
 
 
 class CountingConsumer(FrameConsumer):

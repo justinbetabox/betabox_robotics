@@ -1,9 +1,9 @@
-from betabox_car.audio import Audio
-from betabox_car.drive import Drive
-from betabox_car.robots import BETABOX_CAR
-from betabox_car.sensors import Sensors
-from betabox_car.system import System
-from betabox_car.vision import Vision
+from betabox_robotics.audio import Audio
+from betabox_robotics.drive import Drive
+from betabox_robotics.robots import BETABOX_CAR
+from betabox_robotics.sensors import Sensors
+from betabox_robotics.system import System
+from betabox_robotics.vision import Vision
 
 from .base import RobotBase
 

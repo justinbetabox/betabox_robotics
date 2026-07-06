@@ -1,8 +1,8 @@
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from betabox_car.vision.frame import Frame
-from betabox_car.vision.metadata import Box
+from betabox_robotics.vision.frame import Frame
+from betabox_robotics.vision.metadata import Box
 
 
 @dataclass(frozen=True)

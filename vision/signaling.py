@@ -1,6 +1,6 @@
 from aiohttp import web
 
-from betabox_car.vision.webrtc import WebRTCStreamer
+from betabox_robotics.vision.webrtc import WebRTCStreamer
 
 INDEX_HTML = """
 <!doctype html>

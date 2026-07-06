@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from betabox_car.vision import ColorDetector, Frame
+from betabox_robotics.vision import ColorDetector, Frame
 
 
 def test_color_detector_finds_red_region():

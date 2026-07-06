@@ -3,8 +3,8 @@
 Developer demo for the Betabox Battery sensor.
 """
 
-from betabox_car.robots import BETABOX_CAR
-from betabox_car.sensors import Battery
+from betabox_robotics.robots import BETABOX_CAR
+from betabox_robotics.sensors import Battery
 
 
 def main() -> None:

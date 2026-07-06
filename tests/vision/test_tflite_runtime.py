@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from betabox_car.vision import TFLiteObjectDetectionRuntime
+from betabox_robotics.vision import TFLiteObjectDetectionRuntime
 
 
 def test_tflite_runtime_class_is_available():

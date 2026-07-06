@@ -5,8 +5,8 @@ Developer demo for capturing a snapshot with the Betabox Vision subsystem.
 
 from time import sleep
 
-from betabox_car.robots import BETABOX_CAR
-from betabox_car.vision import Vision
+from betabox_robotics.robots import BETABOX_CAR
+from betabox_robotics.vision import Vision
 
 
 def main() -> None:

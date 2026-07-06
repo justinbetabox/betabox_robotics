@@ -1,7 +1,7 @@
 import time
 from typing import Union
 
-from betabox_car.hardware import DigitalPin, HardwareError, Pin
+from betabox_robotics.hardware import DigitalPin, HardwareError, Pin
 
 
 class UltrasonicError(HardwareError):

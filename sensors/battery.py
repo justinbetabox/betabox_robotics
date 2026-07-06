@@ -1,4 +1,4 @@
-from betabox_car.hardware import ADC, HardwareError
+from betabox_robotics.hardware import ADC, HardwareError
 
 
 class BatteryError(HardwareError):

@@ -7,8 +7,8 @@ Exercises the steering, pan, and tilt servos.
 
 from time import sleep
 
-from betabox_car.hardware import Pins, Servo
-from betabox_car.robots import BETABOX_CAR
+from betabox_robotics.hardware import Pins, Servo
+from betabox_robotics.robots import BETABOX_CAR
 
 
 def main() -> None:

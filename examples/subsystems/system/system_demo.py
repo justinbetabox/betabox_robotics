@@ -3,8 +3,8 @@
 Developer demo for the Betabox System subsystem.
 """
 
-from betabox_car.robots import BETABOX_CAR
-from betabox_car.system import System
+from betabox_robotics.robots import BETABOX_CAR
+from betabox_robotics.system import System
 
 
 def main() -> None:

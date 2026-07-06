@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from betabox_car.vision import WebRTCSignalingServer, WebRTCStreamer
+from betabox_robotics.vision import WebRTCSignalingServer, WebRTCStreamer
 
 
 def test_signaling_server_can_be_created():

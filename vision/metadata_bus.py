@@ -1,7 +1,7 @@
 import threading
 from typing import Dict, List, Optional
 
-from betabox_car.vision.metadata import Metadata
+from betabox_robotics.vision.metadata import Metadata
 
 
 class MetadataBus:

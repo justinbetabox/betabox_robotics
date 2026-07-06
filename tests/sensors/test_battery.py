@@ -7,9 +7,9 @@ Validates battery voltage monitoring and status reporting.
 
 from time import sleep
 
-from betabox_car.hardware import ADC
-from betabox_car.robots import BETABOX_CAR
-from betabox_car.sensors import Battery
+from betabox_robotics.hardware import ADC
+from betabox_robotics.robots import BETABOX_CAR
+from betabox_robotics.sensors import Battery
 
 
 def main() -> None:

@@ -26,7 +26,7 @@ initialize the subsystem.
 Applications should normally access sensors through:
 
 ```python
-from betabox_car import Robot
+from betabox_robotics import Robot
 
 robot = Robot()
 
@@ -101,7 +101,7 @@ Higher-level logic decides what to do with that information.
 Individual sensor components may also be used directly by robot implementations, validation programs, or advanced applications that provide the required hardware dependencies.
 
 ```python
-from betabox_car import Robot
+from betabox_robotics import Robot
 
 robot = Robot()
 

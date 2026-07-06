@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from betabox_car.vision import Detection, Metadata, MetadataBus
+from betabox_robotics.vision import Detection, Metadata, MetadataBus
 
 print("\nMetadata hardware-independent test")
 print("==================================")

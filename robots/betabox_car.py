@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from betabox_car.hardware import AnalogChannel, DigitalPin, Pins, PWMChannel
+from betabox_robotics.hardware import AnalogChannel, DigitalPin, Pins, PWMChannel
 
 
 @dataclass(frozen=True)

@@ -31,7 +31,7 @@ required to initialize the Vision subsystem.
 Applications should normally access vision capabilities through:
 
 ```python
-from betabox_car import Robot
+from betabox_robotics import Robot
 
 robot = Robot()
 

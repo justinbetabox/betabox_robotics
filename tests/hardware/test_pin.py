@@ -7,7 +7,7 @@ Toggles a digital output pin.
 
 from time import sleep
 
-from betabox_car.hardware import Pin, Pins
+from betabox_robotics.hardware import Pin, Pins
 
 
 def main() -> None:

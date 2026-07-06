@@ -6,9 +6,9 @@ from typing import Optional
 
 import cv2
 
-from betabox_car.vision.consumer import FrameConsumer
-from betabox_car.vision.frame import Frame
-from betabox_car.vision.frame_source import FrameSourceError
+from betabox_robotics.vision.consumer import FrameConsumer
+from betabox_robotics.vision.frame import Frame
+from betabox_robotics.vision.frame_source import FrameSourceError
 
 
 @dataclass(frozen=True)

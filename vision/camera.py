@@ -1,7 +1,7 @@
 from typing import Optional
 
-from betabox_car.hardware import HardwareError
-from betabox_car.vision.frame import Frame
+from betabox_robotics.hardware import HardwareError
+from betabox_robotics.vision.frame import Frame
 
 
 class CameraError(HardwareError):

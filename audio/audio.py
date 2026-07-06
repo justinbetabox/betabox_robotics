@@ -8,12 +8,16 @@ from pathlib import Path
 
 import pyaudio
 
-from betabox_car.audio.amplifier import disable_speaker, enable_speaker
-from betabox_car.audio.exceptions import AudioError
-from betabox_car.audio.pronunciation import prepare_speech_text
-from betabox_car.audio.quiet import suppress_stderr
-from betabox_car.audio.speech import SpeechBackend, available_backends, create_backend
-from betabox_car.audio.tones import generate_silence, generate_tone, note_frequency
+from betabox_robotics.audio.amplifier import disable_speaker, enable_speaker
+from betabox_robotics.audio.exceptions import AudioError
+from betabox_robotics.audio.pronunciation import prepare_speech_text
+from betabox_robotics.audio.quiet import suppress_stderr
+from betabox_robotics.audio.speech import (
+    SpeechBackend,
+    available_backends,
+    create_backend,
+)
+from betabox_robotics.audio.tones import generate_silence, generate_tone, note_frequency
 
 
 class Audio:

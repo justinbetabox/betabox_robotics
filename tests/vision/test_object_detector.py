@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from betabox_car.vision import Frame, ModelDetection, ObjectDetector
+from betabox_robotics.vision import Frame, ModelDetection, ObjectDetector
 
 
 class FakeObjectDetectionRuntime:

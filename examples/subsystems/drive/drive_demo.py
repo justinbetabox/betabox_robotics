@@ -5,8 +5,8 @@ Developer demo for the Betabox Drive subsystem.
 
 from time import sleep
 
-from betabox_car.drive import Drive
-from betabox_car.robots import BETABOX_CAR
+from betabox_robotics.drive import Drive
+from betabox_robotics.robots import BETABOX_CAR
 
 
 def main() -> None:

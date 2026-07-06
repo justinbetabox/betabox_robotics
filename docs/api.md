@@ -1,517 +1,370 @@
-# Betabox Car Public API
+# Betabox Robotics Public API
 
 **Status:** Public API Specification\
-**Project:** Betabox Robot Platform\
+**Project:** Betabox Robotics Platform\
+**Audience:** Students, Teachers, Developers\
 **Document:** `api.md`
 
 ------------------------------------------------------------------------
 
-## Purpose
+# Purpose
 
-This document defines the stable public programming interface for the
-Betabox Car SDK.
+The Betabox Robotics SDK exposes a stable, beginner-friendly API for
+programming educational robots.
 
-The public API is the contract used by:
+The API is designed to:
 
--    Student notebooks
--    Curriculum examples
--    Teacher demonstrations
--    Future web interfaces
--    Internal Betabox applications
+-   Hide hardware implementation details.
+-   Present robots in terms of capabilities.
+-   Remain stable across SDK releases.
+-   Support both beginner and advanced users.
+-   Allow robot implementations to evolve without breaking curriculum.
 
-Code outside the SDK should interact with the robot through this API
-instead of directly using hardware libraries, Linux interfaces, or
-implementation-specific modules.
-
-The goal is to allow internal implementations to evolve without breaking
-student-facing code.
+Applications should program **robots**, not GPIO pins, motors, cameras,
+or operating-system services.
 
 ------------------------------------------------------------------------
 
-## API Philosophy
+# Design Philosophy
 
-The Betabox API should be:
+The SDK intentionally exposes two complementary API layers.
 
--    Stable
--    Student-friendly
--    Hardware-independent
--    Easy to read
--    Easy to teach
--    Explicit in behavior
--    Based on physical robot concepts
--    Safe by default
+## 1. Robot API (Recommended)
 
-The API should describe **what** the robot does, not **how** the
-hardware accomplishes it.
-
-Example:
+The Robot API provides high-level robot capabilities.
 
 ``` python
-robot.drive.forward(50)
+from betabox_robotics import BetaboxCar
+
+with BetaboxCar() as car:
+    car.forward(40)
+
+    if car.distance() < 20:
+        car.stop()
+        car.say("Obstacle detected")
 ```
 
-is preferred over exposing motors, PWM, GPIO, or other hardware details.
+This API is intended for:
+
+-   Students
+-   Curriculum
+-   Classroom examples
+-   Teacher demonstrations
 
 ------------------------------------------------------------------------
 
-## Robot API
+## 2. Subsystem API
 
-The primary entry point is:
+Advanced users can directly access reusable subsystem implementations.
 
 ``` python
-from betabox_robotics import Robot
-
-robot = Robot()
+car.drive.forward(40)
+car.audio.say("Hello")
+car.sensors.ultrasonic.distance()
+car.vision.snapshot.capture(filename="photo.jpg")
 ```
 
-Subsystems:
+This API provides finer control while remaining hardware-independent.
+
+------------------------------------------------------------------------
+
+# Robot Hierarchy
 
 ``` text
+RobotBase
+    │
+    ▼
 Robot
- ├── drive
- ├── vision
- ├── sensors
- ├── audio
- └── system
+    │
+    ▼
+CarRobot
+    │
+    ▼
+BetaboxCar
 ```
 
-The Robot object is the primary public interface to the platform.
+Responsibilities:
+
+-   **RobotBase** -- lifecycle support.
+-   **Robot** -- generic robot abstraction and factory.
+-   **CarRobot** -- high-level car capabilities.
+-   **BetaboxCar** -- concrete hardware implementation.
 
 ------------------------------------------------------------------------
 
 # Programming Model
 
-The `Robot` object composes reusable subsystem implementations into a
-complete robot platform.
+Subsystems are reusable.
 
-Subsystem implementations are independent of any specific robot.
+Robot classes compose subsystem implementations into complete robots.
 
-Robot-specific classes are responsible for wiring subsystem
-implementations using robot configuration.
+``` text
+BetaboxCar
+ ├── Drive
+ ├── Sensors
+ ├── Vision
+ ├── Audio
+ └── System
+```
 
-This allows future robot platforms (such as robotic arms, tanks, or
-drones) to reuse existing subsystem implementations without modifying the
-subsystems themselves.
+The Robot API delegates to these subsystem implementations.
 
-Applications should interact with the `Robot` object rather than
-instantiating subsystem implementations directly whenever practical.
+------------------------------------------------------------------------
+
+# Robot API
+
+## Movement
+
+``` python
+car.forward(speed)
+car.backward(speed)
+
+car.left(angle=30)
+car.right(angle=30)
+
+car.center()
+car.stop()
+```
+
+Example:
+
+``` python
+car.forward(35)
+car.left()
+car.stop()
+```
+
+------------------------------------------------------------------------
+
+## Audio
+
+``` python
+car.say(text)
+
+car.play(sound)
+
+car.play_note(note_or_frequency, duration)
+
+car.play_melody(notes, gap=0.0)
+
+car.stop_audio()
+
+car.is_audio_playing()
+```
+
+------------------------------------------------------------------------
+
+## Sensors
+
+### Distance
+
+``` python
+distance = car.distance()
+```
+
+### Battery
+
+``` python
+car.battery_voltage()
+
+car.battery_status()
+
+car.is_battery_low()
+
+car.is_battery_critical()
+```
+
+### Line Sensor
+
+``` python
+car.line_values()
+
+car.line_status()
+
+car.line_normalized()
+```
+
+------------------------------------------------------------------------
+
+## Vision
+
+Vision must be started before capturing or recording.
+
+``` python
+car.start_vision()
+
+car.is_vision_running()
+
+snapshot = car.capture("photo.jpg")
+
+car.start_recording("demo.mp4")
+
+recording = car.stop_recording()
+
+car.is_recording()
+
+car.stop_vision()
+```
+
+------------------------------------------------------------------------
+
+## System
+
+``` python
+car.hostname()
+
+car.ip_addresses()
+
+car.media_paths()
+
+car.ensure_media_paths()
+
+car.status()
+
+car.health()
+```
+
+------------------------------------------------------------------------
+
+# Subsystem API
+
+The subsystem API remains fully available.
+
+## Drive
+
+``` python
+car.drive.forward(speed)
+car.drive.backward(speed)
+
+car.drive.left(angle)
+car.drive.right(angle)
+
+car.drive.center()
+
+car.drive.stop()
+```
+
+## Sensors
+
+``` python
+car.sensors.ultrasonic.distance()
+
+car.sensors.grayscale.read()
+car.sensors.grayscale.status()
+car.sensors.grayscale.normalized()
+
+car.sensors.battery.voltage()
+car.sensors.battery.status()
+car.sensors.battery.is_low()
+car.sensors.battery.is_critical()
+```
+
+## Vision
+
+``` python
+car.vision.start()
+car.vision.stop()
+
+car.vision.snapshot.capture(filename="photo.jpg")
+
+car.vision.recording.start(filename="demo.mp4")
+car.vision.recording.stop()
+```
+
+Lower-level detection, metadata, streaming, and frame APIs remain
+available for advanced applications.
+
+## Audio
+
+``` python
+car.audio.say("Hello")
+
+car.audio.play("success.wav")
+
+car.audio.play_note("C5", 0.5)
+
+car.audio.play_melody([...])
+
+car.audio.stop()
+```
+
+## System
+
+``` python
+car.system.status()
+car.system.health()
+```
+
+------------------------------------------------------------------------
+
+# Resource Ownership
+
+Subsystems own the resources they manage.
+
+  Subsystem   Owns
+  ----------- ----------------------
+  Drive       Motors, steering
+  Sensors     Physical sensors
+  Vision      Camera pipeline
+  Audio       Audio playback
+  System      Platform information
+
+Applications should not construct duplicate subsystem instances.
 
 ------------------------------------------------------------------------
 
 # API Design Rules
 
-Public APIs should:
+The Robot API should:
 
--    Use descriptive names
--    Avoid abbreviations
--    Avoid exposing hardware details
--    Return meaningful Python objects when practical
--    Raise Betabox-specific exceptions
--    Remain backward compatible whenever possible
--    Prefer capability objects over large monolithic classes
--    Compose reusable subsystem implementations
--    Separate robot configuration from subsystem implementation
+-   Prefer robot capabilities over implementation details.
+-   Use descriptive names.
+-   Hide hardware details.
+-   Be safe by default.
+-   Remain backward compatible whenever practical.
+-   Keep beginner code readable.
+
+Not every subsystem method should appear on the Robot API.
+
+Convenience methods should represent common robot tasks rather than
+mirror every implementation detail.
 
 ------------------------------------------------------------------------
 
-# Subsystem APIs
-
-## Drive API
+# Example
 
 ``` python
-robot.drive.forward(speed)
-robot.drive.backward(speed)
-robot.drive.left(speed)
-robot.drive.right(speed)
-robot.drive.stop()
-
-robot.drive.steer(angle)
-robot.drive.center_steering()
-```
-
-The SDK manages steering calibration and limits internally.
-
-------------------------------------------------------------------------
-
-## Vision API
-
-Vision provides capabilities rather than exposing camera implementation
-details.
-
-Capability groups include:
-
--    Camera
--    Streaming
--    Snapshots
--    Recording
--    Detection
--    Metadata
--    Configuration
--    Statistics
-
-### Snapshots
-
-```python
-snapshot = robot.vision.snapshot.capture()
-print(snapshot.path)
-```
-
-### Recording
-
-```python
-robot.vision.recording.start()
-
-# ...
-
-recording = robot.vision.recording.stop()
-
-print(recording.path)
-print(recording.duration)
-```
-
-### Streaming
-
-```python
-robot.vision.stream.start()
-robot.vision.stream.stop()
-```
-
-### Detection
-
-#### Color
-
-```python
-robot.vision.detection.color.enable("red")
-
-metadata = robot.vision.metadata.latest("color")
-```
-
-#### Face
-
-```python
-robot.vision.detection.face.enable()
-
-metadata = robot.vision.metadata.latest("face")
-```
-
-Implemented capabilities:
-
--    Color
--    Face
-
-Planned capabilities:
-
--    Object
--    Traffic Sign
-
-Detection capabilities are exposed as capability objects rather than
-requiring applications to create or register detector instances.
-
-## Sensors API
-
-``` python
-robot.sensors.ultrasonic.distance()
-
-robot.sensors.grayscale.read()
-robot.sensors.grayscale.status()
-
-robot.sensors.battery.voltage()
-robot.sensors.battery.status()
-robot.sensors.battery.is_low()
-robot.sensors.battery.is_critical()
-```
-
-Future sensors should follow:
-
-``` python
-robot.sensors.<sensor>.<action>()
-```
-
-## Audio API
-
-The Audio subsystem provides speech synthesis, sound playback, tone
-generation, and melody playback.
-
-### Speech
-
-```python
-robot.audio.say("Hello from Betabox")
-```
-
-Optional speech configuration is available when using `Audio` directly:
-
-```python
-from betabox_robotics.audio import Audio
-
-audio = Audio(
-    speech_engine="pico",
-    speech_volume=1.8,
-)
-```
-
-Piper is supported as an optional high-quality speech backend:
-
-```python
-audio = Audio(
-    speech_engine="piper",
-    piper_voice="en_US-amy-low",
-)
-```
-
-### Sound Playback
-
-```python
-robot.audio.play_sound("car-honk")
-```
-
-Alias:
-
-```python
-robot.audio.play("car-honk")
-```
-
-### Tone Playback
-
-```python
-robot.audio.play_note("C5", 0.5)
-robot.audio.play_note(440.0, 0.5)
-```
-
-### Melody Playback
-
-```python
-robot.audio.play_melody(
-    [
-        ("C5", 0.2),
-        ("D5", 0.2),
-        ("E5", 0.2),
-        ("G5", 0.4),
-    ],
-    gap=0.05,
-)
-```
-
-### Playback Control
-
-```python
-robot.audio.stop()
-```
-
-### Diagnostics
-
-```python
-robot.audio.speech_backend_name
-robot.audio.available_speech_backends()
-```
-
-Audio hides implementation details such as PyAudio, ALSA, speech engines,
-audio conversion tools, and amplifier GPIO control.
-
-## System API
-
-``` python
-status = robot.system.status()
-```
-
-Representative fields:
-
-``` text
-hostname
-ip_address
-battery
-camera_running
-services
-```
-
-------------------------------------------------------------------------
-
-# Resource Management
-
-Robot implementations compose reusable subsystem implementations and provide the configuration required to initialize them.
-
-Subsystems own the hardware resources they manage.
-
-Examples:
-
--    Vision owns the camera.
--    Drive owns motors and steering.
--    Sensors own sensor devices.
--    Audio owns audio hardware.
--    System owns platform services and status information.
-
-Applications should never need to coordinate shared hardware directly.
-
-Applications should normally interact with subsystem instances provided
-by the `Robot` object rather than constructing additional subsystem
-instances directly.
-
-Applications should enable capabilities rather than creating additional subsystem instances. The SDK manages the lifecycle of shared resources such as the camera.
-
-------------------------------------------------------------------------
-
-# Thread Safety
-
-Subsystem objects are intended to be long-lived.
-
-Background processing is managed internally by the SDK.
-
-Student code should not need to create threads to use robot
-capabilities.
-
-------------------------------------------------------------------------
-
-# Error Handling
-
-Public APIs should raise Betabox-specific exceptions.
-
-Examples:
-
--    BetaboxError
--    HardwareError
--    ConfigurationError
--    ResourceError
--    VisionError
--    DriveError
--    SensorError
--    AudioError
-
-Errors should explain what happened and, when possible, how the user can
-resolve the issue.
-
-Implementation-specific exceptions should not leak into the public API.
-
-------------------------------------------------------------------------
-
-# API Versioning
-
-Breaking API changes should only occur during major SDK releases.
-
-Minor releases should preserve compatibility with existing notebooks
-whenever practical.
-
-------------------------------------------------------------------------
-
-# Student Examples
-
-``` python
-from betabox_robotics import Robot
-
-robot = Robot()
-robot.drive.forward(50)
-robot.drive.stop()
-```
-
-```python
-if robot.sensors.battery.is_low():
-    print("Battery is low.")
-```
-
-```python
-robot.audio.say("Hello from Betabox")
-robot.audio.play_sound("car-honk")
-robot.audio.play_note("C5", 0.5)
-robot.audio.play_melody(
-    [
-        ("C5", 0.2),
-        ("D5", 0.2),
-        ("E5", 0.2),
-        ("G5", 0.4),
-    ],
-    gap=0.05,
-)
-```
-
-``` python
-snapshot = robot.vision.snapshot.capture()
-print(snapshot.path)
-```
-
-```python
 from time import sleep
+from betabox_robotics import BetaboxCar
 
-robot.vision.recording.start()
+with BetaboxCar() as car:
+    car.say("Starting demo")
 
-sleep(5)
+    car.start_vision()
+    sleep(1)
 
-recording = robot.vision.recording.stop()
+    car.forward(30)
+    sleep(1)
+    car.stop()
 
-print(recording.path)
-```
+    print(car.distance())
 
-```python
-robot.vision.detection.color.enable(["red", "green"])
+    photo = car.capture("picture.jpg")
+    print(photo.path)
 
-metadata = robot.vision.metadata.latest("color")
-
-print(metadata.data["counts"])
-```
-
-```python
-robot.vision.detection.face.enable()
-
-metadata = robot.vision.metadata.latest("face")
-
-print(metadata.data["count"])
-```
-
-```python
-from betabox_robotics import Robot
-
-robot = Robot()
-
-robot.drive.forward(40)
-
-distance = robot.sensors.ultrasonic.distance()
-
-if distance < 20:
-    robot.drive.stop()
-    robot.audio.say("Obstacle detected.")
+    if car.is_battery_low():
+        car.say("Battery is low")
 ```
 
 ------------------------------------------------------------------------
 
-# Implementation Boundary
+# Stability
 
-Robot-specific configuration is an implementation detail and should not be accessed directly by applications.
+The Robot API forms the stable boundary between user applications and
+robot implementation.
 
-Applications should not depend on:
+Future robot platforms should reuse the same subsystem architecture
+while exposing their own high-level Robot APIs.
 
--    GPIO
--    PWM
--    I²C implementation details
--    Camera driver objects
--    Linux device paths
--    Streaming protocols
--    Web server internals
--    Calibration files
--    Audio driver objects
--    Speech engine commands
--    Audio conversion tools
--    Speaker amplifier GPIO control
--    Robot configuration objects
-
-Packages under `hardware/`, `vision/`, `drive/`, `sensors/`, and other
-implementation modules are internal unless explicitly documented as
-public.
-
-Applications should interact with the platform through the Robot API.
-
-------------------------------------------------------------------------
-
-# Summary
-
-The Robot API is the stable boundary between user code and robot
-implementation.
-
-Students should think in terms of robot behavior:
-
-``` python
-robot.drive.forward(50)
-robot.vision.snapshot.capture()
-robot.vision.recording.start()
-robot.vision.detection.color.enable("red")
-robot.sensors.battery.voltage()
-robot.audio.say("Hello")
-```
-
-rather than implementation details.
+Student notebooks and curriculum should primarily depend on the Robot
+API.

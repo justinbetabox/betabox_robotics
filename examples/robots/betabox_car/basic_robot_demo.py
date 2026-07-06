@@ -5,19 +5,22 @@ from betabox_robotics import BetaboxCar
 
 def main():
     with BetaboxCar() as car:
-        car.audio.say("Starting robot demo")
+        print("Starting vision")
+        car.start_vision()
+        sleep(1)
 
         print("Driving forward")
-        car.drive.forward(30)
+        car.forward(30)
         sleep(1)
 
         print("Stopping")
-        car.drive.stop()
+        car.stop()
 
-        distance = car.sensors.ultrasonic.distance()
-        print(f"Distance: {distance} cm")
+        distance = car.distance()
+        print(f"Distance: {distance:.2f} cm")
 
-        car.audio.say("Demo complete")
+        snapshot = car.capture("picture.jpg")
+        print(f"Saved snapshot: {snapshot.path}")
 
 
 if __name__ == "__main__":

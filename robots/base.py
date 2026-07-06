@@ -11,7 +11,7 @@ class RobotBase:
         return self._closed
 
     def close(self) -> None:
-        return None
+        self._closed = True
 
     def deinit(self) -> None:
         self.close()

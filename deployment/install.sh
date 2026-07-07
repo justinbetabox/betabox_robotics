@@ -102,7 +102,7 @@ else
 fi
 
 echo "[8/8] Running import smoke test..."
-python -c "import betabox_robotics; print('Betabox Robotics import OK:', betabox_robotics.__version__)"
+python -m betabox_robotics.platform.verify
 
 echo
 echo "======================================"

@@ -10,9 +10,6 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 
-[project.scripts]
-betabox = "betabox_robotics.cli.betabox:main"
-
 authors = [
 { name = "Betabox Learning" }
 ]
@@ -38,6 +35,9 @@ dependencies = [
 "gpiozero",
 "smbus2",
 ]
+
+[project.scripts]
+betabox = "betabox_robotics.cli.betabox:main"
 
 [project.urls]
 Homepage = "https://github.com/justinbetabox/betabox_robotics"

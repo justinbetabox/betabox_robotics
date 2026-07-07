@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "betabox_robotics"
+version = "0.1.0"
+description = "Betabox Robotics SDK"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+
+authors = [
+    { name = "Betabox Learning" }
+]
+
+keywords = [
+    "robotics",
+    "raspberry-pi",
+    "education",
+    "robot",
+    "stem",
+]
+
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Operating System :: POSIX :: Linux",
+    "License :: OSI Approved :: MIT License",
+]
+
+dependencies = [
+    "aiohttp",
+    "aiortc",
+    "gpiozero",
+    "smbus2",
+
+    # OpenCV is pinned to the validated version.
+    "opencv-python==4.12.0.88",
+    "opencv-python-headless==4.12.0.88",
+]
+
+[project.urls]
+Homepage = "https://github.com/justinbetabox/betabox_robotics"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["betabox_robotics*"]
+
+[tool.setuptools.package-data]
+betabox_robotics = [
+    "audio/models/**/*",
+    "vision/data/**/*",
+]

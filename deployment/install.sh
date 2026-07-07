@@ -102,7 +102,7 @@ else
 fi
 
 echo "[8/8] Running import smoke test..."
-python -m betabox_robotics.platform.verify
+python -m betabox_robotics.services.verify
 
 echo
 echo "======================================"

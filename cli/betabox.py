@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 
-from betabox_robotics.platform.verify import main as verify_main
+from betabox_robotics.services.verify import main as verify_main
 
 
 def main() -> int:

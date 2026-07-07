@@ -1,9 +1,9 @@
 #!/bin/bash
 set -e
 
-REPO_URL="https://github.com/justinbetabox/betabox_robotics.git"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SDK_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 LIB_DIR="/opt/libs"
-SDK_DIR="$LIB_DIR/betabox_robotics"
 BETABOX_DIR="/opt/betabox"
 VENV_DIR="$BETABOX_DIR/venv"
 
@@ -38,24 +38,14 @@ echo "[2/8] Creating directories..."
 sudo mkdir -p "$LIB_DIR" "$BETABOX_DIR"
 sudo chown -R "$USER:$USER" "$LIB_DIR" "$BETABOX_DIR"
 
-echo "[3/8] Installing or updating SDK..."
-if [[ -d "$SDK_DIR/.git" ]]; then
-    cd "$SDK_DIR"
-    git pull
-else
-    git clone "$REPO_URL" "$SDK_DIR"
-fi
-
-cd "$SDK_DIR"
-
-echo "[4/8] Creating Python virtual environment..."
+echo "[3/8] Creating Python virtual environment..."
 if [[ ! -d "$VENV_DIR" ]]; then
     python3 -m venv --system-site-packages "$VENV_DIR"
 fi
 
 source "$VENV_DIR/bin/activate"
 
-echo "[5/8] Installing Python dependencies..."
+echo "[4/8] Installing Python dependencies..."
 python -m pip install --upgrade pip setuptools wheel
 
 # Important:
@@ -71,6 +61,9 @@ python -m pip install \
     aiortc \
     smbus2 \
     gpiozero
+
+echo "[5/8] Installing Betabox Robotics SDK..."
+python -m pip install -e "$SDK_DIR" --no-deps
 
 echo "[6/8] Creating media directories..."
 mkdir -p \
@@ -107,7 +100,7 @@ else
 fi
 
 echo "[8/8] Running import smoke test..."
-PYTHONPATH="$LIB_DIR" python -c "import betabox_robotics; print('Betabox Robotics import OK:', betabox_robotics.__version__)"
+python -c "import betabox_robotics; print('Betabox Robotics import OK:', betabox_robotics.__version__)"
 
 echo
 echo "======================================"
@@ -120,4 +113,4 @@ echo
 echo "After reboot:"
 echo "  source $VENV_DIR/bin/activate"
 echo "  cd $SDK_DIR"
-echo "  PYTHONPATH=$LIB_DIR python -m betabox_robotics.examples.robots.betabox_car.basic_robot_demo"
+echo "  python -m betabox_robotics.examples.robots.betabox_car.basic_robot_demo"

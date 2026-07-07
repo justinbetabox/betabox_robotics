@@ -1,131 +1,321 @@
 # Betabox Robotics Deployment
 
-## Overview
-
-This document describes the validated installation process for deploying
-the Betabox Robotics SDK onto a clean Raspberry Pi OS installation.
-
-This process has been tested on a fresh Raspberry Pi image and
-represents the current supported deployment method.
+**Status:** Stable Deployment Specification  
+**Project:** Betabox Robotics SDK  
+**Document:** `deployment.md`
 
 ------------------------------------------------------------------------
 
-# Supported Platform
+## Purpose
 
--   Raspberry Pi OS Bookworm (64-bit)
--   Python 3.11
--   Raspberry Pi 4
--   Robot HAT
--   HifiBerry DAC
--   Raspberry Pi Camera using Picamera2
+This document defines the supported deployment process for installing the
+Betabox Robotics SDK onto a clean Raspberry Pi OS installation.
+
+The deployment process should produce a reproducible environment suitable
+for Betabox development, testing, classroom deployment, and future
+production images.
+
+Unless otherwise documented, all Betabox SDK installations should follow
+this process.
 
 ------------------------------------------------------------------------
 
-# System Requirements
+## Supported Platform
 
-The installer installs the required Debian packages:
+The deployment process is currently validated on:
 
-``` text
-git
-python3-pip
-python3-venv
-python3-dev
-build-essential
-i2c-tools
-python3-pyaudio
-portaudio19-dev
-python3-opencv
-python3-picamera2
-python3-lgpio
-espeak-ng
-libttspico-utils
-ffmpeg
+- Raspberry Pi OS Bookworm (64-bit)
+- Python 3.11
+- Raspberry Pi 4
+- Robot HAT
+- HifiBerry DAC
+- Raspberry Pi Camera using Picamera2
+
+Other operating systems or hardware configurations may work but are not
+currently supported.
+
+------------------------------------------------------------------------
+
+## Deployment Philosophy
+
+Deployment should be:
+
+- Reproducible
+- Automated
+- Version-controlled
+- Hardware-aware
+- Easy for Betabox developers to execute
+
+A freshly imaged Raspberry Pi should be deployable using the repository
+without requiring undocumented manual configuration.
+
+------------------------------------------------------------------------
+
+## Deployment Components
+
+The repository contains two deployment utilities.
+
+### Bootstrap
+
+`deployment/bootstrap.sh`
+
+Responsibilities:
+
+- Install Git if required
+- Clone or update the SDK repository
+- Execute the installer
+
+### Installer
+
+`deployment/install.sh`
+
+Responsibilities:
+
+- Install required Debian packages
+- Create the Python virtual environment
+- Install Python dependencies
+- Install the Betabox Robotics SDK
+- Configure required Raspberry Pi settings
+- Perform a deployment smoke test
+
+The installer assumes it is executed from an existing SDK repository.
+
+------------------------------------------------------------------------
+
+## Python Environment
+
+The SDK is installed into:
+
+```text
+/opt/betabox/venv
 ```
 
-# Python Environment
+The virtual environment is created using:
 
-Create the virtual environment using:
-
-``` bash
+```bash
 python3 -m venv --system-site-packages /opt/betabox/venv
 ```
 
-# Python Dependencies
+System site packages are intentionally enabled to reuse Raspberry Pi
+specific libraries including:
 
-``` text
-aiohttp
-aiortc
-smbus2
-gpiozero
+- Picamera2
+- lgpio
+- PyAudio
+- Debian NumPy
+
+------------------------------------------------------------------------
+
+## Python Dependencies
+
+Runtime dependencies include:
+
+- aiohttp
+- aiortc
+- gpiozero
+- smbus2
+
+OpenCV is intentionally managed by the deployment installer rather than
+the package metadata.
+
+The validated configuration is:
+
+```text
 opencv-python==4.12.0.88
 opencv-python-headless==4.12.0.88
 ```
 
-Install OpenCV with:
+OpenCV is installed using:
 
-``` bash
-pip install --no-deps opencv-python==4.12.0.88 opencv-python-headless==4.12.0.88
+```bash
+pip install --no-deps \
+    opencv-python==4.12.0.88 \
+    opencv-python-headless==4.12.0.88
 ```
 
-# Raspberry Pi Configuration
+This preserves the Debian NumPy installation required by Picamera2 and
+simplejpeg.
 
-Ensure `/boot/firmware/config.txt` contains:
+------------------------------------------------------------------------
 
-``` text
+## Raspberry Pi Configuration
+
+The installer verifies the following configuration in
+`/boot/firmware/config.txt`:
+
+```text
 dtparam=i2c_arm=on
 dtparam=spi=on
+
 dtoverlay=hifiberry-dac
 dtoverlay=i2s-mmap
 ```
 
-Reboot after changes.
+A reboot is required after modifying the Raspberry Pi boot
+configuration.
 
-# Directory Layout
+------------------------------------------------------------------------
 
-``` text
-/opt/betabox/venv
-/opt/libs/betabox_robotics
-~/media/audio
-~/media/pictures
-~/media/videos
+## Audio
+
+The SDK manages the Robot HAT speaker amplifier automatically during
+audio playback.
+
+No boot-time GPIO service is required.
+
+------------------------------------------------------------------------
+
+## Repository Layout
+
+Recommended installation:
+
+```text
+/opt/
+├── betabox/
+│   └── venv/
+└── libs/
+    └── betabox_robotics/
 ```
 
-# Audio
+User media:
 
-The SDK controls the speaker amplifier during playback. No boot-time
-GPIO service is required.
-
-Verify HifiBerry:
-
-``` bash
-aplay -l
+```text
+~/media/
+├── audio/
+├── pictures/
+└── videos/
 ```
 
-# Installation
+------------------------------------------------------------------------
 
-``` bash
-deployment/install.sh
+## Deployment Workflow
+
+Typical deployment consists of:
+
+1. Flash Raspberry Pi OS.
+2. Clone the Betabox Robotics repository.
+3. Execute `deployment/install.sh`.
+4. Reboot if required.
+5. Activate the virtual environment.
+6. Run the verification examples.
+
+------------------------------------------------------------------------
+
+## Fresh Image Installation
+
+### Recommended (Bootstrap)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/justinbetabox/betabox_robotics/main/deployment/bootstrap.sh | bash
 ```
 
-# Verification
+After installation:
 
-``` bash
+```bash
+sudo reboot
+```
+
+### Manual Installation
+
+```bash
+sudo apt update
+sudo apt install -y git
+
+sudo mkdir -p /opt/libs
+sudo chown -R pi:pi /opt/libs
+
+cd /opt/libs
+git clone https://github.com/justinbetabox/betabox_robotics.git
+cd betabox_robotics
+
+chmod +x deployment/install.sh
+./deployment/install.sh
+```
+
+------------------------------------------------------------------------
+
+## Verification
+
+Deployment is considered successful when:
+
+- The SDK imports successfully.
+- Hardware initializes correctly.
+- Audio functions correctly.
+- Camera functions correctly.
+- Robot demonstrations execute successfully.
+- SDK tests complete without errors.
+
+Typical verification commands:
+
+```bash
 source /opt/betabox/venv/bin/activate
-PYTHONPATH=/opt/libs python -c "import betabox_robotics; print(betabox_robotics.__version__)"
-PYTHONPATH=/opt/libs python -m betabox_robotics.examples.robots.betabox_car.basic_robot_demo
-PYTHONPATH=/opt/libs python -m betabox_robotics.examples.subsystems.audio.audio_demo
+
+python -c "import betabox_robotics; print(betabox_robotics.__version__)"
+
+python -m betabox_robotics.examples.robots.betabox_car.basic_robot_demo
+
+python -m betabox_robotics.examples.subsystems.audio.audio_demo
 ```
 
-# Troubleshooting
+Run the automated tests:
 
--   Enable I²C if `/dev/i2c-1` is missing.
--   Activate the virtual environment before running the SDK.
--   Keep OpenCV pinned to 4.12.0.88 and install with `--no-deps`.
--   Verify HifiBerry overlays and `aplay -l` if audio is silent.
+```bash
+cd /opt/libs/betabox_robotics
 
-# Future Improvements
+for test in $(find tests -name "test_*.py" | sort); do
+    echo "===== $test ====="
+    python "$test" || break
+done
+```
 
--   pyproject.toml
--   pip install support
--   Automated verification
--   Hardware diagnostics
+------------------------------------------------------------------------
+
+## Troubleshooting
+
+Common deployment issues include:
+
+- I²C not enabled
+- Missing HifiBerry overlays
+- Incorrect OpenCV version
+- Replaced Debian NumPy installation
+- Missing speech backend
+- Camera unavailable before reboot
+- Missing media assets required by examples
+
+Deployment issues should be resolved by updating the deployment scripts
+rather than introducing undocumented manual steps.
+
+------------------------------------------------------------------------
+
+## Deployment Principles
+
+- Deployment should be reproducible.
+- Deployment should be automated whenever practical.
+- Raspberry Pi specific configuration belongs in deployment tools.
+- Python package management should remain separate from platform
+  configuration.
+- Deployment should avoid undocumented manual steps.
+- Every deployment change should be validated on a fresh Raspberry Pi
+  image.
+
+------------------------------------------------------------------------
+
+## Long-Term Goal
+
+The deployment system is intended to provide a fully reproducible
+installation process for all Betabox robotic platforms.
+
+Future improvements should simplify deployment while preserving
+reproducibility and minimizing manual configuration.
+
+------------------------------------------------------------------------
+
+## Summary
+
+The Betabox Robotics deployment system provides a repeatable,
+version-controlled process for preparing a Raspberry Pi for SDK
+development and classroom use.
+
+Bootstrap handles repository setup while the installer handles system
+configuration, Python dependencies, SDK installation, Raspberry Pi
+configuration, and deployment verification.

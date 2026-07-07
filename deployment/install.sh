@@ -69,8 +69,10 @@ echo "[6/8] Creating media directories..."
 mkdir -p \
     "$HOME/media/pictures" \
     "$HOME/media/videos" \
-    "$HOME/media/audio" \
     "$HOME/media/sounds"
+
+echo "Installing starter sound assets..."
+cp -n "$SDK_DIR/deployment/assets/sounds/"* "$HOME/media/sounds/" 2>/dev/null || true
 
 echo "[7/8] Checking boot configuration..."
 CONFIG_FILE="/boot/firmware/config.txt"

@@ -101,8 +101,8 @@ else
     echo "WARNING: $CONFIG_FILE not found. Boot config was not updated."
 fi
 
-echo "[8/8] Running import smoke test..."
-python -m betabox_robotics.services.verify
+echo "[8/8] Running install check..."
+python -m betabox_robotics.services.install_check
 
 echo
 echo "======================================"
@@ -112,7 +112,10 @@ echo
 echo "A reboot is recommended before hardware validation:"
 echo "  sudo reboot"
 echo
+echo "A reboot is required before hardware validation:"
+echo "  sudo reboot"
+echo
 echo "After reboot:"
 echo "  source $VENV_DIR/bin/activate"
-echo "  cd $SDK_DIR"
+echo "  betabox verify"
 echo "  python -m betabox_robotics.examples.robots.betabox_car.basic_robot_demo"

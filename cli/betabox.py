@@ -8,6 +8,8 @@ from betabox_robotics.services.doctor import main as doctor_main
 from betabox_robotics.services.install_check import main as install_check_main
 from betabox_robotics.services.logs import main as logs_main
 from betabox_robotics.services.monitor import main as monitor_main
+from betabox_robotics.services.reset import main as reset_main
+from betabox_robotics.services.restore import main as restore_main
 from betabox_robotics.services.services import main as services_main
 from betabox_robotics.services.snapshot import main as snapshot_main
 from betabox_robotics.services.status import main as status_main
@@ -58,6 +60,14 @@ def main() -> int:
         "snapshot",
         help="Create or list Betabox diagnostic snapshots",
     )
+    subparsers.add_parser(
+        "restore",
+        help="Restore user data from a Betabox backup",
+    )
+    subparsers.add_parser(
+        "reset",
+        help="Reset generated Betabox media and recreate expected folders",
+    )
 
     args, extra = parser.parse_known_args()
 
@@ -90,6 +100,12 @@ def main() -> int:
 
     if args.command == "snapshot":
         return snapshot_main(extra)
+
+    if args.command == "restore":
+        return restore_main(extra)
+
+    if args.command == "reset":
+        return reset_main(extra)
 
     parser.print_help()
     return 1

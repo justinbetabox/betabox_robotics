@@ -10,6 +10,7 @@ from .metadata import Detection, Metadata
 from .metadata_bus import MetadataBus
 from .model_runtime import ModelDetection, ObjectDetectionRuntime
 from .recording import Recording, RecordingError, RecordingService
+from .service import VisionService, VisionServiceConfig
 from .signaling import WebRTCSignalingServer
 from .snapshot import Snapshot, SnapshotError, SnapshotService
 from .stream import Streamer
@@ -47,4 +48,6 @@ __all__ = [
     "ModelDetection",
     "ObjectDetectionRuntime",
     "TFLiteObjectDetectionRuntime",
+    "VisionService",
+    "VisionServiceConfig",
 ]

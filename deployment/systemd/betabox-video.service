@@ -1,0 +1,16 @@
+[Unit]
+Description=Betabox video streaming service
+After=multi-user.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/opt/libs/betabox_robotics
+ExecStart=/opt/betabox/venv/bin/betabox video --host 0.0.0.0 --port 8080
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

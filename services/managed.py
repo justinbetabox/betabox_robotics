@@ -40,7 +40,8 @@ MANAGED_SERVICES: dict[str, ManagedService] = {
     "video": ManagedService(
         name="video",
         title="Video",
-        unit="car-video-api.service",
+        unit="betabox-video.service",
+        log_file=STATE_DIR / "video.log",
     ),
     "wifi-fallback": ManagedService(
         name="wifi-fallback",

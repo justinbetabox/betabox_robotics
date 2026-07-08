@@ -6,6 +6,7 @@ import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from betabox_robotics.services.managed import MANAGED_SERVICES
 from betabox_robotics.version import __version__
 
 
@@ -89,12 +90,8 @@ def collect_status() -> StatusReport:
     media_root = Path.home() / "media"
 
     services = {
-        "betabox-boot-announce.service": service_status(
-            "betabox-boot-announce.service"
-        ),
-        "betabox-monitor.service": service_status("betabox-monitor.service"),
-        "car-video-api.service": service_status("car-video-api.service"),
-        "jupyterhub.service": service_status("jupyterhub.service"),
+        managed.unit: service_status(managed.unit)
+        for managed in MANAGED_SERVICES.values()
     }
 
     return StatusReport(
@@ -145,8 +142,9 @@ def print_human(report: StatusReport) -> None:
     print()
     print("Services")
     print("--------")
-    for service, state in report.services.items():
-        print(f"{service:32} {state}")
+    for managed in MANAGED_SERVICES.values():
+        state = report.services.get(managed.unit, "unknown")
+        print(f"{managed.title:16} {managed.unit:34} {state}")
 
     print()
     print("JupyterHub")

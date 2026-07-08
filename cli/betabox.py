@@ -5,6 +5,7 @@ import argparse
 from betabox_robotics.services.backup import main as backup_main
 from betabox_robotics.services.boot_announce import main as boot_announce_main
 from betabox_robotics.services.doctor import main as doctor_main
+from betabox_robotics.services.hostname import main as hostname_main
 from betabox_robotics.services.install_check import main as install_check_main
 from betabox_robotics.services.logs import main as logs_main
 from betabox_robotics.services.monitor import main as monitor_main
@@ -68,6 +69,10 @@ def main() -> int:
         "reset",
         help="Reset generated Betabox media and recreate expected folders",
     )
+    subparsers.add_parser(
+        "set-hostname",
+        help="Set hostname from Raspberry Pi serial number",
+    )
 
     args, extra = parser.parse_known_args()
 
@@ -106,6 +111,9 @@ def main() -> int:
 
     if args.command == "reset":
         return reset_main(extra)
+
+    if args.command == "set-hostname":
+        return hostname_main(extra)
 
     parser.print_help()
     return 1

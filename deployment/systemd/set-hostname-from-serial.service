@@ -1,0 +1,15 @@
+[Unit]
+Description=Set Betabox hostname from Raspberry Pi serial number
+DefaultDependencies=no
+After=local-fs.target
+Before=network-pre.target
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/opt/betabox/venv/bin/betabox set-hostname
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

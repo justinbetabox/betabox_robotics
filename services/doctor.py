@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 
+from betabox_robotics.services.managed import MANAGED_SERVICES
 from betabox_robotics.services.status import collect_status
 from betabox_robotics.services.verify import CheckResult, collect_checks
 
@@ -115,14 +116,18 @@ def diagnose_media(results: dict[str, CheckResult]) -> Diagnosis:
 
 def diagnose_services() -> Diagnosis:
     status = collect_status()
-    inactive = [
-        service
-        for service, state in status.services.items()
-        if state not in ("active", "inactive")
-    ]
 
     failed = [
-        service for service, state in status.services.items() if state == "failed"
+        managed.title
+        for managed in MANAGED_SERVICES.values()
+        if status.services.get(managed.unit) == "failed"
+    ]
+
+    not_ready = [
+        f"{managed.title} ({status.services.get(managed.unit, 'unknown')})"
+        for managed in MANAGED_SERVICES.values()
+        if status.services.get(managed.unit, "unknown")
+        not in ("active", "inactive", "not-installed")
     ]
 
     ok = not failed
@@ -137,8 +142,8 @@ def diagnose_services() -> Diagnosis:
 
     if failed:
         message = "Failed services detected: " + ", ".join(failed)
-    elif inactive:
-        message = "Some services are not installed or inactive: " + ", ".join(inactive)
+    elif not_ready:
+        message = "Some services need attention: " + ", ".join(not_ready)
 
     return Diagnosis(
         title="Services",

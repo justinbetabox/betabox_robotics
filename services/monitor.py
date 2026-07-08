@@ -29,6 +29,7 @@ def summarize(snapshot: dict) -> dict:
     return {
         "i2c_available": snapshot.get("i2c_available"),
         "hifiberry_available": snapshot.get("hifiberry_available"),
+        "jupyterhub_proxy_available": snapshot.get("jupyterhub_proxy_available"),
         "services": snapshot.get("services", {}),
     }
 

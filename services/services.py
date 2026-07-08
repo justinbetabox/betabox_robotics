@@ -4,12 +4,7 @@ import json
 import subprocess
 from dataclasses import asdict, dataclass
 
-MANAGED_SERVICES = {
-    "boot-announce": "betabox-boot-announce.service",
-    "monitor": "betabox-monitor.service",
-    "jupyterhub": "jupyterhub.service",
-    "video": "car-video-api.service",
-}
+from betabox_robotics.services.managed import MANAGED_SERVICES
 
 
 @dataclass(frozen=True)
@@ -64,7 +59,8 @@ def enabled_state(unit: str) -> str:
 def collect_services() -> list[ServiceStatus]:
     statuses: list[ServiceStatus] = []
 
-    for name, unit in MANAGED_SERVICES.items():
+    for name, managed in MANAGED_SERVICES.items():
+        unit = managed.unit
         installed = unit_exists(unit)
 
         statuses.append(

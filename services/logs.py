@@ -5,30 +5,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-STATE_DIR = Path.home() / ".local" / "state" / "betabox"
-
-LOG_TARGETS = {
-    "boot-announce": {
-        "title": "Boot Announce",
-        "unit": "betabox-boot-announce.service",
-        "file": STATE_DIR / "boot_announce.log",
-    },
-    "monitor": {
-        "title": "Monitor",
-        "unit": "betabox-monitor.service",
-        "file": STATE_DIR / "monitor.log",
-    },
-    "jupyterhub": {
-        "title": "JupyterHub",
-        "unit": "jupyterhub.service",
-        "file": None,
-    },
-    "video": {
-        "title": "Video",
-        "unit": "car-video-api.service",
-        "file": None,
-    },
-}
+from betabox_robotics.services.managed import MANAGED_SERVICES
 
 
 @dataclass(frozen=True)
@@ -52,16 +29,16 @@ def run(command: list[str], timeout: int = 10) -> subprocess.CompletedProcess | 
 
 
 def get_target(name: str) -> LogTarget | None:
-    data = LOG_TARGETS.get(name)
+    managed = MANAGED_SERVICES.get(name)
 
-    if data is None:
+    if managed is None:
         return None
 
     return LogTarget(
-        name=name,
-        title=str(data["title"]),
-        unit=data.get("unit"),
-        file=data.get("file"),
+        name=managed.name,
+        title=managed.title,
+        unit=managed.unit,
+        file=managed.log_file,
     )
 
 
@@ -124,8 +101,8 @@ def list_targets() -> None:
     print("=====================")
     print()
 
-    for name, data in LOG_TARGETS.items():
-        print(f"{name:14} {data['title']}")
+    for name, managed in MANAGED_SERVICES.items():
+        print(f"{name:14} {managed.title}")
 
     print()
 

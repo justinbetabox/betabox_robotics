@@ -1,0 +1,176 @@
+{% extends "page.html" %}
+{% block stylesheet %}
+  {{ super() }}
+   <style>
+    :root {
+      --bb-bg: #0e1a2b;
+      --bb-card: #16243c;
+      --bb-accent: #007dc6;
+      --bb-text: #ffffff;
+    }
+
+    /* Page background */
+    body {
+      background-color: var(--bb-bg) !important;
+      color: var(--bb-text) !important;
+    }
+
+    /* Force the top bar color across Bootstrap 3/4/5 variants */
+    nav.navbar,
+    .navbar,
+    .navbar-default,
+    .navbar-inverse,
+    .navbar-light,
+    .navbar-dark,
+    .bg-light,
+    .bg-dark {
+      background-color: #007dc6 !important;
+      border: 0 !important;
+    }
+
+    /* Make nav text readable */
+    .navbar .navbar-brand,
+    .navbar .nav-link,
+    .navbar-nav > li > a,
+    .navbar a {
+      color: #fff !important;
+    }
+
+  /* --- Login Button --- */
+  #login_submit,
+  #login-main .btn-jupyter {
+    background: #007dc6 !important; /* primary blue */
+    border: none;
+    color: #fff !important;
+    font-weight: bold;
+    border-radius: 8px;
+    padding: 10px 16px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
+
+  .auth-form-header {
+    background: #007dc6 !important;
+  }
+
+  /* --- Form Control Adjustments --- */
+  #login-main .form-control {
+    box-shadow: none !important;
+  }
+  </style>
+{% endblock %}
+{% block logo %}
+  <a class="navbar-brand" href="{{ base_url }}">
+    <img src="{{ static_url('betabox-logo.png') }}"
+         alt="Betabox"
+         style="height: 32px; margin-right: 8px;">
+  </a>
+{% endblock %}
+{% if announcement_login is string %}
+  {% set announcement = announcement_login %}
+{% endif %}
+{% block login_widget %}
+{% endblock login_widget %}
+{% block main %}
+  {% block login %}
+    <div id="login-main" class="container">
+      {% block login_container %}
+        {% if custom_html %}
+          {{ custom_html | safe }}
+        {% elif login_service %}
+          <div class="service-login">
+            <a role="button"
+               class='btn btn-jupyter btn-lg'
+               href='{{ authenticator_login_url | safe }}'>Sign in with {{ login_service }}</a>
+          </div>
+        {% else %}
+          <form action="{{ authenticator_login_url | safe }}"
+                method="post"
+                role="form">
+            <div class="auth-form-header">
+              <h1>Sign in</h1>
+            </div>
+            <div class='auth-form-body m-auto'>
+              {% if login_error %}<p class="login_error">{{ login_error }}</p>{% endif %}
+              <input type="hidden" name="_xsrf" value="{{ xsrf }}" />
+              {# Allow full override of the "label" and "input" elements of the username and password fields. #}
+              {% block username_input %}
+                <label for="username_input">Username:</label>
+                <input id="username_input"
+                       {% block username_input_attrs %}
+                       type="text"
+                       autocapitalize="off"
+                       autocorrect="off"
+                       autocomplete="username"
+                       class="form-control"
+                       name="username"
+                       value="{{ username }}"
+                       autofocus="autofocus"
+                       {% endblock username_input_attrs %} />
+              {% endblock username_input %}
+              {% block password_input %}
+                <label for='password_input'>Password:</label>
+                <input id="password_input"
+                       {% block password_input_attrs %}
+                       type="password"
+                       class="form-control"
+                       autocomplete="current-password"
+                       name="password"
+                       {% endblock password_input_attrs %} />
+              {% endblock password_input %}
+              {% if authenticator.request_otp %}
+                {% block otp_input %}
+                  <label for="otp_input">{{ authenticator.otp_prompt }}</label>
+                  <input id="otp_input"
+                         {% block otp_input_attrs %}
+                         class="form-control"
+                         autocomplete="one-time-password"
+                         name="otp"
+                         {% endblock otp_input_attrs %} />
+                {% endblock otp_input %}
+              {% endif %}
+              <div class="feedback-container">
+                <input id="login_submit"
+                       type="submit"
+                       class='btn btn-jupyter form-control'
+                       value='Sign in'
+                       tabindex="3" />
+                <div class="feedback-widget hidden">
+                  <i class="fa fa-spinner"></i>
+                </div>
+              </div>
+              {% block login_terms %}
+                {% if login_term_url %}
+                  <div id="login_terms" class="login_terms">
+                    <input type="checkbox"
+                           id="login_terms_checkbox"
+                           name="login_terms_checkbox"
+                           required />
+                    {% block login_terms_text %}
+                      {# allow overriding the text #}
+                      By logging into the platform you accept the <a href="{{ login_term_url }}">terms and conditions</a>.
+                    {% endblock login_terms_text %}
+                  </div>
+                {% endif %}
+              {% endblock login_terms %}
+            </div>
+          </form>
+        {% endif %}
+      {% endblock login_container %}
+    </div>
+  {% endblock login %}
+{% endblock main %}
+{% block script %}
+  {{ super() }}
+  <script>
+    // setup onSubmit feedback
+    $('form').submit((e) => {
+      var form = $(e.target);
+      form.find('.feedback-container>input').attr('disabled', true);
+      form.find('.feedback-container>*').toggleClass('hidden');
+      form.find('.feedback-widget>*').toggleClass('fa-pulse');
+    });
+  </script>
+{% endblock script %}

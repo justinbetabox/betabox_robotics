@@ -1,0 +1,110 @@
+{% extends "templates/spawn_pending.html" %}
+
+{% block stylesheet %}
+  {{ super() }}
+  <style>
+    /* --- Betabox Spawn Pending Theme --- */
+
+    :root {
+      --bb-bg: #0e1a2b;
+      --bb-card: #16243c;
+      --bb-accent: #007dc6;
+      --bb-text: #ffffff;
+    }
+
+    /* Page background */
+    body {
+      background-color: var(--bb-bg) !important;
+      color: var(--bb-text) !important;
+    }
+
+    /* Top navbar (reuse your login colors) */
+    nav.navbar,
+    .navbar,
+    .navbar-default,
+    .navbar-light,
+    .navbar-dark,
+    .bg-light,
+    .bg-dark {
+      background-color: #007dc6 !important;
+      border: 0 !important;
+    }
+
+    .navbar .navbar-brand,
+    .navbar .nav-link,
+    .navbar-nav > li > a,
+    .navbar a {
+      color: #fff !important;
+    }
+
+    /* Main container that holds the "server starting" text + progress bar */
+    .container {
+      margin-top: 3rem;
+      max-width: 720px;
+    }
+
+    .text-center p {
+      color: var(--bb-text);
+    }
+
+    /* Progress bar wrapper */
+    .progress {
+      background-color: #0e1a2b !important;
+      border-radius: 999px !important;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.08);
+      overflow: hidden;
+      height: 1.25rem;
+    }
+
+    /* Actual progress bar */
+    #progress-bar,
+    .progress-bar {
+      background-color: var(--bb-accent) !important;
+      font-weight: 600;
+    }
+
+    /* Progress message text */
+    #progress-message {
+      margin-top: 0.75rem;
+      color: var(--bb-text);
+    }
+
+    /* Event log details block */
+    #progress-details {
+      margin-top: 1.5rem;
+      background-color: var(--bb-card);
+      border-radius: 10px;
+      padding: 0.75rem 1rem;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    #progress-details summary {
+      color: var(--bb-text);
+      cursor: pointer;
+    }
+
+    #progress-log {
+      margin-top: 0.5rem;
+      max-height: 250px;
+      overflow-y: auto;
+      font-size: 0.9rem;
+    }
+
+    .progress-log-event {
+      padding: 0.25rem 0;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+    }
+
+    /* When spawn fails and the bar turns "danger" */
+    .progress-bar-danger {
+      background-color: #d7191c !important;
+    }
+  </style>
+{% endblock %}
+{% block logo %}
+  <a class="navbar-brand" href="{{ base_url }}">
+    <img src="{{ static_url('betabox-logo.png') }}"
+         alt="Betabox"
+         style="height: 32px; margin-right: 8px;">
+  </a>
+{% endblock %}

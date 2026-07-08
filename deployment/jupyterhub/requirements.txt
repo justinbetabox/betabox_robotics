@@ -2,4 +2,3 @@ jupyterhub
 jupyterlab
 notebook
 jupyterhub-idle-culler
-ipywidgets

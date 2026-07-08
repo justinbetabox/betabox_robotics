@@ -87,6 +87,17 @@ sudo npm install -g configurable-http-proxy
 
 cp "$SDK_DIR/deployment/jupyterhub/jupyterhub_config.py" "$JUPYTERHUB_DIR/jupyterhub_config.py"
 
+if [[ -d "$SDK_DIR/deployment/jupyterhub/theme" ]]; then
+    echo "Installing JupyterHub theme..."
+    rm -rf "$JUPYTERHUB_DIR/theme"
+    cp -r "$SDK_DIR/deployment/jupyterhub/theme" "$JUPYTERHUB_DIR/theme"
+fi
+
+echo "Installing JupyterHub static assets..."
+sudo mkdir -p "$JUPYTERHUB_VENV_DIR/share/jupyterhub/static/custom"
+sudo cp "$SDK_DIR/deployment/jupyterhub/theme/static/custom/"* \
+    "$JUPYTERHUB_VENV_DIR/share/jupyterhub/static/custom/"
+
 echo "Installing Robot Car Jupyter kernel..."
 python -m pip install ipykernel
 python -m ipykernel install \
@@ -94,6 +105,9 @@ python -m ipykernel install \
     --name robot-car \
     --display-name "Robot Car"
 
+echo "Removing default Python 3 Jupyter kernel..."
+"$JUPYTERHUB_VENV_DIR/bin/jupyter" kernelspec remove -f python3 || true
+"$JUPYTERHUB_VENV_DIR/bin/python" -m pip uninstall -y ipykernel || true
 echo "[7/10] Creating media directories..."
 mkdir -p \
     "$HOME/media/pictures" \

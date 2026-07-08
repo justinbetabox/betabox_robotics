@@ -4,6 +4,7 @@ import argparse
 
 from betabox_robotics.services.boot_announce import main as boot_announce_main
 from betabox_robotics.services.install_check import main as install_check_main
+from betabox_robotics.services.monitor import main as monitor_main
 from betabox_robotics.services.status import main as status_main
 from betabox_robotics.services.verify import main as verify_main
 
@@ -28,6 +29,10 @@ def main() -> int:
         "boot-announce",
         help="Run the Betabox boot announcement readiness check",
     )
+    subparsers.add_parser(
+        "monitor",
+        help="Run the Betabox platform monitor",
+    )
 
     args, extra = parser.parse_known_args()
 
@@ -42,6 +47,9 @@ def main() -> int:
 
     if args.command == "boot-announce":
         return boot_announce_main()
+
+    if args.command == "monitor":
+        return monitor_main(extra)
 
     parser.print_help()
     return 1

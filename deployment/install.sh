@@ -104,9 +104,10 @@ fi
 echo "[8/9] Installing systemd services..."
 sudo mkdir -p /etc/systemd/system
 sudo cp "$SDK_DIR/deployment/systemd/betabox-boot-announce.service" /etc/systemd/system/
+sudo cp "$SDK_DIR/deployment/systemd/betabox-monitor.service" /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable betabox-boot-announce.service
-
+sudo systemctl enable betabox-monitor.service
 echo "[9/9] Running install check..."
 python -m betabox_robotics.services.install_check
 

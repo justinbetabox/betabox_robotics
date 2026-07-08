@@ -1,0 +1,15 @@
+[Unit]
+Description=Betabox platform monitor
+After=multi-user.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/opt/libs/betabox_robotics
+ExecStart=/opt/betabox/venv/bin/betabox monitor --interval 60
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

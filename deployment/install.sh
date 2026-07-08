@@ -16,7 +16,7 @@ if [[ "$EUID" -eq 0 ]]; then
     exit 1
 fi
 
-echo "[1/8] Installing system packages..."
+echo "[1/9] Installing system packages..."
 sudo apt update
 sudo apt install -y \
     git \
@@ -34,18 +34,18 @@ sudo apt install -y \
     libttspico-utils \
     ffmpeg
 
-echo "[2/8] Creating directories..."
+echo "[2/9] Creating directories..."
 sudo mkdir -p "$LIB_DIR" "$BETABOX_DIR"
 sudo chown -R "$USER:$USER" "$LIB_DIR" "$BETABOX_DIR"
 
-echo "[3/8] Creating Python virtual environment..."
+echo "[3/9] Creating Python virtual environment..."
 if [[ ! -d "$VENV_DIR" ]]; then
     python3 -m venv --system-site-packages "$VENV_DIR"
 fi
 
 source "$VENV_DIR/bin/activate"
 
-echo "[4/8] Installing Python dependencies..."
+echo "[4/9] Installing Python dependencies..."
 python -m pip install --upgrade pip setuptools wheel
 
 # Important:
@@ -62,10 +62,10 @@ python -m pip install \
     smbus2 \
     gpiozero
 
-echo "[5/8] Installing Betabox Robotics SDK..."
+echo "[5/9] Installing Betabox Robotics SDK..."
 python -m pip install -e "$SDK_DIR" --no-deps
 
-echo "[6/8] Creating media directories..."
+echo "[6/9] Creating media directories..."
 mkdir -p \
     "$HOME/media/pictures" \
     "$HOME/media/videos" \
@@ -74,7 +74,7 @@ mkdir -p \
 echo "Installing starter sound assets..."
 cp -n "$SDK_DIR/deployment/assets/sounds/"* "$HOME/media/sounds/" 2>/dev/null || true
 
-echo "[7/8] Checking boot configuration..."
+echo "[7/9] Checking boot configuration..."
 CONFIG_FILE="/boot/firmware/config.txt"
 
 if [[ -f "$CONFIG_FILE" ]]; then
@@ -101,16 +101,19 @@ else
     echo "WARNING: $CONFIG_FILE not found. Boot config was not updated."
 fi
 
-echo "[8/8] Running install check..."
+echo "[8/9] Installing systemd services..."
+sudo mkdir -p /etc/systemd/system
+sudo cp "$SDK_DIR/deployment/systemd/betabox-boot-announce.service" /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable betabox-boot-announce.service
+
+echo "[9/9] Running install check..."
 python -m betabox_robotics.services.install_check
 
 echo
 echo "======================================"
 echo " Install complete"
 echo "======================================"
-echo
-echo "A reboot is recommended before hardware validation:"
-echo "  sudo reboot"
 echo
 echo "A reboot is required before hardware validation:"
 echo "  sudo reboot"

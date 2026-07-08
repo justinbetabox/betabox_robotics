@@ -1,0 +1,15 @@
+[Unit]
+Description=Betabox boot announcer
+After=multi-user.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=pi
+Group=pi
+WorkingDirectory=/opt/libs/betabox_robotics
+ExecStart=/opt/betabox/venv/bin/betabox boot-announce
+RemainAfterExit=no
+
+[Install]
+WantedBy=multi-user.target

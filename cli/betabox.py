@@ -3,8 +3,11 @@ from __future__ import annotations
 import argparse
 
 from betabox_robotics.services.boot_announce import main as boot_announce_main
+from betabox_robotics.services.doctor import main as doctor_main
 from betabox_robotics.services.install_check import main as install_check_main
+from betabox_robotics.services.logs import main as logs_main
 from betabox_robotics.services.monitor import main as monitor_main
+from betabox_robotics.services.services import main as services_main
 from betabox_robotics.services.status import main as status_main
 from betabox_robotics.services.verify import main as verify_main
 
@@ -33,6 +36,18 @@ def main() -> int:
         "monitor",
         help="Run the Betabox platform monitor",
     )
+    subparsers.add_parser(
+        "services",
+        help="Show managed Betabox systemd services",
+    )
+    subparsers.add_parser(
+        "logs",
+        help="Show Betabox service logs",
+    )
+    subparsers.add_parser(
+        "doctor",
+        help="Diagnose Betabox platform issues and suggest fixes",
+    )
 
     args, extra = parser.parse_known_args()
 
@@ -50,6 +65,15 @@ def main() -> int:
 
     if args.command == "monitor":
         return monitor_main(extra)
+
+    if args.command == "services":
+        return services_main(extra)
+
+    if args.command == "logs":
+        return logs_main(extra)
+
+    if args.command == "doctor":
+        return doctor_main(extra)
 
     parser.print_help()
     return 1

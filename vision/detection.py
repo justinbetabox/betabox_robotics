@@ -72,7 +72,10 @@ class DetectionManager(FrameConsumer):
             if not detector.enabled:
                 continue
 
-            metadata = detector.detect(frame)
+            try:
+                metadata = detector.detect(frame)
+            except Exception as exc:
+                raise DetectionError(f"{detector.name} detector failed: {exc}") from exc
 
             if metadata is not None:
                 self.metadata_bus.publish(metadata)

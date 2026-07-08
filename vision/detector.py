@@ -8,8 +8,9 @@ class Detector(ABC):
     """
     Interface for Vision detectors.
 
-    Detectors analyze frames and return Metadata. They do not own the
-    camera and should not draw directly onto frames.
+    Detectors analyze immutable frames and optionally return Metadata.
+    They never own the camera, manage frame acquisition, or modify the
+    original frame image.
     """
 
     def __init__(self, name: str, *, enabled: bool = False) -> None:

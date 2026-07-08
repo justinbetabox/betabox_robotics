@@ -113,7 +113,7 @@ class WebRTCStreamer(Streamer):
     def clients(self) -> int:
         return len(self._peer_connections)
 
-    def statistics(self) -> Dict[str, Any]:
+    def statistics(self) -> dict[str, Any]:
         return {
             "running": self._running,
             "clients": self.clients(),

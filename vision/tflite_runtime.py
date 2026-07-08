@@ -7,7 +7,7 @@ from betabox_robotics.vision.frame import Frame
 from betabox_robotics.vision.model_runtime import ModelDetection
 
 
-class TFLiteObjectDetectionRuntime:
+class TFLiteObjectDetectionModel:
     """
     TensorFlow Lite object detection runtime.
 

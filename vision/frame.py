@@ -6,10 +6,13 @@ from typing import Any
 @dataclass(frozen=True)
 class Frame:
     """
-    Captured camera frame.
+    Immutable frame produced by the Vision pipeline.
 
-    The image data format is implementation-dependent, but for the first
-    Picamera2 implementation this will usually be a NumPy array.
+    A Frame represents a single moment in time captured from the camera.
+    It is passed between Vision components without modification.
+
+    The image format is implementation-defined. The current Betabox camera
+    pipeline uses a NumPy ndarray in BGR color order.
     """
 
     image: Any

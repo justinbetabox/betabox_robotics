@@ -93,6 +93,15 @@ class FrameSource:
     def last_error(self) -> Optional[Exception]:
         return self._last_error
 
+    def statistics(self) -> dict:
+        return {
+            "running": self._running,
+            "fps": self.fps,
+            "consumer_count": self.consumer_count(),
+            "has_frame": self._latest_frame is not None,
+            "last_error": str(self._last_error) if self._last_error else None,
+        }
+
     def _capture_loop(self) -> None:
         interval = 1.0 / self.fps
 

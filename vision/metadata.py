@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from time import time
 from typing import Any, Dict, List, Optional, Tuple
@@ -32,7 +33,7 @@ class Metadata:
 
     source: str
     timestamp: float
-    detections: List[Detection] = field(default_factory=list)
+    detections: Sequence[Detection]
     data: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -40,12 +41,12 @@ class Metadata:
         cls,
         source: str,
         *,
-        detections: Optional[List[Detection]] = None,
+        detections: Sequence[Detection] | None = None,
         data: Optional[Dict[str, Any]] = None,
     ) -> "Metadata":
         return cls(
             source=source,
             timestamp=time(),
-            detections=detections or [],
+            detections=tuple(detections) if detections is not None else (),
             data=data or {},
         )

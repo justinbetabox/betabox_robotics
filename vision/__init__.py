@@ -8,13 +8,13 @@ from .frame_source import FrameSource, FrameSourceError
 from .interfaces import FrameProvider
 from .metadata import Detection, Metadata
 from .metadata_bus import MetadataBus
-from .model_runtime import ModelDetection, ObjectDetectionRuntime
+from .model_runtime import ModelDetection, ObjectDetectionModel
 from .recording import Recording, RecordingError, RecordingService
 from .service import VisionService, VisionServiceConfig
 from .signaling import WebRTCSignalingServer
 from .snapshot import Snapshot, SnapshotError, SnapshotService
 from .stream import Streamer
-from .tflite_runtime import TFLiteObjectDetectionRuntime
+from .tflite_runtime import TFLiteObjectDetectionModel
 from .vision import Vision
 from .webrtc import WebRTCStreamer
 
@@ -46,8 +46,8 @@ __all__ = [
     "DetectionManager",
     "DetectionError",
     "ModelDetection",
-    "ObjectDetectionRuntime",
-    "TFLiteObjectDetectionRuntime",
+    "ObjectDetectionModel",
+    "TFLiteObjectDetectionModel",
     "VisionService",
     "VisionServiceConfig",
 ]

@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -13,11 +14,11 @@ class ModelDetection:
     data: dict[str, Any] = field(default_factory=dict)
 
 
-class ObjectDetectionRuntime(Protocol):
+class ObjectDetectionModel(Protocol):
     """
-    Runtime interface for object detection models.
+    Backend interface for object detection models.
 
-    Implementations may use TFLite, OpenCV DNN, ONNX, or another backend.
+    Implementations may use TFLite, OpenCV DNN, ONNX, or another inference backend.
     """
 
-    def detect(self, frame: Frame) -> list[ModelDetection]: ...
+    def detect(self, frame: Frame) -> Sequence[ModelDetection]: ...

@@ -6,7 +6,7 @@ INDEX_HTML = """
 <!doctype html>
 <html>
 <head>
-  <title>Betabox Vision WebRTC Test</title>
+  <title>Betabox Vision</title>
   <style>
     body {
       font-family: sans-serif;
@@ -36,7 +36,7 @@ INDEX_HTML = """
   </style>
 </head>
 <body>
-  <h1>Betabox Vision WebRTC Test</h1>
+  <h1>Betabox Vision</h1>
   <video id="video" autoplay playsinline muted></video>
   <br>
   <button onclick="start()">Start</button>

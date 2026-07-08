@@ -11,10 +11,10 @@ class Vision:
     """
     Vision subsystem container.
 
-    Owns the FrameSource and MetadataBus. FrameSource owns CameraManager.
-    Streaming, detection, and recording consume frames from FrameSource.
-    Snapshots use the latest available frame through the FrameProvider
-    interface. Detectors publish structured results to MetadataBus.
+    This direct subsystem owns a FrameSource and therefore opens the camera.
+    It should be used when the managed betabox-video.service is not running.
+
+    Long-running platform video should use VisionService instead.
     """
 
     def __init__(

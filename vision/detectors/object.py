@@ -1,36 +1,36 @@
 from betabox_robotics.vision.detector import Detector
 from betabox_robotics.vision.frame import Frame
 from betabox_robotics.vision.metadata import Detection, Metadata
-from betabox_robotics.vision.model_runtime import ObjectDetectionRuntime
+from betabox_robotics.vision.model_runtime import ObjectDetectionModel
 
 
 class ObjectDetector(Detector):
     """
-    Detects objects using a pluggable object detection runtime.
+    Detects objects using a pluggable object detection model.
 
-    The runtime owns model-specific inference details. ObjectDetector
+    The model owns backend-specific inference details. ObjectDetector
     adapts model results into Betabox Vision metadata.
     """
 
     def __init__(
         self,
-        runtime: ObjectDetectionRuntime | None = None,
+        model: ObjectDetectionModel | None = None,
         *,
         enabled: bool = False,
         min_confidence: float = 0.5,
     ) -> None:
         super().__init__("objects", enabled=enabled)
-        self.runtime = runtime
+        self.model = model
         self.min_confidence = float(min_confidence)
 
     def configure(
         self,
         *,
-        runtime: ObjectDetectionRuntime | None = None,
+        model: ObjectDetectionModel | None = None,
         min_confidence: float | None = None,
     ) -> None:
-        if runtime is not None:
-            self.runtime = runtime
+        if model is not None:
+            self.model = model
 
         if min_confidence is not None:
             self.min_confidence = float(min_confidence)
@@ -38,23 +38,23 @@ class ObjectDetector(Detector):
     def enable(
         self,
         *,
-        runtime: ObjectDetectionRuntime | None = None,
+        model: ObjectDetectionModel | None = None,
         min_confidence: float | None = None,
     ) -> None:
-        self.configure(runtime=runtime, min_confidence=min_confidence)
+        self.configure(model=model, min_confidence=min_confidence)
         self.enabled = True
 
     def detect(self, frame: Frame) -> Metadata:
-        if self.runtime is None:
+        if self.model is None:
             return Metadata.create(
                 self.name,
                 data={
                     "count": 0,
-                    "error": "object detection runtime is not configured",
+                    "error": "object detection model is not configured",
                 },
             )
 
-        model_detections = self.runtime.detect(frame)
+        model_detections = self.model.detect(frame)
 
         detections: list[Detection] = []
 

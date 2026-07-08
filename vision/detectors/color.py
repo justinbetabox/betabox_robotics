@@ -36,8 +36,7 @@ class ColorDetector(Detector):
         min_area: float = 500.0,
         enabled: bool = False,
     ) -> None:
-        super().__init__("color:red", enabled=enabled)
-
+        super().__init__("color", enabled=enabled)
         self.colors: list[str] = []
         self.min_area = 500.0
 
@@ -142,8 +141,6 @@ class ColorDetector(Detector):
 
         if min_area is not None:
             self.min_area = float(min_area)
-
-        self.name = "color" if len(color_list) > 1 else f"color:{color_list[0]}"
 
     def enable(
         self,

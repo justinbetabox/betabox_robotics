@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import argparse
 
+from betabox_robotics.services.backup import main as backup_main
 from betabox_robotics.services.boot_announce import main as boot_announce_main
 from betabox_robotics.services.doctor import main as doctor_main
 from betabox_robotics.services.install_check import main as install_check_main
 from betabox_robotics.services.logs import main as logs_main
 from betabox_robotics.services.monitor import main as monitor_main
 from betabox_robotics.services.services import main as services_main
+from betabox_robotics.services.snapshot import main as snapshot_main
 from betabox_robotics.services.status import main as status_main
 from betabox_robotics.services.verify import main as verify_main
 
@@ -48,6 +50,14 @@ def main() -> int:
         "doctor",
         help="Diagnose Betabox platform issues and suggest fixes",
     )
+    subparsers.add_parser(
+        "backup",
+        help="Create or list Betabox backups",
+    )
+    subparsers.add_parser(
+        "snapshot",
+        help="Create or list Betabox diagnostic snapshots",
+    )
 
     args, extra = parser.parse_known_args()
 
@@ -74,6 +84,12 @@ def main() -> int:
 
     if args.command == "doctor":
         return doctor_main(extra)
+
+    if args.command == "backup":
+        return backup_main(extra)
+
+    if args.command == "snapshot":
+        return snapshot_main(extra)
 
     parser.print_help()
     return 1

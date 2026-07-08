@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib
+import shutil
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -69,6 +70,16 @@ def check_path(path: Path) -> CheckResult:
     )
 
 
+def check_executable(command: str) -> CheckResult:
+    path = shutil.which(command)
+
+    return CheckResult(
+        f"command:{command}",
+        path is not None,
+        path if path else "not found",
+    )
+
+
 def collect_checks() -> list[CheckResult]:
     checks: list[CheckResult] = []
 
@@ -102,6 +113,10 @@ def collect_checks() -> list[CheckResult]:
     ]:
         checks.append(check_path(path))
 
+    checks.append(check_executable("node"))
+    checks.append(check_executable("npm"))
+    checks.append(check_executable("configurable-http-proxy"))
+
     return checks
 
 
@@ -133,6 +148,7 @@ def print_results(checks: list[CheckResult]) -> bool:
         print("After reboot:")
         print("  source /opt/betabox/venv/bin/activate")
         print("  betabox verify")
+        print("  betabox doctor")
     else:
         print("Betabox installation check failed.")
 

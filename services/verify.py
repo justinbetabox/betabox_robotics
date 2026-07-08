@@ -154,6 +154,25 @@ def check_robot_constructs() -> CheckResult:
         return CheckResult("robot:construct", False, str(exc))
 
 
+def check_configurable_http_proxy() -> CheckResult:
+    result = run(["configurable-http-proxy", "--version"])
+
+    if result is None or result.returncode != 0:
+        return CheckResult(
+            "jupyterhub:proxy",
+            False,
+            "configurable-http-proxy not installed",
+        )
+
+    output = result.stdout.strip() or result.stderr.strip()
+
+    return CheckResult(
+        "jupyterhub:proxy",
+        True,
+        output or "installed",
+    )
+
+
 def collect_checks(*, include_robot: bool = True) -> list[CheckResult]:
     checks: list[CheckResult] = []
 
@@ -162,6 +181,7 @@ def collect_checks(*, include_robot: bool = True) -> list[CheckResult]:
     checks.append(check_i2c_device())
     checks.append(check_i2c_scan())
     checks.append(check_hifiberry())
+    checks.append(check_configurable_http_proxy())
     checks.append(check_speech_backend())
     checks.extend(check_media_paths())
 

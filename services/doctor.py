@@ -169,6 +169,38 @@ def diagnose_robot(results: dict[str, CheckResult]) -> Diagnosis:
     )
 
 
+def diagnose_jupyterhub(results: dict[str, CheckResult]) -> Diagnosis:
+    proxy = results.get("jupyterhub:proxy")
+    status = collect_status()
+    service_state = status.services.get("jupyterhub.service", "unknown")
+
+    ok = bool(proxy and proxy.ok and service_state == "active")
+
+    suggestions = [
+        "Install Node.js and npm: sudo apt install -y nodejs npm",
+        "Install the proxy: sudo npm install -g configurable-http-proxy",
+        "Restart JupyterHub: sudo systemctl restart jupyterhub.service",
+        "Check logs: betabox logs jupyterhub --journal-only",
+        "Check health: curl -I http://127.0.0.1:8000/hub/health",
+    ]
+
+    if ok:
+        message = "JupyterHub service and proxy are available."
+    elif not (proxy and proxy.ok):
+        message = "JupyterHub proxy is missing."
+    elif service_state != "active":
+        message = f"JupyterHub service is {service_state}."
+    else:
+        message = "JupyterHub is not fully available."
+
+    return Diagnosis(
+        title="JupyterHub",
+        ok=ok,
+        message=message,
+        suggestions=[] if ok else suggestions,
+    )
+
+
 def collect_diagnoses(*, include_robot: bool = True) -> list[Diagnosis]:
     checks = result_map(collect_checks(include_robot=include_robot))
 
@@ -176,6 +208,7 @@ def collect_diagnoses(*, include_robot: bool = True) -> list[Diagnosis]:
         diagnose_i2c(checks),
         diagnose_camera(checks),
         diagnose_audio(checks),
+        diagnose_jupyterhub(checks),
         diagnose_media(checks),
         diagnose_services(),
     ]

@@ -18,6 +18,7 @@ class StatusReport:
     hifiberry_available: bool
     media_paths: dict[str, str]
     services: dict[str, str]
+    jupyterhub_proxy_available: bool
 
 
 def run(command: list[str], timeout: int = 5) -> subprocess.CompletedProcess | None:
@@ -79,11 +80,18 @@ def hifiberry_available() -> bool:
     return "snd_rpi_hifiberry_dac" in output or "HifiBerry" in output
 
 
+def executable_available(command: str) -> bool:
+    result = run(["which", command], timeout=3)
+    return bool(result and result.returncode == 0)
+
+
 def collect_status() -> StatusReport:
     media_root = Path.home() / "media"
 
     services = {
-        "betabox-boot-announce.service": service_status("betabox-boot-announce.service"),
+        "betabox-boot-announce.service": service_status(
+            "betabox-boot-announce.service"
+        ),
         "betabox-monitor.service": service_status("betabox-monitor.service"),
         "car-video-api.service": service_status("car-video-api.service"),
         "jupyterhub.service": service_status("jupyterhub.service"),
@@ -101,6 +109,7 @@ def collect_status() -> StatusReport:
             "sounds": str(media_root / "sounds"),
         },
         services=services,
+        jupyterhub_proxy_available=executable_available("configurable-http-proxy"),
     )
 
 
@@ -121,7 +130,7 @@ def print_human(report: StatusReport) -> None:
         print("IP:       none found")
 
     print()
-    print("Hardware")
+    print("Platform")
     print("--------")
     print(f"I2C:       {'available' if report.i2c_available else 'missing'}")
     print(f"HifiBerry: {'available' if report.hifiberry_available else 'missing'}")
@@ -138,6 +147,15 @@ def print_human(report: StatusReport) -> None:
     print("--------")
     for service, state in report.services.items():
         print(f"{service:32} {state}")
+
+    print()
+    print("JupyterHub")
+    print("----------")
+    print(f"Service:  {report.services.get('jupyterhub.service', 'unknown')}")
+    print(
+        f"Proxy:    {'available' if report.jupyterhub_proxy_available else 'missing'}"
+    )
+    print("Port:     8000")
 
     print()
 

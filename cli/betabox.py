@@ -15,6 +15,7 @@ from betabox_robotics.services.services import main as services_main
 from betabox_robotics.services.snapshot import main as snapshot_main
 from betabox_robotics.services.status import main as status_main
 from betabox_robotics.services.verify import main as verify_main
+from betabox_robotics.services.wifi_fallback import main as wifi_fallback_main
 
 
 def main() -> int:
@@ -73,6 +74,10 @@ def main() -> int:
         "set-hostname",
         help="Set hostname from Raspberry Pi serial number",
     )
+    subparsers.add_parser(
+        "wifi-fallback",
+        help="Start fallback AP if Ethernet and Wi-Fi are unavailable",
+    )
 
     args, extra = parser.parse_known_args()
 
@@ -114,6 +119,9 @@ def main() -> int:
 
     if args.command == "set-hostname":
         return hostname_main(extra)
+
+    if args.command == "wifi-fallback":
+        return wifi_fallback_main(extra)
 
     parser.print_help()
     return 1

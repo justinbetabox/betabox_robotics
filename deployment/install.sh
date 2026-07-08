@@ -149,10 +149,12 @@ sudo mkdir -p /etc/systemd/system
 sudo cp "$SDK_DIR/deployment/systemd/betabox-boot-announce.service" /etc/systemd/system/
 sudo cp "$SDK_DIR/deployment/systemd/betabox-monitor.service" /etc/systemd/system/
 sudo cp "$SDK_DIR/deployment/systemd/jupyterhub.service" /etc/systemd/system/
+sudo cp "$SDK_DIR/deployment/systemd/wifi-fallback.service" /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable betabox-boot-announce.service
 sudo systemctl enable betabox-monitor.service
 sudo systemctl enable jupyterhub.service
+sudo systemctl enable wifi-fallback.service
 
 echo "[10/10] Running install check..."
 python -m betabox_robotics.services.install_check

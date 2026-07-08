@@ -39,25 +39,24 @@ def hostname() -> str:
 
 
 def ip_addresses() -> list[str]:
+    result = run(["hostname", "-I"], timeout=3)
+
+    if result is None or result.returncode != 0:
+        return []
+
     addresses: list[str] = []
 
-    try:
-        host = socket.gethostname()
+    for address in result.stdout.split():
+        address = address.strip()
 
-        for info in socket.getaddrinfo(host, None):
-            address = info[4][0]
+        if not address:
+            continue
 
-            if not isinstance(address, str):
-                continue
+        if address.startswith("127."):
+            continue
 
-            if address.startswith("127."):
-                continue
-
-            if address not in addresses:
-                addresses.append(address)
-
-    except socket.gaierror:
-        pass
+        if address not in addresses:
+            addresses.append(address)
 
     return addresses
 

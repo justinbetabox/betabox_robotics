@@ -42,4 +42,9 @@ MANAGED_SERVICES: dict[str, ManagedService] = {
         title="Video",
         unit="car-video-api.service",
     ),
+    "wifi-fallback": ManagedService(
+        name="wifi-fallback",
+        title="Wi-Fi Fallback",
+        unit="wifi-fallback.service",
+    ),
 }

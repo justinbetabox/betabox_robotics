@@ -1,0 +1,13 @@
+[Unit]
+Description=Betabox Wi-Fi fallback access point
+After=NetworkManager.service set-hostname-from-serial.service
+Wants=NetworkManager.service
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/opt/betabox/venv/bin/betabox wifi-fallback
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -144,6 +144,22 @@ else
     echo "WARNING: $CONFIG_FILE not found. Boot config was not updated."
 fi
 
+echo "Configuring Wi-Fi fallback AP profile..."
+if ! nmcli connection show PiAP >/dev/null 2>&1; then
+    sudo nmcli connection add \
+        type wifi \
+        ifname wlan0 \
+        con-name PiAP \
+        autoconnect no \
+        ssid Betabox
+
+    sudo nmcli connection modify PiAP \
+        802-11-wireless.mode ap \
+        802-11-wireless.band bg \
+        ipv4.method shared \
+        ipv6.method ignore
+fi
+
 echo "[9/10] Installing systemd services..."
 sudo mkdir -p /etc/systemd/system
 sudo cp "$SDK_DIR/deployment/systemd/betabox-boot-announce.service" /etc/systemd/system/

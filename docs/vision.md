@@ -374,6 +374,18 @@ The public Vision API is organized around capabilities rather than implementatio
 
 ------------------------------------------------------------------------
 
+## Managed Vision Service
+
+Betabox Vision now uses a managed camera service for normal student-facing use.
+
+The physical Raspberry Pi camera is owned by:
+
+```text
+betabox-video.service
+```
+
+------------------------------------------------------------------------
+
 ## Future Expansion
 
 The architecture is intended to support future capabilities without

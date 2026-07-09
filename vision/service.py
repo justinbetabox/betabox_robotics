@@ -11,6 +11,7 @@ from betabox_robotics.vision.recording import Recording, RecordingService
 from betabox_robotics.vision.signaling import WebRTCSignalingServer
 from betabox_robotics.vision.snapshot import Snapshot, SnapshotService
 from betabox_robotics.vision.webrtc import WebRTCStreamer
+from betabox_robotics.vision.overlay import OverlayRenderer
 
 
 @dataclass(frozen=True)
@@ -33,10 +34,20 @@ class VisionService:
         self.frame_source = FrameSource(fps=self.config.fps)
         self.metadata_bus = MetadataBus()
         self.detection = DetectionManager(self.metadata_bus)
+        self.overlay = OverlayRenderer()
         self.frame_source.register_consumer(self.detection)
-        self.recording = RecordingService(fps=self.config.fps)
+        self.recording = RecordingService(
+            fps=self.config.fps,
+            metadata_bus=self.metadata_bus,
+            overlay=self.overlay,
+        )
         self.frame_source.register_consumer(self.recording)
-        self.streamer = WebRTCStreamer(fps=self.config.fps)
+        self.overlay = OverlayRenderer()
+        self.streamer = WebRTCStreamer(
+            fps=self.config.fps,
+            metadata_bus=self.metadata_bus,
+            overlay=self.overlay,
+        )
         self.snapshot = SnapshotService(self.frame_source)
         self.server = WebRTCSignalingServer(
             self,
@@ -83,6 +94,7 @@ class VisionService:
             "metadata_sources": list(self.metadata_bus.all_latest().keys()),
             "detection": self.detection_status(),
             "streamer": self.streamer.statistics(),
+            "stream_overlay": self.stream_overlay_status(),
             "host": self.config.host,
             "port": self.config.port,
             "fps": self.config.fps,
@@ -91,10 +103,37 @@ class VisionService:
     def close(self) -> None:
         self.stop()
 
-    def capture_snapshot(self, **kwargs) -> Snapshot:
-        return self.snapshot.capture(**kwargs)
+    def capture_snapshot(
+        self,
+        *,
+        overlay: bool = False,
+        source: str | None = None,
+        **kwargs,
+    ) -> Snapshot:
+        if not overlay:
+            return self.snapshot.capture(**kwargs)
 
-    def start_recording(self, *, filename: str | None = None) -> Path:
+        frame = self.frame_source.latest_frame()
+        metadata = self.latest_metadata(source)
+
+        if metadata is None:
+            return self.snapshot.capture(**kwargs)
+
+        annotated = self.overlay.draw_metadata(frame, metadata)
+        return self.snapshot.capture_frame(annotated, **kwargs)
+
+    def start_recording(
+        self,
+        *,
+        filename: str | None = None,
+        overlay: bool = False,
+        source: str | None = None,
+        ) -> Path:
+        if overlay:
+            self.enable_recording_overlay(source)
+        else:
+            self.disable_recording_overlay()
+
         return self.recording.start(filename=filename)
 
     def stop_recording(self) -> Recording:
@@ -114,6 +153,24 @@ class VisionService:
             name: self.detection.is_enabled(name)
             for name in self.detection.names()
         }
+
+    def enable_stream_overlay(self, source: str | None = None) -> None:
+        self.streamer.enable_overlay(source)
+
+    def disable_stream_overlay(self) -> None:
+        self.streamer.disable_overlay()
+
+    def stream_overlay_status(self) -> dict:
+        return self.streamer.overlay_status()
+
+    def enable_recording_overlay(self, source: str | None = None) -> None:
+        self.recording.enable_overlay(source)
+
+    def disable_recording_overlay(self) -> None:
+        self.recording.disable_overlay()
+
+    def recording_overlay_status(self) -> dict:
+        return self.recording.overlay_status()
 
     def latest_metadata(self, source: str | None = None) -> Metadata | None:
         return self.metadata_bus.latest(source)

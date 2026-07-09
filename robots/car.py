@@ -103,14 +103,14 @@ class CarRobot(Robot):
     def is_vision_running(self) -> bool:
         return self.vision.is_running()
 
-    def snapshot(self):
-        return self.vision_client.snapshot()
+    def snapshot(self, *, overlay: bool = False, source: str | None = None):
+        return self.vision_client.snapshot(overlay=overlay, source=source)
 
-    def capture(self):
-        return self.snapshot()
+    def capture(self, *, overlay: bool = False, source: str | None = None):
+        return self.snapshot(overlay=overlay, source=source)
 
-    def start_recording(self):
-        return self.vision_client.start_recording()
+    def start_recording(self, *, overlay: bool = False, source: str | None = None):
+        return self.vision_client.start_recording(overlay=overlay, source=source)
 
     def stop_recording(self):
         return self.vision_client.stop_recording()
@@ -132,6 +132,12 @@ class CarRobot(Robot):
 
     def detection_status(self):
         return self.vision_client.detection_status()
+
+    def enable_stream_overlay(self, source: str | None = None):
+        return self.vision_client.enable_stream_overlay(source)
+
+    def disable_stream_overlay(self):
+        return self.vision_client.disable_stream_overlay()
 
     def hostname(self) -> str:
         return self.system.hostname()

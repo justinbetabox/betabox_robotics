@@ -9,6 +9,8 @@ import cv2
 from betabox_robotics.vision.consumer import FrameConsumer
 from betabox_robotics.vision.frame import Frame
 from betabox_robotics.vision.frame_source import FrameSourceError
+from betabox_robotics.vision.metadata_bus import MetadataBus
+from betabox_robotics.vision.overlay import OverlayRenderer
 
 
 @dataclass(frozen=True)
@@ -42,6 +44,8 @@ class RecordingService(FrameConsumer):
         directory: str | Path = Path.home() / "media" / "videos",
         fps: float = 20.0,
         filename_prefix: str = "recording",
+        metadata_bus: MetadataBus | None = None,
+        overlay: OverlayRenderer | None = None,
     ) -> None:
         if fps <= 0:
             raise RecordingError("fps must be greater than 0")
@@ -49,6 +53,10 @@ class RecordingService(FrameConsumer):
         self.directory = Path(directory)
         self.fps = float(fps)
         self.filename_prefix = filename_prefix
+        self.metadata_bus = metadata_bus
+        self.overlay = overlay or OverlayRenderer()
+        self.overlay_enabled = False
+        self.overlay_source: str | None = None
 
         self._writer: Optional[cv2.VideoWriter] = None
         self._path: Optional[Path] = None
@@ -132,7 +140,13 @@ class RecordingService(FrameConsumer):
             if self._size != size:
                 raise RecordingError("frame size changed during recording")
 
-            # OpenCV writes BGR frames. Vision frames are RGB.
+            if self.overlay_enabled and self.metadata_bus is not None:
+                metadata = self.metadata_bus.latest(self.overlay_source)
+                if metadata is not None:
+                    frame = self.overlay.draw_metadata(frame, metadata)
+
+            image = frame.image
+
             image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
             assert self._writer is not None
@@ -140,6 +154,20 @@ class RecordingService(FrameConsumer):
 
             self._frame_count += 1
             self._end_timestamp = frame.timestamp
+
+    def enable_overlay(self, source: str | None = None) -> None:
+        self.overlay_enabled = True
+        self.overlay_source = source
+
+    def disable_overlay(self) -> None:
+        self.overlay_enabled = False
+        self.overlay_source = None
+
+    def overlay_status(self) -> dict:
+        return {
+            "enabled": self.overlay_enabled,
+            "source": self.overlay_source,
+        }
 
     def _open_writer(self, size: tuple[int, int], timestamp: float) -> None:
         if self._path is None:

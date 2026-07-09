@@ -50,6 +50,21 @@ class SnapshotService:
         image_format: ImageFormat | None = None,
     ) -> Snapshot:
         frame = self.frame_source.latest_frame()
+        return self.capture_frame(
+            frame,
+            filename=filename,
+            directory=directory,
+            image_format=image_format,
+        )
+
+    def capture_frame(
+        self,
+        frame: Frame,
+        *,
+        filename: str | None = None,
+        directory: str | Path | None = None,
+        image_format: ImageFormat | None = None,
+    ) -> Snapshot:
         output_dir = Path(directory) if directory is not None else self.directory
         fmt = image_format or self.default_format
 

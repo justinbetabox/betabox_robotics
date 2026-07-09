@@ -18,6 +18,7 @@ from .tflite_runtime import TFLiteObjectDetectionModel
 from .vision import Vision
 from .webrtc import WebRTCStreamer
 from .client import ClientRecording, ClientSnapshot, VisionClient, VisionClientError
+from .overlay import OverlayRenderer, OverlayStyle
 
 __all__ = [
     "CameraError",
@@ -55,4 +56,6 @@ __all__ = [
     "VisionClientError",
     "ClientSnapshot",
     "ClientRecording",
+    "OverlayRenderer",
+    "OverlayStyle",
 ]

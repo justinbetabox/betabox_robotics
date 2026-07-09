@@ -8,6 +8,8 @@ from av.video.frame import VideoFrame
 
 from betabox_robotics.vision.frame import Frame
 from betabox_robotics.vision.stream import Streamer
+from betabox_robotics.vision.metadata_bus import MetadataBus
+from betabox_robotics.vision.overlay import OverlayRenderer
 
 
 class VisionVideoTrack(MediaStreamTrack):
@@ -27,7 +29,7 @@ class VisionVideoTrack(MediaStreamTrack):
     async def recv(self):
         await asyncio.sleep(1.0 / self.fps)
 
-        frame = self.streamer.latest_frame()
+        frame = self.streamer.rendered_frame()
 
         if frame is None:
             video_frame = VideoFrame(width=640, height=480, format="rgb24")
@@ -49,8 +51,18 @@ class WebRTCStreamer(Streamer):
     Receives frames from FrameSource and serves them to WebRTC clients.
     """
 
-    def __init__(self, *, fps: float = 20.0) -> None:
+    def __init__(
+        self,
+        *,
+        fps: float = 20.0,
+        metadata_bus: MetadataBus | None = None,
+        overlay: OverlayRenderer | None = None,
+    ) -> None:
         self.fps = float(fps)
+        self.metadata_bus = metadata_bus
+        self.overlay = overlay or OverlayRenderer()
+        self.overlay_enabled = False
+        self.overlay_source: str | None = None
         self._running = False
         self._latest_frame: Optional[Frame] = None
         self._frames_received = 0
@@ -102,6 +114,36 @@ class WebRTCStreamer(Streamer):
             "type": pc.localDescription.type,
         }
 
+    def enable_overlay(self, source: str | None = None) -> None:
+        self.overlay_enabled = True
+        self.overlay_source = source
+
+    def disable_overlay(self) -> None:
+        self.overlay_enabled = False
+        self.overlay_source = None
+
+    def overlay_status(self) -> dict:
+        return {
+            "enabled": self.overlay_enabled,
+            "source": self.overlay_source,
+        }
+
+    def rendered_frame(self) -> Frame | None:
+        frame = self.latest_frame()
+
+        if frame is None:
+            return None
+
+        if not self.overlay_enabled or self.metadata_bus is None:
+            return frame
+
+        metadata = self.metadata_bus.latest(self.overlay_source)
+
+        if metadata is None:
+            return frame
+
+        return self.overlay.draw_metadata(frame, metadata)
+
     async def close_peers(self) -> None:
         pcs = list(self._peer_connections)
 
@@ -117,6 +159,7 @@ class WebRTCStreamer(Streamer):
         return {
             "running": self._running,
             "clients": self.clients(),
+            "overlay": self.overlay_status(),
             "frames_received": self._frames_received,
             "has_frame": self.latest_frame() is not None,
         }

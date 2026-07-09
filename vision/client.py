@@ -44,8 +44,26 @@ class VisionClient:
     def statistics(self) -> dict[str, Any]:
         return self._get("/stats")
 
-    def snapshot(self) -> ClientSnapshot:
-        data = self._post("/snapshot")
+    def snapshot(
+        self,
+        *,
+        overlay: bool = False,
+        source: str | None = None,
+    ) -> ClientSnapshot:
+        query = []
+
+        if overlay:
+            query.append("overlay=true")
+
+        if source is not None:
+            query.append(f"source={source}")
+
+        path = "/snapshot"
+
+        if query:
+            path += "?" + "&".join(query)
+
+        data = self._post(path)
 
         return ClientSnapshot(
             path=Path(data["path"]),
@@ -53,8 +71,26 @@ class VisionClient:
             format=str(data["format"]),
         )
 
-    def start_recording(self) -> Path:
-        data = self._post("/recording/start")
+    def start_recording(
+        self,
+        *,
+        overlay: bool = False,
+        source: str | None = None,
+    ) -> Path:
+        query = []
+
+        if overlay:
+            query.append("overlay=true")
+
+        if source is not None:
+            query.append(f"source={source}")
+
+        path = "/recording/start"
+
+        if query:
+            path += "?" + "&".join(query)
+
+        data = self._post(path)
         return Path(data["path"])
 
     def stop_recording(self) -> ClientRecording:
@@ -80,6 +116,17 @@ class VisionClient:
 
     def disable_detection(self, name: str) -> dict[str, Any]:
         return self._post_json("/detection/disable", {"name": name})
+
+    def enable_stream_overlay(self, source: str | None = None) -> dict[str, Any]:
+        payload: dict[str, Any] = {}
+
+        if source is not None:
+            payload["source"] = source
+
+        return self._post_json("/stream/overlay/enable", payload)
+
+    def disable_stream_overlay(self) -> dict[str, Any]:
+        return self._post_json("/stream/overlay/disable", {})
 
     def _get(self, path: str) -> dict[str, Any]:
         return self._request("GET", path)

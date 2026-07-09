@@ -157,6 +157,8 @@ class WebRTCSignalingServer:
         self.app.router.add_get("/detection", self.detection_status)
         self.app.router.add_post("/detection/enable", self.detection_enable)
         self.app.router.add_post("/detection/disable", self.detection_disable)
+        self.app.router.add_post("/stream/overlay/enable", self.stream_overlay_enable)
+        self.app.router.add_post("/stream/overlay/disable", self.stream_overlay_disable)
 
     async def index(self, request):
         return web.Response(text=INDEX_HTML, content_type="text/html")
@@ -174,14 +176,35 @@ class WebRTCSignalingServer:
 
     async def snapshot(self, request):
         try:
-            snapshot = self.vision.capture_snapshot()
+            overlay = request.query.get("overlay", "false").lower() in (
+                "1",
+                "true",
+                "yes",
+            )
+            source = request.query.get("source")
+
+            snapshot = self.vision.capture_snapshot(
+                overlay=overlay,
+                source=source,
+            )
             return ok(snapshot)
         except Exception as exc:
             return fail(str(exc))
 
     async def recording_start(self, request):
         try:
-            path = self.vision.start_recording()
+            overlay = request.query.get("overlay", "false").lower() in (
+                "1",
+                "true",
+                "yes",
+            )
+            source = request.query.get("source")
+
+            path = self.vision.start_recording(
+                overlay=overlay,
+                source=source,
+            )
+
             return ok(
                 {
                     "recording": True,
@@ -242,6 +265,22 @@ class WebRTCSignalingServer:
                     "detectors": self.vision.detection_status(),
                 }
             )
+        except Exception as exc:
+            return fail(str(exc))
+
+    async def stream_overlay_enable(self, request):
+        try:
+            params = await request.json()
+            source = params.get("source")
+            self.vision.enable_stream_overlay(source)
+            return ok(self.vision.stream_overlay_status())
+        except Exception as exc:
+            return fail(str(exc))
+
+    async def stream_overlay_disable(self, request):
+        try:
+            self.vision.disable_stream_overlay()
+            return ok(self.vision.stream_overlay_status())
         except Exception as exc:
             return fail(str(exc))
 

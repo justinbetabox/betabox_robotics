@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from betabox_robotics.vision.detection import DetectionManager
 from betabox_robotics.vision.frame_source import FrameSource
+from betabox_robotics.vision.metadata import Metadata
 from betabox_robotics.vision.metadata_bus import MetadataBus
-from betabox_robotics.vision.recording import RecordingService
+from betabox_robotics.vision.recording import Recording, RecordingService
 from betabox_robotics.vision.signaling import WebRTCSignalingServer
-from betabox_robotics.vision.snapshot import SnapshotService
+from betabox_robotics.vision.snapshot import Snapshot, SnapshotService
 from betabox_robotics.vision.webrtc import WebRTCStreamer
 
 
@@ -37,7 +39,7 @@ class VisionService:
         self.streamer = WebRTCStreamer(fps=self.config.fps)
         self.snapshot = SnapshotService(self.frame_source)
         self.server = WebRTCSignalingServer(
-            self.streamer,
+            self,
             host=self.config.host,
             port=self.config.port,
         )
@@ -76,10 +78,10 @@ class VisionService:
     def statistics(self) -> dict:
         return {
             "running": self._running,
-            "frame_source_running": self.frame_source.is_running(),
-            "frame_source_consumers": self.frame_source.consumer_count(),
             "frame_source": self.frame_source.statistics(),
             "recording": self.recording.is_recording(),
+            "metadata_sources": list(self.metadata_bus.all_latest().keys()),
+            "detection": self.detection_status(),
             "streamer": self.streamer.statistics(),
             "host": self.config.host,
             "port": self.config.port,
@@ -89,8 +91,32 @@ class VisionService:
     def close(self) -> None:
         self.stop()
 
-    def capture_snapshot(self, **kwargs):
+    def capture_snapshot(self, **kwargs) -> Snapshot:
         return self.snapshot.capture(**kwargs)
+
+    def start_recording(self, *, filename: str | None = None) -> Path:
+        return self.recording.start(filename=filename)
+
+    def stop_recording(self) -> Recording:
+        return self.recording.stop()
+
+    def enable_detection(self, name: str) -> None:
+        self.detection.enable(name)
+
+    def disable_detection(self, name: str) -> None:
+        self.detection.disable(name)
+
+    def detection_names(self) -> list[str]:
+        return self.detection.names()
+
+    def detection_status(self) -> dict[str, bool]:
+        return {
+            name: self.detection.is_enabled(name)
+            for name in self.detection.names()
+        }
+
+    def latest_metadata(self, source: str | None = None) -> Metadata | None:
+        return self.metadata_bus.latest(source)
 
     def __enter__(self) -> "VisionService":
         self.start()

@@ -29,6 +29,7 @@ class CarRobot(Robot):
     vision: Any
     audio: Any
     system: Any
+    vision_client: Any
 
     def forward(self, speed: float) -> None:
         self.drive.forward(speed)
@@ -102,17 +103,35 @@ class CarRobot(Robot):
     def is_vision_running(self) -> bool:
         return self.vision.is_running()
 
-    def capture(self, filename: str | None = None):
-        return self.vision.snapshot.capture(filename=filename)
+    def snapshot(self):
+        return self.vision_client.snapshot()
 
-    def start_recording(self, filename: str | None = None):
-        return self.vision.recording.start(filename=filename)
+    def capture(self):
+        return self.snapshot()
+
+    def start_recording(self):
+        return self.vision_client.start_recording()
 
     def stop_recording(self):
-        return self.vision.recording.stop()
+        return self.vision_client.stop_recording()
 
     def is_recording(self) -> bool:
-        return self.vision.recording.is_recording()
+        return bool(self.vision_client.statistics().get("recording", False))
+
+    def vision_stats(self):
+        return self.vision_client.statistics()
+
+    def metadata(self, source: str | None = None):
+        return self.vision_client.metadata(source)
+
+    def enable_detection(self, name: str):
+        return self.vision_client.enable_detection(name)
+
+    def disable_detection(self, name: str):
+        return self.vision_client.disable_detection(name)
+
+    def detection_status(self):
+        return self.vision_client.detection_status()
 
     def hostname(self) -> str:
         return self.system.hostname()

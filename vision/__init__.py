@@ -17,6 +17,7 @@ from .stream import Streamer
 from .tflite_runtime import TFLiteObjectDetectionModel
 from .vision import Vision
 from .webrtc import WebRTCStreamer
+from .client import ClientRecording, ClientSnapshot, VisionClient, VisionClientError
 
 __all__ = [
     "CameraError",
@@ -50,4 +51,8 @@ __all__ = [
     "TFLiteObjectDetectionModel",
     "VisionService",
     "VisionServiceConfig",
+    "VisionClient",
+    "VisionClientError",
+    "ClientSnapshot",
+    "ClientRecording",
 ]

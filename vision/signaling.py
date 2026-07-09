@@ -1,6 +1,11 @@
+from dataclasses import asdict, is_dataclass
+from pathlib import Path
+from typing import Any, TYPE_CHECKING
+
 from aiohttp import web
 
-from betabox_robotics.vision.webrtc import WebRTCStreamer
+if TYPE_CHECKING:
+    from betabox_robotics.vision.service import VisionService
 
 INDEX_HTML = """
 <!doctype html>
@@ -85,6 +90,41 @@ INDEX_HTML = """
 </html>
 """
 
+def to_json(value: Any) -> Any:
+    if value is None:
+        return None
+
+    if is_dataclass(value) and not isinstance(value, type):
+        return to_json(asdict(value))
+
+    if isinstance(value, dict):
+        return {key: to_json(item) for key, item in value.items()}
+
+    if isinstance(value, (list, tuple)):
+        return [to_json(item) for item in value]
+
+    if isinstance(value, Path):
+        return str(value)
+
+    return value
+
+def ok(data=None):
+    return web.json_response(
+        {
+            "success": True,
+            "data": to_json(data) if data is not None else {},
+        }
+    )
+
+def fail(message: str, *, status: int = 400):
+    return web.json_response(
+        {
+            "success": False,
+            "error": message,
+        },
+        status=status,
+    )
+
 
 class WebRTCSignalingServer:
     """
@@ -96,12 +136,13 @@ class WebRTCSignalingServer:
 
     def __init__(
         self,
-        streamer: WebRTCStreamer,
+        vision: "VisionService",
         *,
         host: str = "0.0.0.0",
         port: int = 8080,
     ) -> None:
-        self.streamer = streamer
+        self.vision = vision
+        self.streamer = vision.streamer
         self.host = host
         self.port = int(port)
         self.app = web.Application()
@@ -109,6 +150,13 @@ class WebRTCSignalingServer:
         self.app.router.add_get("/", self.index)
         self.app.router.add_post("/offer", self.offer)
         self.app.router.add_get("/stats", self.stats)
+        self.app.router.add_post("/snapshot", self.snapshot)
+        self.app.router.add_post("/recording/start", self.recording_start)
+        self.app.router.add_post("/recording/stop", self.recording_stop)
+        self.app.router.add_get("/metadata", self.metadata)
+        self.app.router.add_get("/detection", self.detection_status)
+        self.app.router.add_post("/detection/enable", self.detection_enable)
+        self.app.router.add_post("/detection/disable", self.detection_disable)
 
     async def index(self, request):
         return web.Response(text=INDEX_HTML, content_type="text/html")
@@ -122,7 +170,80 @@ class WebRTCSignalingServer:
         return web.json_response(answer)
 
     async def stats(self, request):
-        return web.json_response(self.streamer.statistics())
+        return ok(self.vision.statistics())
+
+    async def snapshot(self, request):
+        try:
+            snapshot = self.vision.capture_snapshot()
+            return ok(snapshot)
+        except Exception as exc:
+            return fail(str(exc))
+
+    async def recording_start(self, request):
+        try:
+            path = self.vision.start_recording()
+            return ok(
+                {
+                    "recording": True,
+                    "path": str(path),
+                }
+            )
+        except Exception as exc:
+            return fail(str(exc))
+
+    async def recording_stop(self, request):
+        try:
+            recording = self.vision.stop_recording()
+            return ok(recording)
+        except Exception as exc:
+            return fail(str(exc))
+
+    async def metadata(self, request):
+        try:
+            source = request.query.get("source")
+            metadata = self.vision.latest_metadata(source)
+            return ok(metadata or {})
+        except Exception as exc:
+            return fail(str(exc))
+
+    async def detection_status(self, request):
+        try:
+            return ok(
+                {
+                    "detectors": self.vision.detection_names(),
+                    "enabled": self.vision.detection_status(),
+                }
+            )
+        except Exception as exc:
+            return fail(str(exc))
+
+    async def detection_enable(self, request):
+        try:
+            params = await request.json()
+            name = params["name"]
+            self.vision.enable_detection(name)
+            return ok(
+                {
+                    "enabled": name,
+                    "detectors": self.vision.detection_status(),
+                }
+            )
+        except Exception as exc:
+            return fail(str(exc))
+
+    async def detection_disable(self, request):
+        try:
+            params = await request.json()
+            name = params["name"]
+            self.vision.disable_detection(name)
+            return ok(
+                {
+                    "disabled": name,
+                    "detectors": self.vision.detection_status(),
+                }
+            )
+        except Exception as exc:
+            return fail(str(exc))
 
     def run(self, *, handle_signals: bool = True) -> None:
         web.run_app(

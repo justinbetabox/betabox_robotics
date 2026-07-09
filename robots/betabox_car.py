@@ -5,7 +5,7 @@ from betabox_robotics.drive import Drive
 from betabox_robotics.hardware import AnalogChannel, DigitalPin, Pins, PWMChannel
 from betabox_robotics.sensors import Sensors
 from betabox_robotics.system import System
-from betabox_robotics.vision import Vision
+from betabox_robotics.vision import Vision, VisionClient
 
 from .car import CarRobot
 
@@ -105,6 +105,7 @@ class BetaboxCar(CarRobot):
         self.drive = Drive.default(config)
         self.sensors = Sensors.default(config)
         self.vision = Vision.default(config)
+        self.vision_client = VisionClient()
         self.audio = Audio.default(config)
         self.system = System.default(config)
 

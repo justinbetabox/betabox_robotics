@@ -33,10 +33,14 @@ Applications should normally access vision capabilities through:
 ```python
 from betabox_robotics import Robot
 
-robot = Robot()
+robot = Robot.()
 
-robot.vision.snapshot.capture()
+photo = robot.snapshot()
+print(photo.path)
 ```
+
+Applications should normally use the Robot API or VisionClient rather
+than accessing CameraManager, FrameSource, or SnapshotService directly.
 
 The Vision subsystem should not depend on robot-specific configuration
 internally.
@@ -127,27 +131,35 @@ information produced by Vision.
 ## Architectural Overview
 
 ``` text
-                   Vision
-                      │
-                      ▼
-                   Camera
-                      │
-                      ▼
-                 Frame Source
-                      │
-                      ▼
-                 Frame Consumers
-                      │
-  ┌──------┬──--------┼─────────---─---──┐
-  │        │          │                  │
-  ▼        ▼          ▼                  ▼
-WebRTC Recording   Snapshot      Detection Manager
-                                         │
-                                         ▼
-                                     Detectors
-                                         │
-                                         ▼
-                                    Metadata Bus
+               Vision Service
+                     │
+                     ▼
+                Frame Source
+                     │
+    ┌──────────┬─────┴───────────┐
+    │          │                 │
+    ▼          ▼                 ▼
+  WebRTC    Recording    Detection Manager
+    │          │                 │
+    │          │                 ▼
+    │          │            Metadata Bus
+    │          │                 │
+    └──────────┼─────────────────┘
+               ▼
+         Overlay Renderer
+               │
+      ┌────────┴────────┐
+      ▼                 ▼
+Stream Overlay   Recording Overlay
+
+
+    SnapshotService
+           │
+           ▼
+FrameProvider.latest_frame()
+           │
+           ▼
+(Optional Overlay Renderer)
 ```
 
 The Vision subsystem is organized around a single frame pipeline.
@@ -202,10 +214,12 @@ Frame consumers perform work using frames supplied by the Frame Source.
 Typical consumers include:
 
 -    Live streaming
--    Snapshot generation
 -    Recording
 -    Detection
 -    Future AI inference
+
+SnapshotService is not a continuous frame consumer. It retrieves the
+latest available frame through the FrameProvider protocol.
 
 Consumers should remain independent so that they can be enabled,
 disabled, replaced, or tested individually.
@@ -235,6 +249,31 @@ The Metadata Bus is transport-independent and may be consumed simultaneously by 
 
 ------------------------------------------------------------------------
 
+## Overlay Rendering
+
+Overlay rendering is separate from detection.
+
+Detectors publish structured Metadata containing labels, confidence
+values, centers, and bounding boxes. They do not draw directly onto
+camera frames.
+
+OverlayRenderer may combine a frame with selected metadata to create an
+annotated copy of that frame.
+
+Overlay rendering is optional and may be applied independently to:
+
+- Snapshots
+- Recordings
+- WebRTC streams
+
+The original frame remains unchanged.
+
+This separation allows applications to retrieve unmodified camera images,
+render annotations selectively, or present metadata separately in a user
+interface.
+
+------------------------------------------------------------------------
+
 ## Detection Pipeline
 
 ``` text
@@ -254,6 +293,22 @@ The Detection Manager owns the built-in detector implementations and coordinates
 
 Detectors consume frames and publish structured metadata through the Metadata Bus. They should not own the camera, depend on the streaming transport, or permanently modify captured frames.
 
+Detectors are registered with DetectionManager and may be enabled or
+disabled independently.
+
+Detector names remain stable after registration so applications and
+service clients can reference detectors consistently.
+
+Built-in detectors currently include:
+
+- Color detection
+- Face detection
+- Pluggable object detection
+
+Object detection models are accessed through a backend-independent model
+interface so inference implementations may use TFLite, OpenCV DNN, ONNX,
+or future runtimes without changing the public detector API.
+
 ------------------------------------------------------------------------
 
 ## Streaming
@@ -272,6 +327,14 @@ statistics()
 ```
 
 The initial transport is WebRTC.
+
+WebRTC streaming may optionally render metadata overlays before frames
+are delivered to clients.
+
+Overlay rendering is controlled independently from detector execution.
+A detector may remain enabled while stream overlays are disabled, allowing
+metadata to be consumed programmatically without modifying the displayed
+video.
 
 Future transports may include:
 
@@ -301,6 +364,12 @@ Capabilities:
 -    Per-user storage (`~/media/videos`)
 -    Shared camera pipeline
 -    Concurrent operation with other consumers
+-    Optional metadata overlays
+-    Configurable output filenames
+
+When overlays are enabled, RecordingService uses the shared
+OverlayRenderer and selected Metadata source before writing each frame.
+Recording does not modify the original frame in the shared pipeline.
 
 ------------------------------------------------------------------------
 
@@ -321,6 +390,12 @@ Capabilities:
 -    Per-user storage (`~/media/pictures`)
 -    Shared camera pipeline
 -    Timestamp metadata
+-    Configurable output filenames
+-    Optional metadata overlays
+
+Annotated snapshots are produced by combining the latest frame with
+selected Metadata through OverlayRenderer. The unmodified frame remains
+available to other consumers.
 
 ------------------------------------------------------------------------
 
@@ -376,13 +451,166 @@ The public Vision API is organized around capabilities rather than implementatio
 
 ## Managed Vision Service
 
-Betabox Vision now uses a managed camera service for normal student-facing use.
+Betabox Vision uses a managed camera service for normal student-facing
+and platform use.
 
 The physical Raspberry Pi camera is owned by:
 
 ```text
 betabox-video.service
 ```
+
+The service runs VisionService, which owns and coordinates:
+
+- FrameSource
+- CameraManager
+- WebRTCStreamer
+- SnapshotService
+- RecordingService
+- DetectionManager
+- MetadataBus
+- OverlayRenderer
+- HTTP and WebRTC signaling endpoints
+
+Only the managed service should open the physical camera during normal
+robot operation.
+
+Low-level development tests that instantiate CameraManager or FrameSource
+directly require the managed service to be stopped temporarily.
+
+------------------------------------------------------------------------
+
+## VisionClient
+
+Applications normally interact with the managed Vision service through
+VisionClient.
+
+VisionClient does not open or own camera hardware. It communicates with
+betabox-video.service through the local Vision API.
+
+Capabilities include:
+
+- Service statistics
+- Snapshot capture
+- Recording start and stop
+- Metadata retrieval
+- Detector enable and disable
+- Detection status
+- Snapshot overlays
+- Recording overlays
+- WebRTC stream overlays
+
+The Robot API delegates student-facing methods such as the following to
+VisionClient:
+
+```python
+robot.snapshot()
+robot.start_recording()
+robot.stop_recording()
+robot.enable_detection("color")
+robot.metadata("color")
+robot.enable_stream_overlay("color")
+```
+
+This preserves a simple student-facing API while maintaining exclusive
+camera ownership inside the managed service.
+
+------------------------------------------------------------------------
+
+## Managed and Low-Level Usage
+
+The Vision Platform supports two usage levels.
+
+### Managed Usage
+
+Managed usage is the normal platform and student-facing mode.
+
+```text
+    Robot API
+         │
+         ▼
+    VisionClient
+         │
+         ▼
+betabox-video.service
+         │
+         ▼
+   VisionService
+```
+
+The managed service remains running and owns the camera.
+
+### Low-Level Development Usage
+
+Low-level components such as CameraManager and FrameSource may be used
+directly for component validation and development.
+
+Because these components open the camera directly, betabox-video.service
+must be stopped first:
+
+```text
+sudo systemctl stop betabox-video.service
+```
+
+After low-level validation:
+
+```text
+sudo systemctl start betabox-video.service
+```
+
+------------------------------------------------------------------------
+
+## Validation
+
+The Vision Platform is validated at several levels.
+
+### Component Validation
+
+Individual components are validated independently, including:
+
+- CameraManager
+- FrameSource
+- MetadataBus
+- OverlayRenderer
+- SnapshotService
+- RecordingService
+- Detectors
+- WebRTCStreamer
+
+Low-level camera tests require exclusive camera access.
+
+### Managed Service Integration
+
+VisionClient integration tests validate the complete managed path:
+
+```text
+   VisionClient
+         │
+         ▼
+    Vision API
+         │
+         ▼
+   VisionService
+         │
+         ▼
+Shared camera pipeline
+```
+
+Integration validation includes:
+
+- Service statistics
+- Plain snapshots
+- Overlay snapshots
+- Recording
+- Recording overlays
+- Detector control
+- Metadata retrieval
+- WebRTC overlay control
+
+### Deployment Validation
+
+The complete Vision Platform is also validated through fresh-image
+installation and reboot testing.
 
 ------------------------------------------------------------------------
 
@@ -433,6 +661,9 @@ It owns the camera, distributes frames through a shared pipeline, and
 publishes structured metadata while remaining independent of transport
 implementations and robot-specific configuration.
 
-This architecture allows new capabilities to be added through
-composition rather than architectural redesign while preserving a stable
-public Vision API.
+The managed Vision service provides exclusive camera ownership, while
+VisionClient and the Robot API expose stable student-facing capabilities.
+
+New transports, detectors, overlays, and inference backends can be added
+through composition without changing the camera ownership model or
+student-facing API.

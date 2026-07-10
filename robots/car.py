@@ -103,14 +103,44 @@ class CarRobot(Robot):
     def is_vision_running(self) -> bool:
         return self.vision.is_running()
 
-    def snapshot(self, *, overlay: bool = False, source: str | None = None):
-        return self.vision_client.snapshot(overlay=overlay, source=source)
+    def snapshot(
+        self,
+        *,
+        filename: str | None = None,
+        overlay: bool = False,
+        source: str | None = None,
+    ):
+        return self.vision_client.snapshot(
+            filename=filename,
+            overlay=overlay,
+            source=source,
+        )
 
-    def capture(self, *, overlay: bool = False, source: str | None = None):
-        return self.snapshot(overlay=overlay, source=source)
+    def capture(
+        self,
+        *,
+        filename: str | None = None,
+        overlay: bool = False,
+        source: str | None = None,
+    ):
+        return self.snapshot(
+            filename=filename,
+            overlay=overlay,
+            source=source,
+        )
 
-    def start_recording(self, *, overlay: bool = False, source: str | None = None):
-        return self.vision_client.start_recording(overlay=overlay, source=source)
+    def start_recording(
+        self,
+        *,
+        filename: str | None = None,
+        overlay: bool = False,
+        source: str | None = None,
+    ):
+        return self.vision_client.start_recording(
+            filename=filename,
+            overlay=overlay,
+            source=source,
+        )
 
     def stop_recording(self):
         return self.vision_client.stop_recording()

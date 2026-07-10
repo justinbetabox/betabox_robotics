@@ -37,7 +37,8 @@ sudo apt install -y \
     libttspico-utils \
     ffmpeg \
     nodejs \
-    npm
+    npm \
+    jq
 
 echo "[2/10] Creating directories..."
 sudo mkdir -p "$LIB_DIR" "$BETABOX_DIR"

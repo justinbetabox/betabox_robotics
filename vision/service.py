@@ -89,15 +89,26 @@ class VisionService:
     def statistics(self) -> dict:
         return {
             "running": self._running,
-            "frame_source": self.frame_source.statistics(),
-            "recording": self.recording.is_recording(),
-            "metadata_sources": list(self.metadata_bus.all_latest().keys()),
-            "detection": self.detection_status(),
-            "streamer": self.streamer.statistics(),
-            "stream_overlay": self.stream_overlay_status(),
-            "host": self.config.host,
-            "port": self.config.port,
-            "fps": self.config.fps,
+            "camera": self.frame_source.statistics(),
+            "streaming": {
+                **self.streamer.statistics(),
+                "overlay": self.stream_overlay_status(),
+            },
+            "recording": {
+                "active": self.recording.is_recording(),
+                "overlay": self.recording_overlay_status(),
+            },
+            "detection": {
+                "detectors": self.detection_status(),
+                "metadata_sources": list(
+                    self.metadata_bus.all_latest().keys()
+                ),
+            },
+            "server": {
+                "host": self.config.host,
+                "port": self.config.port,
+                "fps": self.config.fps,
+            },
         }
 
     def close(self) -> None:

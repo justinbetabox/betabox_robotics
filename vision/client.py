@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-from urllib import error, request
-import json
+from urllib import error, request, parse
 
 
 class VisionClientError(Exception):
@@ -47,22 +47,18 @@ class VisionClient:
     def snapshot(
         self,
         *,
+        filename: str | None = None,
         overlay: bool = False,
         source: str | None = None,
     ) -> ClientSnapshot:
-        query = []
-
-        if overlay:
-            query.append("overlay=true")
-
-        if source is not None:
-            query.append(f"source={source}")
-
-        path = "/snapshot"
-
-        if query:
-            path += "?" + "&".join(query)
-
+        path = self._path_with_query(
+            "/snapshot",
+            {
+                "filename": filename,
+                "overlay": "true" if overlay else None,
+                "source": source,
+            },
+        )
         data = self._post(path)
 
         return ClientSnapshot(
@@ -74,22 +70,18 @@ class VisionClient:
     def start_recording(
         self,
         *,
+        filename: str | None = None,
         overlay: bool = False,
         source: str | None = None,
     ) -> Path:
-        query = []
-
-        if overlay:
-            query.append("overlay=true")
-
-        if source is not None:
-            query.append(f"source={source}")
-
-        path = "/recording/start"
-
-        if query:
-            path += "?" + "&".join(query)
-
+        path = self._path_with_query(
+            "/recording/start",
+            {
+                "filename": filename,
+                "overlay": "true" if overlay else None,
+                "source": source,
+            },
+        )
         data = self._post(path)
         return Path(data["path"])
 
@@ -105,7 +97,10 @@ class VisionClient:
         )
 
     def metadata(self, source: str | None = None) -> dict[str, Any]:
-        path = "/metadata" if source is None else f"/metadata?source={source}"
+        path = self._path_with_query(
+            "/metadata",
+            {"source": source},
+        )
         return self._get(path)
 
     def detection_status(self) -> dict[str, Any]:
@@ -155,7 +150,21 @@ class VisionClient:
 
         try:
             with request.urlopen(req, timeout=10) as response:
-                body = response.read().decode("utf-8")
+                response_body = response.read().decode("utf-8")
+
+        except error.HTTPError as exc:
+            response_body = exc.read().decode("utf-8")
+
+            try:
+                error_data = json.loads(response_body)
+            except json.JSONDecodeError:
+                raise VisionClientError(
+                    f"Vision service request failed with HTTP {exc.code}"
+                ) from exc
+
+            message = error_data.get("error", f"HTTP {exc.code}")
+            raise VisionClientError(str(message)) from exc
+
         except error.URLError as exc:
             raise VisionClientError(
                 "Betabox Vision service is not available. "
@@ -163,21 +172,39 @@ class VisionClient:
             ) from exc
 
         try:
-            data = json.loads(body) if body else {}
+            response_data = json.loads(response_body) if response_body else {}
         except json.JSONDecodeError as exc:
-            raise VisionClientError(f"invalid Vision service response: {body}") from exc
+            raise VisionClientError(
+                f"invalid Vision service response: {response_body}"
+            ) from exc
 
-        if not isinstance(data, dict):
+        if not isinstance(response_data, dict):
             raise VisionClientError("Vision service returned an unexpected response")
 
-        if not data.get("success", False):
+        if not response_data.get("success", False):
             raise VisionClientError(
-                data.get("error", "Vision service request failed")
+                response_data.get("error", "Vision service request failed")
             )
 
-        payload = data.get("data", {})
+        payload = response_data.get("data", {})
 
         if not isinstance(payload, dict):
             raise VisionClientError("Vision service returned invalid data")
 
         return payload
+
+    def _path_with_query(
+        self,
+        path: str,
+        params: dict[str, Any],
+    ) -> str:
+        filtered = {
+            key: value
+            for key, value in params.items()
+            if value is not None
+        }
+
+        if not filtered:
+            return path
+
+        return f"{path}?{parse.urlencode(filtered)}"

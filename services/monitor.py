@@ -2,16 +2,169 @@ from __future__ import annotations
 
 import json
 import time
-from dataclasses import asdict
+from dataclasses import asdict, dataclass
+from typing import Literal
 from pathlib import Path
 
 from betabox_robotics.services.status import collect_status
+from betabox_robotics.services.system_health import collect_system_health
 
 LOG_DIR = Path.home() / ".local" / "state" / "betabox"
 LOG_FILE = LOG_DIR / "monitor.log"
 
+EVENTS_FILE = LOG_DIR / "events.jsonl"
+
 DEFAULT_INTERVAL_SECONDS = 60
 
+Severity = Literal["info", "warning", "error"]
+
+@dataclass(frozen=True)
+class MonitorEvent:
+    timestamp: str
+    severity: Severity
+    component: str
+    event: str
+    previous: object
+    current: object
+    message: str
+
+def timestamp() -> str:
+    return time.strftime("%Y-%m-%d %H:%M:%S")
+
+def write_event(event: MonitorEvent) -> None:
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+
+    with EVENTS_FILE.open("a", encoding="utf-8") as file:
+        file.write(json.dumps(asdict(event), sort_keys=True) + "\n")
+
+    log(
+        f"[{event.severity.upper()}] "
+        f"{event.component}: {event.message}"
+    )
+
+def severity_for_change(
+    path: str,
+    previous: object,
+    current: object,
+) -> Severity:
+    if path.endswith("battery_state"):
+        if current == "critical":
+            return "error"
+
+        if current == "low":
+            return "warning"
+
+        return "info"
+
+    if path.endswith(
+        (
+            "robot_available",
+            "i2c_available",
+            "audio_available",
+            "vision_service_available",
+            "vision_running",
+            "camera_running",
+            "camera_has_frame",
+        )
+    ):
+        return "info" if current is True else "error"
+
+    if path.endswith("grayscale_available"):
+        return "info" if current is True else "warning"
+
+    if path.startswith("services."):
+        return "info" if current == "active" else "error"
+
+    if path.endswith("temperature_state"):
+        if current == "critical":
+            return "critical"
+
+        if current == "high":
+            return "warning"
+
+        return "info"
+
+    if path.endswith("memory_state"):
+        if current == "critical":
+            return "critical"
+
+        if current == "high":
+            return "warning"
+
+        return "info"
+
+    if path.endswith("disk_state"):
+        if current == "critical":
+            return "critical"
+
+        if current == "high":
+            return "warning"
+
+        return "info"
+
+    if path.endswith("undervoltage_now"):
+        return "critical" if current is True else "info"
+
+    if path.endswith("throttled_now"):
+        return "error" if current is True else "info"
+
+    if path.endswith(
+        (
+            "undervoltage_occurred",
+            "throttled_occurred",
+        )
+    ):
+        return "warning" if current is True else "info"
+
+    if path.endswith(
+        (
+            "ethernet_connected",
+            "wifi_connected",
+        )
+    ):
+        return "info" if current is True else "warning"
+
+    return "info"
+
+def message_for_change(
+    path: str,
+    previous: object,
+    current: object,
+) -> str:
+    labels = {
+        "hardware.robot_available": "Robot hardware",
+        "hardware.i2c_available": "I²C bus",
+        "hardware.battery_state": "Battery",
+        "hardware.grayscale_available": "Grayscale sensor",
+        "hardware.audio_available": "Audio device",
+        "hardware.vision_service_available": "Vision service",
+        "hardware.vision_running": "Vision runtime",
+        "hardware.camera_running": "Camera",
+        "hardware.camera_has_frame": "Camera frames",
+        "system.temperature_state": "CPU temperature",
+        "system.undervoltage_now": "Undervoltage",
+        "system.undervoltage_occurred": "Historical undervoltage",
+        "system.throttled_now": "CPU throttling",
+        "system.throttled_occurred": "Historical throttling",
+        "system.memory_state": "Memory usage",
+        "system.disk_state": "Disk usage",
+        "system.ethernet_connected": "Ethernet",
+        "system.wifi_connected": "Wi-Fi",
+    }
+
+    label = labels.get(path, path)
+
+    if isinstance(current, bool):
+        if path.endswith("_connected"):
+            state = "connected" if current else "disconnected"
+        elif path.endswith("_now") or path.endswith("_occurred"):
+            state = "detected" if current else "cleared"
+        else:
+            state = "available" if current else "unavailable"
+
+        return f"{label} became {state}"
+
+    return f"{label} changed from {previous!r} to {current!r}"
 
 def log(message: str) -> None:
     LOG_DIR.mkdir(parents=True, exist_ok=True)
@@ -21,18 +174,31 @@ def log(message: str) -> None:
 
 
 def collect_snapshot() -> dict:
-    report = collect_status()
-    return asdict(report)
+    status = collect_status()
+    system_health = collect_system_health()
+
+    snapshot = asdict(status)
+    snapshot["system_health"] = system_health.to_dict()
+
+    return snapshot
 
 
 def summarize(snapshot: dict) -> dict:
     hardware = snapshot.get("hardware", {})
+    system_health = snapshot.get("system_health", {})
 
     battery = hardware.get("battery", {})
     audio = hardware.get("audio", {})
     vision = hardware.get("vision", {})
     sensors = hardware.get("sensors", {})
     i2c = hardware.get("i2c", {})
+
+    temperature = system_health.get("temperature", {})
+    throttling = system_health.get("throttling", {})
+    memory = system_health.get("memory", {})
+    disk = system_health.get("disk", {})
+    ethernet = system_health.get("ethernet", {})
+    wifi = system_health.get("wifi", {})
 
     return {
         "services": snapshot.get("services", {}),
@@ -48,6 +214,17 @@ def summarize(snapshot: dict) -> dict:
             "camera_running": vision.get("camera_running"),
             "camera_has_frame": vision.get("camera_has_frame"),
         },
+        "system": {
+            "temperature_state": temperature.get("state"),
+            "undervoltage_now": throttling.get("undervoltage_now"),
+            "undervoltage_occurred": throttling.get("undervoltage_occurred"),
+            "throttled_now": throttling.get("throttled_now"),
+            "throttled_occurred": throttling.get("throttled_occurred"),
+            "memory_state": memory.get("state"),
+            "disk_state": disk.get("state"),
+            "ethernet_connected": ethernet.get("connected"),
+            "wifi_connected": wifi.get("connected"),
+        },
     }
 
 
@@ -60,10 +237,21 @@ def run_once(previous_summary: dict | None = None) -> dict:
         log("initial status: " + json.dumps(summary, sort_keys=True))
         return summary
 
-    changes = find_changes(previous_summary, summary)
+    for path, previous, current in find_changes(
+        previous_summary,
+        summary,
+    ):
+        event = MonitorEvent(
+            timestamp=timestamp(),
+            severity=severity_for_change(path, previous, current),
+            component=path.split(".")[0],
+            event=path,
+            previous=previous,
+            current=current,
+            message=message_for_change(path, previous, current),
+        )
 
-    for change in changes:
-        log("status changed: " + change)
+        write_event(event)
 
     return summary
 
@@ -81,8 +269,12 @@ def run_forever(interval_seconds: int = DEFAULT_INTERVAL_SECONDS) -> int:
 
         time.sleep(interval_seconds)
 
-def find_changes(previous: dict, current: dict, prefix: str = "") -> list[str]:
-    changes: list[str] = []
+def find_changes(
+    previous: dict,
+    current: dict,
+    prefix: str = "",
+) -> list[tuple[str, object, object]]:
+    changes: list[tuple[str, object, object]] = []
 
     keys = set(previous) | set(current)
 
@@ -94,7 +286,7 @@ def find_changes(previous: dict, current: dict, prefix: str = "") -> list[str]:
         if isinstance(old, dict) and isinstance(new, dict):
             changes.extend(find_changes(old, new, path))
         elif old != new:
-            changes.append(f"{path}: {old!r} -> {new!r}")
+            changes.append((path, old, new))
 
     return changes
 

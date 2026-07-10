@@ -17,6 +17,7 @@ from betabox_robotics.services.status import main as status_main
 from betabox_robotics.services.verify import main as verify_main
 from betabox_robotics.services.video import main as video_main
 from betabox_robotics.services.wifi_fallback import main as wifi_fallback_main
+from betabox_robotics.services.events import main as events_main
 
 
 def main() -> int:
@@ -46,6 +47,10 @@ def main() -> int:
     subparsers.add_parser(
         "services",
         help="Show managed Betabox systemd services",
+    )
+    subparsers.add_parser(
+        "events",
+        help="Show Betabox event logs",
     )
     subparsers.add_parser(
         "logs",
@@ -103,6 +108,9 @@ def main() -> int:
 
     if args.command == "services":
         return services_main(extra)
+
+    if args.command == "events":
+        return events_main(extra)
 
     if args.command == "logs":
         return logs_main(extra)

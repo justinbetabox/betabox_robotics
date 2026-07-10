@@ -10,6 +10,10 @@ from betabox_robotics.services.hardware_status import (
     RobotHardwareStatus,
     collect_hardware_status,
 )
+from betabox_robotics.services.system_health import (
+    SystemHealthStatus,
+    collect_system_health,
+)
 from betabox_robotics.services.managed import MANAGED_SERVICES
 from betabox_robotics.version import __version__
 
@@ -25,6 +29,7 @@ class StatusReport:
     services: dict[str, str]
     jupyterhub_proxy_available: bool
     hardware: RobotHardwareStatus
+    system_health: SystemHealthStatus
 
 
 def run(command: list[str], timeout: int = 5) -> subprocess.CompletedProcess | None:
@@ -99,6 +104,7 @@ def collect_status() -> StatusReport:
     }
 
     hardware = collect_hardware_status()
+    system_health = collect_system_health()
 
     return StatusReport(
         version=__version__,
@@ -114,12 +120,67 @@ def collect_status() -> StatusReport:
         services=services,
         jupyterhub_proxy_available=executable_available("configurable-http-proxy"),
         hardware=hardware,
+        system_health=system_health,
     )
 
 
 def format_boolean(value: bool) -> str:
     return "available" if value else "missing"
 
+def print_system_health(system_health: SystemHealthStatus) -> None:
+    print()
+    print("System Health")
+    print("-------------")
+
+    temperature = system_health.temperature
+
+    if temperature.celsius is not None:
+        print(
+            f"CPU Temp:     {temperature.celsius:.1f} °C "
+            f"— {temperature.state}"
+        )
+    else:
+        print("CPU Temp:     unavailable")
+
+    throttling = system_health.throttling
+
+    print(
+        "Undervoltage: "
+        + ("detected" if throttling.undervoltage_now else "no")
+    )
+    print(
+        "Throttling:   "
+        + ("active" if throttling.throttled_now else "no")
+    )
+
+    memory = system_health.memory
+
+    if memory.used_percent is not None:
+        print(
+            f"Memory:       {memory.used_percent:.1f}% "
+            f"— {memory.state}"
+        )
+    else:
+        print("Memory:       unavailable")
+
+    disk = system_health.disk
+
+    if disk.used_percent is not None:
+        print(
+            f"Disk:         {disk.used_percent:.1f}% "
+            f"— {disk.state}"
+        )
+    else:
+        print("Disk:         unavailable")
+
+    print(
+        "Ethernet:     "
+        + ("connected" if system_health.ethernet.connected else "disconnected")
+    )
+    print(
+        "Wi-Fi:        "
+        + ("connected" if system_health.wifi.connected else "disconnected")
+    )
 
 def print_hardware_status(hardware: RobotHardwareStatus) -> None:
     print()
@@ -205,6 +266,7 @@ def print_human(report: StatusReport) -> None:
     print(f"HifiBerry: {'available' if report.hifiberry_available else 'missing'}")
 
     print_hardware_status(report.hardware)
+    print_system_health(report.system_health)
 
     print()
     print("Media")

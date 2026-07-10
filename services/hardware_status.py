@@ -8,6 +8,7 @@ from typing import Any
 from betabox_robotics.vision import VisionClient, VisionClientError
 
 
+
 @dataclass(frozen=True)
 class I2CStatus:
     available: bool
@@ -193,11 +194,16 @@ def collect_robot_status() -> tuple[
     SensorStatus,
     str | None,
 ]:
+    battery_sensor = None
+    grayscale_sensor = None
+
     try:
         from betabox_robotics.robots.betabox_car import BETABOX_CAR
-        from betabox_robotics.sensors import Sensors
+        from betabox_robotics.sensors import Battery, Grayscale
 
-        sensors = Sensors.default(BETABOX_CAR)
+        battery_sensor = Battery.default(BETABOX_CAR)
+        grayscale_sensor = Grayscale.default(BETABOX_CAR)
+
     except Exception as exc:
         return (
             False,
@@ -205,21 +211,21 @@ def collect_robot_status() -> tuple[
                 available=False,
                 voltage=None,
                 state="unknown",
-                error="sensors could not be constructed",
+                error="passive sensors could not be constructed",
             ),
             SensorStatus(
                 grayscale_available=False,
                 grayscale_values=None,
                 ultrasonic_configured=False,
-                error="sensors could not be constructed",
+                error="passive sensors could not be constructed",
             ),
             str(exc),
         )
 
     try:
         try:
-            voltage = float(sensors.battery.voltage())
-            battery_state = str(sensors.battery.status())
+            voltage = float(battery_sensor.voltage())
+            battery_state = str(battery_sensor.status())
 
             battery = BatteryStatus(
                 available=True,
@@ -235,7 +241,7 @@ def collect_robot_status() -> tuple[
             )
 
         try:
-            grayscale_values = sensors.grayscale.read()
+            grayscale_values = grayscale_sensor.read()
 
             sensor_status = SensorStatus(
                 grayscale_available=True,
@@ -253,13 +259,19 @@ def collect_robot_status() -> tuple[
         return True, battery, sensor_status, None
 
     finally:
-        close = getattr(sensors, "close", None)
+        for component in [battery_sensor, grayscale_sensor]:
+            close = getattr(component, "close", None)
 
-        if callable(close):
-            try:
-                close()
-            except Exception:
-                pass
+            if component is None:
+                continue
+
+            close = getattr(component, "close", None)
+
+            if callable(close):
+                try:
+                    close()
+                except Exception:
+                    pass
 
 def collect_hardware_status() -> RobotHardwareStatus:
     i2c = collect_i2c_status()

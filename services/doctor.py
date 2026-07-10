@@ -2,90 +2,110 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import dataclass
+from typing import Literal
 
 from betabox_robotics.services.managed import MANAGED_SERVICES
-from betabox_robotics.services.status import collect_status
 from betabox_robotics.services.verify import CheckResult, collect_checks
 from betabox_robotics.services.hardware_status import RobotHardwareStatus
 from betabox_robotics.services.status import StatusReport, collect_status
 
+DEDICATED_SERVICE_UNITS = {
+    "betabox-video.service",
+    "jupyterhub.service",
+    }
+
+Severity = Literal["info", "warning", "error", "critical"]
+
+SEVERITY_ORDER: dict[Severity, int] = {
+    "info": 0,
+    "warning": 1,
+    "error": 2,
+    "critical": 3,
+}
 
 @dataclass(frozen=True)
 class Diagnosis:
     title: str
     ok: bool
-    message: str
-    suggestions: list[str]
+    severity: Severity
+    summary: str
+    causes: list[str]
+    affected: list[str]
+    actions: list[str]
+
+def healthy(title: str, summary: str) -> Diagnosis:
+    return Diagnosis(
+        title=title,
+        ok=True,
+        severity="info",
+        summary=summary,
+        causes=[],
+        affected=[],
+        actions=[],
+    )
 
 
 def result_map(results: list[CheckResult]) -> dict[str, CheckResult]:
     return {result.name: result for result in results}
 
-
-def diagnose_i2c(results: dict[str, CheckResult]) -> Diagnosis:
-    device = results.get("hardware:i2c")
-    scan = results.get("hardware:i2cdetect")
-
-    ok = bool(device and device.ok and scan and scan.ok)
-
-    suggestions = [
-        "Verify /boot/firmware/config.txt contains dtparam=i2c_arm=on.",
-        "Reboot after enabling I²C.",
-        "Check that the Robot HAT is seated correctly.",
-        "Run: i2cdetect -y 1",
-    ]
-
-    return Diagnosis(
-        title="I²C",
-        ok=ok,
-        message="I²C is available." if ok else "I²C is not fully available.",
-        suggestions=[] if ok else suggestions,
+def diagnose_boot_announce(status: StatusReport) -> Diagnosis:
+    state = status.services.get(
+        "betabox-boot-announce.service",
+        "unknown",
     )
 
+    if state in ("active", "inactive"):
+        return healthy(
+            "Boot Announce",
+            (
+                "Boot announcement service completed successfully."
+                if state == "inactive"
+                else "Boot announcement service is running."
+            ),
+        )
 
-def diagnose_camera(results: dict[str, CheckResult]) -> Diagnosis:
-    camera = results.get("camera:picamera2")
-    ok = bool(camera and camera.ok)
-
-    suggestions = [
-        "Verify the camera ribbon cable is connected correctly.",
-        "Reboot if the camera was recently enabled or connected.",
-        "Run: python -c \"from picamera2 import Picamera2; print('picamera2 ok')\"",
-        "Check whether another process is using the camera.",
-    ]
+    if state == "failed":
+        return Diagnosis(
+            title="Boot Announce",
+            ok=False,
+            severity="warning",
+            summary="The boot announcement service failed.",
+            causes=[
+                "The audio device was unavailable during boot.",
+                "A speech backend failed.",
+                "The amplifier GPIO was unavailable.",
+                "A dependency was not ready when the service started.",
+            ],
+            affected=[
+                "Startup voice announcements",
+                "Teacher-facing boot status feedback",
+            ],
+            actions=[
+                "Run: betabox logs boot-announce --journal-only",
+                "Run: aplay -l",
+                "Run: betabox verify",
+                "Restart: sudo systemctl restart betabox-boot-announce.service",
+            ],
+        )
 
     return Diagnosis(
-        title="Camera",
-        ok=ok,
-        message="Picamera2 is available." if ok else "Picamera2 is unavailable.",
-        suggestions=[] if ok else suggestions,
+        title="Boot Announce",
+        ok=False,
+        severity="warning",
+        summary=f"Boot announcement service state is {state}.",
+        causes=[
+            "The service is still starting.",
+            "The service state could not be determined.",
+        ],
+        affected=[
+            "Startup voice announcements",
+        ],
+        actions=[
+            "Wait briefly and run betabox doctor again.",
+            "Run: betabox services",
+            "Review the boot announcement logs.",
+        ],
     )
-
-
-def diagnose_audio(results: dict[str, CheckResult]) -> Diagnosis:
-    hifiberry = results.get("audio:hifiberry")
-    speech = results.get("audio:speech_backend")
-
-    ok = bool(hifiberry and hifiberry.ok and speech and speech.ok)
-
-    suggestions = [
-        "Verify /boot/firmware/config.txt contains dtoverlay=hifiberry-dac.",
-        "Verify /boot/firmware/config.txt contains dtoverlay=i2s-mmap.",
-        "Reboot after changing audio overlays.",
-        "Run: aplay -l",
-        "Verify a speech backend is installed, such as espeak-ng or pico2wave.",
-        "Do not keep GPIO20 high at boot; the SDK controls the speaker amplifier during playback.",
-    ]
-
-    return Diagnosis(
-        title="Audio",
-        ok=ok,
-        message="Audio platform is available."
-        if ok
-        else "Audio platform is not fully available.",
-        suggestions=[] if ok else suggestions,
-    )
-
 
 def diagnose_media(results: dict[str, CheckResult]) -> Diagnosis:
     required = [
@@ -95,62 +115,96 @@ def diagnose_media(results: dict[str, CheckResult]) -> Diagnosis:
     ]
 
     missing = [
-        name for name in required if not (results.get(name) and results[name].ok)
+        name
+        for name in required
+        if not (results.get(name) and results[name].ok)
     ]
 
-    ok = not missing
-
-    suggestions = [
-        "Run the deployment installer again.",
-        "Create missing media folders under ~/media.",
-        "Expected folders: ~/media/pictures, ~/media/videos, ~/media/sounds.",
-    ]
+    if not missing:
+        return healthy(
+            "Media",
+            "Media folders are available.",
+        )
 
     return Diagnosis(
         title="Media",
-        ok=ok,
-        message="Media folders are available."
-        if ok
-        else f"Missing media paths: {', '.join(missing)}",
-        suggestions=[] if ok else suggestions,
+        ok=False,
+        severity="warning",
+        summary="One or more media folders are missing.",
+        causes=[
+            "The installer did not create all media directories.",
+            "A media directory was removed.",
+        ],
+        affected=[
+            "Snapshots",
+            "Recordings",
+            "Audio files",
+        ],
+        actions=[
+            "Run the deployment installer again.",
+            "Create ~/media/pictures, ~/media/videos, and ~/media/sounds.",
+            "Run: betabox status",
+        ],
     )
 
 
 def diagnose_services(status: StatusReport) -> Diagnosis:
-
     failed = [
         managed.title
         for managed in MANAGED_SERVICES.values()
-        if status.services.get(managed.unit) == "failed"
+        if managed.unit not in DEDICATED_SERVICE_UNITS
+            and status.services.get(managed.unit) == "failed"
     ]
 
     not_ready = [
         f"{managed.title} ({status.services.get(managed.unit, 'unknown')})"
         for managed in MANAGED_SERVICES.values()
-        if status.services.get(managed.unit, "unknown")
-        not in ("active", "inactive", "not-installed")
+        if managed.unit not in DEDICATED_SERVICE_UNITS
+            and status.services.get(managed.unit, "unknown")
+            not in ("active", "inactive", "not-installed")
     ]
-
-    ok = not failed
-
-    suggestions = [
-        "Run: betabox services",
-        "Run: betabox logs <service>",
-        "Restart a failed service with: sudo systemctl restart <service>",
-    ]
-
-    message = "No failed managed services detected."
 
     if failed:
-        message = "Failed services detected: " + ", ".join(failed)
-    elif not_ready:
-        message = "Some services need attention: " + ", ".join(not_ready)
+        return Diagnosis(
+            title="Managed Services",
+            ok=False,
+            severity="error",
+            summary="One or more managed services have failed.",
+            causes=[
+                "A service crashed during startup.",
+                "A dependency or hardware resource is unavailable.",
+                "A service unit or command may be misconfigured.",
+            ],
+            affected=failed,
+            actions=[
+                "Run: betabox services",
+                "Run: betabox logs <service> --journal-only",
+                "Restart the failed service.",
+            ],
+        )
 
-    return Diagnosis(
-        title="Services",
-        ok=ok,
-        message=message,
-        suggestions=[] if ok else suggestions,
+    if not_ready:
+        return Diagnosis(
+            title="Managed Services",
+            ok=False,
+            severity="warning",
+            summary="Some managed services are not ready.",
+            causes=[
+                "A service is still activating.",
+                "A one-shot service exited unexpectedly.",
+                "A service state could not be determined.",
+            ],
+            affected=not_ready,
+            actions=[
+                "Run: betabox services",
+                "Wait briefly and run betabox doctor again.",
+                "Review the relevant service logs.",
+            ],
+        )
+
+    return healthy(
+        "Managed Services",
+        "No failed managed services were detected.",
     )
 
 
@@ -159,58 +213,113 @@ def diagnose_jupyterhub(
     status: StatusReport,
 ) -> Diagnosis:
     proxy = results.get("jupyterhub:proxy")
-    service_state = status.services.get("jupyterhub.service", "unknown")
+    service_state = status.services.get(
+        "jupyterhub.service",
+        "unknown",
+    )
 
-    ok = bool(proxy and proxy.ok and service_state == "active")
+    proxy_ok = bool(proxy and proxy.ok)
+    service_ok = service_state == "active"
 
-    suggestions = [
-        "Install Node.js and npm: sudo apt install -y nodejs npm",
-        "Install the proxy: sudo npm install -g configurable-http-proxy",
-        "Restart JupyterHub: sudo systemctl restart jupyterhub.service",
-        "Check logs: betabox logs jupyterhub --journal-only",
-        "Check health: curl -I http://127.0.0.1:8000/hub/health",
+    if proxy_ok and service_ok:
+        return healthy(
+            "JupyterHub",
+            "JupyterHub service and proxy are available.",
+        )
+
+    causes: list[str] = []
+    affected = [
+        "Student notebook access",
+        "Robot Car kernel sessions",
     ]
+    actions: list[str] = []
 
-    if ok:
-        message = "JupyterHub service and proxy are available."
-    elif not (proxy and proxy.ok):
-        message = "JupyterHub proxy is missing."
-    elif service_state != "active":
-        message = f"JupyterHub service is {service_state}."
-    else:
-        message = "JupyterHub is not fully available."
+    if not proxy_ok:
+        causes.append("configurable-http-proxy is missing or unavailable.")
+        actions.extend(
+            [
+                "Install Node.js and npm.",
+                "Install configurable-http-proxy.",
+            ]
+        )
+
+    if not service_ok:
+        causes.append(f"jupyterhub.service is {service_state}.")
+        actions.extend(
+            [
+                "Restart jupyterhub.service.",
+                "Check: betabox logs jupyterhub --journal-only",
+            ]
+        )
+
+    actions.append(
+        "Check: curl -I http://127.0.0.1:8000/hub/health"
+    )
 
     return Diagnosis(
         title="JupyterHub",
-        ok=ok,
-        message=message,
-        suggestions=[] if ok else suggestions,
+        ok=False,
+        severity="error",
+        summary="JupyterHub is not fully available.",
+        causes=causes,
+        affected=affected,
+        actions=actions,
     )
 
-def diagnose_robot_hardware(hardware: RobotHardwareStatus) -> Diagnosis:
-    ok = hardware.robot_available and hardware.i2c.available
+def diagnose_robot_hardware(
+    hardware: RobotHardwareStatus,
+) -> Diagnosis:
+    if not hardware.i2c.available:
+        return Diagnosis(
+            title="Robot Hardware",
+            ok=False,
+            severity="critical",
+            summary="The robot I²C bus is unavailable.",
+            causes=[
+                "I²C is disabled.",
+                "The Robot HAT is disconnected.",
+                "The I²C device node is missing.",
+            ],
+            affected=[
+                "Robot HAT",
+                "Battery monitoring",
+                "Grayscale sensor",
+                "Motor and servo control",
+            ],
+            actions=[
+                "Verify dtparam=i2c_arm=on.",
+                "Reboot the robot.",
+                "Check that the Robot HAT is seated correctly.",
+                "Run: i2cdetect -y 1",
+            ],
+        )
 
-    suggestions = [
-        "Verify /boot/firmware/config.txt contains dtparam=i2c_arm=on.",
-        "Run: i2cdetect -y 1",
-        "Check that the Robot HAT is seated correctly.",
-        "Check the Robot HAT power and cable connections.",
-    ]
+    if not hardware.robot_available:
+        return Diagnosis(
+            title="Robot Hardware",
+            ok=False,
+            severity="critical",
+            summary=hardware.robot_error or "Robot hardware is unavailable.",
+            causes=[
+                "Robot HAT communication failed.",
+                "A required hardware component could not be constructed.",
+            ],
+            affected=[
+                "Drive",
+                "Steering",
+                "Battery",
+                "Sensors",
+            ],
+            actions=[
+                "Check Robot HAT power.",
+                "Reseat the Robot HAT.",
+                "Run: betabox verify",
+            ],
+        )
 
-    if ok:
-        message = "Robot hardware and I²C bus are available."
-    elif hardware.robot_error:
-        message = f"Robot hardware is unavailable: {hardware.robot_error}"
-    elif not hardware.i2c.available:
-        message = "The I²C bus is unavailable."
-    else:
-        message = "Robot hardware is unavailable."
-
-    return Diagnosis(
-        title="Robot Hardware",
-        ok=ok,
-        message=message,
-        suggestions=[] if ok else suggestions,
+    return healthy(
+        "Robot Hardware",
+        "Robot hardware and I²C communication are available.",
     )
 
 
@@ -221,157 +330,440 @@ def diagnose_battery(hardware: RobotHardwareStatus) -> Diagnosis:
         return Diagnosis(
             title="Battery",
             ok=False,
-            message=battery.error or "Battery voltage is unavailable.",
-            suggestions=[
-                "Check the battery connection.",
-                "Check the Robot HAT power connection.",
-                "Run: betabox status",
+            severity="error",
+            summary=battery.error or "Battery voltage is unavailable.",
+            causes=[
+                "Battery is disconnected.",
+                "Robot HAT power is unavailable.",
+                "Battery monitoring hardware is not responding.",
+            ],
+            affected=[
+                "Drive motors",
+                "Steering servo",
+                "Sensors",
+            ],
+            actions=[
+                "Check the battery connector.",
+                "Check Robot HAT power.",
                 "Run: betabox verify",
             ],
         )
 
-    critical = battery.state == "critical"
-
-    if critical:
-        message = (
-            f"Battery voltage is critical: {battery.voltage:.2f} V."
-        )
-    elif battery.state == "low":
-        message = f"Battery voltage is low: {battery.voltage:.2f} V."
-    else:
-        message = (
-            f"Battery voltage is healthy: {battery.voltage:.2f} V."
-        )
-
-    return Diagnosis(
-        title="Battery",
-        ok=not critical,
-        message=message,
-        suggestions=(
-            [
+    if battery.state == "critical":
+        return Diagnosis(
+            title="Battery",
+            ok=False,
+            severity="critical",
+            summary=f"Battery voltage is critical: {battery.voltage:.2f} V.",
+            causes=[
+                "Battery is discharged.",
+                "Battery voltage dropped under load.",
+                "Battery or connector may be damaged.",
+            ],
+            affected=[
+                "Drive motors",
+                "Steering servo",
+                "Robot stability",
+            ],
+            actions=[
                 "Stop driving the robot.",
                 "Recharge or replace the battery.",
-                "Check the battery connector.",
-            ]
-            if critical
-            else []
-        ),
+                "Inspect and reseat the battery connector.",
+                "Run: betabox verify",
+            ],
+        )
+
+    if battery.state == "low":
+        return Diagnosis(
+            title="Battery",
+            ok=False,
+            severity="warning",
+            summary=f"Battery voltage is low: {battery.voltage:.2f} V.",
+            causes=[
+                "Battery is partially discharged.",
+                "Recent motor use reduced battery voltage.",
+            ],
+            affected=[
+                "Drive runtime",
+                "Servo reliability",
+            ],
+            actions=[
+                "Recharge the battery before extended use.",
+                "Avoid high-load driving until recharged.",
+            ],
+        )
+
+    return healthy(
+        "Battery",
+        f"Battery voltage is healthy: {battery.voltage:.2f} V.",
     )
 
 
-def diagnose_grayscale(hardware: RobotHardwareStatus) -> Diagnosis:
+def diagnose_grayscale(
+    hardware: RobotHardwareStatus,
+) -> Diagnosis:
     sensors = hardware.sensors
-    ok = sensors.grayscale_available
 
-    if ok:
+    if sensors.grayscale_available:
         values = sensors.grayscale_values or []
-        message = "Grayscale sensor is available."
+
+        summary = "Grayscale sensor is available."
 
         if values:
-            message += " Values: " + ", ".join(str(value) for value in values)
-    else:
-        message = sensors.error or "Grayscale sensor is unavailable."
+            summary += " Values: " + ", ".join(
+                str(value) for value in values
+            )
+
+        return healthy(
+            "Grayscale",
+            summary,
+        )
 
     return Diagnosis(
         title="Grayscale",
-        ok=ok,
-        message=message,
-        suggestions=(
-            []
-            if ok
-            else [
-                "Check the grayscale sensor cable.",
-                "Check the Robot HAT connection.",
-                "Run the grayscale validation test.",
-            ]
-        ),
+        ok=False,
+        severity="warning",
+        summary=sensors.error or "Grayscale sensor is unavailable.",
+        causes=[
+            "The grayscale sensor cable is disconnected.",
+            "The Robot HAT ADC is unavailable.",
+            "The sensor hardware is not responding.",
+        ],
+        affected=[
+            "Line following",
+            "Line avoidance",
+            "Surface reflectance readings",
+        ],
+        actions=[
+            "Check the grayscale sensor cable.",
+            "Check the Robot HAT connection.",
+            "Run the grayscale validation test.",
+        ],
     )
 
 
-def diagnose_audio_hardware(hardware: RobotHardwareStatus) -> Diagnosis:
+def diagnose_audio_hardware(
+    hardware: RobotHardwareStatus,
+) -> Diagnosis:
     audio = hardware.audio
-    ok = audio.available
+
+    if audio.available:
+        return healthy(
+            "Audio Hardware",
+            f"Audio device is available: {audio.device}.",
+        )
 
     return Diagnosis(
         title="Audio Hardware",
-        ok=ok,
-        message=(
-            f"Audio device is available: {audio.device}."
-            if ok
-            else audio.error or "Audio device is unavailable."
-        ),
-        suggestions=(
-            []
-            if ok
-            else [
-                "Run: aplay -l",
-                "Verify dtoverlay=hifiberry-dac is configured.",
-                "Reboot after changing audio overlays.",
-            ]
-        ),
+        ok=False,
+        severity="warning",
+        summary=audio.error or "Audio device is unavailable.",
+        causes=[
+            "The HifiBerry overlay is missing.",
+            "The audio device failed to initialize.",
+            "The audio hardware is disconnected.",
+        ],
+        affected=[
+            "Speech output",
+            "Sound playback",
+            "Tones and melodies",
+        ],
+        actions=[
+            "Run: aplay -l",
+            "Verify dtoverlay=hifiberry-dac is configured.",
+            "Reboot after changing audio overlays.",
+        ],
     )
 
 
-def diagnose_vision_hardware(hardware: RobotHardwareStatus) -> Diagnosis:
+def diagnose_vision_hardware(
+    hardware: RobotHardwareStatus,
+) -> Diagnosis:
     vision = hardware.vision
 
-    ok = (
-        vision.service_available
-        and vision.running
-        and vision.camera_running
-        and vision.camera_has_frame
-    )
-
-    if ok:
-        message = "Vision service and camera pipeline are healthy."
-    elif not vision.service_available:
-        message = vision.error or "Vision service is unavailable."
-    elif not vision.running:
-        message = "Vision service is not running."
-    elif not vision.camera_running:
-        message = "Vision service is running, but the camera is stopped."
-    elif not vision.camera_has_frame:
-        message = "Vision service is running, but no camera frame is available."
-    else:
-        message = "Vision platform is degraded."
-
-    return Diagnosis(
-        title="Vision Hardware",
-        ok=ok,
-        message=message,
-        suggestions=(
-            []
-            if ok
-            else [
+    if not vision.service_available:
+        return Diagnosis(
+            title="Vision",
+            ok=False,
+            severity="error",
+            summary=vision.error or "Vision service is unavailable.",
+            causes=[
+                "betabox-video.service is stopped or failed.",
+                "The Vision API is not responding.",
+                "The service failed during camera startup.",
+            ],
+            affected=[
+                "WebRTC streaming",
+                "Snapshots",
+                "Recording",
+                "Detection",
+            ],
+            actions=[
                 "Run: betabox services",
                 "Run: betabox logs video --journal-only",
                 "Restart Vision: sudo systemctl restart betabox-video.service",
+            ],
+        )
+
+    if not vision.running:
+        return Diagnosis(
+            title="Vision",
+            ok=False,
+            severity="error",
+            summary="Vision service is responding but the runtime is stopped.",
+            causes=[
+                "VisionService failed to start.",
+                "Camera initialization failed.",
+            ],
+            affected=[
+                "Streaming",
+                "Snapshots",
+                "Recording",
+                "Detection",
+            ],
+            actions=[
+                "Restart betabox-video.service.",
+                "Check the Vision service logs.",
                 "Check the camera ribbon cable.",
-            ]
-        ),
+            ],
+        )
+
+    if not vision.camera_running:
+        return Diagnosis(
+            title="Vision",
+            ok=False,
+            severity="error",
+            summary="Vision runtime is active, but the camera is stopped.",
+            causes=[
+                "Camera initialization failed.",
+                "Camera hardware is disconnected.",
+                "Another process may have opened the camera.",
+            ],
+            affected=[
+                "Streaming",
+                "Snapshots",
+                "Recording",
+                "Detection",
+            ],
+            actions=[
+                "Check the camera ribbon cable.",
+                "Check for another camera process.",
+                "Restart betabox-video.service.",
+            ],
+        )
+
+    if not vision.camera_has_frame:
+        return Diagnosis(
+            title="Vision",
+            ok=False,
+            severity="warning",
+            summary="The camera is running, but no recent frame is available.",
+            causes=[
+                "The capture loop may be stalled.",
+                "The camera stopped returning frames.",
+            ],
+            affected=[
+                "Live video",
+                "Snapshots",
+                "Recording",
+                "Detection",
+            ],
+            actions=[
+                "Check: curl http://127.0.0.1:8080/stats",
+                "Restart betabox-video.service.",
+                "Review the video service logs.",
+            ],
+        )
+
+    return healthy(
+        "Vision",
+        "Vision service and camera pipeline are healthy.",
     )
 
-def collect_diagnoses(*, include_robot: bool = True) -> list[Diagnosis]:
-    checks = result_map(collect_checks(include_robot=False))
+def collect_diagnoses() -> list[Diagnosis]:
+    checks = result_map(
+        collect_checks(include_robot=False)
+    )
+
     status = collect_status()
     hardware = status.hardware
 
+    robot_hardware = diagnose_robot_hardware(hardware)
+    vision = diagnose_vision_hardware(hardware)
+
     diagnoses = [
-        diagnose_i2c(checks),
-        diagnose_camera(checks),
-        diagnose_audio(checks),
+        robot_hardware,
+        diagnose_audio_hardware(hardware),
+        vision,
         diagnose_jupyterhub(checks, status),
+        diagnose_boot_announce(status),
         diagnose_media(checks),
         diagnose_services(status),
-        diagnose_robot_hardware(hardware),
-        diagnose_battery(hardware),
-        diagnose_grayscale(hardware),
-        diagnose_audio_hardware(hardware),
-        diagnose_vision_hardware(hardware),
     ]
+
+    if robot_hardware.ok:
+        diagnoses.append(diagnose_battery(hardware))
+        diagnoses.append(diagnose_grayscale(hardware))
 
     return diagnoses
 
+def diagnose_temperature(status: SystemHealthStatus) -> Diagnosis:
+    temperature = status.temperature
+
+    if temperature.celsius is None:
+        return Diagnosis(
+            title="CPU Temperature",
+            ok=False,
+            severity="warning",
+            summary=temperature.error or "CPU temperature is unavailable.",
+            causes=["Thermal sensor data could not be read."],
+            affected=["Thermal monitoring"],
+            actions=["Check /sys/class/thermal/thermal_zone0/temp."],
+        )
+
+    if temperature.state == "critical":
+        return Diagnosis(
+            title="CPU Temperature",
+            ok=False,
+            severity="critical",
+            summary=f"CPU temperature is critical: {temperature.celsius:.1f} °C.",
+            causes=[
+                "Insufficient cooling.",
+                "Heavy sustained CPU load.",
+                "Blocked airflow.",
+            ],
+            affected=[
+                "Camera performance",
+                "Vision inference",
+                "System stability",
+            ],
+            actions=[
+                "Stop high-load workloads.",
+                "Check the fan and heatsink.",
+                "Improve airflow.",
+                "Reboot after the system cools.",
+            ],
+        )
+
+    if temperature.state == "high":
+        return Diagnosis(
+            title="CPU Temperature",
+            ok=False,
+            severity="warning",
+            summary=f"CPU temperature is high: {temperature.celsius:.1f} °C.",
+            causes=[
+                "High CPU load.",
+                "Cooling may be insufficient.",
+            ],
+            affected=[
+                "Performance",
+                "Vision frame rate",
+            ],
+            actions=[
+                "Check cooling and airflow.",
+                "Review running processes.",
+            ],
+        )
+
+    return healthy(
+        "CPU Temperature",
+        f"CPU temperature is normal: {temperature.celsius:.1f} °C.",
+    )
+
+def diagnose_power(status: SystemHealthStatus) -> Diagnosis:
+    throttling = status.throttling
+
+    if throttling.undervoltage_now:
+        return Diagnosis(
+            title="System Power",
+            ok=False,
+            severity="critical",
+            summary="The Raspberry Pi is currently experiencing undervoltage.",
+            causes=[
+                "Power supply cannot provide enough current.",
+                "Power cable has excessive resistance.",
+                "Robot load is causing a voltage drop.",
+            ],
+            affected=[
+                "System stability",
+                "Camera",
+                "USB devices",
+                "Networking",
+            ],
+            actions=[
+                "Use a higher-quality power supply.",
+                "Inspect the power cable and connectors.",
+                "Reduce load and retest.",
+            ],
+        )
+
+    if throttling.throttled_now:
+        return Diagnosis(
+            title="System Power",
+            ok=False,
+            severity="error",
+            summary="The Raspberry Pi is currently throttled.",
+            causes=[
+                "Undervoltage.",
+                "Excessive temperature.",
+            ],
+            affected=[
+                "CPU performance",
+                "Vision frame rate",
+            ],
+            actions=[
+                "Check power and temperature.",
+                "Review: vcgencmd get_throttled",
+            ],
+        )
+
+    if throttling.undervoltage_occurred or throttling.throttled_occurred:
+        return Diagnosis(
+            title="System Power",
+            ok=False,
+            severity="warning",
+            summary="A power or throttling event has occurred since boot.",
+            causes=[
+                "Earlier undervoltage.",
+                "Earlier thermal throttling.",
+            ],
+            affected=["Historical system reliability"],
+            actions=[
+                "Run: vcgencmd get_throttled",
+                "Check power and cooling.",
+            ],
+        )
+
+    return healthy(
+        "System Power",
+        "No undervoltage or throttling is currently detected.",
+    )
+
+def diagnosis_counts(
+    diagnoses: list[Diagnosis],
+) -> dict[str, int]:
+    return {
+        "critical": sum(
+            1
+            for diagnosis in diagnoses
+            if not diagnosis.ok and diagnosis.severity == "critical"
+        ),
+        "error": sum(
+            1
+            for diagnosis in diagnoses
+            if not diagnosis.ok and diagnosis.severity == "error"
+        ),
+        "warning": sum(
+            1
+            for diagnosis in diagnoses
+            if not diagnosis.ok and diagnosis.severity == "warning"
+        ),
+        "healthy": sum(
+            1
+            for diagnosis in diagnoses
+            if diagnosis.ok
+        ),
+    }
 
 def print_diagnoses(diagnoses: list[Diagnosis]) -> bool:
     print()
@@ -379,18 +771,50 @@ def print_diagnoses(diagnoses: list[Diagnosis]) -> bool:
     print("==============")
     print()
 
+    diagnoses = sorted(
+        diagnoses,
+        key=lambda diagnosis: (
+            diagnosis.ok,
+            -SEVERITY_ORDER[diagnosis.severity],
+            diagnosis.title,
+        ),
+    )
+
+    counts = diagnosis_counts(diagnoses)
+
+    print("Platform Summary")
+    print("----------------")
+    print(f"Critical: {counts['critical']}")
+    print(f"Errors:   {counts['error']}")
+    print(f"Warnings: {counts['warning']}")
+    print(f"Healthy:  {counts['healthy']}")
+    print()
+
     all_ok = True
 
     for diagnosis in diagnoses:
-        status = "OK" if diagnosis.ok else "ISSUE"
-        print(f"[{status}] {diagnosis.title}")
-        print(f"      {diagnosis.message}")
+        status = "OK" if diagnosis.ok else diagnosis.severity.upper()
 
-        if diagnosis.suggestions:
+        print(f"[{status}] {diagnosis.title}")
+        print(f"      {diagnosis.summary}")
+
+        if diagnosis.causes:
             print()
-            print("      Suggested actions:")
-            for suggestion in diagnosis.suggestions:
-                print(f"      - {suggestion}")
+            print("      Likely causes:")
+            for cause in diagnosis.causes:
+                print(f"      - {cause}")
+
+        if diagnosis.affected:
+            print()
+            print("      Affected components:")
+            for component in diagnosis.affected:
+                print(f"      - {component}")
+
+        if diagnosis.actions:
+            print()
+            print("      Recommended actions:")
+            for index, action in enumerate(diagnosis.actions, start=1):
+                print(f"      {index}. {action}")
 
         print()
 
@@ -406,10 +830,10 @@ def print_diagnoses(diagnoses: list[Diagnosis]) -> bool:
     return all_ok
 
 
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="betabox doctor")
-
-    args = parser.parse_args(argv)
+    parser.parse_args(argv)
 
     diagnoses = collect_diagnoses()
     return 0 if print_diagnoses(diagnoses) else 1

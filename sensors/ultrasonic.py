@@ -1,12 +1,22 @@
+from __future__ import annotations
+
 import time
-from typing import Union
+from typing import Self, TypeAlias
 
-from betabox_robotics.hardware import DigitalPin, HardwareError, Pin
+from betabox_robotics.hardware import (
+    DigitalPin,
+    Pin,
+)
+
+from .exceptions import (
+    UltrasonicError,
+    UltrasonicReadError,
+    UltrasonicTimeoutError,
+)
+from .types import UltrasonicReading
 
 
-class UltrasonicError(HardwareError):
-    """Raised when an ultrasonic sensor operation fails."""
-
+PinInput: TypeAlias = Pin | DigitalPin | str | int
 
 class Ultrasonic:
     """
@@ -20,8 +30,8 @@ class Ultrasonic:
 
     def __init__(
         self,
-        trigger: Union[Pin, DigitalPin, str, int],
-        echo: Union[Pin, DigitalPin, str, int],
+        trigger: PinInput,
+        echo: PinInput,
         *,
         timeout: float = 0.02,
     ) -> None:
@@ -32,6 +42,19 @@ class Ultrasonic:
 
         self.trigger = self._make_output_pin(trigger)
         self.echo = self._make_input_pin(echo)
+
+        self._closed = False
+
+    @property
+    def closed(self) -> bool:
+        return self._closed
+
+
+    def _require_open(self) -> None:
+        if self._closed:
+            raise UltrasonicError(
+                "ultrasonic sensor is closed"
+            )
 
     @classmethod
     def default(
@@ -48,14 +71,14 @@ class Ultrasonic:
             timeout=timeout,
         )
 
-    def _make_output_pin(self, pin) -> Pin:
+    def _make_output_pin(self, pin: PinInput) -> Pin:
         if isinstance(pin, Pin):
             pin.output()
             return pin
 
         return Pin(pin, mode=Pin.OUT)
 
-    def _make_input_pin(self, pin) -> Pin:
+    def _make_input_pin(self, pin: PinInput) -> Pin:
         if isinstance(pin, Pin):
             pin.input(pull=Pin.PULL_DOWN)
             return pin
@@ -63,6 +86,8 @@ class Ultrasonic:
         return Pin(pin, mode=Pin.IN, pull=Pin.PULL_DOWN)
 
     def _read_once(self) -> float:
+        self._require_open()
+
         self.trigger.off()
         time.sleep(0.001)
 
@@ -70,59 +95,103 @@ class Ultrasonic:
         time.sleep(0.00001)
         self.trigger.off()
 
-        pulse_start = 0.0
-        pulse_end = 0.0
-        timeout_start = time.time()
+        timeout_start = time.monotonic()
 
         while self.echo.read() == 0:
-            pulse_start = time.time()
+            if time.monotonic() - timeout_start > self.timeout:
+                raise UltrasonicTimeoutError(
+                    "timed out waiting for ultrasonic echo to start"
+                )
 
-            if pulse_start - timeout_start > self.timeout:
-                return -1
+        pulse_start = time.monotonic()
 
         while self.echo.read() == 1:
-            pulse_end = time.time()
+            if time.monotonic() - pulse_start > self.timeout:
+                raise UltrasonicTimeoutError(
+                    "timed out waiting for ultrasonic echo to end"
+                )
 
-            if pulse_end - timeout_start > self.timeout:
-                return -1
-
-        if pulse_start == 0 or pulse_end == 0:
-            return -2
+        pulse_end = time.monotonic()
 
         duration = pulse_end - pulse_start
-        distance_cm = round(duration * self.SOUND_SPEED_M_S / 2 * 100, 2)
 
-        return distance_cm
+        if duration <= 0:
+            raise UltrasonicReadError(
+                "invalid ultrasonic pulse duration"
+            )
+
+        return round(
+            duration * self.SOUND_SPEED_M_S / 2 * 100,
+            2,
+        )
 
     def distance(self, samples: int = 10) -> float:
+        self._require_open()
+
         if samples <= 0:
-            raise UltrasonicError("samples must be greater than 0")
+            raise UltrasonicError(
+                "samples must be greater than 0"
+            )
+
+        last_error: UltrasonicError | None = None
 
         for _ in range(samples):
-            value = self._read_once()
+            try:
+                return self._read_once()
+            except UltrasonicError as exc:
+                last_error = exc
 
-            if value != -1:
-                return value
+        if isinstance(last_error, UltrasonicReadError):
+            raise UltrasonicReadError(
+                f"no valid ultrasonic reading after {samples} attempts"
+            ) from last_error
 
-        return -1
+        raise UltrasonicTimeoutError(
+            f"no valid ultrasonic reading after {samples} attempts"
+        ) from last_error
 
     def read(self, times: int = 10) -> float:
         """
-        Compatibility alias for old API.
+        Compatibility API.
+
+        Returns distance in centimeters, or -1 when a valid reading
+        cannot be obtained. New code should use distance(), which raises
+        a typed UltrasonicError instead.
         """
-        return self.distance(samples=times)
+        try:
+            return self.distance(samples=times)
+        except UltrasonicTimeoutError:
+            return -1
+        except UltrasonicReadError:
+            return -2
+
+    def reading(
+        self,
+        samples: int = 10,
+    ) -> UltrasonicReading:
+        return UltrasonicReading(
+            distance_cm=self.distance(samples=samples),
+            samples_requested=samples,
+        )
 
     def close(self) -> None:
-        if hasattr(self, "trigger"):
+        if self._closed:
+            return
+
+        try:
             self.trigger.close()
-        if hasattr(self, "echo"):
-            self.echo.close()
+        finally:
+            try:
+                self.echo.close()
+            finally:
+                self._closed = True
+
+    def __enter__(self) -> Self:
+        self._require_open()
+        return self
 
     def deinit(self) -> None:
         self.close()
-
-    def __enter__(self) -> "Ultrasonic":
-        return self
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:
         self.close()

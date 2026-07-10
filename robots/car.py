@@ -7,7 +7,14 @@ from betabox_robotics.audio import (
     NoteValue,
 )
 from betabox_robotics.drive import Drive
-from betabox_robotics.sensors import Sensors
+from betabox_robotics.sensors import (
+    BatteryReading,
+    BatteryState,
+    GrayscaleReading,
+    Sensors,
+    SensorsStatus,
+    UltrasonicReading,
+)
 from betabox_robotics.system import MediaPaths, System, SystemStatus, SystemHealth
 from betabox_robotics.vision import (
     ClientDetectionStatus,
@@ -106,6 +113,16 @@ class CarRobot(Robot):
         self._require_ready()
         return self.sensors.ultrasonic.distance(samples)
 
+    def distance_reading(
+        self,
+        samples: int = 10,
+    ) -> UltrasonicReading:
+        self._require_ready()
+
+        return self.sensors.ultrasonic.reading(
+            samples=samples,
+        )
+
     # Battery
     def battery_voltage(self) -> float:
         self._require_ready()
@@ -119,9 +136,13 @@ class CarRobot(Robot):
         self._require_ready()
         return self.sensors.battery.is_critical()
 
-    def battery_status(self) -> str:
+    def battery_status(self) -> BatteryState:
         self._require_ready()
         return self.sensors.battery.status()
+
+    def battery_reading(self) -> BatteryReading:
+        self._require_ready()
+        return self.sensors.battery.reading()
 
     # Line sensor
     def line_status(self, threshold: float = 0.5) -> list[int]:
@@ -136,9 +157,24 @@ class CarRobot(Robot):
         self._require_ready()
         return self.sensors.grayscale.normalized()
 
+    def line_reading(
+        self,
+        *,
+        threshold: float = 0.5,
+    ) -> GrayscaleReading:
+        self._require_ready()
+
+        return self.sensors.grayscale.reading(
+            threshold=threshold,
+        )
+
     def is_vision_running(self) -> bool:
         self._require_ready()
         return self.vision.statistics().running
+
+    def sensors_status(self) -> SensorsStatus:
+        self._require_ready()
+        return self.sensors.status()
 
     def snapshot(
         self,
@@ -246,8 +282,7 @@ class CarRobot(Robot):
         return self.system.ensure_media_paths()
 
     def status(self) -> SystemStatus:
-        self._require_ready()
-        return self.system.status()
+        return self.system_status()
 
     def system_status(self) -> SystemStatus:
         self._require_ready()
@@ -273,7 +308,11 @@ class CarRobot(Robot):
             HealthCheck(
                 name="battery",
                 ok=not battery_critical,
-                message=f"battery status: {battery_status}" if battery_critical else "",
+                message=(
+                    f"battery status: {battery_status.value}"
+                    if battery_critical
+                    else ""
+                ),
             )
         )
 

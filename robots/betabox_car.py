@@ -108,21 +108,29 @@ class BetaboxCar(CarRobot):
         self.audio = Audio.default(config)
         self.system = System.default(config)
 
+        self.start()
+
+
     def close(self) -> None:
         if self.closed:
             return
 
-        self.stop_all()
+        try:
+            self.stop_all()
+        finally:
+            for subsystem in (
+                self.audio,
+                self.drive,
+                self.sensors,
+                self.system,
+            ):
+                close = getattr(subsystem, "close", None)
 
-        for subsystem in (
-            self.audio,
-            self.drive,
-            self.sensors,
-            self.system,
-        ):
-            close = getattr(subsystem, "close", None)
+                if callable(close):
+                    try:
+                        close()
+                    except Exception:
+                        pass
 
-            if callable(close):
-                close()
-
-        self._closed = True
+            self._started = False
+            self._closed = True

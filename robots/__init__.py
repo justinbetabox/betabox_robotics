@@ -13,6 +13,8 @@ from .capabilities import RobotCapability
 from .car import CarRobot
 from .health import HealthCheck, RobotHealth
 from .robot import Robot
+from .exceptions import RobotError, RobotLifecycleError
+
 
 __all__ = [
     "RobotBase",
@@ -29,4 +31,6 @@ __all__ = [
     "RobotCapability",
     "HealthCheck",
     "RobotHealth",
+    "RobotError",
+    "RobotLifecycleError",
 ]

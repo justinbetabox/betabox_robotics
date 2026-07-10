@@ -1,11 +1,19 @@
 from pathlib import Path
 from typing import Any
 
+from betabox_robotics.audio import Audio
+from betabox_robotics.drive import Drive
+from betabox_robotics.sensors import Sensors
+from betabox_robotics.system import MediaPaths, System, SystemStatus
+from betabox_robotics.vision import (
+    ClientRecording,
+    ClientSnapshot,
+    VisionClient,
+)
+
 from .capabilities import RobotCapability
 from .health import HealthCheck, RobotHealth
 from .robot import Robot
-
-from betabox_robotics.vision import ClientRecording, ClientSnapshot, VisionClient
 
 
 class CarRobot(Robot):
@@ -27,76 +35,101 @@ class CarRobot(Robot):
         RobotCapability.SYSTEM,
     }
 
-    drive: Any
-    sensors: Any
+    drive: Drive
+    sensors: Sensors
     vision: VisionClient
-    audio: Any
-    system: Any
+    audio: Audio
+    system: System
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._recording_started_by_robot = False
 
     def forward(self, speed: float) -> None:
+        self._require_ready()
         self.drive.forward(speed)
 
     def backward(self, speed: float) -> None:
+        self._require_ready()
         self.drive.backward(speed)
 
     def stop(self) -> None:
+        self._require_ready()
         self.drive.stop()
 
     def left(self, angle: float = 30) -> None:
+        self._require_ready()
         self.drive.left(angle)
 
     def right(self, angle: float = 30) -> None:
+        self._require_ready()
         self.drive.right(angle)
 
     def center(self) -> None:
+        self._require_ready()
         self.drive.center()
 
     def say(self, text: str) -> None:
+        self._require_ready()
         self.audio.say(text)
 
-    def play(self, sound) -> None:
+    def play(self, sound: str | Path) -> None:
+        self._require_ready()
         self.audio.play(sound)
 
-    def play_note(self, note_or_frequency, duration: float) -> None:
+    def play_note(self, note_or_frequency: str | float, duration: float) -> None:
+        self._require_ready()
         self.audio.play_note(note_or_frequency, duration)
 
-    def play_melody(self, notes, *, gap: float = 0.0) -> None:
+    def play_melody(self, notes: list[Any], *, gap: float = 0.0) -> None:
+        self._require_ready()
         self.audio.play_melody(notes, gap=gap)
 
     def stop_audio(self) -> None:
+        self._require_ready()
         self.audio.stop()
 
     def is_audio_playing(self) -> bool:
+        self._require_ready()
         return self.audio.is_playing()
 
     # Ultrasonic
     def distance(self, samples: int = 10) -> float:
+        self._require_ready()
         return self.sensors.ultrasonic.distance(samples)
 
     # Battery
     def battery_voltage(self) -> float:
+        self._require_ready()
         return self.sensors.battery.voltage()
 
     def is_battery_low(self) -> bool:
+        self._require_ready()
         return self.sensors.battery.is_low()
 
     def is_battery_critical(self) -> bool:
+        self._require_ready()
         return self.sensors.battery.is_critical()
 
     def battery_status(self) -> str:
+        self._require_ready()
         return self.sensors.battery.status()
 
     # Line sensor
     def line_status(self, threshold: float = 0.5) -> list[int]:
+        self._require_ready()
         return self.sensors.grayscale.status(threshold=threshold)
 
     def line_values(self) -> list[int]:
+        self._require_ready()
         return self.sensors.grayscale.read()
 
     def line_normalized(self) -> list[float]:
+        self._require_ready()
         return self.sensors.grayscale.normalized()
 
     def is_vision_running(self) -> bool:
+        self._require_ready()
         return bool(self.vision.statistics().get("running", False))
 
     def snapshot(
@@ -106,6 +139,7 @@ class CarRobot(Robot):
         overlay: bool = False,
         source: str | None = None,
     ) -> ClientSnapshot:
+        self._require_ready()
         return self.vision.snapshot(
             filename=filename,
             overlay=overlay,
@@ -132,57 +166,80 @@ class CarRobot(Robot):
         overlay: bool = False,
         source: str | None = None,
     ) -> Path:
-        return self.vision.start_recording(
+        self._require_ready()
+
+        path = self.vision.start_recording(
             filename=filename,
             overlay=overlay,
             source=source,
         )
 
+        self._recording_started_by_robot = True
+        return path
+
     def stop_recording(self) -> ClientRecording:
-        return self.vision.stop_recording()
+        self._require_ready()
+
+        recording = self.vision.stop_recording()
+        self._recording_started_by_robot = False
+        return recording
 
     def is_recording(self) -> bool:
+        self._require_ready()
         stats = self.vision.statistics()
         recording = stats.get("recording", {})
         return bool(recording.get("active", False))
 
     def vision_stats(self) -> dict[str, Any]:
+        self._require_ready()
         return self.vision.statistics()
 
     def metadata(self, source: str | None = None) -> dict[str, Any]:
+        self._require_ready()
         return self.vision.metadata(source)
 
-    def enable_detection(self, name: str) -> None:
+    def enable_detection(self, name: str) -> dict[str, Any]:
+        self._require_ready()
         return self.vision.enable_detection(name)
 
-    def disable_detection(self, name: str) -> None:
+    def disable_detection(self, name: str) -> dict[str, Any]:
+        self._require_ready()
         return self.vision.disable_detection(name)
 
     def detection_status(self) -> dict[str, Any]:
+        self._require_ready()
         return self.vision.detection_status()
 
-    def enable_stream_overlay(self, source: str | None = None) -> None:
+    def enable_stream_overlay(self, source: str | None = None) -> dict[str, Any]:
+        self._require_ready()
         return self.vision.enable_stream_overlay(source)
 
-    def disable_stream_overlay(self) -> None:
+    def disable_stream_overlay(self) -> dict[str, Any]:
+        self._require_ready()
         return self.vision.disable_stream_overlay()
 
     def hostname(self) -> str:
+        self._require_ready()
         return self.system.hostname()
 
     def ip_addresses(self) -> list[str]:
+        self._require_ready()
         return self.system.ip_addresses()
 
-    def media_paths(self):
+    def media_paths(self) -> MediaPaths:
+        self._require_ready()
         return self.system.media_paths()
 
-    def ensure_media_paths(self):
+    def ensure_media_paths(self) -> MediaPaths:
+        self._require_ready()
         return self.system.ensure_media_paths()
 
-    def status(self):
+    def status(self) -> SystemStatus:
+        self._require_ready()
         return self.system.status()
 
-    def health(self):
+    def health(self) -> RobotHealth:
+        self._require_ready()
         checks = []
 
         system_health = self.system.health()
@@ -211,21 +268,35 @@ class CarRobot(Robot):
         )
 
     def stop_all(self) -> None:
-        self.drive.stop()
+        self.require_open()
+
+        if self._recording_started_by_robot:
+            try:
+                self.vision.stop_recording()
+            except Exception:
+                pass
+            finally:
+                self._recording_started_by_robot = False
 
         try:
-            if self.is_recording():
-                self.stop_recording()
+            self.drive.stop()
         except Exception:
             pass
 
         try:
-            self.stop_audio()
+            self.audio.stop()
         except Exception:
             pass
 
         system_stop_all = getattr(self.system, "stop_all", None)
+
         if callable(system_stop_all):
-            system_stop_all()
+            try:
+                system_stop_all()
+            except Exception:
+                pass
 
         self._started = False
+
+    def _require_ready(self) -> None:
+        self.require_started()

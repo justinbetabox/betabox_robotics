@@ -6,9 +6,13 @@ from betabox_robotics.drive import Drive
 from betabox_robotics.sensors import Sensors
 from betabox_robotics.system import MediaPaths, System, SystemStatus
 from betabox_robotics.vision import (
+    ClientDetectionStatus,
+    ClientMetadata,
     ClientRecording,
     ClientSnapshot,
+    ClientStreamOverlayStatus,
     VisionClient,
+    ClientVisionStatistics,
 )
 
 from .capabilities import RobotCapability
@@ -130,7 +134,7 @@ class CarRobot(Robot):
 
     def is_vision_running(self) -> bool:
         self._require_ready()
-        return bool(self.vision.statistics().get("running", False))
+        return self.vision.statistics().running
 
     def snapshot(
         self,
@@ -186,35 +190,38 @@ class CarRobot(Robot):
 
     def is_recording(self) -> bool:
         self._require_ready()
-        stats = self.vision.statistics()
-        recording = stats.get("recording", {})
-        return bool(recording.get("active", False))
+        return self.vision.statistics().recording.active
 
-    def vision_stats(self) -> dict[str, Any]:
+    def vision_stats(self) -> ClientVisionStatistics:
         self._require_ready()
         return self.vision.statistics()
 
-    def metadata(self, source: str | None = None) -> dict[str, Any]:
+    def metadata(self, source: str | None = None) -> ClientMetadata | None:
         self._require_ready()
         return self.vision.metadata(source)
 
-    def enable_detection(self, name: str) -> dict[str, Any]:
+    def enable_detection(self, name: str) -> ClientDetectionStatus:
         self._require_ready()
         return self.vision.enable_detection(name)
 
-    def disable_detection(self, name: str) -> dict[str, Any]:
+    def disable_detection(self, name: str) -> ClientDetectionStatus:
         self._require_ready()
         return self.vision.disable_detection(name)
 
-    def detection_status(self) -> dict[str, Any]:
+    def detection_status(self) -> ClientDetectionStatus:
         self._require_ready()
         return self.vision.detection_status()
 
-    def enable_stream_overlay(self, source: str | None = None) -> dict[str, Any]:
+    def enable_stream_overlay(
+        self,
+        source: str | None = None,
+    ) -> ClientStreamOverlayStatus:
         self._require_ready()
         return self.vision.enable_stream_overlay(source)
 
-    def disable_stream_overlay(self) -> dict[str, Any]:
+    def disable_stream_overlay(
+        self,
+    ) -> ClientStreamOverlayStatus:
         self._require_ready()
         return self.vision.disable_stream_overlay()
 

@@ -22,10 +22,10 @@ def main() -> None:
     print("Checking service statistics...")
     stats = client.statistics()
 
-    assert stats["running"] is True
-    assert stats["camera"]["running"] is True
-    assert stats["camera"]["has_frame"] is True
-    assert stats["streaming"]["running"] is True
+    assert stats.running is True
+    assert stats.camera.running is True
+    assert stats.camera.has_frame is True
+    assert stats.streaming.running is True
 
     print("Capturing plain snapshot...")
     snapshot = client.snapshot(
@@ -101,9 +101,9 @@ def main() -> None:
     print("Checking final service statistics...")
     final_stats = client.statistics()
 
-    assert final_stats["recording"]["active"] is False
-    assert final_stats["streaming"]["overlay"]["enabled"] is False
-    assert final_stats["detection"]["detectors"]["color"] is False
+    assert final_stats.recording.active is False
+    assert final_stats.streaming.overlay.enabled is False
+    assert final_stats.detection.detectors["color"] is False
 
     print()
     print("Vision integration test passed.")

@@ -177,15 +177,12 @@ def collect_vision_status() -> VisionStatus:
             error=str(exc),
         )
 
-    camera = statistics.get("camera", {})
-    streaming = statistics.get("streaming", {})
-
     return VisionStatus(
         service_available=True,
-        running=bool(statistics.get("running", False)),
-        camera_running=bool(camera.get("running", False)),
-        camera_has_frame=bool(camera.get("has_frame", False)),
-        clients=int(streaming.get("clients", 0)),
+        running=statistics.running,
+        camera_running=statistics.camera.running,
+        camera_has_frame=statistics.camera.has_frame,
+        clients=statistics.streaming.clients,
     )
 
 def collect_robot_status() -> tuple[
@@ -259,9 +256,7 @@ def collect_robot_status() -> tuple[
         return True, battery, sensor_status, None
 
     finally:
-        for component in [battery_sensor, grayscale_sensor]:
-            close = getattr(component, "close", None)
-
+        for component in (battery_sensor, grayscale_sensor):
             if component is None:
                 continue
 

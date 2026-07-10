@@ -17,7 +17,22 @@ from .stream import Streamer
 from .tflite_runtime import TFLiteObjectDetectionModel
 from .vision import Vision
 from .webrtc import WebRTCStreamer
-from .client import ClientRecording, ClientSnapshot, VisionClient, VisionClientError
+from .client import (
+    ClientCameraStatistics,
+    ClientDetection,
+    ClientDetectionStatistics,
+    ClientDetectionStatus,
+    ClientMetadata,
+    ClientRecording,
+    ClientRecordingStatus,
+    ClientSnapshot,
+    ClientStreamingStatistics,
+    ClientStreamOverlayStatus,
+    ClientVisionServerStatistics,
+    ClientVisionStatistics,
+    VisionClient,
+    VisionClientError,
+)
 from .overlay import OverlayRenderer, OverlayStyle
 
 __all__ = [
@@ -58,4 +73,16 @@ __all__ = [
     "ClientRecording",
     "OverlayRenderer",
     "OverlayStyle",
+    "ClientDetection",
+    "ClientMetadata",
+    "ClientDetectionStatus",
+    "ClientStreamOverlayStatus",
+    "ClientVisionStatistics",
+    "VisionClientError",
+    "ClientDetection",
+    "ClientCameraStatistics",
+    "ClientDetectionStatistics",
+    "ClientStreamingStatistics",
+    "ClientVisionServerStatistics",
+
 ]

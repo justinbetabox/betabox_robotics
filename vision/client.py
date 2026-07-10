@@ -31,6 +31,101 @@ class ClientRecording:
         return max(0.0, self.end_timestamp - self.start_timestamp)
 
 
+@dataclass(frozen=True)
+class ClientDetection:
+    label: str
+    confidence: float | None
+    box: tuple[int, int, int, int] | None
+    center: tuple[int, int] | None
+    data: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class ClientMetadata:
+    source: str
+    timestamp: float
+    detections: list[ClientDetection]
+    data: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class ClientDetectionStatus:
+    detectors: dict[str, bool]
+    changed: str | None = None
+
+    @property
+    def enabled(self) -> list[str]:
+        return sorted(
+            name
+            for name, is_enabled in self.detectors.items()
+            if is_enabled
+        )
+
+    @property
+    def disabled(self) -> list[str]:
+        return sorted(
+            name
+            for name, is_enabled in self.detectors.items()
+            if not is_enabled
+        )
+
+    def is_enabled(self, name: str) -> bool:
+        return bool(self.detectors.get(name, False))
+
+
+@dataclass(frozen=True)
+class ClientStreamOverlayStatus:
+    enabled: bool
+    source: str | None = None
+
+
+@dataclass(frozen=True)
+class ClientCameraStatistics:
+    running: bool
+    fps: float
+    consumer_count: int
+    has_frame: bool
+    last_error: str | None
+
+
+@dataclass(frozen=True)
+class ClientStreamingStatistics:
+    running: bool
+    clients: int
+    frames_received: int
+    has_frame: bool
+    overlay: ClientStreamOverlayStatus
+
+
+@dataclass(frozen=True)
+class ClientRecordingStatus:
+    active: bool
+    overlay: ClientStreamOverlayStatus
+
+
+@dataclass(frozen=True)
+class ClientDetectionStatistics:
+    detectors: dict[str, bool]
+    metadata_sources: list[str]
+
+
+@dataclass(frozen=True)
+class ClientVisionServerStatistics:
+    host: str
+    port: int
+    fps: float
+
+
+@dataclass(frozen=True)
+class ClientVisionStatistics:
+    running: bool
+    camera: ClientCameraStatistics
+    streaming: ClientStreamingStatistics
+    recording: ClientRecordingStatus
+    detection: ClientDetectionStatistics
+    server: ClientVisionServerStatistics
+
+
 class VisionClient:
     """
     Client for the managed Betabox Vision service.
@@ -41,8 +136,9 @@ class VisionClient:
     def __init__(self, base_url: str = "http://127.0.0.1:8080") -> None:
         self.base_url = base_url.rstrip("/")
 
-    def statistics(self) -> dict[str, Any]:
-        return self._get("/stats")
+    def statistics(self) -> ClientVisionStatistics:
+        data = self._get("/stats")
+        return self._parse_statistics(data)
 
     def snapshot(
         self,
@@ -96,32 +192,65 @@ class VisionClient:
             fps=float(data["fps"]),
         )
 
-    def metadata(self, source: str | None = None) -> dict[str, Any]:
+    def metadata(
+        self,
+        source: str | None = None,
+    ) -> ClientMetadata | None:
         path = self._path_with_query(
             "/metadata",
             {"source": source},
         )
-        return self._get(path)
 
-    def detection_status(self) -> dict[str, Any]:
-        return self._get("/detection")
+        data = self._get(path)
 
-    def enable_detection(self, name: str) -> dict[str, Any]:
-        return self._post_json("/detection/enable", {"name": name})
+        if not data:
+            return None
 
-    def disable_detection(self, name: str) -> dict[str, Any]:
-        return self._post_json("/detection/disable", {"name": name})
+        return self._parse_metadata(data)
 
-    def enable_stream_overlay(self, source: str | None = None) -> dict[str, Any]:
+    def detection_status(self) -> ClientDetectionStatus:
+        data = self._get("/detection")
+        return self._parse_detection_status(data)
+
+    def enable_detection(self, name: str) -> ClientDetectionStatus:
+        data = self._post_json(
+            "/detection/enable",
+            {"name": name},
+        )
+        return self._parse_detection_status(data)
+
+    def disable_detection(self, name: str) -> ClientDetectionStatus:
+        data = self._post_json(
+            "/detection/disable",
+            {"name": name},
+        )
+        return self._parse_detection_status(data)
+
+    def enable_stream_overlay(
+        self,
+        source: str | None = None,
+    ) -> ClientStreamOverlayStatus:
         payload: dict[str, Any] = {}
 
         if source is not None:
             payload["source"] = source
 
-        return self._post_json("/stream/overlay/enable", payload)
+        data = self._post_json(
+            "/stream/overlay/enable",
+            payload,
+        )
 
-    def disable_stream_overlay(self) -> dict[str, Any]:
-        return self._post_json("/stream/overlay/disable", {})
+        return self._parse_stream_overlay_status(data)
+
+    def disable_stream_overlay(
+        self,
+    ) -> ClientStreamOverlayStatus:
+        data = self._post_json(
+            "/stream/overlay/disable",
+            {},
+        )
+
+        return self._parse_stream_overlay_status(data)
 
     def _get(self, path: str) -> dict[str, Any]:
         return self._request("GET", path)
@@ -208,3 +337,218 @@ class VisionClient:
             return path
 
         return f"{path}?{parse.urlencode(filtered)}"
+
+    def _parse_detection(
+        self,
+        data: dict[str, Any],
+    ) -> ClientDetection:
+        box_data = data.get("box")
+        center_data = data.get("center")
+
+        box: tuple[int, int, int, int] | None = None
+        center: tuple[int, int] | None = None
+
+        if isinstance(box_data, (list, tuple)) and len(box_data) == 4:
+            box = (
+                int(box_data[0]),
+                int(box_data[1]),
+                int(box_data[2]),
+                int(box_data[3]),
+            )
+
+        if isinstance(center_data, (list, tuple)) and len(center_data) == 2:
+            center = (
+                int(center_data[0]),
+                int(center_data[1]),
+            )
+
+        confidence_value = data.get("confidence")
+        confidence = (
+            float(confidence_value)
+            if confidence_value is not None
+            else None
+        )
+
+        extra_data = data.get("data", {})
+
+        return ClientDetection(
+            label=str(data.get("label", "")),
+            confidence=confidence,
+            box=box,
+            center=center,
+            data=extra_data if isinstance(extra_data, dict) else {},
+        )
+
+    def _parse_metadata(
+        self,
+        data: dict[str, Any],
+    ) -> ClientMetadata:
+        detections_data = data.get("detections", [])
+
+        detections = [
+            self._parse_detection(item)
+            for item in detections_data
+            if isinstance(item, dict)
+        ]
+
+        extra_data = data.get("data", {})
+
+        return ClientMetadata(
+            source=str(data.get("source", "")),
+            timestamp=float(data.get("timestamp", 0.0)),
+            detections=detections,
+            data=extra_data if isinstance(extra_data, dict) else {},
+        )
+
+    def _parse_detection_status(
+        self,
+        data: dict[str, Any],
+    ) -> ClientDetectionStatus:
+        detectors_data = data.get("detectors", {})
+        changed = data.get("enabled") or data.get("disabled")
+
+        detectors: dict[str, bool] = {}
+
+        if isinstance(detectors_data, dict):
+            detectors = {
+                str(name): bool(enabled)
+                for name, enabled in detectors_data.items()
+            }
+        else:
+            detectors = {
+                str(name): False
+                for name in detectors_data
+            }
+
+        return ClientDetectionStatus(
+            detectors=detectors,
+            changed=str(changed) if isinstance(changed, str) else None,
+    )
+
+    def _parse_stream_overlay_status(
+        self,
+        data: dict[str, Any],
+    ) -> ClientStreamOverlayStatus:
+        source = data.get("source")
+
+        return ClientStreamOverlayStatus(
+            enabled=bool(data.get("enabled", False)),
+            source=str(source) if source is not None else None,
+        )
+
+    def _parse_camera_statistics(
+        self,
+        data: dict[str, Any],
+    ) -> ClientCameraStatistics:
+        last_error = data.get("last_error")
+
+        return ClientCameraStatistics(
+            running=bool(data.get("running", False)),
+            fps=float(data.get("fps", 0.0)),
+            consumer_count=int(data.get("consumer_count", 0)),
+            has_frame=bool(data.get("has_frame", False)),
+            last_error=str(last_error) if last_error is not None else None,
+        )
+
+    def _parse_streaming_statistics(
+        self,
+        data: dict[str, Any],
+    ) -> ClientStreamingStatistics:
+        overlay_data = data.get("overlay", {})
+
+        if not isinstance(overlay_data, dict):
+            overlay_data = {}
+
+        return ClientStreamingStatistics(
+            running=bool(data.get("running", False)),
+            clients=int(data.get("clients", 0)),
+            frames_received=int(data.get("frames_received", 0)),
+            has_frame=bool(data.get("has_frame", False)),
+            overlay=self._parse_stream_overlay_status(overlay_data),
+        )
+
+    def _parse_recording_status(
+        self,
+        data: dict[str, Any],
+    ) -> ClientRecordingStatus:
+        overlay_data = data.get("overlay", {})
+
+        if not isinstance(overlay_data, dict):
+            overlay_data = {}
+
+        return ClientRecordingStatus(
+            active=bool(data.get("active", False)),
+            overlay=self._parse_stream_overlay_status(overlay_data),
+        )
+
+    def _parse_detection_statistics(
+        self,
+        data: dict[str, Any],
+    ) -> ClientDetectionStatistics:
+        detectors_data = data.get("detectors", {})
+        metadata_sources_data = data.get("metadata_sources", [])
+
+        detectors: dict[str, bool] = {}
+
+        if isinstance(detectors_data, dict):
+            detectors = {
+                str(name): bool(enabled)
+                for name, enabled in detectors_data.items()
+            }
+
+        metadata_sources: list[str] = []
+
+        if isinstance(metadata_sources_data, list):
+            metadata_sources = [
+                str(source)
+                for source in metadata_sources_data
+            ]
+
+        return ClientDetectionStatistics(
+            detectors=detectors,
+            metadata_sources=metadata_sources,
+        )
+
+    def _parse_server_statistics(
+        self,
+        data: dict[str, Any],
+    ) -> ClientVisionServerStatistics:
+        return ClientVisionServerStatistics(
+            host=str(data.get("host", "")),
+            port=int(data.get("port", 0)),
+            fps=float(data.get("fps", 0.0)),
+        )
+
+    def _parse_statistics(
+        self,
+        data: dict[str, Any],
+    ) -> ClientVisionStatistics:
+        camera_data = data.get("camera", {})
+        streaming_data = data.get("streaming", {})
+        recording_data = data.get("recording", {})
+        detection_data = data.get("detection", {})
+        server_data = data.get("server", {})
+
+        if not isinstance(camera_data, dict):
+            camera_data = {}
+
+        if not isinstance(streaming_data, dict):
+            streaming_data = {}
+
+        if not isinstance(recording_data, dict):
+            recording_data = {}
+
+        if not isinstance(detection_data, dict):
+            detection_data = {}
+
+        if not isinstance(server_data, dict):
+            server_data = {}
+
+        return ClientVisionStatistics(
+            running=bool(data.get("running", False)),
+            camera=self._parse_camera_statistics(camera_data),
+            streaming=self._parse_streaming_statistics(streaming_data),
+            recording=self._parse_recording_status(recording_data),
+            detection=self._parse_detection_statistics(detection_data),
+            server=self._parse_server_statistics(server_data),
+        )

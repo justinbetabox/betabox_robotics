@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from betabox_robotics.services.managed import MANAGED_SERVICES
 from betabox_robotics.services.status import collect_status
 from betabox_robotics.services.verify import CheckResult, collect_checks
+from betabox_robotics.services.hardware_status import RobotHardwareStatus
+from betabox_robotics.services.status import StatusReport, collect_status
 
 
 @dataclass(frozen=True)
@@ -114,8 +116,7 @@ def diagnose_media(results: dict[str, CheckResult]) -> Diagnosis:
     )
 
 
-def diagnose_services() -> Diagnosis:
-    status = collect_status()
+def diagnose_services(status: StatusReport) -> Diagnosis:
 
     failed = [
         managed.title
@@ -153,30 +154,11 @@ def diagnose_services() -> Diagnosis:
     )
 
 
-def diagnose_robot(results: dict[str, CheckResult]) -> Diagnosis:
-    robot = results.get("robot:construct")
-    ok = bool(robot and robot.ok)
-
-    suggestions = [
-        "Run: betabox verify",
-        "Check I²C and Robot HAT connectivity.",
-        "Check battery power.",
-        "Review the exact robot construction error shown by betabox verify.",
-    ]
-
-    return Diagnosis(
-        title="Robot",
-        ok=ok,
-        message="Robot object can be constructed."
-        if ok
-        else "Robot object could not be constructed.",
-        suggestions=[] if ok else suggestions,
-    )
-
-
-def diagnose_jupyterhub(results: dict[str, CheckResult]) -> Diagnosis:
+def diagnose_jupyterhub(
+    results: dict[str, CheckResult],
+    status: StatusReport,
+) -> Diagnosis:
     proxy = results.get("jupyterhub:proxy")
-    status = collect_status()
     service_state = status.services.get("jupyterhub.service", "unknown")
 
     ok = bool(proxy and proxy.ok and service_state == "active")
@@ -205,21 +187,188 @@ def diagnose_jupyterhub(results: dict[str, CheckResult]) -> Diagnosis:
         suggestions=[] if ok else suggestions,
     )
 
+def diagnose_robot_hardware(hardware: RobotHardwareStatus) -> Diagnosis:
+    ok = hardware.robot_available and hardware.i2c.available
+
+    suggestions = [
+        "Verify /boot/firmware/config.txt contains dtparam=i2c_arm=on.",
+        "Run: i2cdetect -y 1",
+        "Check that the Robot HAT is seated correctly.",
+        "Check the Robot HAT power and cable connections.",
+    ]
+
+    if ok:
+        message = "Robot hardware and I²C bus are available."
+    elif hardware.robot_error:
+        message = f"Robot hardware is unavailable: {hardware.robot_error}"
+    elif not hardware.i2c.available:
+        message = "The I²C bus is unavailable."
+    else:
+        message = "Robot hardware is unavailable."
+
+    return Diagnosis(
+        title="Robot Hardware",
+        ok=ok,
+        message=message,
+        suggestions=[] if ok else suggestions,
+    )
+
+
+def diagnose_battery(hardware: RobotHardwareStatus) -> Diagnosis:
+    battery = hardware.battery
+
+    if not battery.available or battery.voltage is None:
+        return Diagnosis(
+            title="Battery",
+            ok=False,
+            message=battery.error or "Battery voltage is unavailable.",
+            suggestions=[
+                "Check the battery connection.",
+                "Check the Robot HAT power connection.",
+                "Run: betabox status",
+                "Run: betabox verify",
+            ],
+        )
+
+    critical = battery.state == "critical"
+
+    if critical:
+        message = (
+            f"Battery voltage is critical: {battery.voltage:.2f} V."
+        )
+    elif battery.state == "low":
+        message = f"Battery voltage is low: {battery.voltage:.2f} V."
+    else:
+        message = (
+            f"Battery voltage is healthy: {battery.voltage:.2f} V."
+        )
+
+    return Diagnosis(
+        title="Battery",
+        ok=not critical,
+        message=message,
+        suggestions=(
+            [
+                "Stop driving the robot.",
+                "Recharge or replace the battery.",
+                "Check the battery connector.",
+            ]
+            if critical
+            else []
+        ),
+    )
+
+
+def diagnose_grayscale(hardware: RobotHardwareStatus) -> Diagnosis:
+    sensors = hardware.sensors
+    ok = sensors.grayscale_available
+
+    if ok:
+        values = sensors.grayscale_values or []
+        message = "Grayscale sensor is available."
+
+        if values:
+            message += " Values: " + ", ".join(str(value) for value in values)
+    else:
+        message = sensors.error or "Grayscale sensor is unavailable."
+
+    return Diagnosis(
+        title="Grayscale",
+        ok=ok,
+        message=message,
+        suggestions=(
+            []
+            if ok
+            else [
+                "Check the grayscale sensor cable.",
+                "Check the Robot HAT connection.",
+                "Run the grayscale validation test.",
+            ]
+        ),
+    )
+
+
+def diagnose_audio_hardware(hardware: RobotHardwareStatus) -> Diagnosis:
+    audio = hardware.audio
+    ok = audio.available
+
+    return Diagnosis(
+        title="Audio Hardware",
+        ok=ok,
+        message=(
+            f"Audio device is available: {audio.device}."
+            if ok
+            else audio.error or "Audio device is unavailable."
+        ),
+        suggestions=(
+            []
+            if ok
+            else [
+                "Run: aplay -l",
+                "Verify dtoverlay=hifiberry-dac is configured.",
+                "Reboot after changing audio overlays.",
+            ]
+        ),
+    )
+
+
+def diagnose_vision_hardware(hardware: RobotHardwareStatus) -> Diagnosis:
+    vision = hardware.vision
+
+    ok = (
+        vision.service_available
+        and vision.running
+        and vision.camera_running
+        and vision.camera_has_frame
+    )
+
+    if ok:
+        message = "Vision service and camera pipeline are healthy."
+    elif not vision.service_available:
+        message = vision.error or "Vision service is unavailable."
+    elif not vision.running:
+        message = "Vision service is not running."
+    elif not vision.camera_running:
+        message = "Vision service is running, but the camera is stopped."
+    elif not vision.camera_has_frame:
+        message = "Vision service is running, but no camera frame is available."
+    else:
+        message = "Vision platform is degraded."
+
+    return Diagnosis(
+        title="Vision Hardware",
+        ok=ok,
+        message=message,
+        suggestions=(
+            []
+            if ok
+            else [
+                "Run: betabox services",
+                "Run: betabox logs video --journal-only",
+                "Restart Vision: sudo systemctl restart betabox-video.service",
+                "Check the camera ribbon cable.",
+            ]
+        ),
+    )
 
 def collect_diagnoses(*, include_robot: bool = True) -> list[Diagnosis]:
-    checks = result_map(collect_checks(include_robot=include_robot))
+    checks = result_map(collect_checks(include_robot=False))
+    status = collect_status()
+    hardware = status.hardware
 
     diagnoses = [
         diagnose_i2c(checks),
         diagnose_camera(checks),
         diagnose_audio(checks),
-        diagnose_jupyterhub(checks),
+        diagnose_jupyterhub(checks, status),
         diagnose_media(checks),
-        diagnose_services(),
+        diagnose_services(status),
+        diagnose_robot_hardware(hardware),
+        diagnose_battery(hardware),
+        diagnose_grayscale(hardware),
+        diagnose_audio_hardware(hardware),
+        diagnose_vision_hardware(hardware),
     ]
-
-    if include_robot:
-        diagnoses.append(diagnose_robot(checks))
 
     return diagnoses
 
@@ -259,15 +408,10 @@ def print_diagnoses(diagnoses: list[Diagnosis]) -> bool:
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="betabox doctor")
-    parser.add_argument(
-        "--no-robot",
-        action="store_true",
-        help="Skip checks that construct the robot object",
-    )
 
     args = parser.parse_args(argv)
 
-    diagnoses = collect_diagnoses(include_robot=not args.no_robot)
+    diagnoses = collect_diagnoses()
     return 0 if print_diagnoses(diagnoses) else 1
 
 

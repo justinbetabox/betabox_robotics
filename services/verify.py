@@ -5,6 +5,11 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from betabox_robotics.services.hardware_status import (
+    RobotHardwareStatus,
+    collect_hardware_status,
+)
+
 
 @dataclass(frozen=True)
 class CheckResult:
@@ -144,15 +149,46 @@ def check_media_paths() -> list[CheckResult]:
 
 
 def check_robot_constructs() -> CheckResult:
+    car = None
+
     try:
         from betabox_robotics import BetaboxCar
 
         car = BetaboxCar()
-        car.close()
-        return CheckResult("robot:construct", True, "BetaboxCar constructed and closed")
-    except Exception as exc:
-        return CheckResult("robot:construct", False, str(exc))
 
+        return CheckResult(
+            "robot:construct",
+            True,
+            "BetaboxCar constructed successfully",
+        )
+
+    except Exception as exc:
+        return CheckResult(
+            "robot:construct",
+            False,
+            str(exc),
+        )
+
+    finally:
+        if car is not None:
+            try:
+                car.drive.stop()
+            except Exception:
+                pass
+
+            for subsystem in (
+                car.audio,
+                car.drive,
+                car.sensors,
+                car.system,
+            ):
+                close = getattr(subsystem, "close", None)
+
+                if callable(close):
+                    try:
+                        close()
+                    except Exception:
+                        pass
 
 def check_configurable_http_proxy() -> CheckResult:
     result = run(["configurable-http-proxy", "--version"])
@@ -172,21 +208,157 @@ def check_configurable_http_proxy() -> CheckResult:
         output or "installed",
     )
 
+def checks_from_hardware_status(
+    hardware: RobotHardwareStatus,
+) -> list[CheckResult]:
+    checks: list[CheckResult] = []
+
+    checks.append(
+        CheckResult(
+            "hardware:i2c",
+            hardware.i2c.available,
+            (
+                ", ".join(hardware.i2c.devices)
+                if hardware.i2c.devices
+                else hardware.i2c.error or "no I²C devices detected"
+            ),
+        )
+    )
+
+    checks.append(
+        CheckResult(
+            "hardware:robot",
+            hardware.robot_available,
+            hardware.robot_error or "robot hardware available",
+        )
+    )
+
+    battery = hardware.battery
+
+    checks.append(
+        CheckResult(
+            "hardware:battery",
+            battery.available and battery.state != "critical",
+            (
+                f"{battery.voltage:.2f} V — {battery.state}"
+                if battery.available and battery.voltage is not None
+                else battery.error or "battery unavailable"
+            ),
+        )
+    )
+
+    sensors = hardware.sensors
+
+    checks.append(
+        CheckResult(
+            "hardware:grayscale",
+            sensors.grayscale_available,
+            (
+                ", ".join(
+                    str(value)
+                    for value in sensors.grayscale_values or []
+                )
+                if sensors.grayscale_available
+                else sensors.error or "grayscale unavailable"
+            ),
+        )
+    )
+
+    checks.append(
+        CheckResult(
+            "hardware:ultrasonic_configured",
+            sensors.ultrasonic_configured,
+            (
+                "ultrasonic configured"
+                if sensors.ultrasonic_configured
+                else "ultrasonic not configured"
+            ),
+        )
+    )
+
+    checks.append(
+        CheckResult(
+            "audio:hifiberry",
+            hardware.audio.available,
+            hardware.audio.device
+            or hardware.audio.error
+            or "audio unavailable",
+        )
+    )
+
+    vision = hardware.vision
+
+    vision_ok = (
+        vision.service_available
+        and vision.running
+        and vision.camera_running
+        and vision.camera_has_frame
+    )
+
+    checks.append(
+        CheckResult(
+            "vision:service",
+            vision_ok,
+            (
+                "Vision service and camera pipeline healthy"
+                if vision_ok
+                else vision.error or "Vision service degraded"
+            ),
+        )
+    )
+
+    return checks
+
+def check_ultrasonic_read() -> CheckResult:
+    try:
+        from betabox_robotics.robots.betabox_car import BETABOX_CAR
+        from betabox_robotics.sensors import Sensors
+
+        sensors = Sensors.default(BETABOX_CAR)
+
+        try:
+            distance = float(sensors.ultrasonic.distance(samples=3))
+        finally:
+            close = getattr(sensors, "close", None)
+
+            if callable(close):
+                close()
+
+        if distance < 0:
+            return CheckResult(
+                "hardware:ultrasonic_read",
+                False,
+                f"invalid distance result: {distance}",
+            )
+
+        return CheckResult(
+            "hardware:ultrasonic_read",
+            True,
+            f"{distance:.1f} cm",
+        )
+
+    except Exception as exc:
+        return CheckResult(
+            "hardware:ultrasonic_read",
+            False,
+            str(exc),
+        )
 
 def collect_checks(*, include_robot: bool = True) -> list[CheckResult]:
     checks: list[CheckResult] = []
 
     checks.extend(check_imports())
     checks.append(check_picamera2())
-    checks.append(check_i2c_device())
-    checks.append(check_i2c_scan())
-    checks.append(check_hifiberry())
     checks.append(check_configurable_http_proxy())
     checks.append(check_speech_backend())
     checks.extend(check_media_paths())
 
+    hardware = collect_hardware_status()
+    checks.extend(checks_from_hardware_status(hardware))
+
     if include_robot:
         checks.append(check_robot_constructs())
+        checks.append(check_ultrasonic_read())
 
     return checks
 

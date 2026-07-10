@@ -6,6 +6,10 @@ import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from betabox_robotics.services.hardware_status import (
+    RobotHardwareStatus,
+    collect_hardware_status,
+)
 from betabox_robotics.services.managed import MANAGED_SERVICES
 from betabox_robotics.version import __version__
 
@@ -20,6 +24,7 @@ class StatusReport:
     media_paths: dict[str, str]
     services: dict[str, str]
     jupyterhub_proxy_available: bool
+    hardware: RobotHardwareStatus
 
 
 def run(command: list[str], timeout: int = 5) -> subprocess.CompletedProcess | None:
@@ -93,6 +98,8 @@ def collect_status() -> StatusReport:
         for managed in MANAGED_SERVICES.values()
     }
 
+    hardware = collect_hardware_status()
+
     return StatusReport(
         version=__version__,
         hostname=hostname(),
@@ -106,7 +113,73 @@ def collect_status() -> StatusReport:
         },
         services=services,
         jupyterhub_proxy_available=executable_available("configurable-http-proxy"),
+        hardware=hardware,
     )
+
+
+def format_boolean(value: bool) -> str:
+    return "available" if value else "missing"
+
+
+def print_hardware_status(hardware: RobotHardwareStatus) -> None:
+    print()
+    print("Robot Hardware")
+    print("--------------")
+
+    print(
+        f"Robot:       "
+        f"{'available' if hardware.robot_available else 'unavailable'}"
+    )
+
+    print(f"I²C bus:     {format_boolean(hardware.i2c.available)}")
+
+    if hardware.i2c.devices:
+        print(f"I²C devices: {', '.join(hardware.i2c.devices)}")
+    else:
+        print("I²C devices: none detected")
+
+    if hardware.battery.available and hardware.battery.voltage is not None:
+        print(
+            f"Battery:     {hardware.battery.voltage:.2f} V "
+            f"— {hardware.battery.state}"
+        )
+    else:
+        print("Battery:     unavailable")
+
+    if hardware.sensors.grayscale_available:
+        values = hardware.sensors.grayscale_values or []
+        formatted = ", ".join(str(value) for value in values)
+        print(f"Grayscale:   available ({formatted})")
+    else:
+        print("Grayscale:   unavailable")
+
+    print(
+        "Ultrasonic:  "
+        + (
+            "configured"
+            if hardware.sensors.ultrasonic_configured
+            else "not configured"
+        )
+    )
+
+    if hardware.audio.available:
+        device = hardware.audio.device or "available"
+        print(f"Audio:       {device}")
+    else:
+        print("Audio:       unavailable")
+
+    if hardware.vision.service_available:
+        if hardware.vision.camera_running and hardware.vision.camera_has_frame:
+            vision_state = "healthy"
+        elif hardware.vision.running:
+            vision_state = "degraded"
+        else:
+            vision_state = "stopped"
+
+        print(f"Vision:      {vision_state}")
+        print(f"Clients:     {hardware.vision.clients}")
+    else:
+        print("Vision:      unavailable")
 
 
 def print_human(report: StatusReport) -> None:
@@ -130,6 +203,8 @@ def print_human(report: StatusReport) -> None:
     print("--------")
     print(f"I2C:       {'available' if report.i2c_available else 'missing'}")
     print(f"HifiBerry: {'available' if report.hifiberry_available else 'missing'}")
+
+    print_hardware_status(report.hardware)
 
     print()
     print("Media")

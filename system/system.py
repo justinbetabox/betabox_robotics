@@ -1,6 +1,8 @@
 import socket
-from dataclasses import dataclass
+import subprocess
+from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import Any, Self
 
 from betabox_robotics.version import __version__
 
@@ -11,6 +13,24 @@ class MediaPaths:
     videos: Path
     sounds: Path
 
+    @property
+    def all(self) -> tuple[Path, Path, Path]:
+        return (
+            self.pictures,
+            self.videos,
+            self.sounds,
+        )
+
+    def exists(self) -> bool:
+        return all(path.exists() for path in self.all)
+
+    def to_dict(self) -> dict[str, str]:
+        return {
+            "pictures": str(self.pictures),
+            "videos": str(self.videos),
+            "sounds": str(self.sounds),
+        }
+
 
 @dataclass(frozen=True)
 class SystemStatus:
@@ -19,11 +39,26 @@ class SystemStatus:
     ip_addresses: list[str]
     media: MediaPaths
 
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "version": self.version,
+            "hostname": self.hostname,
+            "ip_addresses": list(self.ip_addresses),
+            "media": self.media.to_dict(),
+        }
+
 
 @dataclass(frozen=True)
 class SystemHealth:
     ok: bool
     messages: list[str]
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+class SystemError(Exception):
+    """Raised when System subsystem operations fail."""
 
 
 class System:
@@ -31,37 +66,68 @@ class System:
     System information and platform paths.
     """
 
+    def __init__(self) -> None:
+            self._closed = False
+
+    def __enter__(self) -> Self:
+        self._require_open()
+        return self
+
+
+    def __exit__(
+        self,
+        exc_type: object,
+        exc_value: object,
+        traceback: object,
+    ) -> None:
+        self.close()
+
+    @property
+    def closed(self) -> bool:
+        return self._closed
+
+    def _require_open(self) -> None:
+        if self._closed:
+            raise SystemError("system subsystem is closed")
+
     @classmethod
-    def default(cls, robot_config=None) -> "System":
+    def default(cls, robot_config: object | None = None) -> "System":
         return cls()
 
     def hostname(self) -> str:
+        self._require_open()
         return socket.gethostname()
 
     def ip_addresses(self) -> list[str]:
-        addresses: list[str] = []
+        self._require_open()
 
         try:
-            hostname = socket.gethostname()
+            result = subprocess.run(
+                ["hostname", "-I"],
+                capture_output=True,
+                text=True,
+                timeout=3,
+                check=False,
+            )
+        except Exception:
+            return []
 
-            for info in socket.getaddrinfo(hostname, None):
-                address = info[4][0]
+        if result.returncode != 0:
+            return []
 
-                if not isinstance(address, str):
-                    continue
+        addresses: list[str] = []
 
-                if address.startswith("127."):
-                    continue
+        for address in result.stdout.split():
+            if address.startswith("127."):
+                continue
 
-                if address not in addresses:
-                    addresses.append(address)
-
-        except socket.gaierror:
-            pass
+            if address not in addresses:
+                addresses.append(address)
 
         return addresses
 
     def media_paths(self) -> MediaPaths:
+        self._require_open()
         base = Path.home() / "media"
 
         return MediaPaths(
@@ -71,6 +137,7 @@ class System:
         )
 
     def ensure_media_paths(self) -> MediaPaths:
+        self._require_open()
         paths = self.media_paths()
 
         paths.pictures.mkdir(parents=True, exist_ok=True)
@@ -80,6 +147,7 @@ class System:
         return paths
 
     def status(self) -> SystemStatus:
+        self._require_open()
         return SystemStatus(
             version=__version__,
             hostname=self.hostname(),
@@ -89,25 +157,34 @@ class System:
 
     def stop_all(self) -> None:
         """
-        Placeholder for future coordinated shutdown behavior.
+        Stop active System-managed behavior without closing the subsystem.
+
+        System currently owns no active background behavior.
         """
-        return None
+        self._require_open()
 
     def health(self) -> SystemHealth:
-        messages: list[str] = []
+        self._require_open()
 
         media = self.media_paths()
 
-        if not media.pictures.exists():
-            messages.append(f"missing pictures directory: {media.pictures}")
-
-        if not media.videos.exists():
-            messages.append(f"missing videos directory: {media.videos}")
-
-        if not media.sounds.exists():
-            messages.append(f"missing sounds directory: {media.sounds}")
+        messages = [
+            f"missing media directory: {path}"
+            for path in media.all
+            if not path.exists()
+        ]
 
         return SystemHealth(
-            ok=len(messages) == 0,
+            ok=not messages,
             messages=messages,
         )
+
+    def close(self) -> None:
+        if self._closed:
+            return
+
+        self._closed = True
+
+
+    def deinit(self) -> None:
+        self.close()

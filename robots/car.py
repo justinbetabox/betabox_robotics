@@ -8,7 +8,7 @@ from betabox_robotics.audio import (
 )
 from betabox_robotics.drive import Drive
 from betabox_robotics.sensors import Sensors
-from betabox_robotics.system import MediaPaths, System, SystemStatus
+from betabox_robotics.system import MediaPaths, System, SystemStatus, SystemHealth
 from betabox_robotics.vision import (
     ClientDetectionStatus,
     ClientMetadata,
@@ -249,6 +249,10 @@ class CarRobot(Robot):
         self._require_ready()
         return self.system.status()
 
+    def system_status(self) -> SystemStatus:
+        self._require_ready()
+        return self.system.status()
+
     def health(self) -> RobotHealth:
         self._require_ready()
         checks: list[HealthCheck] = []
@@ -277,6 +281,10 @@ class CarRobot(Robot):
             ok=all(check.ok for check in checks),
             checks=checks,
         )
+
+    def system_health(self) -> SystemHealth:
+        self._require_ready()
+        return self.system.health()
 
     def audio_status(self) -> AudioStatus:
         self._require_ready()

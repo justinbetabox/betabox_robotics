@@ -5,6 +5,7 @@ import tempfile
 import wave
 from contextlib import contextmanager
 from pathlib import Path
+from dataclasses import dataclass
 
 import pyaudio
 
@@ -17,7 +18,24 @@ from betabox_robotics.audio.speech import (
     available_backends,
     create_backend,
 )
-from betabox_robotics.audio.tones import generate_silence, generate_tone, note_frequency
+from betabox_robotics.audio.tones import (
+    MelodyNote,
+    NoteValue,
+    generate_silence,
+    generate_tone,
+    note_frequency,
+)
+
+@dataclass(frozen=True)
+class AudioStatus:
+    backend: str
+    available_backends: list[str]
+    output_device_index: int | None
+    sample_rate: int
+    auto_amp: bool
+    keep_amp_enabled: bool
+    playing: bool
+    closed: bool
 
 
 class Audio:
@@ -62,11 +80,23 @@ class Audio:
         if self.keep_amp_enabled:
             enable_speaker()
 
+        self._closed = False
+
+    @property
+    def closed(self) -> bool:
+        return self._closed
+
+    def _require_open(self) -> None:
+        if self._closed:
+            raise AudioError("audio subsystem is closed")
+
     @classmethod
     def default(cls, robot_config=None) -> "Audio":
         return cls()
 
     def say(self, text: str) -> None:
+        self._require_open()
+
         if not text:
             raise AudioError("speech text cannot be empty")
 
@@ -93,9 +123,13 @@ class Audio:
                 pass
 
     def play(self, sound: str | Path) -> None:
+        self._require_open()
+
         self.play_sound(sound)
 
     def play_sound(self, sound: str | Path) -> None:
+        self._require_open()
+
         path = self._resolve_sound_path(sound)
         wav_path, is_temp = self._to_pcm16_wav(path)
 
@@ -109,6 +143,8 @@ class Audio:
                     pass
 
     def play_wav(self, sound: str | Path, *, volume: float = 1.0) -> None:
+        self._require_open()
+
         path = Path(sound)
 
         if not path.exists():
@@ -139,8 +175,20 @@ class Audio:
                             data = self._scale_pcm16(data, volume)
                         stream.write(data)
 
-    def play_note(self, note_or_frequency: str | float | int, duration: float) -> None:
+    def play_note(
+        self,
+        note_or_frequency: NoteValue,
+        duration: float,
+    ) -> None:
+        self._require_open()
+
+        if duration <= 0:
+            raise AudioError("note duration must be greater than 0")
+
         frequency = note_frequency(note_or_frequency)
+
+        if frequency <= 0:
+            raise AudioError("frequency must be greater than 0")
 
         data = generate_tone(
             frequency,
@@ -156,10 +204,19 @@ class Audio:
 
     def play_melody(
         self,
-        notes: list[tuple[str | float | int, float]],
+        notes: list[MelodyNote],
         *,
         gap: float = 0.0,
     ) -> None:
+        self._require_open()
+
+        if gap < 0:
+            raise AudioError("melody gap cannot be negative")
+
+        for note_or_frequency, duration in notes:
+            if duration <= 0:
+                raise AudioError("melody note duration must be greater than 0")
+
         if not notes:
             return
 
@@ -188,30 +245,49 @@ class Audio:
 
     def stop(self) -> None:
         """
-        Stop is reserved for future async playback.
+        Disable the speaker amplifier.
 
-        Current playback methods are synchronous.
+        Playback is currently synchronous, so this method cannot interrupt
+        an active playback operation. It is reserved for future asynchronous
+        playback support.
         """
+        self._require_open()
+
         if self.auto_amp and not self.keep_amp_enabled:
             disable_speaker()
 
     def is_playing(self) -> bool:
+        """
+        Return whether asynchronous playback is active.
+
+        Playback is currently synchronous, so this always returns False.
+        """
+        self._require_open()
         return False
 
     @property
     def speech_backend_name(self) -> str:
-        return getattr(self.speech_backend, "name", type(self.speech_backend).__name__)
+        return getattr(
+            self.speech_backend,
+            "name",
+            type(self.speech_backend).__name__,
+        )
 
     def available_speech_backends(self) -> list[str]:
         return available_backends()
 
     def close(self) -> None:
-        self.stop()
+        if self._closed:
+            return
 
-        if self.keep_amp_enabled:
-            disable_speaker()
+        try:
+            self.stop()
 
-        self._pyaudio.terminate()
+            if self.keep_amp_enabled:
+                disable_speaker()
+        finally:
+            self._pyaudio.terminate()
+            self._closed = True
 
     def deinit(self) -> None:
         self.close()
@@ -418,18 +494,25 @@ class Audio:
 
         return self._apply_wav_volume(wav_path, self.speech_volume)
 
-    def _apply_wav_volume(self, wav_path: Path, volume: float) -> Path:
+    def _apply_wav_volume(
+        self,
+        wav_path: Path,
+        volume: float,
+    ) -> Path:
         scale = max(0.0, min(3.0, float(volume)))
-
-        fd, temp_path = tempfile.mkstemp(prefix="betabox_speech_", suffix=".wav")
-        os.close(fd)
-
-        output_path = Path(temp_path)
 
         ffmpeg = shutil.which("ffmpeg")
 
         if ffmpeg is None:
             return wav_path
+
+        fd, temp_path = tempfile.mkstemp(
+            prefix="betabox_speech_",
+            suffix=".wav",
+        )
+        os.close(fd)
+
+        output_path = Path(temp_path)
 
         command = [
             ffmpeg,
@@ -455,7 +538,9 @@ class Audio:
             except OSError:
                 pass
 
-            raise AudioError(f"speech volume processing failed: {exc.stderr}") from exc
+            raise AudioError(
+                f"speech volume processing failed: {exc.stderr}"
+            ) from exc
 
         return output_path
 
@@ -464,3 +549,15 @@ class Audio:
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
+
+    def status(self) -> AudioStatus:
+        return AudioStatus(
+            backend=self.speech_backend_name,
+            available_backends=available_backends(),
+            output_device_index=self._device_index,
+            sample_rate=self.sample_rate,
+            auto_amp=self.auto_amp,
+            keep_amp_enabled=self.keep_amp_enabled,
+            playing=False,
+            closed=self.closed,
+        )

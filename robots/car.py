@@ -1,7 +1,11 @@
 from pathlib import Path
-from typing import Any
 
-from betabox_robotics.audio import Audio
+from betabox_robotics.audio import (
+    Audio,
+    AudioStatus,
+    MelodyNote,
+    NoteValue,
+)
 from betabox_robotics.drive import Drive
 from betabox_robotics.sensors import Sensors
 from betabox_robotics.system import MediaPaths, System, SystemStatus
@@ -81,11 +85,11 @@ class CarRobot(Robot):
         self._require_ready()
         self.audio.play(sound)
 
-    def play_note(self, note_or_frequency: str | float, duration: float) -> None:
+    def play_note(self, note_or_frequency: NoteValue, duration: float) -> None:
         self._require_ready()
         self.audio.play_note(note_or_frequency, duration)
 
-    def play_melody(self, notes: list[Any], *, gap: float = 0.0) -> None:
+    def play_melody(self, notes: list[MelodyNote], *, gap: float = 0.0) -> None:
         self._require_ready()
         self.audio.play_melody(notes, gap=gap)
 
@@ -247,7 +251,7 @@ class CarRobot(Robot):
 
     def health(self) -> RobotHealth:
         self._require_ready()
-        checks = []
+        checks: list[HealthCheck] = []
 
         system_health = self.system.health()
         checks.append(
@@ -273,6 +277,10 @@ class CarRobot(Robot):
             ok=all(check.ok for check in checks),
             checks=checks,
         )
+
+    def audio_status(self) -> AudioStatus:
+        self._require_ready()
+        return self.audio.status()
 
     def stop_all(self) -> None:
         self.require_open()

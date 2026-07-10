@@ -12,6 +12,7 @@ from betabox_robotics.services.status import StatusReport, collect_status
 DEDICATED_SERVICE_UNITS = {
     "betabox-video.service",
     "jupyterhub.service",
+    "betabox-boot-announce.service",
     }
 
 Severity = Literal["info", "warning", "error", "critical"]

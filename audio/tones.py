@@ -1,5 +1,9 @@
 import math
 import struct
+from typing import TypeAlias
+
+NoteValue: TypeAlias = str | float | int
+MelodyNote: TypeAlias = tuple[NoteValue, float]
 
 NOTE_FREQUENCIES = {
     "C0": 16.35,
@@ -121,7 +125,7 @@ FLAT_ALIASES = {
 }
 
 
-def note_frequency(note_or_frequency: str | float | int) -> float:
+def note_frequency(note_or_frequency: NoteValue) -> float:
     if isinstance(note_or_frequency, (float, int)):
         return float(note_or_frequency)
 
@@ -147,6 +151,14 @@ def generate_tone(
     sample_rate: int = 44100,
     volume: float = 1.0,
 ) -> bytes:
+    if frequency <= 0:
+        raise ValueError("frequency must be greater than 0")
+
+    if duration < 0:
+        raise ValueError("duration cannot be negative")
+
+    if sample_rate <= 0:
+        raise ValueError("sample_rate must be greater than 0")
     frames = int(sample_rate * duration)
     scale = max(0.0, min(1.0, float(volume)))
     data = bytearray(frames * 2)
@@ -164,5 +176,10 @@ def generate_silence(
     *,
     sample_rate: int = 44100,
 ) -> bytes:
+    if duration < 0:
+        raise ValueError("duration cannot be negative")
+
+    if sample_rate <= 0:
+        raise ValueError("sample_rate must be greater than 0")
     frames = int(sample_rate * duration)
     return bytes(frames * 2)

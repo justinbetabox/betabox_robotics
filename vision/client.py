@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
-from urllib import error, request, parse
+from urllib import error, parse, request
 
 
 class VisionClientError(Exception):

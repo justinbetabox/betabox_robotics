@@ -1,8 +1,11 @@
+from pathlib import Path
 from typing import Any
 
 from .capabilities import RobotCapability
 from .health import HealthCheck, RobotHealth
 from .robot import Robot
+
+from betabox_robotics.vision import ClientRecording, ClientSnapshot, VisionClient
 
 
 class CarRobot(Robot):
@@ -26,10 +29,9 @@ class CarRobot(Robot):
 
     drive: Any
     sensors: Any
-    vision: Any
+    vision: VisionClient
     audio: Any
     system: Any
-    vision_client: Any
 
     def forward(self, speed: float) -> None:
         self.drive.forward(speed)
@@ -94,14 +96,8 @@ class CarRobot(Robot):
     def line_normalized(self) -> list[float]:
         return self.sensors.grayscale.normalized()
 
-    def start_vision(self) -> None:
-        self.vision.start()
-
-    def stop_vision(self) -> None:
-        self.vision.stop()
-
     def is_vision_running(self) -> bool:
-        return self.vision.is_running()
+        return bool(self.vision.statistics().get("running", False))
 
     def snapshot(
         self,
@@ -109,8 +105,8 @@ class CarRobot(Robot):
         filename: str | None = None,
         overlay: bool = False,
         source: str | None = None,
-    ):
-        return self.vision_client.snapshot(
+    ) -> ClientSnapshot:
+        return self.vision.snapshot(
             filename=filename,
             overlay=overlay,
             source=source,
@@ -122,7 +118,7 @@ class CarRobot(Robot):
         filename: str | None = None,
         overlay: bool = False,
         source: str | None = None,
-    ):
+    ) -> ClientSnapshot:
         return self.snapshot(
             filename=filename,
             overlay=overlay,
@@ -135,39 +131,41 @@ class CarRobot(Robot):
         filename: str | None = None,
         overlay: bool = False,
         source: str | None = None,
-    ):
-        return self.vision_client.start_recording(
+    ) -> Path:
+        return self.vision.start_recording(
             filename=filename,
             overlay=overlay,
             source=source,
         )
 
-    def stop_recording(self):
-        return self.vision_client.stop_recording()
+    def stop_recording(self) -> ClientRecording:
+        return self.vision.stop_recording()
 
     def is_recording(self) -> bool:
-        return bool(self.vision_client.statistics().get("recording", False))
+        stats = self.vision.statistics()
+        recording = stats.get("recording", {})
+        return bool(recording.get("active", False))
 
-    def vision_stats(self):
-        return self.vision_client.statistics()
+    def vision_stats(self) -> dict[str, Any]:
+        return self.vision.statistics()
 
-    def metadata(self, source: str | None = None):
-        return self.vision_client.metadata(source)
+    def metadata(self, source: str | None = None) -> dict[str, Any]:
+        return self.vision.metadata(source)
 
-    def enable_detection(self, name: str):
-        return self.vision_client.enable_detection(name)
+    def enable_detection(self, name: str) -> None:
+        return self.vision.enable_detection(name)
 
-    def disable_detection(self, name: str):
-        return self.vision_client.disable_detection(name)
+    def disable_detection(self, name: str) -> None:
+        return self.vision.disable_detection(name)
 
-    def detection_status(self):
-        return self.vision_client.detection_status()
+    def detection_status(self) -> dict[str, Any]:
+        return self.vision.detection_status()
 
-    def enable_stream_overlay(self, source: str | None = None):
-        return self.vision_client.enable_stream_overlay(source)
+    def enable_stream_overlay(self, source: str | None = None) -> None:
+        return self.vision.enable_stream_overlay(source)
 
-    def disable_stream_overlay(self):
-        return self.vision_client.disable_stream_overlay()
+    def disable_stream_overlay(self) -> None:
+        return self.vision.disable_stream_overlay()
 
     def hostname(self) -> str:
         return self.system.hostname()
@@ -218,12 +216,6 @@ class CarRobot(Robot):
         try:
             if self.is_recording():
                 self.stop_recording()
-        except Exception:
-            pass
-
-        try:
-            if self.is_vision_running():
-                self.stop_vision()
         except Exception:
             pass
 

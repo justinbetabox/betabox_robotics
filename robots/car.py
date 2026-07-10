@@ -6,7 +6,7 @@ from betabox_robotics.audio import (
     MelodyNote,
     NoteValue,
 )
-from betabox_robotics.drive import Drive
+from betabox_robotics.drive import Drive, DriveStatus, DriveError
 from betabox_robotics.sensors import (
     BatteryReading,
     BatteryState,
@@ -83,6 +83,10 @@ class CarRobot(Robot):
     def center(self) -> None:
         self._require_ready()
         self.drive.center()
+
+    def drive_status(self) -> DriveStatus:
+        self._require_ready()
+        return self.drive.status()
 
     def say(self, text: str) -> None:
         self._require_ready()

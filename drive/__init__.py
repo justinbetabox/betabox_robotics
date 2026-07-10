@@ -1,3 +1,8 @@
-from .drive import Drive
+from .drive import Drive, DriveStatus
+from .exceptions import DriveError
 
-__all__ = ["Drive"]
+__all__ = [
+    "Drive",
+    "DriveError",
+    "DriveStatus",
+]

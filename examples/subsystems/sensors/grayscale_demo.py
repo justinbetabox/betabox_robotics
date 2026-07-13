@@ -15,7 +15,7 @@ def main() -> None:
     print("======================")
     print()
 
-    with Grayscale.default(BETABOX_CAR) as grayscale:
+    with Grayscale.default(BETABOX_CAR.sensors.grayscale) as grayscale:
         while True:
             values = grayscale.read()
             status = grayscale.status(values)

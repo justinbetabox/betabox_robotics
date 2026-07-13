@@ -13,7 +13,7 @@ def main() -> None:
     print("====================")
     print()
 
-    with Battery.default(BETABOX_CAR) as battery:
+    with Battery.default(BETABOX_CAR.sensors.battery) as battery:
         voltage = battery.voltage()
         status = battery.status()
 

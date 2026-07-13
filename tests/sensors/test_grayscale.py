@@ -7,17 +7,12 @@ Validates grayscale sensor readings and line/floor status reporting.
 
 from time import sleep
 
-from betabox_robotics.hardware import ADC
 from betabox_robotics.robots import BETABOX_CAR
 from betabox_robotics.sensors import Grayscale
 
 
 def main() -> None:
-    with Grayscale(
-        left=ADC(BETABOX_CAR.grayscale.left),
-        middle=ADC(BETABOX_CAR.grayscale.middle),
-        right=ADC(BETABOX_CAR.grayscale.right),
-    ) as grayscale:
+    with Grayscale.default(BETABOX_CAR.sensors.grayscale) as grayscale:
         print("\nGrayscale validation test")
         print("=========================")
 

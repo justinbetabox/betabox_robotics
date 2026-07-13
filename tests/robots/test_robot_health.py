@@ -1,16 +1,17 @@
 from unittest.mock import Mock
 
 from betabox_robotics.robots import CarRobot, HealthCheck, RobotHealth
-
+from betabox_robotics.sensors import BatteryState
 
 class FakeCar(CarRobot):
-    def __init__(self):
+    def __init__(self) -> None:
         super().__init__()
-
         self.drive = Mock()
         self.audio = Mock()
         self.sensors = Mock()
         self.vision = Mock()
+        self.system = Mock()
+
         self.system = Mock()
 
         self.system.health.return_value = Mock(
@@ -19,10 +20,12 @@ class FakeCar(CarRobot):
         )
 
         self.sensors.battery.is_critical.return_value = False
-        self.sensors.battery.status.return_value = "ok"
+        self.sensors.battery.status.return_value = BatteryState.OK
+
+        self.start()
 
 
-def test_health_returns_robot_health():
+def test_health_returns_robot_health() -> None:
     car = FakeCar()
 
     health = car.health()
@@ -31,7 +34,7 @@ def test_health_returns_robot_health():
     assert health.ok is True
 
 
-def test_health_includes_system_check():
+def test_health_includes_system_check() -> None:
     car = FakeCar()
 
     health = car.health()
@@ -44,7 +47,7 @@ def test_health_includes_system_check():
     car.system.health.assert_called_once_with()
 
 
-def test_health_includes_battery_check():
+def test_health_includes_battery_check() -> None:
     car = FakeCar()
 
     health = car.health()
@@ -56,7 +59,7 @@ def test_health_includes_battery_check():
     assert battery_check.message == ""
 
 
-def test_health_reports_system_failure():
+def test_health_reports_system_failure() -> None:
     car = FakeCar()
     car.system.health.return_value = Mock(
         ok=False,
@@ -69,10 +72,10 @@ def test_health_reports_system_failure():
     assert health.messages == ["missing pictures directory"]
 
 
-def test_health_reports_critical_battery():
+def test_health_reports_critical_battery() -> None:
     car = FakeCar()
     car.sensors.battery.is_critical.return_value = True
-    car.sensors.battery.status.return_value = "critical"
+    car.sensors.battery.status.return_value = BatteryState.CRITICAL
 
     health = car.health()
 

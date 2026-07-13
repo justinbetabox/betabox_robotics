@@ -15,7 +15,7 @@ def main() -> None:
     print("=======================")
     print()
 
-    with Ultrasonic.default(BETABOX_CAR) as sensor:
+    with Ultrasonic.default(BETABOX_CAR.sensors.ultrasonic) as sensor:
         while True:
             distance = sensor.distance()
 

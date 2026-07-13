@@ -7,18 +7,12 @@ Validates battery voltage monitoring and status reporting.
 
 from time import sleep
 
-from betabox_robotics.hardware import ADC
 from betabox_robotics.robots import BETABOX_CAR
 from betabox_robotics.sensors import Battery
 
 
 def main() -> None:
-    with Battery(
-        adc=ADC(BETABOX_CAR.battery.channel),
-        scale=BETABOX_CAR.battery.scale,
-        low_voltage=BETABOX_CAR.battery.low_voltage,
-        critical_voltage=BETABOX_CAR.battery.critical_voltage,
-    ) as battery:
+    with Battery.default(BETABOX_CAR.sensors.battery) as battery:
         print("\nBattery validation test")
         print("=======================")
 

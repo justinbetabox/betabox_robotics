@@ -16,6 +16,7 @@ from .config import (
     VisionConfig,
 )
 from .robot import Robot
+from .health import HealthCheck, RobotHealth
 
 __all__ = [
     "RobotBase",
@@ -35,4 +36,6 @@ __all__ = [
     "VisionConfig",
     "AudioConfig",
     "SystemConfig",
+    "HealthCheck",
+    "RobotHealth",
 ]

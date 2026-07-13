@@ -7,6 +7,7 @@ from betabox_robotics.audio import (
     MelodyNote,
 )
 
+from betabox_robotics.robots import BETABOX_CAR
 
 def main() -> None:
     print()
@@ -14,7 +15,7 @@ def main() -> None:
     print("======================")
     print()
 
-    audio = Audio.default()
+    audio = Audio.default(BETABOX_CAR.audio)
 
     status = audio.status()
     assert isinstance(status, AudioStatus)

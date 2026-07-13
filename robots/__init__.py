@@ -17,6 +17,7 @@ from .config import (
 )
 from .robot import Robot
 from .health import HealthCheck, RobotHealth
+from .exceptions import RobotLifecycleError
 
 __all__ = [
     "RobotBase",
@@ -38,4 +39,5 @@ __all__ = [
     "SystemConfig",
     "HealthCheck",
     "RobotHealth",
+    "RobotLifecycleError",
 ]

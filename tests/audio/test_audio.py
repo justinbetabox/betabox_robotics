@@ -19,7 +19,7 @@ class FakeAudio(Audio):
         self.speech_volume = 1.0
         self.played_sounds: list[str | Path] = []
         self.played_wavs: list[str | Path] = []
-        self.closed = False
+        self._closed = False
 
     def play_sound(self, sound: str | Path) -> None:
         self.played_sounds.append(sound)
@@ -28,7 +28,7 @@ class FakeAudio(Audio):
         self.played_wavs.append(sound)
 
     def close(self) -> None:
-        self.closed = True
+        self._closed = True
 
 
 def test_audio_play_delegates_to_play_sound():

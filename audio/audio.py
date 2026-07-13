@@ -6,6 +6,7 @@ import wave
 from contextlib import contextmanager
 from pathlib import Path
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import pyaudio
 
@@ -25,6 +26,9 @@ from betabox_robotics.audio.tones import (
     generate_tone,
     note_frequency,
 )
+
+if TYPE_CHECKING:
+    from betabox_robotics.robots.config import AudioConfig
 
 @dataclass(frozen=True)
 class AudioStatus:
@@ -91,8 +95,21 @@ class Audio:
             raise AudioError("audio subsystem is closed")
 
     @classmethod
-    def default(cls, robot_config=None) -> "Audio":
-        return cls()
+    def default(
+        cls,
+        config: "AudioConfig",
+    ) -> "Audio":
+        return cls(
+            speech_engine=config.speech_engine,
+            speech_language=config.speech_language,
+            piper_model=config.piper_model,
+            piper_voice=config.piper_voice,
+            preferred_output_device=config.preferred_output_device,
+            sample_rate=config.sample_rate,
+            auto_amp=config.auto_amp,
+            keep_amp_enabled=config.keep_amp_enabled,
+            speech_volume=config.speech_volume,
+        )
 
     def say(self, text: str) -> None:
         self._require_open()

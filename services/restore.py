@@ -5,13 +5,10 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
-BACKUP_ROOT = Path.home() / "betabox-backups"
-
-RESTORE_PATHS = [
-    Path.home() / "media",
-    Path.home() / ".config",
-    Path.home() / ".local" / "state" / "betabox",
-]
+from betabox_robotics.config import (
+    DEFAULT_PLATFORM_CONFIG,
+    PlatformConfig,
+)
 
 
 @dataclass(frozen=True)
@@ -22,18 +19,29 @@ class RestoreItem:
     message: str = ""
 
 
-def list_backups() -> list[Path]:
-    if not BACKUP_ROOT.exists():
+def list_backups(
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> list[Path]:
+    backup_root = config.paths.backup_root
+
+    if not backup_root.exists():
         return []
 
     return sorted(
-        [path for path in BACKUP_ROOT.iterdir() if path.is_dir()],
+        [
+            path
+            for path in backup_root.iterdir()
+            if path.is_dir()
+        ],
         reverse=True,
     )
 
 
-def backup_path(name: str) -> Path:
-    return BACKUP_ROOT / name
+def backup_path(
+    name: str,
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> Path:
+    return config.paths.backup_root / name
 
 
 def backup_source_path(backup_dir: Path, destination: Path) -> Path:
@@ -83,15 +91,24 @@ def restore_item(backup_dir: Path, destination: Path, *, dry_run: bool) -> Resto
         )
 
 
-def restore_backup(name: str, *, dry_run: bool = False) -> list[RestoreItem]:
-    backup_dir = backup_path(name)
+def restore_backup(
+    name: str,
+    *,
+    dry_run: bool = False,
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> list[RestoreItem]:
+    backup_dir = backup_path(name, config)
 
     if not backup_dir.exists():
         raise FileNotFoundError(f"Backup not found: {name}")
 
     return [
-        restore_item(backup_dir, destination, dry_run=dry_run)
-        for destination in RESTORE_PATHS
+        restore_item(
+            backup_dir,
+            destination,
+            dry_run=dry_run,
+        )
+        for destination in config.paths.restore_paths
     ]
 
 

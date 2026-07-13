@@ -9,9 +9,10 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 from betabox_robotics.version import __version__
-
-BACKUP_ROOT = Path.home() / "betabox-backups"
-
+from betabox_robotics.config import (
+    DEFAULT_PLATFORM_CONFIG,
+    PlatformConfig,
+)
 
 @dataclass(frozen=True)
 class BackupItem:
@@ -35,16 +36,10 @@ def timestamp() -> str:
     return time.strftime("%Y%m%d-%H%M%S")
 
 
-def source_paths() -> list[Path]:
-    home = Path.home()
-
-    return [
-        home / "media",
-        home / ".config",
-        home / ".local" / "state" / "betabox",
-        Path("/opt/libs/betabox_robotics/docs"),
-        Path("/opt/libs/betabox_robotics/deployment"),
-    ]
+def source_paths(
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> list[Path]:
+    return list(config.paths.backup_sources)
 
 
 def copy_item(source: Path, backup_dir: Path) -> BackupItem:
@@ -89,12 +84,19 @@ def write_manifest(report: BackupReport, backup_dir: Path) -> None:
         json.dump(asdict(report), file, indent=2)
 
 
-def create_backup(name: str | None = None) -> BackupReport:
+def create_backup(
+    name: str | None = None,
+    *,
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> BackupReport:
     backup_name = name or timestamp()
-    backup_dir = BACKUP_ROOT / backup_name
+    backup_dir = config.paths.backup_root / backup_name
     backup_dir.mkdir(parents=True, exist_ok=False)
 
-    items = [copy_item(source, backup_dir) for source in source_paths()]
+    items = [
+        copy_item(source, backup_dir)
+        for source in source_paths(config)
+    ]
 
     report = BackupReport(
         name=backup_name,
@@ -109,12 +111,20 @@ def create_backup(name: str | None = None) -> BackupReport:
     return report
 
 
-def list_backups() -> list[Path]:
-    if not BACKUP_ROOT.exists():
+def list_backups(
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> list[Path]:
+    backup_root = config.paths.backup_root
+
+    if not backup_root.exists():
         return []
 
     return sorted(
-        [path for path in BACKUP_ROOT.iterdir() if path.is_dir()],
+        [
+            path
+            for path in backup_root.iterdir()
+            if path.is_dir()
+        ],
         reverse=True,
     )
 

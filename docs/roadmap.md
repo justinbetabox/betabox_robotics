@@ -1,214 +1,211 @@
 # Betabox Platform Roadmap
 
+**Status:** Active Development Roadmap\
+**Project:** Betabox Robot Platform\
+**Document:** `roadmap.md`
+
 ------------------------------------------------------------------------
 
-## Foundation
+## Vision
 
--    [x] Hardware
+The Betabox Platform is being developed as a complete educational robotics platform rather than simply a Python SDK.
+
+Development is organized into major milestones that build upon one another while preserving a stable, student-friendly Robot API.
+
+------------------------------------------------------------------------
+
+# Phase 1 --- Foundation ✅
+
+Core platform architecture and reusable SDK.
+
+## Hardware
+
+-    [x] Hardware abstractions
+-    [x] GPIO, I²C, PWM, ADC
+-    [x] Motor and Servo abstractions
+-    [x] Hardware validation
+
+## Reusable Subsystems
+
 -    [x] Drive
 -    [x] Sensors
+-    [x] Vision
+-    [x] Audio
+-    [x] System
+
+## Documentation
+
+-    [x] Architecture
+-    [x] Design Principles
+-    [x] Public API
+-    [x] Subsystem documentation
 
 ------------------------------------------------------------------------
 
-## Core Robot Services
+# Phase 2 --- Stable Robot Platform ✅
 
-### Vision
+A stable Robot API built from reusable subsystem implementations.
 
--    [x] Foundation
+## Robot API
+
+-    [x] Stable Robot API
+-    [x] Robot hierarchy
+-    [x] Robot implementations
+-    [x] Convenience APIs
+-    [x] Context manager support
+-    [x] Resource ownership
+-    [x] Health reporting
+-    [x] Robot configuration model
+
+## Vision Platform
+
+-    [x] Shared frame pipeline
 -    [x] Snapshots
 -    [x] Recording
--    [ ] Detection
-    -    [x] Framework
-    -    [x] Color
-    -    [x] Face
-    -    [ ] Object
-        -    [ ] Evaluate object detection inference backends
-        -    [ ] Select long-term inference runtime
-        -    [ ] Build Betabox object detection dataset
-        -    [ ] Train first classroom object detection model
-        -    [ ] Integrate custom object detection runtime
-        -    [ ] Add validation tests
-        -    [ ] Add developer example
-        -    [ ] Update public API documentation
-    -    [ ] Traffic Sign
-        -    [ ] Collect U.S. traffic sign dataset
-        -    [ ] Train Betabox traffic sign model
-        -    [ ] Integrate traffic sign detector
-        -    [ ] Add validation tests
-        -    [ ] Add developer example
-        -    [ ] Update public API documentation
--    [ ] Configuration
--    [x] Public Vision API
+-    [x] WebRTC streaming
+-    [x] Metadata bus
+-    [x] Overlay rendering
+-    [x] Color detection
+-    [x] Face detection
+-    [ ] Classroom object detection models
 
-### Audio
+## Deployment
 
--    [x] Foundation
+-    [x] Bootstrap installer
+-    [x] Platform installer
+-    [x] Deployment automation
+-    [x] System service installation
+-    [x] JupyterHub integration
+-    [x] Deployment verification
 
-### System
+## Validation
 
--    [x] Foundation
--    [x] Status
--    [x] Health foundation
--    [ ] Platform health aggregation
--    [ ] Network
--    [ ] Storage
--    [ ] Identity
--    [ ] Services
--    [ ] Diagnostics
+-    [x] Hardware validation
+-    [x] Subsystem validation
+-    [x] Robot validation
+-    [x] Developer examples
 
 ------------------------------------------------------------------------
-## Robot Platform
 
-### Robot Architecture
+# Phase 3 --- Platform Services 🚧
 
--    [x] Robot hardware configuration model
--    [x] Dependency injection into reusable subsystems
--    [x] Robot-specific platform wiring
--    [x] Shared Robot base class
--    [x] Public Robot API
--    [ ] Robot capability discovery
--    [ ] Robot lifecycle management
--    [ ] Robot health reporting
--    [x] Subsystem factory pattern (.default())
--    [ ] Robot composition framework
+Current development focus.
 
-### Robot Configuration
+## Configuration
 
--    [x] Drive configuration
--    [x] Sensor configuration
--    [ ] Vision configuration
--    [ ] Audio configuration
--    [ ] System configuration
--    [ ] Unified RobotConfig
+-    [ ] Configuration audit
+-    [ ] Unified configuration model
 -    [ ] Configuration validation
 -    [ ] Configuration serialization
 
-### Resource Management
+## Platform Services
 
--    [ ] Shared resource ownership
--    [ ] Camera ownership
--    [ ] Audio ownership
--    [ ] Graceful subsystem shutdown
--    [ ] Context manager support
--    [ ] Vision lifecycle
--    [ ] Audio lifecycle
--    [ ] System lifecycle
+-    [x] Backup
+-    [x] Restore
+-    [x] Reset
+-    [x] Monitoring
+-    [x] Diagnostics
+-    [x] Logging
+-    [x] Service management
+-    [ ] Software updates
 
-### Robot Implementations
+## Platform Health
 
--    [x] Betabox Car
+-    [ ] Aggregated health reporting
+-    [ ] Runtime diagnostics
+-    [ ] Configuration inspection
+
+------------------------------------------------------------------------
+
+# Phase 4 --- Launchpad
+
+Browser-based platform management.
+
+-    [ ] Dashboard
+-    [ ] Robot status
+-    [ ] Live video
+-    [ ] Diagnostics
+-    [ ] Monitoring
+-    [ ] Backup and restore
+-    [ ] Logs
+-    [ ] Configuration management
+
+------------------------------------------------------------------------
+
+# Phase 5 --- Classroom Platform
+
+Educational experience built on the Robot API.
+
+## Teacher Experience
+
+-    [ ] Teacher Portal
+-    [ ] Classroom management
+-    [ ] Fleet management
+-    [ ] Classroom diagnostics
+
+## Student Experience
+
+-    [ ] Student Portal
+-    [ ] Curriculum integration
+-    [ ] Coding environment
+-    [ ] Guided lessons
+
+------------------------------------------------------------------------
+
+# Phase 6 --- Additional Robot Platforms
+
+Reusable subsystem architecture enables additional robots.
+
 -    [ ] Betabox Arm
 -    [ ] Betabox Tank
 -    [ ] Betabox Rover
 -    [ ] Betabox Drone
 
-### Applications
+------------------------------------------------------------------------
 
--    [ ] Portal
--    [ ] Curriculum
--    [ ] Teacher Tools
+# Future Vision Capabilities
+
+-    [ ] Classroom object detection
+-    [ ] Traffic sign detection
+-    [ ] QR code detection
+-    [ ] AprilTags
+-    [ ] Pose estimation
+-    [ ] OCR
+-    [ ] AI acceleration
 
 ------------------------------------------------------------------------
 
-## Platform Deployment
+# Platform 1.0
 
--    [ ] Fresh Raspberry Pi setup script
--    [ ] System dependencies
--    [ ] Service files
--    [ ] Camera/audio/I2C configuration
--    [ ] Jupyter kernel setup
--    [ ] Media directory setup
--    [ ] Verification command
--    [ ] Reset and Recovery tools
+Version 1.0 represents a stable educational robotics platform with:
 
-------------------------------------------------------------------------
-
-## Platform Administration
-
--    [ ] Backup
--    [ ] Restore
--    [ ] Reset
--    [ ] Monitoring
--    [ ] Logging
--    [ ] Diagnostics CLI
--    [ ] Service Management
--    [ ] Software Updates
+-    Stable Robot API
+-    Stable platform services
+-    Launchpad
+-    Teacher and Student experiences
+-    Complete deployment automation
+-    Comprehensive documentation
+-    Validated classroom workflows
+-    Support for multiple Betabox robot platforms
 
 ------------------------------------------------------------------------
 
-## Documentation
+## Guiding Principles
 
--    [x] Design Principles
--    [x] Platform Architecture
--    [x] Public API
--    [x] Hardware Architecture
--    [x] Drive Architecture
--    [x] Vision Architecture
--    [x] Audio Architecture
--    [x] System Architecture
--    [x] Sensors Architecture
--    [ ] Deployment Guide
+Throughout development the platform will continue to prioritize:
 
-------------------------------------------------------------------------
-
-## Validation
-
-### Hardware
-
--    [x] Hardware validation framework
--    [ ] Complete validation coverage
-
-### Subsystems
-
--    [x] Hardware validation
--    [x] Subsystem validation
--    [x] Robot validation
--    [x] Audio validation
--    [x] System validation
-
-### Robot
-
--    [ ] Robot integration validation
-
-### Examples
-
--    [x] Hardware examples
--    [x] Drive examples
--    [x] Sensors examples
--    [x] Vision examples
--    [x] Audio examples
--    [x] System examples
+-    Student-first APIs
+-    Hardware independence
+-    Reusable subsystem implementations
+-    Stable public interfaces
+-    Safe operation
+-    Classroom reliability
+-    Long-term maintainability
 
 ------------------------------------------------------------------------
 
-## Release Milestones
+## Summary
 
--    [x] 0.1 Project Initialization
--    [x] 0.2 Hardware Foundation
--    [x] 0.3 Drive & Sensors
--    [x] 0.4 Vision Foundation
--    [ ] 0.5 Vision Platform
--    [x] 0.6 Audio Foundation
--    [ ] 0.7 System Services
--    [x] 0.8 Robot Platform
--    [ ] 0.9 Applications
--    [ ] 1.0 Betabox Platform
+The Betabox roadmap emphasizes long-term architectural milestones rather than individual implementation tasks.
 
-------------------------------------------------------------------------
-
-## Architectural Direction
-
-Subsystems (Drive, Sensors, Vision, Audio, and System) are designed to be
-robot-independent.
-
-Robot-specific classes are responsible for wiring subsystem implementations
-using RobotConfig. Future robot platforms (Arm, Tank, Drone, etc.) should
-reuse existing subsystems whenever practical rather than introducing
-robot-specific subsystem implementations.
-
-Future robot platforms should compose existing subsystem implementations
-through robot-specific configuration rather than modifying reusable
-subsystems.
-
-Dependencies should always flow from Robot implementations toward
-reusable subsystem implementations and never in the opposite direction.
+Each phase builds upon the previous one while preserving a stable Robot API and enabling the platform to evolve from a reusable robotics SDK into a complete classroom robotics platform.

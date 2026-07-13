@@ -26,9 +26,7 @@ implementation details.
 The Hardware Layer forms the reusable foundation beneath the Betabox
 subsystems.
 
-Robot implementations never interact with Linux hardware directly.
-Instead, they compose reusable subsystems, which in turn compose reusable
-hardware abstractions.
+Robot implementations never interact directly with Linux hardware interfaces. Instead, they compose reusable subsystems, which in turn compose reusable hardware abstractions built on hardware interfaces and controllers.
 
 Applications should never access the Hardware Layer directly.
 
@@ -61,7 +59,7 @@ Applications should never access the Hardware Layer directly.
 Linux / Physical Hardware
 ```
 
-Each layer communicates only with the layer immediately below it.
+Dependencies flow downward through the hardware layers. Each layer depends only on the abstractions immediately beneath it.
 
 ------------------------------------------------------------------------
 
@@ -125,9 +123,9 @@ Responsibilities:
 These classes know nothing about motors, servos, sensors, or robot
 behavior.
 
-### Layer 2 --- Hardware Devices
+### Layer 2 --- Hardware Controllers
 
-These classes understand specific hardware controllers.
+These classes abstract specific hardware controllers while hiding controller-specific implementation details.
 
 Examples:
 
@@ -213,6 +211,8 @@ platforms while maintaining a stable public API.
 ------------------------------------------------------------------------
 
 ## Hardware API
+
+The classes below illustrate the primary public hardware abstractions. They are representative examples rather than a complete API reference.
 
 ### Pin
 
@@ -339,7 +339,7 @@ default API should protect both the hardware and the user.
 
 ## Resource Ownership
 
-Ownership always flows downward. Ownership is established through composition.
+Resource ownership is established through composition.
 
 Example:
 
@@ -365,7 +365,7 @@ Likewise:
   Camera
 ```
 
-Each layer owns the resources immediately below it.
+Each component owns the hardware resources it composes and manages.
 
 Hardware resources should never be controlled simultaneously by multiple
 independent components.
@@ -398,6 +398,26 @@ The same Servo, Motor, PWM, ADC, Pin, I2C, and other hardware abstractions shoul
 
 ------------------------------------------------------------------------
 
+## Configuration
+
+Hardware abstractions receive configuration through construction or
+explicit factory methods.
+
+Examples include:
+
+-    Pin assignments
+-    PWM channels
+-    ADC channels
+-    Calibration values
+-    Voltage scaling
+-    Safety limits
+
+Hardware abstractions should never import robot-specific configuration
+modules directly.
+
+Robot implementations are responsible for selecting and supplying the
+appropriate configuration.
+
 ## Future Hardware
 
 Future hardware components may include:
@@ -405,7 +425,6 @@ Future hardware components may include:
 -    Encoder
 -    RGB LED
 -    IMU
--    Camera
 -    Microphone
 
 Future hardware interfaces may include:
@@ -429,8 +448,7 @@ tested, and safe to use.
 
 The hardware validation scripts under tests `/hardware/` validate the reusable hardware abstractions on a physical Betabox robot implementation.
 
-These scripts are intended to run on a physical Betabox Car and may use
-`BETABOX_CAR` to validate the robot’s configured wiring.
+These validation scripts execute reusable hardware abstractions on a physical Betabox robot implementation (currently the Betabox Car).
 
 Reusable source modules under `hardware/`, `drive/`, `sensors/`, `vision/`,
 `audio/`, and `system/` should not import robot-specific configuration.

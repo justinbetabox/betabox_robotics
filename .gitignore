@@ -36,4 +36,4 @@ htmlcov/
 *.log
 
 # Generated files
-PROJECT_TREE.txt
+project-tree.txt

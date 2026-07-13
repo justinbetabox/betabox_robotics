@@ -1,8 +1,11 @@
 from dataclasses import asdict, dataclass
-from typing import Any, Self
+from typing import TYPE_CHECKING, Any, Self
 
 from betabox_robotics.hardware import PWM, Motor, Pin, Servo
 from .exceptions import DriveError
+
+if TYPE_CHECKING:
+    from betabox_robotics.robots.config import DriveConfig
 
 @dataclass(frozen=True)
 class DriveStatus:
@@ -56,7 +59,7 @@ class Drive:
     @classmethod
     def default(
         cls,
-        robot_config,
+        config: "DriveConfig",
         *,
         left_reversed: bool | None = None,
         right_reversed: bool | None = None,
@@ -65,34 +68,58 @@ class Drive:
         steering_min: float | None = None,
         steering_max: float | None = None,
     ) -> "Drive":
-        left_cfg = robot_config.left_motor
-        right_cfg = robot_config.right_motor
-        steering_cfg = robot_config.steering
+        left_cfg = config.left_motor
+        right_cfg = config.right_motor
+        steering_cfg = config.steering
 
         left_motor = Motor(
             PWM(left_cfg.pwm),
             Pin(left_cfg.direction, mode=Pin.OUT),
-            reversed=left_cfg.reversed if left_reversed is None else left_reversed,
+            reversed=(
+                left_cfg.reversed
+                if left_reversed is None
+                else left_reversed
+            ),
         )
 
         right_motor = Motor(
             PWM(right_cfg.pwm),
             Pin(right_cfg.direction, mode=Pin.OUT),
-            reversed=right_cfg.reversed if right_reversed is None else right_reversed,
+            reversed=(
+                right_cfg.reversed
+                if right_reversed is None
+                else right_reversed
+            ),
         )
 
         steering = Servo(
             steering_cfg.servo,
-            min_angle=steering_cfg.min_angle if steering_min is None else steering_min,
-            max_angle=steering_cfg.max_angle if steering_max is None else steering_max,
+            min_angle=(
+                steering_cfg.min_angle
+                if steering_min is None
+                else steering_min
+            ),
+            max_angle=(
+                steering_cfg.max_angle
+                if steering_max is None
+                else steering_max
+            ),
         )
 
         return cls(
             left_motor=left_motor,
             right_motor=right_motor,
             steering=steering,
-            left_trim=left_cfg.trim if left_trim is None else left_trim,
-            right_trim=right_cfg.trim if right_trim is None else right_trim,
+            left_trim=(
+                left_cfg.trim
+                if left_trim is None
+                else left_trim
+            ),
+            right_trim=(
+                right_cfg.trim
+                if right_trim is None
+                else right_trim
+            ),
         )
 
     def speed(self, left: float, right: float) -> None:

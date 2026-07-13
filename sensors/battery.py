@@ -1,11 +1,14 @@
 from __future__ import annotations
 
-from typing import Self
+from typing import TYPE_CHECKING, Self
 
 from betabox_robotics.hardware import ADC
 
 from .exceptions import BatteryError
 from .types import BatteryReading, BatteryState
+
+if TYPE_CHECKING:
+    from betabox_robotics.robots.config import BatteryConfig
 
 class Battery:
     """
@@ -49,23 +52,12 @@ class Battery:
         self._closed = False
 
     @classmethod
-    def default(
-        cls,
-        robot_config,
-        *,
-        scale: float | None = None,
-        low_voltage: float | None = None,
-        critical_voltage: float | None = None,
-    ) -> "Battery":
-        cfg = robot_config.battery
-
+    def default(cls, config: "BatteryConfig") -> "Battery":
         return cls(
-            ADC(cfg.channel),
-            scale=cfg.scale if scale is None else scale,
-            low_voltage=cfg.low_voltage if low_voltage is None else low_voltage,
-            critical_voltage=(
-                cfg.critical_voltage if critical_voltage is None else critical_voltage
-            ),
+            ADC(config.channel),
+            scale=config.scale,
+            low_voltage=config.low_voltage,
+            critical_voltage=config.critical_voltage,
         )
 
     @property

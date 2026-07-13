@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Self
+from typing import TYPE_CHECKING, Self
 
 from betabox_robotics.hardware import ADC
 
 from .exceptions import GrayscaleError
 from .types import GrayscaleReading
 
+if TYPE_CHECKING:
+    from betabox_robotics.robots.config import GrayscaleConfig
 
 class Grayscale:
     """
@@ -56,19 +58,12 @@ class Grayscale:
         self._closed = False
 
     @classmethod
-    def default(
-        cls,
-        robot_config,
-        *,
-        reference: Sequence[int] | None = None,
-    ) -> "Grayscale":
-        cfg = robot_config.grayscale
-
+    def default(cls, config: "GrayscaleConfig") -> "Grayscale":
         return cls(
-            left=ADC(cfg.left),
-            middle=ADC(cfg.middle),
-            right=ADC(cfg.right),
-            reference=reference,
+            left=ADC(config.left),
+            middle=ADC(config.middle),
+            right=ADC(config.right),
+            reference=config.reference,
         )
 
     def read(

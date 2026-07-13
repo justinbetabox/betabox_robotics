@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import time
-from typing import Self, TypeAlias
+from typing import TYPE_CHECKING, Self, TypeAlias, cast
 
 from betabox_robotics.hardware import (
     DigitalPin,
@@ -15,6 +15,8 @@ from .exceptions import (
 )
 from .types import UltrasonicReading
 
+if TYPE_CHECKING:
+    from betabox_robotics.robots.config import UltrasonicConfig
 
 PinInput: TypeAlias = Pin | DigitalPin | str | int
 
@@ -57,22 +59,16 @@ class Ultrasonic:
             )
 
     @classmethod
-    def default(
-        cls,
-        robot_config,
-        *,
-        timeout: float = 0.02,
-    ) -> "Ultrasonic":
-        cfg = robot_config.ultrasonic
-
+    def default(cls, config: "UltrasonicConfig") -> "Ultrasonic":
         return cls(
-            trigger=cfg.trigger,
-            echo=cfg.echo,
-            timeout=timeout,
+            trigger=config.trigger,
+            echo=config.echo,
+            timeout=config.timeout,
         )
 
     def _make_output_pin(self, pin: PinInput) -> Pin:
         if isinstance(pin, Pin):
+            pin = cast(Pin, pin)
             pin.output()
             return pin
 
@@ -80,6 +76,7 @@ class Ultrasonic:
 
     def _make_input_pin(self, pin: PinInput) -> Pin:
         if isinstance(pin, Pin):
+            pin = cast(Pin, pin)
             pin.input(pull=Pin.PULL_DOWN)
             return pin
 

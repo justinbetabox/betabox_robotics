@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
-from typing import Any, Self
+from typing import TYPE_CHECKING, Any, Self
 
 from .battery import Battery
 from .grayscale import Grayscale
 from .ultrasonic import Ultrasonic
 
 from .exceptions import SensorsError
+
+if TYPE_CHECKING:
+    from betabox_robotics.robots.config import SensorsConfig
 
 
 @dataclass(frozen=True)
@@ -53,11 +56,11 @@ class Sensors:
         )
 
     @classmethod
-    def default(cls, robot_config) -> "Sensors":
+    def default(cls, config: "SensorsConfig") -> "Sensors":
         return cls(
-            ultrasonic=Ultrasonic.default(robot_config),
-            grayscale=Grayscale.default(robot_config),
-            battery=Battery.default(robot_config),
+            ultrasonic=Ultrasonic.default(config.ultrasonic),
+            grayscale=Grayscale.default(config.grayscale),
+            battery=Battery.default(config.battery),
         )
 
     def close(self) -> None:

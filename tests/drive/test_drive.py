@@ -16,7 +16,7 @@ from betabox_robotics.robots import BETABOX_CAR
 
 
 def main() -> None:
-    drive = Drive.default(BETABOX_CAR)
+    drive = Drive.default(BETABOX_CAR.drive)
 
     try:
         print("\nDrive validation test")

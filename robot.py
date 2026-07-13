@@ -1,5 +1,5 @@
-from betabox_robotics.robots.betabox_car import BETABOX_CAR, BetaboxCar, RobotConfig
-
+from betabox_robotics.robots.betabox_car import BETABOX_CAR, BetaboxCar
+from betabox_robotics.robots.config import RobotConfig
 
 class Robot:
     """
@@ -10,7 +10,7 @@ class Robot:
 
     @classmethod
     def default(cls) -> BetaboxCar:
-        return BetaboxCar(BETABOX_CAR)
+        return BetaboxCar()
 
     @classmethod
     def from_config(cls, config: RobotConfig) -> BetaboxCar:

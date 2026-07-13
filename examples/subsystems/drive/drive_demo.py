@@ -15,7 +15,7 @@ def main() -> None:
     print("==================")
     print()
 
-    with Drive.default(BETABOX_CAR) as drive:
+    with Drive.default(BETABOX_CAR.drive) as drive:
         try:
             print("Centering steering...")
             drive.center()

@@ -24,7 +24,7 @@ def test_color_detector_finds_red_region():
     print(f"count={metadata.data.get('count')}")
     print(f"detection_count={len(metadata.detections)}")
 
-    assert metadata.source == "color:red"
+    assert metadata.source == "color"
     assert metadata.data["colors"] == ["red"]
     assert metadata.data["counts"]["red"] == 1
     assert metadata.data["count"] == 1
@@ -80,7 +80,7 @@ def test_color_detector_finds_multiple_colors():
 def test_color_detector_can_be_reconfigured_on_enable():
     detector = ColorDetector()
 
-    assert detector.name == "color:red"
+    assert detector.name == "color"
 
     detector.enable(["red", "green", "blue"], min_area=100)
 

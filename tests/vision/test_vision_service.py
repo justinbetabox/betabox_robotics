@@ -24,9 +24,13 @@ def main() -> None:
     print(stats)
 
     assert stats["running"] is False
-    assert stats["host"] == "127.0.0.1"
-    assert stats["port"] == 8081
-    assert stats["fps"] == 10
+    assert stats["camera"]["running"] is False
+    assert stats["streaming"]["running"] is False
+    assert stats["recording"]["active"] is False
+
+    assert stats["server"]["host"] == "127.0.0.1"
+    assert stats["server"]["port"] == 8081
+    assert stats["server"]["fps"] == 10
 
     assert service.frame_source.consumer_count() >= 3
     assert service.streamer is not None

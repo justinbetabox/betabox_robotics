@@ -80,9 +80,7 @@ class BetaboxCar(CarRobot):
         # These factories will be updated in the next step.
         self.drive = Drive.default(config.drive)
         self.sensors = Sensors.default(config.sensors)
-        self.vision = VisionClient(
-            base_url=config.vision.service_url,
-        )
+        self.vision = VisionClient.default(config.vision)
         self.audio = Audio.default(config.audio)
         self.system = System.default(config.system)
 

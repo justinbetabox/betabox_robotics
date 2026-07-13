@@ -3,9 +3,11 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib import error, parse, request
 
+if TYPE_CHECKING:
+    from betabox_robotics.robots.config import VisionConfig
 
 class VisionClientError(Exception):
     """Raised when the managed Vision service cannot complete a request."""
@@ -133,8 +135,32 @@ class VisionClient:
     This does not open the camera. It talks to betabox-video.service.
     """
 
-    def __init__(self, base_url: str = "http://127.0.0.1:8080") -> None:
+    def __init__(
+        self,
+        base_url: str = "http://127.0.0.1:8080",
+        *,
+        timeout: float = 10.0,
+    ) -> None:
+        if not base_url:
+            raise VisionClientError("base_url cannot be empty")
+
+        if timeout <= 0:
+            raise VisionClientError(
+                "timeout must be greater than 0"
+            )
+
         self.base_url = base_url.rstrip("/")
+        self.timeout = float(timeout)
+
+    @classmethod
+    def default(
+        cls,
+        config: "VisionConfig",
+    ) -> "VisionClient":
+        return cls(
+            base_url=config.service_url,
+            timeout=config.request_timeout,
+        )
 
     def statistics(self) -> ClientVisionStatistics:
         data = self._get("/stats")
@@ -278,7 +304,10 @@ class VisionClient:
         req = request.Request(url, data=body, headers=headers, method=method)
 
         try:
-            with request.urlopen(req, timeout=10) as response:
+            with request.urlopen(
+                req,
+                timeout=self.timeout,
+            ) as response:
                 response_body = response.read().decode("utf-8")
 
         except error.HTTPError as exc:
@@ -405,25 +434,48 @@ class VisionClient:
         data: dict[str, Any],
     ) -> ClientDetectionStatus:
         detectors_data = data.get("detectors", {})
-        changed = data.get("enabled") or data.get("disabled")
+        enabled_data = data.get("enabled", {})
+        disabled_data = data.get("disabled")
 
-        detectors: dict[str, bool] = {}
+        detectors: dict[str, bool]
 
         if isinstance(detectors_data, dict):
+            # Enable/disable endpoints return the state map directly.
             detectors = {
                 str(name): bool(enabled)
                 for name, enabled in detectors_data.items()
             }
-        else:
+
+        elif isinstance(detectors_data, list):
+            # GET /detection returns detector names plus a separate
+            # enabled-state mapping.
+            state_map = (
+                enabled_data
+                if isinstance(enabled_data, dict)
+                else {}
+            )
+
             detectors = {
-                str(name): False
+                str(name): bool(state_map.get(name, False))
                 for name in detectors_data
             }
 
+        else:
+            raise VisionClientError(
+                "Vision service returned invalid detector status"
+            )
+
+        changed: str | None = None
+
+        if isinstance(enabled_data, str):
+            changed = enabled_data
+        elif isinstance(disabled_data, str):
+            changed = disabled_data
+
         return ClientDetectionStatus(
             detectors=detectors,
-            changed=str(changed) if isinstance(changed, str) else None,
-    )
+            changed=changed,
+        )
 
     def _parse_stream_overlay_status(
         self,

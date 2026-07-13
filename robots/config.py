@@ -62,6 +62,13 @@ class SensorsConfig:
 @dataclass(frozen=True)
 class VisionConfig:
     service_url: str = "http://127.0.0.1:8080"
+    request_timeout: float = 10.0
+
+    def __post_init__(self):
+        if not self.service_url:
+            raise ValueError("service_url cannot be empty")
+        if self.request_timeout <= 0:
+            raise ValueError("request_timeout must be greater than 0")
 
 
 @dataclass(frozen=True)

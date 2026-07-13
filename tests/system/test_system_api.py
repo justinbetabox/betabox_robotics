@@ -7,6 +7,7 @@ from betabox_robotics.system import (
     SystemHealth,
     SystemStatus,
 )
+from robots.betabox_car import BETABOX_CAR
 
 
 def main() -> None:
@@ -15,7 +16,7 @@ def main() -> None:
     print("=======================")
     print()
 
-    system = System.default()
+    system = System.default(BETABOX_CAR.system)
 
     assert system.closed is False
     assert isinstance(system.hostname(), str)

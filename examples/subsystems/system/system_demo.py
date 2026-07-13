@@ -13,7 +13,7 @@ def main() -> None:
     print("===================")
     print()
 
-    system = System.default(BETABOX_CAR)
+    system = System.default(BETABOX_CAR.system)
 
     status = system.status()
 

@@ -2,9 +2,12 @@ import socket
 import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Self
+from typing import TYPE_CHECKING, Any, Self
 
 from betabox_robotics.version import __version__
+
+if TYPE_CHECKING:
+    from betabox_robotics.robots.config import SystemConfig
 
 
 @dataclass(frozen=True)
@@ -66,8 +69,17 @@ class System:
     System information and platform paths.
     """
 
-    def __init__(self) -> None:
-            self._closed = False
+    def __init__(
+        self,
+        *,
+        media_root: str | Path | None = None,
+    ) -> None:
+        self._media_root = (
+            Path(media_root).expanduser()
+            if media_root is not None
+            else Path.home() / "media"
+        )
+        self._closed = False
 
     def __enter__(self) -> Self:
         self._require_open()
@@ -91,8 +103,13 @@ class System:
             raise SystemError("system subsystem is closed")
 
     @classmethod
-    def default(cls, robot_config: object | None = None) -> "System":
-        return cls()
+    def default(
+        cls,
+        config: "SystemConfig",
+    ) -> "System":
+        return cls(
+            media_root=config.media_root,
+        )
 
     def hostname(self) -> str:
         self._require_open()
@@ -128,12 +145,11 @@ class System:
 
     def media_paths(self) -> MediaPaths:
         self._require_open()
-        base = Path.home() / "media"
 
         return MediaPaths(
-            pictures=base / "pictures",
-            videos=base / "videos",
-            sounds=base / "sounds",
+            pictures=self._media_root / "pictures",
+            videos=self._media_root / "videos",
+            sounds=self._media_root / "sounds",
         )
 
     def ensure_media_paths(self) -> MediaPaths:

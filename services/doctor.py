@@ -4,16 +4,19 @@ import argparse
 from dataclasses import dataclass
 from typing import Literal
 
-from betabox_robotics.services.managed import MANAGED_SERVICES
+from betabox_robotics.services.managed import managed_services
 from betabox_robotics.services.verify import CheckResult, collect_checks
 from betabox_robotics.services.hardware_status import RobotHardwareStatus
 from betabox_robotics.services.status import StatusReport, collect_status
+from betabox_robotics.services.system_health import (
+    SystemHealthStatus,
+)
 
-DEDICATED_SERVICE_UNITS = {
-    "betabox-video.service",
-    "jupyterhub.service",
-    "betabox-boot-announce.service",
-    }
+from betabox_robotics.config import (
+    DEFAULT_PLATFORM_CONFIG,
+    PlatformConfig,
+)
+
 
 Severity = Literal["info", "warning", "error", "critical"]
 
@@ -34,6 +37,15 @@ class Diagnosis:
     affected: list[str]
     actions: list[str]
 
+def dedicated_service_units(
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> set[str]:
+    return {
+        config.services.video,
+        config.services.jupyterhub,
+        config.services.boot_announce,
+    }
+
 def healthy(title: str, summary: str) -> Diagnosis:
     return Diagnosis(
         title=title,
@@ -49,9 +61,14 @@ def healthy(title: str, summary: str) -> Diagnosis:
 def result_map(results: list[CheckResult]) -> dict[str, CheckResult]:
     return {result.name: result for result in results}
 
-def diagnose_boot_announce(status: StatusReport) -> Diagnosis:
+def diagnose_boot_announce(
+    status: StatusReport,
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> Diagnosis:
+    unit = config.services.boot_announce
+
     state = status.services.get(
-        "betabox-boot-announce.service",
+        unit,
         "unknown",
     )
 
@@ -85,7 +102,7 @@ def diagnose_boot_announce(status: StatusReport) -> Diagnosis:
                 "Run: betabox logs boot-announce --journal-only",
                 "Run: aplay -l",
                 "Run: betabox verify",
-                "Restart: sudo systemctl restart betabox-boot-announce.service",
+                f"Restart: sudo systemctl restart {unit}",
             ],
         )
 
@@ -149,20 +166,39 @@ def diagnose_media(results: dict[str, CheckResult]) -> Diagnosis:
     )
 
 
-def diagnose_services(status: StatusReport) -> Diagnosis:
+def diagnose_services(
+    status: StatusReport,
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> Diagnosis:
+    services = managed_services(config)
+    dedicated = dedicated_service_units(config)
     failed = [
-        managed.title
-        for managed in MANAGED_SERVICES.values()
-        if managed.unit not in DEDICATED_SERVICE_UNITS
-            and status.services.get(managed.unit) == "failed"
+        service.title
+        for service in services.values()
+        if (
+            service.unit not in dedicated
+            and status.services.get(service.unit) == "failed"
+        )
     ]
 
     not_ready = [
-        f"{managed.title} ({status.services.get(managed.unit, 'unknown')})"
-        for managed in MANAGED_SERVICES.values()
-        if managed.unit not in DEDICATED_SERVICE_UNITS
-            and status.services.get(managed.unit, "unknown")
-            not in ("active", "inactive", "not-installed")
+        (
+            f"{service.title} "
+            f"({status.services.get(service.unit, 'unknown')})"
+        )
+        for service in services.values()
+        if (
+            service.unit not in dedicated
+            and status.services.get(
+                service.unit,
+                "unknown",
+            )
+            not in (
+                "active",
+                "inactive",
+                "not-installed",
+            )
+        )
     ]
 
     if failed:
@@ -212,10 +248,11 @@ def diagnose_services(status: StatusReport) -> Diagnosis:
 def diagnose_jupyterhub(
     results: dict[str, CheckResult],
     status: StatusReport,
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> Diagnosis:
     proxy = results.get("jupyterhub:proxy")
     service_state = status.services.get(
-        "jupyterhub.service",
+        config.services.jupyterhub,
         "unknown",
     )
 
@@ -245,16 +282,22 @@ def diagnose_jupyterhub(
         )
 
     if not service_ok:
-        causes.append(f"jupyterhub.service is {service_state}.")
+        causes.append(
+            f"{config.services.jupyterhub} is {service_state}."
+        )
         actions.extend(
             [
-                "Restart jupyterhub.service.",
+                (
+                    "Restart: sudo systemctl restart "
+                    f"{config.services.jupyterhub}"
+                ),
                 "Check: betabox logs jupyterhub --journal-only",
             ]
         )
 
     actions.append(
-        "Check: curl -I http://127.0.0.1:8000/hub/health"
+        f"Check: curl -I "
+        f"{config.network.jupyterhub_health_url}"
     )
 
     return Diagnosis(
@@ -269,6 +312,7 @@ def diagnose_jupyterhub(
 
 def diagnose_robot_hardware(
     hardware: RobotHardwareStatus,
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> Diagnosis:
     if not hardware.i2c.available:
         return Diagnosis(
@@ -291,7 +335,7 @@ def diagnose_robot_hardware(
                 "Verify dtparam=i2c_arm=on.",
                 "Reboot the robot.",
                 "Check that the Robot HAT is seated correctly.",
-                "Run: i2cdetect -y 1",
+                f"Run: i2cdetect -y {config.verification.i2c_bus}",
             ],
         )
 
@@ -479,6 +523,7 @@ def diagnose_audio_hardware(
 
 def diagnose_vision_hardware(
     hardware: RobotHardwareStatus,
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> Diagnosis:
     vision = hardware.vision
 
@@ -489,7 +534,7 @@ def diagnose_vision_hardware(
             severity="error",
             summary=vision.error or "Vision service is unavailable.",
             causes=[
-                "betabox-video.service is stopped or failed.",
+                f"{config.services.video} is stopped or failed.",
                 "The Vision API is not responding.",
                 "The service failed during camera startup.",
             ],
@@ -502,7 +547,7 @@ def diagnose_vision_hardware(
             actions=[
                 "Run: betabox services",
                 "Run: betabox logs video --journal-only",
-                "Restart Vision: sudo systemctl restart betabox-video.service",
+                f"Restart: sudo systemctl restart {config.services.video}",
             ],
         )
 
@@ -524,7 +569,7 @@ def diagnose_vision_hardware(
             ],
             actions=[
                 "Restart betabox-video.service.",
-                "Check the Vision service logs.",
+                f"Run: betabox logs video --journal-only",
                 "Check the camera ribbon cable.",
             ],
         )
@@ -549,7 +594,7 @@ def diagnose_vision_hardware(
             actions=[
                 "Check the camera ribbon cable.",
                 "Check for another camera process.",
-                "Restart betabox-video.service.",
+                f"Restart: sudo systemctl restart {config.services.video}",
             ],
         )
 
@@ -570,8 +615,8 @@ def diagnose_vision_hardware(
                 "Detection",
             ],
             actions=[
-                "Check: curl http://127.0.0.1:8080/stats",
-                "Restart betabox-video.service.",
+                f"Check: {config.network.vision_url}/stats",
+                f"Restart: sudo systemctl restart {config.services.video}",
                 "Review the video service logs.",
             ],
         )
@@ -581,25 +626,36 @@ def diagnose_vision_hardware(
         "Vision service and camera pipeline are healthy.",
     )
 
-def collect_diagnoses() -> list[Diagnosis]:
-    checks = result_map(
-        collect_checks(include_robot=False)
+def collect_diagnoses(
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> list[Diagnosis]:
+    status = collect_status(config)
+
+    checks = collect_checks(
+        include_robot=False,
+        config=config,
     )
 
-    status = collect_status()
+    results = result_map(checks)
+
     hardware = status.hardware
 
-    robot_hardware = diagnose_robot_hardware(hardware)
-    vision = diagnose_vision_hardware(hardware)
+    system = status.system_health
+
+    robot_hardware = diagnose_robot_hardware(hardware, config)
+    vision = diagnose_vision_hardware(hardware, config)
 
     diagnoses = [
+        diagnose_temperature(system),
+        diagnose_power(system),
+
         robot_hardware,
         diagnose_audio_hardware(hardware),
         vision,
-        diagnose_jupyterhub(checks, status),
-        diagnose_boot_announce(status),
-        diagnose_media(checks),
-        diagnose_services(status),
+        diagnose_jupyterhub(results, status, config),
+        diagnose_boot_announce(status, config),
+        diagnose_media(results),
+        diagnose_services(status, config),
     ]
 
     if robot_hardware.ok:
@@ -836,7 +892,9 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="betabox doctor")
     parser.parse_args(argv)
 
-    diagnoses = collect_diagnoses()
+    config = DEFAULT_PLATFORM_CONFIG
+
+    diagnoses = collect_diagnoses(config)
     return 0 if print_diagnoses(diagnoses) else 1
 
 

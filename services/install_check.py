@@ -19,7 +19,10 @@ class CheckResult:
     message: str = ""
 
 
-def run(command: list[str], timeout: int = 5) -> subprocess.CompletedProcess | None:
+def run(
+    command: list[str],
+    timeout: int = 5,
+) -> subprocess.CompletedProcess | None:
     try:
         return subprocess.run(
             command,
@@ -40,16 +43,31 @@ def check_import(module: str) -> CheckResult:
         return CheckResult(f"import:{module}", False, str(exc))
 
 
-def check_command(command: list[str], name: str) -> CheckResult:
-    result = run(command)
+def check_command(
+    command: list[str],
+    name: str,
+    *,
+    timeout: int = 5,
+) -> CheckResult:
+    result = run(
+        command,
+        timeout=timeout,
+    )
 
     if result is None:
-        return CheckResult(name, False, "command failed to run")
+        return CheckResult(
+            name,
+            False,
+            "command failed to run",
+        )
 
     return CheckResult(
         name,
         result.returncode == 0,
-        result.stdout.strip() or result.stderr.strip(),
+        (
+            result.stdout.strip()
+            or result.stderr.strip()
+        ),
     )
 
 
@@ -68,14 +86,24 @@ def check_config_line(
             f"{config_file} missing",
         )
 
-    text = config_file.read_text(
-        errors="ignore",
-    )
+    try:
+        text = config_file.read_text(
+            encoding="utf-8",
+            errors="ignore",
+        )
+    except Exception as exc:
+        return CheckResult(
+            f"config:{line}",
+            False,
+            str(exc),
+        )
+
+    present = line in text
 
     return CheckResult(
         f"config:{line}",
-        line in text,
-        "present" if line in text else "missing",
+        present,
+        "present" if present else "missing",
     )
 
 
@@ -101,21 +129,27 @@ def collect_checks(
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> list[CheckResult]:
     checks: list[CheckResult] = []
+    verification = config.verification
 
     for module in (
-        config.verification.required_python_modules
+        verification.required_python_modules
     ):
-        checks.append(check_import(module))
+        checks.append(
+            check_import(module)
+        )
 
     checks.append(
         check_command(
             ["betabox", "--help"],
             "cli:betabox",
+            timeout=(
+                verification.command_timeout_seconds
+            ),
         )
     )
 
     for line in (
-        config.verification.required_boot_config_lines
+        verification.required_boot_config_lines
     ):
         checks.append(
             check_config_line(
@@ -124,16 +158,20 @@ def collect_checks(
             )
         )
 
-    for path in (
+    required_paths = (
         config.paths.pictures_dir,
         config.paths.videos_dir,
         config.paths.sounds_dir,
         config.paths.car_honk_sound,
-    ):
-        checks.append(check_path(path))
+    )
+
+    for path in required_paths:
+        checks.append(
+            check_path(path)
+        )
 
     for executable in (
-        config.verification.required_executables
+        verification.required_executables
     ):
         checks.append(
             check_executable(executable)

@@ -6,17 +6,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from betabox_robotics.services.backup import create_backup
-
-RESET_PATHS = [
-    Path.home() / "media" / "pictures",
-    Path.home() / "media" / "videos",
-]
-
-RECREATE_PATHS = [
-    Path.home() / "media" / "pictures",
-    Path.home() / "media" / "videos",
-    Path.home() / "media" / "sounds",
-]
+from betabox_robotics.config import (
+    DEFAULT_PLATFORM_CONFIG,
+    PlatformConfig,
+)
 
 
 @dataclass(frozen=True)
@@ -92,20 +85,38 @@ def recreate_path(path: Path, *, dry_run: bool) -> ResetItem:
         )
 
 
-def run_reset(*, dry_run: bool, backup: bool) -> tuple[str | None, list[ResetItem]]:
+def run_reset(
+    *,
+    dry_run: bool,
+    backup: bool,
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> tuple[str | None, list[ResetItem]]:
     backup_name: str | None = None
 
     if backup and not dry_run:
-        report = create_backup(name=None)
+        report = create_backup(
+            name=None,
+            config=config,
+        )
         backup_name = report.name
 
     items: list[ResetItem] = []
 
-    for path in RESET_PATHS:
-        items.append(remove_path(path, dry_run=dry_run))
+    for path in config.paths.reset_paths:
+        items.append(
+            remove_path(
+                path,
+                dry_run=dry_run,
+            )
+        )
 
-    for path in RECREATE_PATHS:
-        items.append(recreate_path(path, dry_run=dry_run))
+    for path in config.paths.recreate_paths:
+        items.append(
+            recreate_path(
+                path,
+                dry_run=dry_run,
+            )
+        )
 
     return backup_name, items
 

@@ -14,9 +14,10 @@ from betabox_robotics.services.services import collect_services
 from betabox_robotics.services.status import collect_status
 from betabox_robotics.services.verify import collect_checks
 from betabox_robotics.version import __version__
-
-SNAPSHOT_ROOT = Path.home() / "betabox-snapshots"
-STATE_DIR = Path.home() / ".local" / "state" / "betabox"
+from betabox_robotics.config import (
+    DEFAULT_PLATFORM_CONFIG,
+    PlatformConfig,
+)
 
 
 @dataclass(frozen=True)
@@ -75,11 +76,13 @@ def copy_if_exists(source: Path, destination: Path) -> None:
         shutil.copy2(source, destination)
 
 
-def create_snapshot(name: str | None = None) -> SnapshotReport:
+def create_snapshot(
+    name: str | None = None,
+    *,
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> SnapshotReport:
     snapshot_name = name or f"snapshot-{timestamp()}"
-    snapshot_dir = SNAPSHOT_ROOT / snapshot_name
-    snapshot_dir.mkdir(parents=True, exist_ok=False)
-
+    snapshot_dir = config.paths.snapshot_root / snapshot_name
     report = SnapshotReport(
         name=snapshot_name,
         path=str(snapshot_dir),
@@ -119,8 +122,8 @@ def create_snapshot(name: str | None = None) -> SnapshotReport:
     )
 
     logs_dir = snapshot_dir / "logs"
-    copy_if_exists(STATE_DIR / "monitor.log", logs_dir / "monitor.log")
-    copy_if_exists(STATE_DIR / "boot_announce.log", logs_dir / "boot_announce.log")
+    copy_if_exists(config.paths.monitor_log, logs_dir / "monitor.log")
+    copy_if_exists(config.paths.boot_announce_log, logs_dir / "boot_announce.log")
 
     write_text(
         logs_dir / "journal-betabox-monitor.txt",
@@ -145,12 +148,20 @@ def create_snapshot(name: str | None = None) -> SnapshotReport:
     return report
 
 
-def list_snapshots() -> list[Path]:
-    if not SNAPSHOT_ROOT.exists():
+def list_snapshots(
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> list[Path]:
+    snapshot_root = config.paths.snapshot_root
+
+    if not snapshot_root.exists():
         return []
 
     return sorted(
-        [path for path in SNAPSHOT_ROOT.iterdir() if path.is_dir()],
+        [
+            path
+            for path in snapshot_root.iterdir()
+            if path.is_dir()
+        ],
         reverse=True,
     )
 

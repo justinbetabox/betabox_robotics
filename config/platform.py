@@ -97,6 +97,21 @@ class PlatformPathsConfig:
             self.state_dir,
         )
 
+    @property
+    def reset_paths(self) -> tuple[Path, ...]:
+        return (
+            self.pictures_dir,
+            self.videos_dir,
+        )
+
+    @property
+    def recreate_paths(self) -> tuple[Path, ...]:
+        return (
+            self.pictures_dir,
+            self.videos_dir,
+            self.sounds_dir,
+        )
+
 
 @dataclass(frozen=True)
 class PlatformConfig:

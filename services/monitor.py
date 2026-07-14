@@ -13,8 +13,6 @@ from betabox_robotics.services.status import collect_status
 from betabox_robotics.services.system_health import collect_system_health
 
 
-DEFAULT_INTERVAL_SECONDS = 60
-
 Severity = Literal["info", "warning", "error", "critical"]
 
 @dataclass(frozen=True)
@@ -306,14 +304,28 @@ def run_once(
 
 
 def run_forever(
-    interval_seconds: int = DEFAULT_INTERVAL_SECONDS,
+    interval_seconds: int | None = None,
     *,
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> int:
+    selected_interval = (
+        config.monitoring.interval_seconds
+        if interval_seconds is None
+        else interval_seconds
+    )
+
+    if selected_interval <= 0:
+        raise ValueError(
+            "interval_seconds must be greater than 0"
+        )
+
     previous_summary: dict | None = None
 
     log(
-        f"monitor loop starting interval={interval_seconds}s",
+        (
+            "monitor loop starting "
+            f"interval={selected_interval}s"
+        ),
         config=config,
     )
 
@@ -329,7 +341,7 @@ def run_forever(
                 config=config,
             )
 
-        time.sleep(interval_seconds)
+        time.sleep(selected_interval)
 
 def find_changes(
     previous: dict,
@@ -354,22 +366,33 @@ def find_changes(
 
 
 def main(argv: list[str] | None = None) -> int:
-    interval = DEFAULT_INTERVAL_SECONDS
+    config = DEFAULT_PLATFORM_CONFIG
+    interval = config.monitoring.interval_seconds
 
     if argv:
         if "--once" in argv:
-            run_once()
+            run_once(config=config)
             return 0
 
         if "--interval" in argv:
             index = argv.index("--interval")
+
             try:
                 interval = int(argv[index + 1])
             except Exception:
                 print("Invalid --interval value")
                 return 1
 
-    return run_forever(interval)
+            if interval <= 0:
+                print(
+                    "--interval must be greater than 0"
+                )
+                return 1
+
+    return run_forever(
+        interval,
+        config=config,
+    )
 
 
 if __name__ == "__main__":

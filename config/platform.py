@@ -316,6 +316,33 @@ class PlatformVerificationConfig:
 
 
 @dataclass(frozen=True)
+class PlatformMonitoringConfig:
+    """
+    Defaults used by platform monitoring, events, and log tools.
+    """
+
+    interval_seconds: int = 60
+    default_event_count: int = 20
+    default_log_lines: int = 50
+
+    def __post_init__(self) -> None:
+        if self.interval_seconds <= 0:
+            raise ValueError(
+                "interval_seconds must be greater than 0"
+            )
+
+        if self.default_event_count < 0:
+            raise ValueError(
+                "default_event_count cannot be negative"
+            )
+
+        if self.default_log_lines <= 0:
+            raise ValueError(
+                "default_log_lines must be greater than 0"
+            )
+
+
+@dataclass(frozen=True)
 class PlatformConfig:
     """
     Operational configuration shared by Betabox services, CLI tools,
@@ -327,6 +354,7 @@ class PlatformConfig:
     network: PlatformNetworkConfig
     services: PlatformServicesConfig
     verification: PlatformVerificationConfig
+    monitoring: PlatformMonitoringConfig
 
     @classmethod
     def default(cls) -> "PlatformConfig":
@@ -336,6 +364,7 @@ class PlatformConfig:
             network=PlatformNetworkConfig(),
             services=PlatformServicesConfig(),
             verification=PlatformVerificationConfig(),
+            monitoring=PlatformMonitoringConfig(),
         )
 
 

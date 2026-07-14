@@ -116,29 +116,68 @@ def list_targets(
     print()
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="betabox logs")
-    parser.add_argument("target", nargs="?", help="Log target name")
-    parser.add_argument("-n", "--lines", type=int, default=50, help="Number of lines")
-    parser.add_argument(
-        "--journal-only", action="store_true", help="Only show journal logs"
+def main(
+    argv: list[str] | None = None,
+) -> int:
+    config = DEFAULT_PLATFORM_CONFIG
+
+    parser = argparse.ArgumentParser(
+        prog="betabox logs"
     )
-    parser.add_argument("--file-only", action="store_true", help="Only show file logs")
+
     parser.add_argument(
-        "--list", action="store_true", help="List available log targets"
+        "target",
+        nargs="?",
+        help="Log target name",
+    )
+
+    parser.add_argument(
+        "-n",
+        "--lines",
+        type=int,
+        default=config.monitoring.default_log_lines,
+        help="Number of lines",
+    )
+
+    parser.add_argument(
+        "--journal-only",
+        action="store_true",
+        help="Only show journal logs",
+    )
+
+    parser.add_argument(
+        "--file-only",
+        action="store_true",
+        help="Only show file logs",
+    )
+
+    parser.add_argument(
+        "--list",
+        action="store_true",
+        help="List available log targets",
     )
 
     args = parser.parse_args(argv)
 
+    if args.lines <= 0:
+        print("--lines must be greater than 0")
+        return 1
+
     if args.list or not args.target:
-        list_targets()
+        list_targets(config)
         return 0
 
-    target = get_target(args.target)
+    target = get_target(
+        args.target,
+        config,
+    )
 
     if target is None:
-        print(f"Unknown log target: {args.target}")
-        list_targets()
+        print(
+            f"Unknown log target: "
+            f"{args.target}"
+        )
+        list_targets(config)
         return 1
 
     show_journal = not args.file_only

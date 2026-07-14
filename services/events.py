@@ -90,13 +90,19 @@ def print_events(events: list[dict[str, Any]]) -> None:
 
     print()
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="betabox events")
+def main(
+    argv: list[str] | None = None,
+) -> int:
+    config = DEFAULT_PLATFORM_CONFIG
+
+    parser = argparse.ArgumentParser(
+        prog="betabox events"
+    )
 
     parser.add_argument(
         "--last",
         type=int,
-        default=20,
+        default=config.monitoring.default_event_count,
         help="Show the most recent events",
     )
 
@@ -119,14 +125,20 @@ def main(argv: list[str] | None = None) -> int:
 
     args = parser.parse_args(argv)
 
-    events = read_events()
+    events = read_events(config)
     events = filter_events(
         events,
         severity=args.severity,
         component=args.component,
     )
 
-    if args.last is not None and args.last >= 0:
+    if args.last < 0:
+        print("--last cannot be negative")
+        return 1
+
+    if args.last == 0:
+        events = []
+    else:
         events = events[-args.last:]
 
     if args.json:

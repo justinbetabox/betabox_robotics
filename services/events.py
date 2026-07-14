@@ -2,27 +2,26 @@ from __future__ import annotations
 
 import argparse
 import json
-from pathlib import Path
 from typing import Any
 
-
-EVENTS_FILE = (
-    Path.home()
-    / ".local"
-    / "state"
-    / "betabox"
-    / "events.jsonl"
+from betabox_robotics.config import (
+    DEFAULT_PLATFORM_CONFIG,
+    PlatformConfig,
 )
 
 
-def read_events() -> list[dict[str, Any]]:
-    if not EVENTS_FILE.exists():
+def read_events(
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> list[dict[str, Any]]:
+    events_file = config.paths.events_file
+
+    if not events_file.exists():
         return []
 
     events: list[dict[str, Any]] = []
 
-    with EVENTS_FILE.open("r", encoding="utf-8") as file:
-        for line_number, line in enumerate(file, start=1):
+    with events_file.open("r", encoding="utf-8") as file:
+        for line in file:
             line = line.strip()
 
             if not line:
@@ -31,8 +30,6 @@ def read_events() -> list[dict[str, Any]]:
             try:
                 event = json.loads(line)
             except json.JSONDecodeError:
-                # Ignore incomplete or damaged lines rather than
-                # breaking the entire events command.
                 continue
 
             if isinstance(event, dict):

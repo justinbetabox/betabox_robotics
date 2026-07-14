@@ -4,19 +4,18 @@ import json
 import time
 from dataclasses import asdict, dataclass
 from typing import Literal
-from pathlib import Path
 
+from betabox_robotics.config import (
+    DEFAULT_PLATFORM_CONFIG,
+    PlatformConfig,
+)
 from betabox_robotics.services.status import collect_status
 from betabox_robotics.services.system_health import collect_system_health
 
-LOG_DIR = Path.home() / ".local" / "state" / "betabox"
-LOG_FILE = LOG_DIR / "monitor.log"
-
-EVENTS_FILE = LOG_DIR / "events.jsonl"
 
 DEFAULT_INTERVAL_SECONDS = 60
 
-Severity = Literal["info", "warning", "error"]
+Severity = Literal["info", "warning", "error", "critical"]
 
 @dataclass(frozen=True)
 class MonitorEvent:
@@ -31,15 +30,31 @@ class MonitorEvent:
 def timestamp() -> str:
     return time.strftime("%Y-%m-%d %H:%M:%S")
 
-def write_event(event: MonitorEvent) -> None:
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
+def write_event(
+    event: MonitorEvent,
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> None:
+    config.paths.state_dir.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
-    with EVENTS_FILE.open("a", encoding="utf-8") as file:
-        file.write(json.dumps(asdict(event), sort_keys=True) + "\n")
+    with config.paths.events_file.open(
+        "a",
+        encoding="utf-8",
+    ) as file:
+        file.write(
+            json.dumps(
+                asdict(event),
+                sort_keys=True,
+            )
+            + "\n"
+        )
 
     log(
         f"[{event.severity.upper()}] "
-        f"{event.component}: {event.message}"
+        f"{event.component}: {event.message}",
+        config=config,
     )
 
 def severity_for_change(
@@ -166,11 +181,23 @@ def message_for_change(
 
     return f"{label} changed from {previous!r} to {current!r}"
 
-def log(message: str) -> None:
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
+def log(
+    message: str,
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> None:
+    config.paths.state_dir.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
-    with LOG_FILE.open("a") as file:
-        file.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {message}\n")
+    with config.paths.monitor_log.open(
+        "a",
+        encoding="utf-8",
+    ) as file:
+        file.write(
+            f"{time.strftime('%Y-%m-%d %H:%M:%S')} "
+            f"{message}\n"
+        )
 
 
 def collect_snapshot() -> dict:
@@ -228,13 +255,24 @@ def summarize(snapshot: dict) -> dict:
     }
 
 
-def run_once(previous_summary: dict | None = None) -> dict:
+def run_once(
+    previous_summary: dict | None = None,
+    *,
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> dict:
     snapshot = collect_snapshot()
     summary = summarize(snapshot)
 
     if previous_summary is None:
-        log("monitor started")
-        log("initial status: " + json.dumps(summary, sort_keys=True))
+        log(
+            "monitor started",
+            config=config,
+        )
+        log(
+            "initial status: "
+            + json.dumps(summary, sort_keys=True),
+            config=config,
+        )
         return summary
 
     for path, previous, current in find_changes(
@@ -243,29 +281,53 @@ def run_once(previous_summary: dict | None = None) -> dict:
     ):
         event = MonitorEvent(
             timestamp=timestamp(),
-            severity=severity_for_change(path, previous, current),
+            severity=severity_for_change(
+                path,
+                previous,
+                current,
+            ),
             component=path.split(".")[0],
             event=path,
             previous=previous,
             current=current,
-            message=message_for_change(path, previous, current),
+            message=message_for_change(
+                path,
+                previous,
+                current,
+            ),
         )
 
-        write_event(event)
+        write_event(
+            event,
+            config=config,
+        )
 
     return summary
 
 
-def run_forever(interval_seconds: int = DEFAULT_INTERVAL_SECONDS) -> int:
+def run_forever(
+    interval_seconds: int = DEFAULT_INTERVAL_SECONDS,
+    *,
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> int:
     previous_summary: dict | None = None
 
-    log(f"monitor loop starting interval={interval_seconds}s")
+    log(
+        f"monitor loop starting interval={interval_seconds}s",
+        config=config,
+    )
 
     while True:
         try:
-            previous_summary = run_once(previous_summary)
+            previous_summary = run_once(
+                previous_summary,
+                config=config,
+            )
         except Exception as exc:
-            log(f"monitor error: {exc}")
+            log(
+                f"monitor error: {exc}",
+                config=config,
+            )
 
         time.sleep(interval_seconds)
 

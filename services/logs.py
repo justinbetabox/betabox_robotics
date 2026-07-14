@@ -5,7 +5,11 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from betabox_robotics.services.managed import MANAGED_SERVICES
+from betabox_robotics.config import (
+    DEFAULT_PLATFORM_CONFIG,
+    PlatformConfig,
+)
+from betabox_robotics.services.managed import managed_services
 
 
 @dataclass(frozen=True)
@@ -28,8 +32,11 @@ def run(command: list[str], timeout: int = 10) -> subprocess.CompletedProcess | 
         return None
 
 
-def get_target(name: str) -> LogTarget | None:
-    managed = MANAGED_SERVICES.get(name)
+def get_target(
+    name: str,
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> LogTarget | None:
+    managed = managed_services(config).get(name)
 
     if managed is None:
         return None
@@ -95,13 +102,15 @@ def print_target_logs(
         print()
 
 
-def list_targets() -> None:
+def list_targets(
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> None:
     print()
     print("Available log targets")
     print("=====================")
     print()
 
-    for name, managed in MANAGED_SERVICES.items():
+    for name, managed in managed_services(config).items():
         print(f"{name:14} {managed.title}")
 
     print()

@@ -11,6 +11,8 @@ const DRIVE_THROTTLE_CURVE = 1.7;
 const DRIVE_STEERING_CURVE = 1.5;
 const CAMERA_CURVE = 1.6;
 
+const STATUS_REFRESH_INTERVAL_MS = 5000;
+
 const state = {
     websocket: null,
     ready: false,
@@ -52,31 +54,235 @@ function clamp(value, minimum, maximum) {
     );
 }
 
-function setVideoState(state) {
-    const panel = document.querySelector(
-        ".video-panel"
-    );
+function formatVoltage(value) {
+    const voltage = Number(value);
 
-    panel.dataset.videoState = state;
-
-    const status = document.querySelector(
-        ".video-status"
-    );
-
-    if (!status) {
-        return;
+    if (!Number.isFinite(voltage)) {
+        return "--";
     }
 
+    return `${voltage.toFixed(2)} V`;
+}
+
+
+function formatTemperature(value) {
+    const temperature = Number(value);
+
+    if (!Number.isFinite(temperature)) {
+        return "--";
+    }
+
+    return `${temperature.toFixed(1)} °C`;
+}
+
+
+function setHudHealth(
+    label,
+    cssClass
+) {
+    element(
+        "hud-health"
+    ).textContent = label;
+
+    const dot = element(
+        "hud-health-dot"
+    );
+
+    dot.classList.remove(
+        "hud-unknown",
+        "hud-healthy",
+        "hud-warning",
+        "hud-critical"
+    );
+
+    dot.classList.add(
+        cssClass
+    );
+}
+
+function determineHealth(status) {
+    const hardware =
+        status.hardware ?? {};
+
+    const systemHealth =
+        status.system_health ?? {};
+
+    const battery =
+        hardware.battery ?? {};
+
+    const temperature =
+        systemHealth.temperature ?? {};
+
+    const throttling =
+        systemHealth.throttling ?? {};
+
+    if (
+        hardware.robot_available === false ||
+        battery.state === "critical" ||
+        temperature.state === "critical" ||
+        throttling.undervoltage_now === true ||
+        throttling.throttled_now === true
+    ) {
+        return {
+            label: "Needs Attention",
+            cssClass: "hud-critical",
+        };
+    }
+
+    if (
+        battery.available === false ||
+        battery.state === "low" ||
+        temperature.state === "high" ||
+        hardware.vision?.service_available === false
+    ) {
+        return {
+            label: "Warning",
+            cssClass: "hud-warning",
+        };
+    }
+
+    return {
+        label: "Healthy",
+        cssClass: "hud-healthy",
+    };
+}
+
+function renderPlatformStatus(status) {
+    const health =
+        determineHealth(status);
+
+    setHudHealth(
+        health.label,
+        health.cssClass
+    );
+
+    element(
+        "hud-battery"
+    ).textContent =
+        formatVoltage(
+            status.hardware
+                ?.battery
+                ?.voltage
+        );
+
+    element(
+        "hud-temperature"
+    ).textContent =
+        formatTemperature(
+            status.system_health
+                ?.temperature
+                ?.celsius
+        );
+}
+
+
+function renderPlatformStatusError() {
+    setHudHealth(
+        "Unavailable",
+        "hud-critical"
+    );
+
+    element(
+        "hud-battery"
+    ).textContent = "--";
+
+    element(
+        "hud-temperature"
+    ).textContent = "--";
+}
+
+
+async function refreshPlatformStatus() {
+    try {
+        const response = await fetch(
+            "/api/status",
+            {
+                cache: "no-store",
+                headers: {
+                    Accept:
+                        "application/json",
+                },
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error(
+                `Status request failed: `
+                + response.status
+            );
+        }
+
+        const status =
+            await response.json();
+
+        renderPlatformStatus(
+            status
+        );
+
+    } catch (error) {
+        console.error(
+            "Could not load platform status",
+            error
+        );
+
+        renderPlatformStatusError();
+    }
+}
+
+function setVideoState(state) {
+    const panel =
+        document.querySelector(
+            ".video-panel"
+        );
+
+    panel.dataset.videoState =
+        state;
+
+    const status =
+        document.querySelector(
+            ".video-status"
+        );
+
     const labels = {
-        connecting: "Connecting camera…",
-        connected: "Camera connected",
-        disconnected: "Reconnecting camera…",
-        error: "Camera unavailable",
-        closed: "Camera disconnected",
+        connecting:
+            "Connecting camera…",
+        connected:
+            "Camera connected",
+        disconnected:
+            "Reconnecting camera…",
+        error:
+            "Camera unavailable",
+        closed:
+            "Camera disconnected",
     };
 
-    status.textContent =
-        labels[state] ?? "Camera";
+    if (status !== null) {
+        status.textContent =
+            labels[state]
+            ?? "Camera";
+    }
+
+    const hudCamera =
+        element("hud-camera");
+
+    if (hudCamera !== null) {
+        const hudLabels = {
+            connecting:
+                "Connecting",
+            connected:
+                "Connected",
+            disconnected:
+                "Reconnecting",
+            error:
+                "Unavailable",
+            closed:
+                "Disconnected",
+        };
+
+        hudCamera.textContent =
+            hudLabels[state]
+            ?? "Unknown";
+    }
 }
 
 function shapeAxis(
@@ -363,6 +569,26 @@ function setConnectionState(
         `drive-connection ${cssClass}`;
 
     connection.textContent = label;
+
+    const hudDrive =
+        element("hud-drive");
+
+    if (hudDrive !== null) {
+        const hudLabels = {
+            "status-connecting":
+                "Connecting",
+            "status-connected":
+                "Connected",
+            "status-busy":
+                "Busy",
+            "status-disconnected":
+                "Disconnected",
+        };
+
+        hudDrive.textContent =
+            hudLabels[cssClass]
+            ?? label;
+    }
 }
 
 function connect() {
@@ -998,6 +1224,13 @@ document.addEventListener(
             );
 
         videoConnection.connect();
+
+        refreshPlatformStatus();
+
+        window.setInterval(
+            refreshPlatformStatus,
+            STATUS_REFRESH_INTERVAL_MS
+        );
 
         connect();
 

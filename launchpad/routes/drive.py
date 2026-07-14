@@ -79,6 +79,53 @@ async def drive_page(
             >
                 Connecting camera…
             </div>
+            <div
+                id="drive-hud"
+                class="drive-hud"
+                aria-live="polite"
+            >
+                <div class="drive-hud-primary">
+                    <span
+                        id="hud-health-dot"
+                        class="drive-hud-dot hud-unknown"
+                    ></span>
+
+                    <div class="drive-hud-value">
+                        <span>Robot</span>
+                        <strong id="hud-health">
+                            Checking…
+                        </strong>
+                    </div>
+                </div>
+
+                <div class="drive-hud-value">
+                    <span>Battery</span>
+                    <strong id="hud-battery">
+                        --
+                    </strong>
+                </div>
+
+                <div class="drive-hud-value">
+                    <span>Temperature</span>
+                    <strong id="hud-temperature">
+                        --
+                    </strong>
+                </div>
+
+                <div class="drive-hud-value">
+                    <span>Drive</span>
+                    <strong id="hud-drive">
+                        Connecting
+                    </strong>
+                </div>
+
+                <div class="drive-hud-value">
+                    <span>Camera</span>
+                    <strong id="hud-camera">
+                        Connecting
+                    </strong>
+                </div>
+            </div>
             <video
                 id="drive-video"
                 class="drive-video"

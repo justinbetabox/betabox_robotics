@@ -49,9 +49,9 @@ async def home(
             tool_card(
                 title="Live Camera",
                 description=(
-                    "View the robot camera stream."
+                    "View the robot's live camera feed."
                 ),
-                href=config.network.vision_url,
+                href="/camera",
             ),
             tool_card(
                 title="Media",

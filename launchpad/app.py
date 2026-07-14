@@ -13,6 +13,7 @@ from betabox_robotics.launchpad.routes import (
     setup_drive_routes,
     setup_home_routes,
     setup_status_routes,
+    setup_camera_routes,
 )
 
 from betabox_robotics.launchpad.drive_controller import (
@@ -50,6 +51,7 @@ def create_app(
     setup_home_routes(app)
     setup_status_routes(app)
     setup_drive_routes(app)
+    setup_camera_routes(app)
 
     app.router.add_static(
         "/static/",

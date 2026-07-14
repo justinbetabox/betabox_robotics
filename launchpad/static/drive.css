@@ -1,0 +1,366 @@
+.drive-body {
+    min-height: 100vh;
+    background: #111820;
+    color: #f5f7f9;
+}
+
+.drive-header {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    gap: 1.5rem;
+
+    padding: 1rem clamp(1rem, 3vw, 2.5rem);
+    background: #17212b;
+    border-bottom: 1px solid #2b3742;
+}
+
+.drive-header h1 {
+    margin: 0;
+    font-size: clamp(1.6rem, 4vw, 2.5rem);
+    text-align: center;
+}
+
+.drive-header .eyebrow {
+    margin-bottom: 0.3rem;
+    color: #8fa0ae;
+    text-align: center;
+}
+
+.back-link {
+    color: #dce5eb;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.drive-connection {
+    justify-self: end;
+    padding: 0.55rem 0.8rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 800;
+}
+
+.status-connecting {
+    background: #374554;
+}
+
+.status-connected {
+    background: #1f6f3f;
+}
+
+.status-busy {
+    background: #8a6200;
+}
+
+.status-disconnected {
+    background: #912f38;
+}
+
+.drive-layout {
+    display: grid;
+    grid-template-columns:
+        minmax(0, 1.6fr)
+        minmax(320px, 0.7fr);
+    gap: 1.25rem;
+
+    min-height: calc(100vh - 90px);
+    padding: 1.25rem;
+}
+
+.video-panel {
+    position: relative;
+    min-height: 520px;
+    overflow: hidden;
+    border: 1px solid #35414c;
+    border-radius: 20px;
+    background: #05080b;
+}
+
+.drive-video {
+    width: 100%;
+    height: 100%;
+    min-height: 520px;
+    border: 0;
+}
+
+.video-overlay {
+    position: absolute;
+    right: 1rem;
+    bottom: 1rem;
+    left: 1rem;
+
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+
+    padding: 0.75rem 1rem;
+    border: 1px solid rgb(255 255 255 / 14%);
+    border-radius: 12px;
+    background: rgb(5 8 11 / 76%);
+    backdrop-filter: blur(10px);
+}
+
+.control-panel {
+    display: grid;
+    align-content: start;
+    gap: 1.25rem;
+
+    padding: 1.25rem;
+    border: 1px solid #35414c;
+    border-radius: 20px;
+    background: #17212b;
+}
+
+.speed-control {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+}
+
+.speed-control input {
+    width: min(260px, 55%);
+}
+
+.joystick-section {
+    display: grid;
+    justify-items: center;
+    gap: 1rem;
+}
+
+.joystick-help {
+    margin: 0;
+    color: #91a1ae;
+    font-size: 0.85rem;
+}
+
+.joystick {
+    position: relative;
+
+    width: min(100%, 320px);
+    aspect-ratio: 1;
+
+    overflow: hidden;
+    border: 2px solid #44515e;
+    border-radius: 50%;
+    background:
+        radial-gradient(
+            circle at center,
+            #24313d 0 18%,
+            #1d2934 18% 48%,
+            #17212b 48% 100%
+        );
+
+    box-shadow:
+        inset 0 0 40px rgb(0 0 0 / 25%),
+        0 12px 30px rgb(0 0 0 / 20%);
+
+    cursor: grab;
+    touch-action: none;
+    user-select: none;
+}
+
+.joystick:active {
+    cursor: grabbing;
+}
+
+.joystick-crosshair::before,
+.joystick-crosshair::after {
+    position: absolute;
+    content: "";
+    background: rgb(255 255 255 / 10%);
+}
+
+.joystick-crosshair::before {
+    top: 50%;
+    right: 12%;
+    left: 12%;
+    height: 1px;
+}
+
+.joystick-crosshair::after {
+    top: 12%;
+    bottom: 12%;
+    left: 50%;
+    width: 1px;
+}
+
+.joystick-stick {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+
+    width: 30%;
+    aspect-ratio: 1;
+
+    border: 2px solid #79add3;
+    border-radius: 50%;
+    background:
+        radial-gradient(
+            circle at 35% 30%,
+            #5f91b8,
+            #2e526d 70%
+        );
+
+    box-shadow:
+        0 8px 22px rgb(0 0 0 / 40%),
+        inset 0 1px 2px rgb(255 255 255 / 28%);
+
+    transform: translate(0, 0);
+    translate: -50% -50%;
+    pointer-events: none;
+}
+
+.joystick-label {
+    position: absolute;
+    color: #8fa0ad;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    pointer-events: none;
+}
+
+.joystick-forward {
+    top: 6%;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.joystick-reverse {
+    bottom: 6%;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.joystick-left {
+    top: 50%;
+    left: 5%;
+    transform:
+        translateY(-50%)
+        rotate(-90deg);
+}
+
+.joystick-right {
+    top: 50%;
+    right: 4%;
+    transform:
+        translateY(-50%)
+        rotate(90deg);
+}
+
+.joystick-readout {
+    display: flex;
+    justify-content: center;
+    gap: 2rem;
+
+    color: #91a1ae;
+    font-size: 0.8rem;
+}
+
+.joystick-readout span {
+    display: grid;
+    gap: 0.25rem;
+    text-align: center;
+}
+
+.joystick-readout strong {
+    color: #ffffff;
+}
+
+.emergency-stop {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.65rem;
+
+    width: 100%;
+    min-height: 64px;
+
+    border: 1px solid #d45b66;
+    border-radius: 14px;
+    background: #a32430;
+    color: #ffffff;
+
+    font: inherit;
+    font-size: 1rem;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+.emergency-stop:hover,
+.emergency-stop:active {
+    background: #c02e3c;
+}
+
+.stop-icon {
+    font-size: 1.35rem;
+}
+
+.keyboard-help {
+    display: grid;
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+    gap: 0.5rem;
+
+    padding: 1rem;
+    border-radius: 12px;
+    background: #111820;
+    color: #acbac5;
+    font-size: 0.82rem;
+}
+
+.keyboard-help strong {
+    grid-column: 1 / -1;
+    color: #ffffff;
+}
+
+.drive-safety {
+    margin: 0;
+    color: #92a2af;
+    font-size: 0.8rem;
+    line-height: 1.5;
+}
+
+@media (max-width: 960px) {
+    .drive-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .video-panel,
+    .drive-video {
+        min-height: 420px;
+    }
+}
+
+@media (max-width: 640px) {
+    .drive-header {
+        grid-template-columns: 1fr auto;
+    }
+
+    .drive-header > div:nth-child(2) {
+        display: none;
+    }
+
+    .drive-layout {
+        padding: 0.75rem;
+    }
+
+    .video-panel,
+    .drive-video {
+        min-height: 300px;
+    }
+
+    .keyboard-help {
+        display: none;
+    }
+
+    .joystick {
+        width: min(82vw, 300px);
+    }
+
+    .joystick-readout {
+        gap: 1rem;
+    }
+}

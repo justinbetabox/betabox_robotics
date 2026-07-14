@@ -10,13 +10,31 @@ from betabox_robotics.config import (
     PlatformConfig,
 )
 from betabox_robotics.launchpad.routes import (
+    setup_drive_routes,
     setup_home_routes,
     setup_status_routes,
+)
+
+from betabox_robotics.launchpad.drive_controller import (
+    ManualDriveController,
 )
 
 
 STATIC_DIR = Path(__file__).parent / "static"
 
+async def drive_controller_context(
+    app: web.Application,
+):
+    controller = ManualDriveController()
+
+    await controller.start()
+
+    app["drive_controller"] = controller
+
+    try:
+        yield
+    finally:
+        await controller.close()
 
 def create_app(
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
@@ -25,8 +43,13 @@ def create_app(
 
     app["platform_config"] = config
 
+    app.cleanup_ctx.append(
+        drive_controller_context
+    )
+
     setup_home_routes(app)
     setup_status_routes(app)
+    setup_drive_routes(app)
 
     app.router.add_static(
         "/static/",

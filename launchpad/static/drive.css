@@ -1,8 +1,21 @@
 .drive-body {
-    min-height: 100vh;
+    display: grid;
+    grid-template-rows:
+        auto
+        minmax(0, 1fr);
+
+    width: 100%;
+    height: 100dvh;
+    min-height: 0;
+    margin: 0;
+    overflow: hidden;
+
     background: #111820;
     color: #f5f7f9;
 }
+
+
+/* Header */
 
 .drive-header {
     display: grid;
@@ -35,8 +48,10 @@
 
 .drive-connection {
     justify-self: end;
+
     padding: 0.55rem 0.8rem;
     border-radius: 999px;
+
     font-size: 0.8rem;
     font-weight: 800;
 }
@@ -57,20 +72,34 @@
     background: #912f38;
 }
 
+
+/* Main layout */
+
 .drive-layout {
     display: grid;
     grid-template-columns:
-        minmax(0, 1.6fr)
-        minmax(320px, 0.7fr);
-    gap: 1.25rem;
+        minmax(0, 1.55fr)
+        minmax(420px, 0.85fr);
+    gap: 1rem;
 
-    min-height: calc(100vh - 90px);
-    padding: 1.25rem;
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+
+    padding: 1rem;
+    overflow: hidden;
 }
+
+
+/* Video */
 
 .video-panel {
     position: relative;
-    min-height: 520px;
+
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+
     overflow: hidden;
     border: 1px solid #35414c;
     border-radius: 20px;
@@ -78,10 +107,16 @@
 }
 
 .drive-video {
+    display: block;
+
     width: 100%;
     height: 100%;
-    min-height: 520px;
+    min-width: 0;
+    min-height: 0;
+
     border: 0;
+    background: #000;
+    object-fit: contain;
 }
 
 .video-overlay {
@@ -97,22 +132,73 @@
     padding: 0.75rem 1rem;
     border: 1px solid rgb(255 255 255 / 14%);
     border-radius: 12px;
+
     background: rgb(5 8 11 / 76%);
     backdrop-filter: blur(10px);
 }
 
+.video-status {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    z-index: 2;
+
+    padding: 0.5rem 0.75rem;
+    border-radius: 999px;
+
+    background: rgb(5 8 11 / 76%);
+    color: #d8e1e8;
+
+    font-size: 0.78rem;
+    font-weight: 800;
+
+    backdrop-filter: blur(10px);
+    transition: opacity 140ms ease;
+}
+
+.video-panel[data-video-state="connected"] .video-status {
+    opacity: 0;
+    pointer-events: none;
+}
+
+
+/* Control panel */
+
 .control-panel {
     display: grid;
-    align-content: start;
-    gap: 1.25rem;
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+        "speed speed"
+        "drive camera"
+        "stop stop"
+        "keyboard keyboard"
+        "safety safety";
+    grid-template-rows:
+        auto
+        minmax(0, 1fr)
+        auto
+        auto
+        auto;
 
-    padding: 1.25rem;
+    align-items: start;
+    gap: 0.75rem;
+
+    min-width: 0;
+    min-height: 0;
+    height: 100%;
+
+    padding: 1rem;
+    overflow: hidden;
+
     border: 1px solid #35414c;
     border-radius: 20px;
     background: #17212b;
 }
 
 .speed-control {
+    grid-area: speed;
+
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -123,27 +209,61 @@
     width: min(260px, 55%);
 }
 
+
+/* Joystick sections */
+
 .joystick-section {
+    grid-area: drive;
+}
+
+.camera-control-section {
+    grid-area: camera;
+}
+
+.joystick-section,
+.camera-control-section {
     display: grid;
+    align-content: start;
     justify-items: center;
-    gap: 1rem;
+    gap: 0.6rem;
+
+    min-width: 0;
+    min-height: 0;
+}
+
+.joystick-section > div:first-child,
+.camera-control-heading {
+    width: 100%;
+}
+
+.joystick-section .eyebrow,
+.camera-control-section .eyebrow {
+    margin-bottom: 0.25rem;
 }
 
 .joystick-help {
     margin: 0;
     color: #91a1ae;
-    font-size: 0.85rem;
+    font-size: 0.75rem;
+    line-height: 1.3;
 }
+
+
+/* Joystick */
 
 .joystick {
     position: relative;
 
-    width: min(100%, 320px);
+    width: min(
+        100%,
+        clamp(145px, 25vh, 255px)
+    );
     aspect-ratio: 1;
 
     overflow: hidden;
     border: 2px solid #44515e;
     border-radius: 50%;
+
     background:
         radial-gradient(
             circle at center,
@@ -196,6 +316,7 @@
 
     border: 2px solid #79add3;
     border-radius: 50%;
+
     background:
         radial-gradient(
             circle at 35% 30%,
@@ -209,16 +330,19 @@
 
     transform: translate(0, 0);
     translate: -50% -50%;
+
     pointer-events: none;
 }
 
 .joystick-label {
     position: absolute;
+
     color: #8fa0ad;
     font-size: 0.7rem;
     font-weight: 800;
     letter-spacing: 0.08em;
     text-transform: uppercase;
+
     pointer-events: none;
 }
 
@@ -237,6 +361,7 @@
 .joystick-left {
     top: 50%;
     left: 5%;
+
     transform:
         translateY(-50%)
         rotate(-90deg);
@@ -245,6 +370,7 @@
 .joystick-right {
     top: 50%;
     right: 4%;
+
     transform:
         translateY(-50%)
         rotate(90deg);
@@ -269,23 +395,85 @@
     color: #ffffff;
 }
 
+
+/* Camera control */
+
+.camera-control-heading {
+    display: grid;
+    gap: 0.45rem;
+}
+
+.camera-joystick {
+    width: min(
+        100%,
+        clamp(135px, 22vh, 220px)
+    );
+
+    background:
+        radial-gradient(
+            circle at center,
+            #283845 0 18%,
+            #202d38 18% 48%,
+            #17212b 48% 100%
+        );
+}
+
+.camera-stick {
+    border-color: #d6a968;
+
+    background:
+        radial-gradient(
+            circle at 35% 30%,
+            #d6a968,
+            #805f34 70%
+        );
+}
+
+.camera-center-button {
+    justify-self: stretch;
+
+    padding: 0.45rem 0.65rem;
+    border: 1px solid #52616e;
+    border-radius: 9px;
+
+    background: #24313d;
+    color: #ffffff;
+
+    font: inherit;
+    font-size: 0.72rem;
+    font-weight: 800;
+
+    cursor: pointer;
+}
+
+.camera-center-button:hover {
+    background: #314354;
+}
+
+
+/* Emergency stop */
+
 .emergency-stop {
+    grid-area: stop;
+
     display: flex;
     justify-content: center;
     align-items: center;
     gap: 0.65rem;
 
     width: 100%;
-    min-height: 64px;
+    min-height: 52px;
 
     border: 1px solid #d45b66;
     border-radius: 14px;
+
     background: #a32430;
     color: #ffffff;
 
     font: inherit;
     font-size: 1rem;
     font-weight: 900;
+
     cursor: pointer;
 }
 
@@ -298,125 +486,127 @@
     font-size: 1.35rem;
 }
 
-.keyboard-help {
-    display: grid;
-    grid-template-columns:
-        repeat(2, minmax(0, 1fr));
-    gap: 0.5rem;
 
-    padding: 1rem;
-    border-radius: 12px;
+/* Keyboard and safety information */
+
+.keyboard-help {
+    grid-area: keyboard;
+
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1rem;
+
+    padding: 0.65rem 0.8rem;
+    border-radius: 10px;
+
     background: #111820;
     color: #acbac5;
-    font-size: 0.82rem;
+
+    font-size: 0.72rem;
 }
 
 .keyboard-help strong {
-    grid-column: 1 / -1;
+    width: 100%;
     color: #ffffff;
 }
 
 .drive-safety {
+    grid-area: safety;
+
     margin: 0;
     color: #92a2af;
-    font-size: 0.8rem;
-    line-height: 1.5;
+
+    font-size: 0.7rem;
+    line-height: 1.35;
 }
 
-.camera-control-section {
-    display: grid;
-    justify-items: center;
-    gap: 1rem;
 
-    padding-top: 1.25rem;
-    border-top: 1px solid #34414c;
-}
+/* Short desktop windows */
 
-.camera-control-heading {
-    display: flex;
-    justify-content: space-between;
-    align-items: start;
-    gap: 1rem;
-    width: 100%;
-}
+@media (max-height: 760px) and (min-width: 961px) {
+    .drive-header {
+        padding-top: 0.6rem;
+        padding-bottom: 0.6rem;
+    }
 
-.camera-joystick {
-    width: min(100%, 230px);
-    background:
-        radial-gradient(
-            circle at center,
-            #283845 0 18%,
-            #202d38 18% 48%,
-            #17212b 48% 100%
+    .drive-header h1 {
+        font-size: 1.6rem;
+    }
+
+    .drive-header .eyebrow {
+        display: none;
+    }
+
+    .drive-layout {
+        gap: 0.65rem;
+        padding: 0.65rem;
+    }
+
+    .control-panel {
+        gap: 0.5rem;
+        padding: 0.75rem;
+    }
+
+    .joystick {
+        width: min(
+            100%,
+            clamp(130px, 23vh, 190px)
         );
-}
+    }
 
-.camera-stick {
-    border-color: #d6a968;
-    background:
-        radial-gradient(
-            circle at 35% 30%,
-            #d6a968,
-            #805f34 70%
+    .camera-joystick {
+        width: min(
+            100%,
+            clamp(120px, 20vh, 170px)
         );
+    }
+
+    .joystick-help,
+    .keyboard-help,
+    .drive-safety {
+        display: none;
+    }
+
+    .emergency-stop {
+        min-height: 44px;
+    }
 }
 
-.camera-center-button {
-    padding: 0.6rem 0.85rem;
-    border: 1px solid #52616e;
-    border-radius: 10px;
-    background: #24313d;
-    color: #ffffff;
-    font: inherit;
-    font-size: 0.8rem;
-    font-weight: 800;
-    cursor: pointer;
-}
 
-.camera-center-button:hover {
-    background: #314354;
-}
-
-.video-status {
-    position: absolute;
-    top: 1rem;
-    left: 1rem;
-    z-index: 2;
-
-    padding: 0.5rem 0.75rem;
-    border-radius: 999px;
-    background: rgb(5 8 11 / 76%);
-    color: #d8e1e8;
-    font-size: 0.78rem;
-    font-weight: 800;
-    backdrop-filter: blur(10px);
-}
-
-.video-panel[data-video-state="connected"]
-.video-status {
-    display: none;
-}
-
-.video-panel[data-video-state="error"]
-.video-status::after {
-    content: "Camera unavailable";
-}
-
-.video-panel[data-video-state="disconnected"]
-.video-status::after {
-    content: "Reconnecting camera…";
-}
+/* Tablet and narrow layouts */
 
 @media (max-width: 960px) {
+    .drive-body {
+        display: block;
+
+        height: auto;
+        min-height: 100dvh;
+
+        overflow-y: auto;
+    }
+
     .drive-layout {
         grid-template-columns: 1fr;
+
+        height: auto;
+        min-height: 0;
+
+        overflow: visible;
     }
 
     .video-panel,
     .drive-video {
-        min-height: 420px;
+        min-height: min(52dvh, 420px);
+    }
+
+    .control-panel {
+        height: auto;
+        overflow: visible;
     }
 }
+
+
+/* Phones */
 
 @media (max-width: 640px) {
     .drive-header {
@@ -436,6 +626,17 @@
         min-height: 300px;
     }
 
+    .control-panel {
+        grid-template-columns: 1fr;
+        grid-template-areas:
+            "speed"
+            "drive"
+            "camera"
+            "stop"
+            "keyboard"
+            "safety";
+    }
+
     .keyboard-help {
         display: none;
     }
@@ -444,20 +645,19 @@
         width: min(82vw, 300px);
     }
 
+    .camera-joystick {
+        width: min(68vw, 230px);
+    }
+
     .joystick-readout {
         gap: 1rem;
     }
 
     .camera-control-heading {
         align-items: stretch;
-        flex-direction: column;
     }
 
     .camera-center-button {
         width: 100%;
-    }
-
-    .camera-joystick {
-        width: min(68vw, 230px);
     }
 }

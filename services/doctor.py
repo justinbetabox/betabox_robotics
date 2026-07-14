@@ -568,8 +568,8 @@ def diagnose_vision_hardware(
                 "Detection",
             ],
             actions=[
-                "Restart betabox-video.service.",
-                f"Run: betabox logs video --journal-only",
+                f"Restart: sudo systemctl restart {config.services.video}",
+                "Run: betabox logs video --journal-only",
                 "Check the camera ribbon cable.",
             ],
         )

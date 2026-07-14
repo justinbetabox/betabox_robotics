@@ -185,6 +185,12 @@ class PlatformNetworkConfig:
     jupyterhub_port: int = 8000
     vision_port: int = 8080
 
+    wifi_interface: str = "wlan0"
+    ethernet_interface: str = "eth0"
+    ap_connection_name: str = "PiAP"
+    identity_prefix: str = "Betabox"
+    wifi_fallback_delay_seconds: int = 20
+
     def __post_init__(self) -> None:
         if not self.local_host:
             raise ValueError("local_host cannot be empty")
@@ -200,6 +206,22 @@ class PlatformNetworkConfig:
                 raise ValueError(
                     f"{name} must be between 1 and 65535"
                 )
+
+        for name, value in (
+            ("wifi_interface", self.wifi_interface),
+            ("ethernet_interface", self.ethernet_interface),
+            ("ap_connection_name", self.ap_connection_name),
+            ("identity_prefix", self.identity_prefix),
+        ):
+            if not value:
+                raise ValueError(
+                    f"{name} cannot be empty"
+                )
+
+        if self.wifi_fallback_delay_seconds < 0:
+            raise ValueError(
+                "wifi_fallback_delay_seconds cannot be negative"
+            )
 
     @property
     def jupyterhub_url(self) -> str:

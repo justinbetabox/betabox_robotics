@@ -128,7 +128,14 @@ def create_snapshot(
     write_text(
         logs_dir / "journal-betabox-monitor.txt",
         command_output(
-            ["journalctl", "-u", "betabox-monitor.service", "-n", "100", "--no-pager"]
+            [
+                "journalctl",
+                "-u",
+                config.services.monitor,
+                "-n",
+                "100",
+                "--no-pager",
+            ]
         ),
     )
     write_text(

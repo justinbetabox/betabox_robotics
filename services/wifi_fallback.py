@@ -3,7 +3,10 @@ from __future__ import annotations
 import argparse
 import subprocess
 import time
-from pathlib import Path
+
+from betabox_robotics.services.identity import (
+    identity_name,
+)
 
 WIFI_IFACE = "wlan0"
 ETH_IFACE = "eth0"
@@ -24,28 +27,20 @@ def run(command: list[str], timeout: int = 10) -> subprocess.CompletedProcess | 
         return None
 
 
-def get_serial() -> str | None:
-    serial_path = Path("/sys/firmware/devicetree/base/serial-number")
+def dynamic_ssid(
+    prefix: str = SSID_PREFIX,
+) -> str:
+    name = identity_name(
+        prefix,
+        fallback="UNKNOWN",
+    )
 
-    if serial_path.exists():
-        serial = serial_path.read_text(errors="ignore").replace("\x00", "").strip()
-        return serial or None
+    if name is None:
+        raise RuntimeError(
+            "failed to construct fallback SSID"
+        )
 
-    cpuinfo = Path("/proc/cpuinfo")
-
-    if cpuinfo.exists():
-        for line in cpuinfo.read_text(errors="ignore").splitlines():
-            if line.startswith("Serial"):
-                parts = line.split(":", 1)
-                if len(parts) == 2:
-                    return parts[1].strip() or None
-
-    return None
-
-
-def dynamic_ssid(prefix: str = SSID_PREFIX) -> str:
-    serial = get_serial() or "UNKNOWN"
-    return f"{prefix}-{serial[-4:]}"
+    return name
 
 
 def nmcli_available() -> bool:

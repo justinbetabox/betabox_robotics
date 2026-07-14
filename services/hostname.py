@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import argparse
 import subprocess
-from pathlib import Path
+
+from betabox_robotics.services.identity import (
+    identity_name,
+)
 
 PREFIX = "Betabox"
 
@@ -11,32 +14,10 @@ def run(command: list[str]) -> subprocess.CompletedProcess:
     return subprocess.run(command, capture_output=True, text=True)
 
 
-def get_serial() -> str | None:
-    serial_path = Path("/sys/firmware/devicetree/base/serial-number")
-
-    if serial_path.exists():
-        serial = serial_path.read_text(errors="ignore").replace("\x00", "").strip()
-        return serial or None
-
-    cpuinfo = Path("/proc/cpuinfo")
-
-    if cpuinfo.exists():
-        for line in cpuinfo.read_text(errors="ignore").splitlines():
-            if line.startswith("Serial"):
-                parts = line.split(":", 1)
-                if len(parts) == 2:
-                    return parts[1].strip() or None
-
-    return None
-
-
-def desired_hostname(prefix: str = PREFIX) -> str | None:
-    serial = get_serial()
-
-    if not serial:
-        return None
-
-    return f"{prefix}-{serial[-4:]}"
+def desired_hostname(
+    prefix: str = PREFIX,
+) -> str | None:
+    return identity_name(prefix)
 
 
 def current_hostname() -> str:

@@ -184,6 +184,7 @@ class PlatformNetworkConfig:
 
     jupyterhub_port: int = 8000
     vision_port: int = 8080
+    launchpad_port: int = 8088
 
     wifi_interface: str = "wlan0"
     ethernet_interface: str = "eth0"
@@ -201,6 +202,7 @@ class PlatformNetworkConfig:
         for name, port in (
             ("jupyterhub_port", self.jupyterhub_port),
             ("vision_port", self.vision_port),
+            ("launchpad_port", self.launchpad_port),
         ):
             if not 1 <= port <= 65535:
                 raise ValueError(
@@ -239,6 +241,13 @@ class PlatformNetworkConfig:
         return (
             f"http://{self.local_host}:"
             f"{self.vision_port}"
+        )
+
+    @property
+    def launchpad_url(self) -> str:
+        return (
+            f"http://{self.local_host}:"
+            f"{self.launchpad_port}"
         )
 
 @dataclass(frozen=True)

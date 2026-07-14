@@ -18,6 +18,9 @@ from betabox_robotics.services.verify import main as verify_main
 from betabox_robotics.services.video import main as video_main
 from betabox_robotics.services.wifi_fallback import main as wifi_fallback_main
 from betabox_robotics.services.events import main as events_main
+from betabox_robotics.launchpad.app import (
+    main as launchpad_main,
+)
 
 
 def main() -> int:
@@ -88,6 +91,10 @@ def main() -> int:
         "video",
         help="Run the Betabox video streaming service",
     )
+    subparsers.add_parser(
+        "launchpad",
+        help="Run the Betabox Launchpad web interface",
+    )
 
     args, extra = parser.parse_known_args()
 
@@ -138,6 +145,9 @@ def main() -> int:
 
     if args.command == "video":
         return video_main(extra)
+
+    if args.command == "launchpad":
+        return launchpad_main(extra)
 
     parser.print_help()
     return 1

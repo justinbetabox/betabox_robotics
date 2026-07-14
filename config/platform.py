@@ -341,6 +341,19 @@ class PlatformMonitoringConfig:
                 "default_log_lines must be greater than 0"
             )
 
+@dataclass(frozen=True)
+class PlatformRuntimeConfig:
+    """
+    Runtime defaults for installed Betabox services.
+    """
+
+    vision_fps: int = 20
+
+    def __post_init__(self) -> None:
+        if self.vision_fps <= 0:
+            raise ValueError(
+                "vision_fps must be greater than 0"
+            )
 
 @dataclass(frozen=True)
 class PlatformConfig:
@@ -355,6 +368,7 @@ class PlatformConfig:
     services: PlatformServicesConfig
     verification: PlatformVerificationConfig
     monitoring: PlatformMonitoringConfig
+    runtime: PlatformRuntimeConfig
 
     @classmethod
     def default(cls) -> "PlatformConfig":
@@ -365,6 +379,7 @@ class PlatformConfig:
             services=PlatformServicesConfig(),
             verification=PlatformVerificationConfig(),
             monitoring=PlatformMonitoringConfig(),
+            runtime=PlatformRuntimeConfig(),
         )
 
 

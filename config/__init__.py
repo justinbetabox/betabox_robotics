@@ -9,6 +9,7 @@ from .platform import (
     UsageThresholdConfig,
     PlatformVerificationConfig,
     PlatformMonitoringConfig,
+    PlatformRuntimeConfig,
 )
 
 __all__ = [
@@ -21,5 +22,6 @@ __all__ = [
     "UsageThresholdConfig",
     "PlatformVerificationConfig",
     "PlatformMonitoringConfig",
+    "PlatformRuntimeConfig",
     "DEFAULT_PLATFORM_CONFIG",
 ]

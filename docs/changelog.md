@@ -8,6 +8,63 @@ represent architectural milestones rather than production releases.
 
 ------------------------------------------------------------------------
 
+## 0.7.0 (Development) --- Stable Platform Foundation
+
+### Added
+
+#### Platform Configuration
+
+-    Centralized `PlatformConfig` architecture.
+-    Immutable platform configuration model.
+-    Platform Paths configuration.
+-    Platform Network configuration.
+-    Platform Runtime configuration.
+-    Platform Health configuration.
+-    Platform Monitoring configuration.
+-    Platform Verification configuration.
+-    Platform Services configuration.
+-    Standardized configuration validation.
+
+#### Platform Services
+
+-    Managed service registry.
+-    Platform health collection.
+-    Hardware status collection.
+-    Installation verification.
+-    Diagnostic framework.
+-    Event management improvements.
+-    Logging improvements.
+-    Video service configuration integration.
+-    Hostname configuration integration.
+-    Wi-Fi fallback configuration integration.
+
+#### Validation
+
+-    Expanded platform validation suite.
+-    Runtime configuration validation.
+-    Hardware verification improvements.
+-    Health monitoring validation.
+-    Service configuration validation.
+
+### Changed
+
+#### Platform Architecture
+
+-    Completed migration from scattered platform constants to centralized `PlatformConfig`.
+-    Standardized dependency injection across platform services.
+-    Removed duplicated paths, ports, service names, thresholds, and runtime defaults.
+-    Standardized platform service configuration.
+-    Clarified the separation between `PlatformConfig` and `RobotConfig`.
+
+#### Documentation
+
+-    Added Platform Configuration architecture documentation.
+-    Updated architecture documentation.
+-    Updated project README.
+-    Updated platform documentation to reflect the stable platform architecture.
+
+------------------------------------------------------------------------
+
 ## 0.6.0 (Development) --- Platform Architecture & Documentation
 
 ### Added
@@ -161,10 +218,10 @@ represent architectural milestones rather than production releases.
 
 ## Future Milestones
 
-Planned future milestones include:
-
--    Configuration & Platform Services
--    Launchpad
+-    Betabox Launchpad
+-    Teacher Portal
+-    Student Portal
 -    Classroom Platform
 -    Additional Betabox Robot Platforms
+-    Fleet Management
 -    Version 1.0

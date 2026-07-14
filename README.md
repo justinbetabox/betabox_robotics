@@ -45,16 +45,33 @@ drivers, speech engines, or background services.
 ## Features
 
 -    Stable Robot API
+-    Robot implementations
 -    Reusable subsystem architecture
 -    Hardware abstraction layer
--    Vision subsystem with snapshots, recording, detection, and WebRTC
-    streaming
+-    Centralized Platform Configuration
+-    Vision subsystem with snapshots, recording, detection, and WebRTC streaming
 -    Audio subsystem with speech, sounds, tones, and melodies
 -    Drive subsystem with steering and motor control
 -    Sensors subsystem with ultrasonic, grayscale, and battery monitoring
--    System subsystem for platform information and health
--    Managed platform services
+-    System subsystem
+-    Platform services (status, doctor, verify, monitoring, recovery)
 -    Deployment and classroom management tools
+
+------------------------------------------------------------------------
+
+## Core Components
+
+The Betabox Platform consists of:
+
+-    Betabox Robotics SDK
+-    Robot Implementations
+-    Platform Services
+-    Platform Configuration
+-    Deployment Infrastructure
+-    Administration CLI
+-    Documentation
+-    Classroom Curriculum (future)
+-    Launchpad (in development)
 
 ------------------------------------------------------------------------
 
@@ -108,6 +125,7 @@ python -m betabox_robotics.examples.robots.betabox_car.basic_robot_demo
 betabox_robotics/
 ├── audio/          Audio subsystem
 ├── cli/            Administration CLI
+├── config/         Platform configuration
 ├── deployment/     Installation and system configuration
 ├── docs/           Documentation
 ├── drive/          Drive subsystem
@@ -132,6 +150,7 @@ betabox_robotics/
 
 -    `docs/architecture.md`
 -    `docs/design_principles.md`
+-    `docs/platform/platform.md`
 
 ### SDK
 
@@ -174,22 +193,21 @@ See `docs/roadmap.md` for the long-term project direction.
 ## Platform Architecture
 
 ``` text
-Applications
-       │
-       ▼
-Launchpad / CLI
-       │
-       ▼
-Robot API
-       │
-       ▼
-Betabox Robotics SDK
-       │
-       ▼
-Platform Services
-       │
-       ▼
-Linux Operating System
+                 Applications
+                      │
+                      ▼
+         Robot API / Launchpad / CLI
+                      │
+         ┌────────────┴─────────────┐
+         ▼                          ▼
+Betabox Robotics SDK        Platform Services
+         │                          │
+         ▼                          ▼
+Hardware Abstractions         PlatformConfig
+         │                          │
+         └────────────┬─────────────┘
+                      ▼
+            Linux Operating System
 ```
 
 ------------------------------------------------------------------------
@@ -217,11 +235,16 @@ instructions.
 
 Current status:
 
--    Stable SDK architecture
--    Stable subsystem architecture
--    Stable deployment process
--    Active platform development
--    Preparing for Launchpad and future robot platforms
+✓    Stable Hardware Abstraction Layer
+✓    Stable Subsystem Architecture
+✓    Stable Robot API
+✓    Stable Platform Services
+✓    Stable Platform Configuration
+✓    Stable Deployment
+
+Current focus:
+
+→    Betabox Launchpad
 
 Future robot implementations include:
 

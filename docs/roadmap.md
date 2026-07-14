@@ -87,16 +87,16 @@ A stable Robot API built from reusable subsystem implementations.
 
 ------------------------------------------------------------------------
 
-# Phase 3 --- Platform Services 🚧
+# Phase 3 --- Platform Services ✅
 
-Current development focus.
+A stable operational platform built on top of the Betabox Robotics SDK. This phase establishes the services, diagnostics, configuration, recovery, and management infrastructure that support classroom operation.
 
 ## Configuration
 
--    [ ] Configuration audit
--    [ ] Unified configuration model
--    [ ] Configuration validation
--    [ ] Configuration serialization
+-    [x] Configuration audit
+-    [x] Unified configuration model
+-    [x] Configuration validation
+-    [x] Configuration serialization
 
 ## Platform Services
 
@@ -104,20 +104,34 @@ Current development focus.
 -    [x] Restore
 -    [x] Reset
 -    [x] Monitoring
--    [x] Diagnostics
+-    [x] Status
+-    [x] Verification
+-    [x] Doctor
 -    [x] Logging
+-    [x] Event management
 -    [x] Service management
--    [ ] Software updates
+-    [x] Boot announcements
+-    [x] Wi-Fi fallback
+-    [x] Hostname management
+-    [x] Video service
+-    [ ] Software updates (internal use)
 
 ## Platform Health
 
--    [ ] Aggregated health reporting
--    [ ] Runtime diagnostics
--    [ ] Configuration inspection
+-    [x] Aggregated health reporting
+-    [x] Runtime diagnostics
+-    [x] Configuration-driven thresholds
+
+## Platform Architecture
+
+-    [x] Managed service registry
+-    [x] PlatformConfig
+-    [x] Platform/Robot configuration separation
+-    [x] Dependency injection across services
 
 ------------------------------------------------------------------------
 
-# Phase 4 --- Launchpad
+# Phase 4 --- Betabox Launchpad
 
 Browser-based platform management.
 
@@ -126,9 +140,15 @@ Browser-based platform management.
 -    [ ] Live video
 -    [ ] Diagnostics
 -    [ ] Monitoring
--    [ ] Backup and restore
 -    [ ] Logs
--    [ ] Configuration management
+-    [ ] Events
+-    [ ] Verification
+-    [ ] Doctor
+-    [ ] Service management
+-    [ ] Backup
+-    [ ] Restore
+-    [ ] Reset
+-    [ ] Configuration
 
 ------------------------------------------------------------------------
 
@@ -180,6 +200,7 @@ Reusable subsystem architecture enables additional robots.
 Version 1.0 represents a stable educational robotics platform with:
 
 -    Stable Robot API
+-    Stable PlatformConfig
 -    Stable platform services
 -    Launchpad
 -    Teacher and Student experiences

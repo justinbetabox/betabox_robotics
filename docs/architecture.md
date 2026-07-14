@@ -19,29 +19,25 @@ The architecture separates stable user-facing interfaces from replaceable implem
 ## Architecture
 
 ``` text
-           Applications
-                │
-                ▼
-        Betabox Robot API
-                │
-                ▼
-      Robot Implementations
-     (Car and future robots)
-                │
-                ▼
-       Reusable Subsystems
- ┌────────┬───────┬────────┬──────┐
- │        │       │        │      │
-Drive   Vision  Sensors  Audio  System
-                │
-                ▼
-        Platform Services
-                │
-                ▼
-     Hardware Abstractions
-                │
-                ▼
-     Linux / Device Drivers
+                    Applications
+                         │
+                         ▼
+            Robot API / Launchpad / CLI
+                         │
+         ┌───────────────┴───────────────┐
+         ▼                               ▼
+Robot Implementations            Platform Services
+         │                               │
+         ▼                               ▼
+ Reusable Subsystems               PlatformConfig
+         │                               │
+         ▼                               ▼
+         └───────────────┬───────────────┘
+                         ▼
+                Hardware Abstractions
+                         │
+                         ▼
+                Linux / Device Drivers
 ```
 
 Dependencies generally flow downward from stable, user-facing layers toward replaceable implementation layers.
@@ -182,20 +178,28 @@ For example:
 
 ### Platform Services
 
-Platform services provide shared internal capabilities used by robot implementations and subsystems.
+Platform services provide the operational capabilities shared across the
+entire Betabox platform.
 
 Examples include:
 
--    Resource management
--    Configuration loading and validation
--    Robot lifecycle coordination
--    Event distribution
--    Background service integration
--    Logging
--    Monitoring
--    Future scheduling
+-    Status
+-    Verification
+-    Doctor
+-    Health monitoring
+-    Backup
+-    Restore
+-    Reset
+-    Event logging
+-    Log management
+-    Video service
+-    Boot announcements
+-    Wi-Fi fallback
+-    Managed services
 
-Platform services coordinate shared behavior while remaining invisible to ordinary student-facing code.
+Platform services consume PlatformConfig and coordinate the installed
+Betabox platform while remaining independent of robot hardware
+configuration.
 
 They should not unnecessarily expose Linux services, process management, file-system details, or internal communication mechanisms through the public Robot API.
 
@@ -222,26 +226,31 @@ Higher layers should not communicate directly with Linux device files, GPIO libr
 
 ## Configuration
 
-Configuration defines how reusable implementations are assembled for a particular robot.
+Configuration is divided into two independent systems.
 
-Configuration may include:
+PlatformConfig describes the installed Betabox platform.
 
--    Pin assignments
--    PWM channels
--    ADC channels
--    Motor direction
--    Reversal flags
--    Steering limits
--    Calibration values
--    Voltage thresholds
--    Camera defaults
--    Installed capabilities
+Examples include:
 
-Reusable subsystem modules should accept configuration through explicit construction or factory methods.
+-    filesystem paths
+-    networking
+-    service names
+-    monitoring
+-    verification
+-    runtime defaults
 
-They should not import a specific robot configuration directly.
+RobotConfig describes the physical robot.
 
-Robot implementations are responsible for choosing and supplying the appropriate configuration.
+Examples include:
+
+-    motors
+-    servos
+-    sensors
+-    battery
+-    vision hardware
+-    audio hardware
+
+Separating these concerns allows multiple robot types to share one platform while exposing different hardware implementations.
 
 ------------------------------------------------------------------------
 
@@ -386,7 +395,18 @@ Modules, attributes, or classes marked private or omitted from public documentat
 
 The Betabox Robot API and reusable subsystem architecture are intended to become the stable foundation for all Betabox robotic platforms.
 
-Applications, curriculum, notebooks, teacher tools, Launchpad, and Portal interfaces should continue to function even as hardware implementations, operating systems, communication protocols, and internal technologies evolve.
+The Betabox Platform is intended to become the stable foundation for:
+
+-    Launchpad
+-    Teacher Portal
+-    Student Portal
+-    Curriculum
+-    Notebooks
+-    Classroom management
+-    Future robot platforms
+
+These applications should build on stable public interfaces without
+depending on implementation details.
 
 The platform should allow internal components to be replaced, extended, or independently tested without requiring unnecessary changes to user-facing software.
 
@@ -403,6 +423,33 @@ The platform should allow internal components to be replaced, extended, or indep
 -    Public interfaces remain small, explicit, and stable.
 -    Internal implementations may evolve without unnecessarily affecting application code.
 -    Lifecycle management leaves hardware in a safe and predictable state.
+
+------------------------------------------------------------------------
+
+## Stable Architecture Boundaries
+
+The platform defines several intentionally stable boundaries.
+
+Public Robot API
+    Stable
+
+Subsystem APIs
+    Stable
+
+Platform Services
+    Stable
+
+PlatformConfig
+    Stable
+
+Hardware implementations
+    Replaceable
+
+Linux implementation
+    Replaceable
+
+Third-party libraries
+    Replaceable
 
 ------------------------------------------------------------------------
 

@@ -14,19 +14,35 @@ from betabox_robotics.robots import BETABOX_CAR
 def main() -> None:
     servos = {
         "steering": Servo(
-            BETABOX_CAR.steering.servo,
-            min_angle=BETABOX_CAR.steering.min_angle,
-            max_angle=BETABOX_CAR.steering.max_angle,
+            BETABOX_CAR.drive.steering.servo,
+            min_angle=BETABOX_CAR.drive.steering.min_angle,
+            max_angle=BETABOX_CAR.drive.steering.max_angle,
         ),
         "pan": Servo(
-            Pins.P0,
-            min_angle=-45,
-            max_angle=45,
+            BETABOX_CAR.camera_mount.pan_servo,
+            min_angle=(
+                BETABOX_CAR
+                .camera_mount
+                .pan_min_angle
+            ),
+            max_angle=(
+                BETABOX_CAR
+                .camera_mount
+                .pan_max_angle
+            ),
         ),
         "tilt": Servo(
-            Pins.P1,
-            min_angle=-30,
-            max_angle=45,
+            BETABOX_CAR.camera_mount.tilt_servo,
+            min_angle=(
+                BETABOX_CAR
+                .camera_mount
+                .tilt_min_angle
+            ),
+            max_angle=(
+                BETABOX_CAR
+                .camera_mount
+                .tilt_max_angle
+            ),
         ),
     }
 

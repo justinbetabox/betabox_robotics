@@ -30,6 +30,11 @@ from .capabilities import RobotCapability
 from .health import HealthCheck, RobotHealth
 from .robot import Robot
 
+from betabox_robotics.camera import (
+    CameraMount,
+    CameraMountStatus,
+)
+
 
 class CarRobot(Robot):
     """
@@ -52,6 +57,7 @@ class CarRobot(Robot):
 
     drive: Drive
     sensors: Sensors
+    camera_mount: CameraMount
     vision: VisionClient
     audio: Audio
     system: System
@@ -83,6 +89,68 @@ class CarRobot(Robot):
     def center(self) -> None:
         self._require_ready()
         self.drive.center()
+
+    def look(
+        self,
+        *,
+        pan: float | None = None,
+        tilt: float | None = None,
+        smooth: bool = True,
+    ) -> None:
+        self._require_ready()
+
+        self.camera_mount.look(
+            pan=pan,
+            tilt=tilt,
+            smooth=smooth,
+        )
+
+
+    def camera_pan(
+        self,
+        angle: float,
+        *,
+        smooth: bool = True,
+    ) -> None:
+        self._require_ready()
+
+        self.camera_mount.pan(
+            angle,
+            smooth=smooth,
+        )
+
+
+    def camera_tilt(
+        self,
+        angle: float,
+        *,
+        smooth: bool = True,
+    ) -> None:
+        self._require_ready()
+
+        self.camera_mount.tilt(
+            angle,
+            smooth=smooth,
+        )
+
+
+    def look_center(
+        self,
+        *,
+        smooth: bool = True,
+    ) -> None:
+        self._require_ready()
+
+        self.camera_mount.center(
+            smooth=smooth,
+        )
+
+
+    def camera_mount_status(
+        self,
+    ) -> CameraMountStatus:
+        self._require_ready()
+        return self.camera_mount.status()
 
     def drive_status(self) -> DriveStatus:
         self._require_ready()

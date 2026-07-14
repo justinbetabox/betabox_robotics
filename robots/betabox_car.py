@@ -4,11 +4,15 @@ from betabox_robotics.hardware import Pins
 from betabox_robotics.sensors import Sensors
 from betabox_robotics.system import System
 from betabox_robotics.vision import VisionClient
+from betabox_robotics.camera import (
+    CameraMount,
+)
 
 from .car import CarRobot
 from .config import (
     AudioConfig,
     BatteryConfig,
+    CameraMountConfig,
     DriveConfig,
     GrayscaleConfig,
     MotorConfig,
@@ -60,6 +64,18 @@ BETABOX_CAR = RobotConfig(
             critical_voltage=6.2,
         ),
     ),
+    camera_mount=CameraMountConfig(
+        pan_servo=Pins.P0,
+        tilt_servo=Pins.P1,
+        pan_min_angle=-45.0,
+        pan_max_angle=45.0,
+        tilt_min_angle=-30.0,
+        tilt_max_angle=45.0,
+        pan_center=0.0,
+        tilt_center=0.0,
+        pan_reversed=True,
+        tilt_reversed=True,
+    ),
     vision=VisionConfig(),
     audio=AudioConfig(),
     system=SystemConfig(),
@@ -80,6 +96,9 @@ class BetaboxCar(CarRobot):
         # These factories will be updated in the next step.
         self.drive = Drive.default(config.drive)
         self.sensors = Sensors.default(config.sensors)
+        self.camera_mount = CameraMount.default(
+            config.camera_mount
+        )
         self.vision = VisionClient.default(config.vision)
         self.audio = Audio.default(config.audio)
         self.system = System.default(config.system)
@@ -95,6 +114,7 @@ class BetaboxCar(CarRobot):
         finally:
             for subsystem in (
                 self.audio,
+                self.camera_mount,
                 self.drive,
                 self.sensors,
                 self.system,

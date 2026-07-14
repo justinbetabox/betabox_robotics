@@ -21,6 +21,51 @@ class SteeringConfig:
     min_angle: float = -30
     max_angle: float = 30
 
+@dataclass(frozen=True)
+class CameraMountConfig:
+    pan_servo: PWMChannel
+    tilt_servo: PWMChannel
+
+    pan_min_angle: float = -45.0
+    pan_max_angle: float = 45.0
+
+    tilt_min_angle: float = -30.0
+    tilt_max_angle: float = 45.0
+
+    pan_center: float = 0.0
+    tilt_center: float = 0.0
+
+    pan_reversed: bool = False
+    tilt_reversed: bool = False
+
+    def __post_init__(self) -> None:
+        if self.pan_min_angle >= self.pan_max_angle:
+            raise ValueError(
+                "pan_min_angle must be less than pan_max_angle"
+            )
+
+        if self.tilt_min_angle >= self.tilt_max_angle:
+            raise ValueError(
+                "tilt_min_angle must be less than tilt_max_angle"
+            )
+
+        if not (
+            self.pan_min_angle
+            <= self.pan_center
+            <= self.pan_max_angle
+        ):
+            raise ValueError(
+                "pan_center must be within the pan angle range"
+            )
+
+        if not (
+            self.tilt_min_angle
+            <= self.tilt_center
+            <= self.tilt_max_angle
+        ):
+            raise ValueError(
+                "tilt_center must be within the tilt angle range"
+            )
 
 @dataclass(frozen=True)
 class DriveConfig:
@@ -92,6 +137,7 @@ class SystemConfig:
 @dataclass(frozen=True)
 class RobotConfig:
     drive: DriveConfig
+    camera_mount: CameraMountConfig
     sensors: SensorsConfig
     vision: VisionConfig = VisionConfig()
     audio: AudioConfig = AudioConfig()

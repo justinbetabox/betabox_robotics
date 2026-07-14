@@ -1,7 +1,13 @@
 "use strict";
 
 const HEARTBEAT_INTERVAL_MS = 500;
-const JOYSTICK_DEAD_ZONE = 0.12;
+
+const DRIVE_DEAD_ZONE = 0.12;
+const CAMERA_DEAD_ZONE = 0.08;
+
+const DRIVE_THROTTLE_CURVE = 1.7;
+const DRIVE_STEERING_CURVE = 1.5;
+const CAMERA_CURVE = 1.6;
 
 const state = {
     websocket: null,
@@ -23,6 +29,10 @@ const state = {
     cameraTilt: 0,
     headlights: false,
     horn: false,
+
+    cameraJoystickActive: false,
+    cameraJoystickX: 0,
+    cameraJoystickY: 0,
 };
 
 const DRIVE_SEND_INTERVAL_MS = 50;
@@ -39,65 +49,77 @@ function clamp(value, minimum, maximum) {
     );
 }
 
-function applyDeadZone(value) {
-    if (Math.abs(value) < JOYSTICK_DEAD_ZONE) {
+function shapeAxis(
+    value,
+    deadZone,
+    exponent
+) {
+    const magnitude = Math.abs(value);
+
+    if (magnitude <= deadZone) {
         return 0;
     }
 
-    const direction = Math.sign(value);
-    const adjusted =
-        (Math.abs(value) - JOYSTICK_DEAD_ZONE) /
-        (1 - JOYSTICK_DEAD_ZONE);
+    const normalized =
+        (magnitude - deadZone)
+        / (1 - deadZone);
 
-    return direction * adjusted;
+    const curved =
+        Math.pow(
+            normalized,
+            exponent
+        );
+
+    return Math.sign(value) * curved;
 }
 
 function effectiveThrottle() {
-    if (state.joystickActive) {
-        return applyDeadZone(
-            -state.joystickY
-        );
-    }
+    let raw = 0;
 
-    if (
+    if (state.joystickActive) {
+        raw = -state.joystickY;
+    } else if (
         state.keyboardForward &&
         !state.keyboardBackward
     ) {
-        return 1;
-    }
-
-    if (
+        raw = 1;
+    } else if (
         state.keyboardBackward &&
         !state.keyboardForward
     ) {
-        return -1;
+        raw = -1;
     }
 
-    return 0;
+    return shapeAxis(
+        raw,
+        DRIVE_DEAD_ZONE,
+        DRIVE_THROTTLE_CURVE
+    );
 }
 
-function effectiveSteering() {
-    if (state.joystickActive) {
-        return applyDeadZone(
-            state.joystickX
-        );
-    }
 
-    if (
+function effectiveSteering() {
+    let raw = 0;
+
+    if (state.joystickActive) {
+        raw = state.joystickX;
+    } else if (
         state.keyboardLeft &&
         !state.keyboardRight
     ) {
-        return -1;
-    }
-
-    if (
+        raw = -1;
+    } else if (
         state.keyboardRight &&
         !state.keyboardLeft
     ) {
-        return 1;
+        raw = 1;
     }
 
-    return 0;
+    return shapeAxis(
+        raw,
+        DRIVE_DEAD_ZONE,
+        DRIVE_STEERING_CURVE
+    );
 }
 
 
@@ -145,12 +167,62 @@ function describeControlState(
     return motionText;
 }
 
+function updateCameraReadout() {
+    const panPercent =
+        Math.round(
+            state.cameraPan * 100
+        );
+
+    const tiltPercent =
+        Math.round(
+            state.cameraTilt * 100
+        );
+
+    let panText = "Center";
+
+    if (panPercent < 0) {
+        panText =
+            `Left ${Math.abs(panPercent)}%`;
+    } else if (panPercent > 0) {
+        panText =
+            `Right ${panPercent}%`;
+    }
+
+    let tiltText = "Center";
+
+    if (tiltPercent < 0) {
+        tiltText =
+            `Down ${Math.abs(tiltPercent)}%`;
+    } else if (tiltPercent > 0) {
+        tiltText =
+            `Up ${tiltPercent}%`;
+    }
+
+    element(
+        "camera-pan-value"
+    ).textContent = panText;
+
+    element(
+        "camera-tilt-value"
+    ).textContent = tiltText;
+}
 
 function sendDriveState(
     force = false
 ) {
     if (!state.ready) {
         return;
+    }
+
+    if (
+        force &&
+        pendingDriveTimer !== null
+    ) {
+        window.clearTimeout(
+            pendingDriveTimer
+        );
+
+        pendingDriveTimer = null;
     }
 
     const now = performance.now();
@@ -459,6 +531,7 @@ function updateJoystickReadout() {
   const throttle =
       effectiveThrottle()
       * (state.speed / 100);
+
     const steering = effectiveSteering();
 
     element(
@@ -485,13 +558,18 @@ function updateJoystickReadout() {
     ).textContent = steeringText;
 }
 
-function positionJoystickStick() {
+function positionStick(
+    joystickId,
+    stickId,
+    x,
+    y
+) {
     const joystick = element(
-        "drive-joystick"
+        joystickId
     );
 
     const stick = element(
-        "drive-stick"
+        stickId
     );
 
     const bounds =
@@ -502,9 +580,173 @@ function positionJoystickStick() {
 
     stick.style.transform =
         `translate(
-            ${state.joystickX * maximumDistance}px,
-            ${state.joystickY * maximumDistance}px
+            ${x * maximumDistance}px,
+            ${y * maximumDistance}px
         )`;
+}
+
+
+function positionDriveStick() {
+    positionStick(
+        "drive-joystick",
+        "drive-stick",
+        state.joystickX,
+        state.joystickY
+    );
+}
+
+
+function positionCameraStick() {
+    positionStick(
+        "camera-joystick",
+        "camera-stick",
+        state.cameraJoystickX,
+        state.cameraJoystickY
+    );
+}
+
+function setCameraFromPointer(
+    event
+) {
+    const joystick = element(
+        "camera-joystick"
+    );
+
+    const bounds =
+        joystick.getBoundingClientRect();
+
+    const centerX =
+        bounds.left + bounds.width / 2;
+
+    const centerY =
+        bounds.top + bounds.height / 2;
+
+    const radius =
+        Math.min(
+            bounds.width,
+            bounds.height
+        ) / 2;
+
+    let x =
+        (event.clientX - centerX)
+        / radius;
+
+    let y =
+        (event.clientY - centerY)
+        / radius;
+
+    const magnitude =
+        Math.hypot(x, y);
+
+    if (magnitude > 1) {
+        x /= magnitude;
+        y /= magnitude;
+    }
+
+    state.cameraJoystickX =
+        clamp(x, -1, 1);
+
+    state.cameraJoystickY =
+        clamp(y, -1, 1);
+
+    state.cameraPan = shapeAxis(
+        state.cameraJoystickX,
+        CAMERA_DEAD_ZONE,
+        CAMERA_CURVE
+    );
+
+    state.cameraTilt = shapeAxis(
+        -state.cameraJoystickY,
+        CAMERA_DEAD_ZONE,
+        CAMERA_CURVE
+    );
+
+    positionCameraStick();
+    updateCameraReadout();
+    sendDriveState();
+}
+
+function configureCameraJoystick() {
+    const joystick = element(
+        "camera-joystick"
+    );
+
+    joystick.addEventListener(
+        "pointerdown",
+        (event) => {
+            event.preventDefault();
+
+            state.cameraJoystickActive = true;
+
+            joystick.setPointerCapture(
+                event.pointerId
+            );
+
+            setCameraFromPointer(
+                event
+            );
+        }
+    );
+
+    joystick.addEventListener(
+        "pointermove",
+        (event) => {
+            if (!state.cameraJoystickActive) {
+                return;
+            }
+
+            event.preventDefault();
+
+            setCameraFromPointer(
+                event
+            );
+        }
+    );
+
+    const release = (event) => {
+        if (!state.cameraJoystickActive) {
+            return;
+        }
+
+        event.preventDefault();
+
+        state.cameraJoystickActive = false;
+
+        // Do not reset x/y. The camera remains pointed
+        // at the selected position.
+        sendDriveState(true);
+    };
+
+    joystick.addEventListener(
+        "pointerup",
+        release
+    );
+
+    joystick.addEventListener(
+        "pointercancel",
+        release
+    );
+
+    joystick.addEventListener(
+        "lostpointercapture",
+        release
+    );
+
+    element(
+        "camera-center"
+    ).addEventListener(
+        "click",
+        () => {
+            state.cameraJoystickX = 0;
+            state.cameraJoystickY = 0;
+            state.cameraPan = 0;
+            state.cameraTilt = 0;
+
+            positionCameraStick();
+            updateCameraReadout();
+            sendDriveState(true);
+        }
+    );
 }
 
 function setJoystickFromPointer(
@@ -551,7 +793,7 @@ function setJoystickFromPointer(
     state.joystickY =
         clamp(y, -1, 1);
 
-    positionJoystickStick();
+    positionDriveStick();
     updateJoystickReadout();
     sendDriveState();
 }
@@ -563,7 +805,7 @@ function resetJoystick(
     state.joystickX = 0;
     state.joystickY = 0;
 
-    positionJoystickStick();
+    positionDriveStick();
     updateJoystickReadout();
 
     if (sendCommand) {
@@ -685,12 +927,15 @@ document.addEventListener(
     "DOMContentLoaded",
     () => {
         configureKeyboard();
+        configureCameraJoystick();
         configureJoystick();
         configureSpeed();
         configureSafety();
+        updateCameraReadout();
 
         updateJoystickReadout();
-        positionJoystickStick();
+        positionDriveStick();
+        positionCameraStick();
 
         connect();
 

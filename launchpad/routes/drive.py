@@ -167,6 +167,72 @@ async def drive_page(
                     </span>
                 </div>
             </div>
+            <div class="camera-control-section">
+                <div class="camera-control-heading">
+                    <div>
+                        <p class="eyebrow">Camera Control</p>
+                        <p class="joystick-help">
+                            Drag to point the camera. It stays in position
+                            when released.
+                        </p>
+                    </div>
+
+                    <button
+                        id="camera-center"
+                        class="camera-center-button"
+                        type="button"
+                    >
+                        Center Camera
+                    </button>
+                </div>
+
+                <div
+                    id="camera-joystick"
+                    class="joystick camera-joystick"
+                    role="application"
+                    aria-label="Camera pan and tilt joystick"
+                    tabindex="0"
+                >
+                    <div
+                        class="joystick-crosshair"
+                        aria-hidden="true"
+                    ></div>
+
+                    <div
+                        id="camera-stick"
+                        class="joystick-stick camera-stick"
+                        aria-hidden="true"
+                    ></div>
+
+                    <span class="joystick-label joystick-forward">
+                        Up
+                    </span>
+
+                    <span class="joystick-label joystick-reverse">
+                        Down
+                    </span>
+
+                    <span class="joystick-label joystick-left">
+                        Left
+                    </span>
+
+                    <span class="joystick-label joystick-right">
+                        Right
+                    </span>
+                </div>
+
+                <div class="joystick-readout">
+                    <span>
+                        Pan
+                        <strong id="camera-pan-value">Center</strong>
+                    </span>
+
+                    <span>
+                        Tilt
+                        <strong id="camera-tilt-value">Center</strong>
+                    </span>
+                </div>
+            </div>
 
             <button
                 id="emergency-stop"

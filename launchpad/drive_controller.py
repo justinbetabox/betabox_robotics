@@ -143,6 +143,59 @@ class ManualDriveController:
             and self._owner is None
         )
 
+    def _camera_axis_to_angle(
+        self,
+        value: float,
+        *,
+        minimum: float,
+        center: float,
+        maximum: float,
+    ) -> float:
+        """
+        Convert a normalized -1.0..1.0 axis into an asymmetric angle range.
+        """
+
+        if value < 0:
+            return center + (
+                abs(value)
+                * (minimum - center)
+            )
+
+        return center + (
+            value
+            * (maximum - center)
+        )
+
+
+    async def _apply_camera_axes(
+        self,
+        pan: float,
+        tilt: float,
+    ) -> None:
+        robot = self._require_robot()
+        config = robot.config.camera_mount
+
+        pan_angle = self._camera_axis_to_angle(
+            pan,
+            minimum=config.pan_min_angle,
+            center=config.pan_center,
+            maximum=config.pan_max_angle,
+        )
+
+        tilt_angle = self._camera_axis_to_angle(
+            tilt,
+            minimum=config.tilt_min_angle,
+            center=config.tilt_center,
+            maximum=config.tilt_max_angle,
+        )
+
+        await asyncio.to_thread(
+            robot.look,
+            pan=pan_angle,
+            tilt=tilt_angle,
+            smooth=False,
+        )
+
     async def start(self) -> None:
         if self._watchdog_task is None:
             self._watchdog_task = asyncio.create_task(
@@ -233,7 +286,17 @@ class ManualDriveController:
             ):
                 return
 
-            self._desired_state = ControlState()
+            current = self._desired_state
+
+            self._desired_state = ControlState(
+                throttle=0.0,
+                steering=0.0,
+                camera_pan=current.camera_pan,
+                camera_tilt=current.camera_tilt,
+                headlights=current.headlights,
+                horn=False,
+            )
+
             self._last_applied_state = None
             self._state_generation += 1
 
@@ -526,22 +589,70 @@ class ManualDriveController:
         except asyncio.CancelledError:
             raise
 
+    async def _generation_is_current(
+        self,
+        generation: int,
+    ) -> bool:
+        async with self._lock:
+            return (
+                generation
+                == self._state_generation
+            )
+
     async def _apply_state(
         self,
         state: ControlState,
         generation: int,
     ) -> None:
-        await self._apply_steering_axis(
-            state.steering
+        async with self._lock:
+            previous = self._last_applied_state
+
+        steering_changed = (
+            previous is None
+            or state.steering != previous.steering
         )
 
-        async with self._lock:
-            if generation != self._state_generation:
+        throttle_changed = (
+            previous is None
+            or state.throttle != previous.throttle
+        )
+
+        camera_changed = (
+            previous is None
+            or state.camera_pan != previous.camera_pan
+            or state.camera_tilt != previous.camera_tilt
+        )
+
+        if steering_changed:
+            await self._apply_steering_axis(
+                state.steering
+            )
+
+            if not await self._generation_is_current(
+                generation
+            ):
                 return
 
-        await self._apply_throttle(
-            state.throttle
-        )
+        if throttle_changed:
+            await self._apply_throttle(
+                state.throttle
+            )
+
+            if not await self._generation_is_current(
+                generation
+            ):
+                return
+
+        if camera_changed:
+            await self._apply_camera_axes(
+                state.camera_pan,
+                state.camera_tilt,
+            )
+
+            if not await self._generation_is_current(
+                generation
+            ):
+                return
 
         async with self._lock:
             if generation == self._state_generation:

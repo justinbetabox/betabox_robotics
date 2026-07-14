@@ -323,6 +323,60 @@
     line-height: 1.5;
 }
 
+.camera-control-section {
+    display: grid;
+    justify-items: center;
+    gap: 1rem;
+
+    padding-top: 1.25rem;
+    border-top: 1px solid #34414c;
+}
+
+.camera-control-heading {
+    display: flex;
+    justify-content: space-between;
+    align-items: start;
+    gap: 1rem;
+    width: 100%;
+}
+
+.camera-joystick {
+    width: min(100%, 230px);
+    background:
+        radial-gradient(
+            circle at center,
+            #283845 0 18%,
+            #202d38 18% 48%,
+            #17212b 48% 100%
+        );
+}
+
+.camera-stick {
+    border-color: #d6a968;
+    background:
+        radial-gradient(
+            circle at 35% 30%,
+            #d6a968,
+            #805f34 70%
+        );
+}
+
+.camera-center-button {
+    padding: 0.6rem 0.85rem;
+    border: 1px solid #52616e;
+    border-radius: 10px;
+    background: #24313d;
+    color: #ffffff;
+    font: inherit;
+    font-size: 0.8rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.camera-center-button:hover {
+    background: #314354;
+}
+
 @media (max-width: 960px) {
     .drive-layout {
         grid-template-columns: 1fr;
@@ -362,5 +416,18 @@
 
     .joystick-readout {
         gap: 1rem;
+    }
+
+    .camera-control-heading {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .camera-center-button {
+        width: 100%;
+    }
+
+    .camera-joystick {
+        width: min(68vw, 230px);
     }
 }

@@ -6,6 +6,11 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from betabox_robotics.config import (
+    DEFAULT_PLATFORM_CONFIG,
+    PlatformConfig,
+)
+
 
 @dataclass(frozen=True)
 class CheckResult:
@@ -48,13 +53,25 @@ def check_command(command: list[str], name: str) -> CheckResult:
     )
 
 
-def check_config_line(line: str) -> CheckResult:
-    config = Path("/boot/firmware/config.txt")
+def check_config_line(
+    line: str,
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> CheckResult:
+    config_file = (
+        config.verification.boot_config_file
+    )
 
-    if not config.exists():
-        return CheckResult(f"config:{line}", False, f"{config} missing")
+    if not config_file.exists():
+        return CheckResult(
+            f"config:{line}",
+            False,
+            f"{config_file} missing",
+        )
 
-    text = config.read_text(errors="ignore")
+    text = config_file.read_text(
+        errors="ignore",
+    )
+
     return CheckResult(
         f"config:{line}",
         line in text,
@@ -80,42 +97,47 @@ def check_executable(command: str) -> CheckResult:
     )
 
 
-def collect_checks() -> list[CheckResult]:
+def collect_checks(
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> list[CheckResult]:
     checks: list[CheckResult] = []
 
-    for module in [
-        "betabox_robotics",
-        "cv2",
-        "numpy",
-        "pyaudio",
-        "gpiozero",
-        "smbus2",
-        "aiohttp",
-        "aiortc",
-    ]:
+    for module in (
+        config.verification.required_python_modules
+    ):
         checks.append(check_import(module))
 
-    checks.append(check_command(["betabox", "--help"], "cli:betabox"))
+    checks.append(
+        check_command(
+            ["betabox", "--help"],
+            "cli:betabox",
+        )
+    )
 
-    for line in [
-        "dtparam=i2c_arm=on",
-        "dtparam=spi=on",
-        "dtoverlay=hifiberry-dac",
-        "dtoverlay=i2s-mmap",
-    ]:
-        checks.append(check_config_line(line))
+    for line in (
+        config.verification.required_boot_config_lines
+    ):
+        checks.append(
+            check_config_line(
+                line,
+                config,
+            )
+        )
 
-    for path in [
-        Path.home() / "media" / "pictures",
-        Path.home() / "media" / "videos",
-        Path.home() / "media" / "sounds",
-        Path.home() / "media" / "sounds" / "car-honk.mp3",
-    ]:
+    for path in (
+        config.paths.pictures_dir,
+        config.paths.videos_dir,
+        config.paths.sounds_dir,
+        config.paths.car_honk_sound,
+    ):
         checks.append(check_path(path))
 
-    checks.append(check_executable("node"))
-    checks.append(check_executable("npm"))
-    checks.append(check_executable("configurable-http-proxy"))
+    for executable in (
+        config.verification.required_executables
+    ):
+        checks.append(
+            check_executable(executable)
+        )
 
     return checks
 
@@ -156,8 +178,14 @@ def print_results(checks: list[CheckResult]) -> bool:
 
 
 def main() -> int:
-    checks = collect_checks()
-    return 0 if print_results(checks) else 1
+    config = DEFAULT_PLATFORM_CONFIG
+    checks = collect_checks(config)
+
+    return (
+        0
+        if print_results(checks)
+        else 1
+    )
 
 
 if __name__ == "__main__":

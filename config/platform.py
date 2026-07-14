@@ -112,6 +112,10 @@ class PlatformPathsConfig:
             self.sounds_dir,
         )
 
+    @property
+    def car_honk_sound(self) -> Path:
+        return self.sounds_dir / "car-honk.mp3"
+
 @dataclass(frozen=True)
 class UsageThresholdConfig:
     high_percent: float = 85.0
@@ -256,6 +260,62 @@ class PlatformServicesConfig:
 
 
 @dataclass(frozen=True)
+class PlatformVerificationConfig:
+    """
+    Requirements verified on an installed Betabox Platform.
+    """
+
+    i2c_device: Path = Path("/dev/i2c-1")
+    i2c_bus: int = 1
+
+    boot_config_file: Path = Path(
+        "/boot/firmware/config.txt"
+    )
+
+    required_boot_config_lines: tuple[str, ...] = (
+        "dtparam=i2c_arm=on",
+        "dtparam=spi=on",
+        "dtoverlay=hifiberry-dac",
+        "dtoverlay=i2s-mmap",
+    )
+
+    required_python_modules: tuple[str, ...] = (
+        "betabox_robotics",
+        "cv2",
+        "numpy",
+        "pyaudio",
+        "gpiozero",
+        "smbus2",
+        "aiohttp",
+        "aiortc",
+    )
+
+    required_executables: tuple[str, ...] = (
+        "node",
+        "npm",
+        "configurable-http-proxy",
+    )
+
+    hifiberry_identifiers: tuple[str, ...] = (
+        "snd_rpi_hifiberry_dac",
+        "HifiBerry",
+    )
+
+    command_timeout_seconds: int = 5
+
+    def __post_init__(self) -> None:
+        if self.i2c_bus < 0:
+            raise ValueError(
+                "i2c_bus must be zero or greater"
+            )
+
+        if self.command_timeout_seconds <= 0:
+            raise ValueError(
+                "command_timeout_seconds must be greater than 0"
+            )
+
+
+@dataclass(frozen=True)
 class PlatformConfig:
     """
     Operational configuration shared by Betabox services, CLI tools,
@@ -266,6 +326,7 @@ class PlatformConfig:
     health: PlatformHealthConfig
     network: PlatformNetworkConfig
     services: PlatformServicesConfig
+    verification: PlatformVerificationConfig
 
     @classmethod
     def default(cls) -> "PlatformConfig":
@@ -274,6 +335,7 @@ class PlatformConfig:
             health=PlatformHealthConfig(),
             network=PlatformNetworkConfig(),
             services=PlatformServicesConfig(),
+            verification=PlatformVerificationConfig(),
         )
 
 

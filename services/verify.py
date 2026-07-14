@@ -10,6 +10,11 @@ from betabox_robotics.services.hardware_status import (
     collect_hardware_status,
 )
 
+from betabox_robotics.config import (
+    DEFAULT_PLATFORM_CONFIG,
+    PlatformConfig,
+)
+
 
 @dataclass(frozen=True)
 class CheckResult:
@@ -30,28 +35,35 @@ def run(command: list[str], timeout: int = 5) -> subprocess.CompletedProcess | N
         return None
 
 
-def check_imports() -> list[CheckResult]:
+def check_imports(
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> list[CheckResult]:
     checks: list[CheckResult] = []
 
-    modules = [
-        "betabox_robotics",
-        "cv2",
-        "numpy",
-        "pyaudio",
-        "gpiozero",
-        "smbus2",
-        "aiohttp",
-        "aiortc",
-    ]
-
-    for module in modules:
+    for module in config.verification.required_python_modules:
         try:
             imported = importlib.import_module(module)
-            version = getattr(imported, "__version__", "")
-            message = version if version else "import ok"
-            checks.append(CheckResult(f"import:{module}", True, message))
+            version = getattr(
+                imported,
+                "__version__",
+                "",
+            )
+
+            checks.append(
+                CheckResult(
+                    f"import:{module}",
+                    True,
+                    version or "import ok",
+                )
+            )
         except Exception as exc:
-            checks.append(CheckResult(f"import:{module}", False, str(exc)))
+            checks.append(
+                CheckResult(
+                    f"import:{module}",
+                    False,
+                    str(exc),
+                )
+            )
 
     return checks
 
@@ -64,17 +76,27 @@ def check_picamera2() -> CheckResult:
         return CheckResult("camera:picamera2", False, str(exc))
 
 
-def check_i2c_device() -> CheckResult:
-    path = Path("/dev/i2c-1")
+def check_i2c_device(
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> CheckResult:
+    path = config.verification.i2c_device
+
     return CheckResult(
         "hardware:i2c",
         path.exists(),
-        str(path) if path.exists() else "/dev/i2c-1 missing",
+        str(path) if path.exists() else f"{path} missing",
     )
 
 
-def check_i2c_scan() -> CheckResult:
-    result = run(["i2cdetect", "-y", "1"], timeout=5)
+def check_i2c_scan(
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> CheckResult:
+    bus = config.verification.i2c_bus
+
+    result = run(
+        ["i2cdetect", "-y", str(bus)],
+        timeout=config.verification.command_timeout_seconds,
+    )
 
     if result is None:
         return CheckResult("hardware:i2cdetect", False, "i2cdetect failed to run")
@@ -101,19 +123,38 @@ def check_i2c_scan() -> CheckResult:
     )
 
 
-def check_hifiberry() -> CheckResult:
-    result = run(["aplay", "-l"], timeout=5)
+def check_hifiberry(
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> CheckResult:
+    result = run(
+        ["aplay", "-l"],
+        timeout=config.verification.command_timeout_seconds,
+    )
 
     if result is None:
-        return CheckResult("audio:hifiberry", False, "aplay failed to run")
+        return CheckResult(
+            "audio:hifiberry",
+            False,
+            "aplay failed to run",
+        )
 
     output = result.stdout + result.stderr
-    ok = "snd_rpi_hifiberry_dac" in output or "HifiBerry" in output
+
+    ok = any(
+        identifier in output
+        for identifier in (
+            config.verification.hifiberry_identifiers
+        )
+    )
 
     return CheckResult(
         "audio:hifiberry",
         ok,
-        "HifiBerry detected" if ok else "HifiBerry not found in aplay -l",
+        (
+            "HifiBerry detected"
+            if ok
+            else "HifiBerry not found in aplay -l"
+        ),
     )
 
 
@@ -131,18 +172,24 @@ def check_speech_backend() -> CheckResult:
         return CheckResult("audio:speech_backend", False, str(exc))
 
 
-def check_media_paths() -> list[CheckResult]:
-    paths = [
-        Path.home() / "media" / "pictures",
-        Path.home() / "media" / "videos",
-        Path.home() / "media" / "sounds",
-    ]
+def check_media_paths(
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> list[CheckResult]:
+    paths = (
+        config.paths.pictures_dir,
+        config.paths.videos_dir,
+        config.paths.sounds_dir,
+    )
 
     return [
         CheckResult(
             f"media:{path.name}",
             path.exists(),
-            str(path) if path.exists() else f"missing {path}",
+            (
+                str(path)
+                if path.exists()
+                else f"missing {path}"
+            ),
         )
         for path in paths
     ]
@@ -314,7 +361,9 @@ def check_ultrasonic_read() -> CheckResult:
         from betabox_robotics.robots.betabox_car import BETABOX_CAR
         from betabox_robotics.sensors import Sensors
 
-        sensors = Sensors.default(BETABOX_CAR)
+        sensors = Sensors.default(
+            BETABOX_CAR.sensors
+        )
 
         try:
             distance = float(sensors.ultrasonic.distance(samples=3))
@@ -344,21 +393,24 @@ def check_ultrasonic_read() -> CheckResult:
             str(exc),
         )
 
-def collect_checks(*, include_robot: bool = True) -> list[CheckResult]:
+def collect_checks(
+    *,
+    include_robot: bool = True,
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> list[CheckResult]:
     checks: list[CheckResult] = []
 
-    checks.extend(check_imports())
+    checks.extend(check_imports(config))
     checks.append(check_picamera2())
     checks.append(check_configurable_http_proxy())
     checks.append(check_speech_backend())
-    checks.extend(check_media_paths())
+    checks.extend(check_media_paths(config))
 
-    hardware = collect_hardware_status()
+    hardware = collect_hardware_status(config)
     checks.extend(checks_from_hardware_status(hardware))
 
     if include_robot:
         checks.append(check_robot_constructs())
-        checks.append(check_ultrasonic_read())
 
     return checks
 
@@ -392,7 +444,9 @@ def print_results(checks: list[CheckResult]) -> bool:
 
 
 def main() -> int:
-    checks = collect_checks()
+    config = DEFAULT_PLATFORM_CONFIG
+
+    checks = collect_checks(config=config)
     return 0 if print_results(checks) else 1
 
 

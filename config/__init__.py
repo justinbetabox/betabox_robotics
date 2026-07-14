@@ -7,6 +7,7 @@ from .platform import (
     PlatformServicesConfig,
     TemperatureThresholdConfig,
     UsageThresholdConfig,
+    PlatformVerificationConfig,
 )
 
 __all__ = [
@@ -17,5 +18,6 @@ __all__ = [
     "PlatformServicesConfig",
     "TemperatureThresholdConfig",
     "UsageThresholdConfig",
+    "PlatformVerificationConfig",
     "DEFAULT_PLATFORM_CONFIG",
 ]

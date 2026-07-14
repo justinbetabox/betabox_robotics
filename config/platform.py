@@ -169,6 +169,91 @@ class PlatformHealthConfig:
                 "wifi_interface cannot be empty"
             )
 
+@dataclass(frozen=True)
+class PlatformNetworkConfig:
+    """
+    Network endpoints exposed by the installed Betabox Platform.
+    """
+
+    local_host: str = "127.0.0.1"
+    bind_host: str = "0.0.0.0"
+
+    jupyterhub_port: int = 8000
+    vision_port: int = 8080
+
+    def __post_init__(self) -> None:
+        if not self.local_host:
+            raise ValueError("local_host cannot be empty")
+
+        if not self.bind_host:
+            raise ValueError("bind_host cannot be empty")
+
+        for name, port in (
+            ("jupyterhub_port", self.jupyterhub_port),
+            ("vision_port", self.vision_port),
+        ):
+            if not 1 <= port <= 65535:
+                raise ValueError(
+                    f"{name} must be between 1 and 65535"
+                )
+
+    @property
+    def jupyterhub_url(self) -> str:
+        return (
+            f"http://{self.local_host}:"
+            f"{self.jupyterhub_port}"
+        )
+
+    @property
+    def jupyterhub_health_url(self) -> str:
+        return f"{self.jupyterhub_url}/hub/health"
+
+    @property
+    def vision_url(self) -> str:
+        return (
+            f"http://{self.local_host}:"
+            f"{self.vision_port}"
+        )
+
+@dataclass(frozen=True)
+class PlatformServicesConfig:
+    """
+    Names of system services managed by the Betabox Platform.
+    """
+
+    hostname: str = "set-hostname-from-serial.service"
+    boot_announce: str = "betabox-boot-announce.service"
+    monitor: str = "betabox-monitor.service"
+    jupyterhub: str = "jupyterhub.service"
+    video: str = "betabox-video.service"
+    wifi_fallback: str = "wifi-fallback.service"
+
+    def __post_init__(self) -> None:
+        values = (
+            self.hostname,
+            self.boot_announce,
+            self.monitor,
+            self.jupyterhub,
+            self.video,
+            self.wifi_fallback,
+        )
+
+        if any(not value for value in values):
+            raise ValueError(
+                "service unit names cannot be empty"
+            )
+
+    @property
+    def all_units(self) -> tuple[str, ...]:
+        return (
+            self.hostname,
+            self.boot_announce,
+            self.monitor,
+            self.jupyterhub,
+            self.video,
+            self.wifi_fallback,
+        )
+
 
 @dataclass(frozen=True)
 class PlatformConfig:
@@ -179,12 +264,16 @@ class PlatformConfig:
 
     paths: PlatformPathsConfig
     health: PlatformHealthConfig
+    network: PlatformNetworkConfig
+    services: PlatformServicesConfig
 
     @classmethod
     def default(cls) -> "PlatformConfig":
         return cls(
             paths=PlatformPathsConfig.default(),
             health=PlatformHealthConfig(),
+            network=PlatformNetworkConfig(),
+            services=PlatformServicesConfig(),
         )
 
 

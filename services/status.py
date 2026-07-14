@@ -14,7 +14,11 @@ from betabox_robotics.services.system_health import (
     SystemHealthStatus,
     collect_system_health,
 )
-from betabox_robotics.services.managed import MANAGED_SERVICES
+from betabox_robotics.config import (
+    DEFAULT_PLATFORM_CONFIG,
+    PlatformConfig,
+)
+from betabox_robotics.services.managed import managed_services
 from betabox_robotics.version import __version__
 
 
@@ -95,16 +99,18 @@ def executable_available(command: str) -> bool:
     return bool(result and result.returncode == 0)
 
 
-def collect_status() -> StatusReport:
-    media_root = Path.home() / "media"
+def collect_status(
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> StatusReport:
+    managed = managed_services(config)
 
     services = {
-        managed.unit: service_status(managed.unit)
-        for managed in MANAGED_SERVICES.values()
+        service.unit: service_status(service.unit)
+        for service in managed.values()
     }
 
     hardware = collect_hardware_status()
-    system_health = collect_system_health()
+    system_health = collect_system_health(config)
 
     return StatusReport(
         version=__version__,
@@ -113,9 +119,9 @@ def collect_status() -> StatusReport:
         i2c_available=Path("/dev/i2c-1").exists(),
         hifiberry_available=hifiberry_available(),
         media_paths={
-            "pictures": str(media_root / "pictures"),
-            "videos": str(media_root / "videos"),
-            "sounds": str(media_root / "sounds"),
+            "pictures": str(config.paths.pictures_dir),
+            "videos": str(config.paths.videos_dir),
+            "sounds": str(config.paths.sounds_dir),
         },
         services=services,
         jupyterhub_proxy_available=executable_available("configurable-http-proxy"),
@@ -243,7 +249,10 @@ def print_hardware_status(hardware: RobotHardwareStatus) -> None:
         print("Vision:      unavailable")
 
 
-def print_human(report: StatusReport) -> None:
+def print_human(
+    report: StatusReport,
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> None:
     print()
     print("Betabox Status")
     print("==============")
@@ -278,29 +287,43 @@ def print_human(report: StatusReport) -> None:
     print()
     print("Services")
     print("--------")
-    for managed in MANAGED_SERVICES.values():
-        state = report.services.get(managed.unit, "unknown")
-        print(f"{managed.title:16} {managed.unit:34} {state}")
+    managed = managed_services(config)
+    for service in managed.values():
+        state = report.services.get(
+            service.unit,
+            "unknown",
+        )
+
+        print(
+            f"{service.title:16} "
+            f"{service.unit:34} "
+            f"{state}"
+        )
 
     print()
     print("JupyterHub")
     print("----------")
-    print(f"Service:  {report.services.get('jupyterhub.service', 'unknown')}")
     print(
-        f"Proxy:    {'available' if report.jupyterhub_proxy_available else 'missing'}"
+        f"Service:  "
+        f"{report.services.get(config.services.jupyterhub, 'unknown')}"
     )
-    print("Port:     8000")
+    print(
+        f"Proxy:    "
+        f"{'available' if report.jupyterhub_proxy_available else 'missing'}"
+    )
+    print(f"Port:     {config.network.jupyterhub_port}")
 
     print()
 
 
 def main(argv: list[str] | None = None) -> int:
-    report = collect_status()
+    config = DEFAULT_PLATFORM_CONFIG
+    report = collect_status(config)
 
     if argv and "--json" in argv:
         print(json.dumps(asdict(report), indent=2))
     else:
-        print_human(report)
+        print_human(report, config)
 
     return 0
 

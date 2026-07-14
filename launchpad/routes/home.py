@@ -61,13 +61,6 @@ async def home(
                 href="/media",
             ),
             tool_card(
-                title="Robot Status",
-                description=(
-                    "Check battery, sensors, and platform health."
-                ),
-                href="/status",
-            ),
-            tool_card(
                 title="Calibration",
                 description=(
                     "Run guided robot calibration tools."
@@ -130,18 +123,106 @@ async def home(
 </head>
 <body>
     <header class="site-header">
-        <div>
+        <div class="brand">
             <p class="eyebrow">Betabox Robotics</p>
             <h1>Launchpad</h1>
-            <p class="subtitle">
-                Choose a tool to begin.
-            </p>
+
+            <div class="robot-identity">
+                <strong id="hud-hostname">Connecting…</strong>
+                <span id="hud-ip"></span>
+            </div>
         </div>
 
-        <div class="role-badge">
-            Student Mode
-        </div>
+        <button
+            id="hud-toggle"
+            class="hud"
+            type="button"
+            aria-expanded="false"
+            aria-controls="hud-details"
+        >
+            <span
+                id="hud-health-dot"
+                class="hud-health-dot status-unknown"
+            ></span>
+
+            <span class="hud-item hud-overall">
+                <span class="hud-label">Robot</span>
+                <strong id="hud-health">Checking…</strong>
+            </span>
+
+            <span class="hud-item">
+                <span class="hud-label">Battery</span>
+                <strong id="hud-battery">--</strong>
+            </span>
+
+            <span class="hud-item">
+                <span class="hud-label">Temperature</span>
+                <strong id="hud-temperature">--</strong>
+            </span>
+
+            <span class="hud-item hud-wide">
+                <span class="hud-label">Camera</span>
+                <strong id="hud-camera">--</strong>
+            </span>
+
+            <span class="hud-expand-icon" aria-hidden="true">
+                ▾
+            </span>
+        </button>
     </header>
+
+    <section
+        id="hud-details"
+        class="hud-details"
+        hidden
+    >
+        <div class="hud-detail-grid">
+            <div class="hud-detail">
+                <span>Battery</span>
+                <strong id="detail-battery">--</strong>
+            </div>
+
+            <div class="hud-detail">
+                <span>CPU Temperature</span>
+                <strong id="detail-temperature">--</strong>
+            </div>
+
+            <div class="hud-detail">
+                <span>Memory</span>
+                <strong id="detail-memory">--</strong>
+            </div>
+
+            <div class="hud-detail">
+                <span>Disk</span>
+                <strong id="detail-disk">--</strong>
+            </div>
+
+            <div class="hud-detail">
+                <span>Camera</span>
+                <strong id="detail-camera">--</strong>
+            </div>
+
+            <div class="hud-detail">
+                <span>Vision</span>
+                <strong id="detail-vision">--</strong>
+            </div>
+
+            <div class="hud-detail">
+                <span>Audio</span>
+                <strong id="detail-audio">--</strong>
+            </div>
+
+            <div class="hud-detail">
+                <span>I²C</span>
+                <strong id="detail-i2c">--</strong>
+            </div>
+
+        </div>
+
+        <p id="hud-updated" class="hud-updated">
+            Waiting for platform status…
+        </p>
+    </section>
 
     <main>
         <section>
@@ -174,6 +255,7 @@ async def home(
             </div>
         </section>
     </main>
+    <script src="/static/launchpad.js"></script>
 </body>
 </html>
 """

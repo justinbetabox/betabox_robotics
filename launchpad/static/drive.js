@@ -1,4 +1,6 @@
-"use strict";
+import {
+    VideoConnection,
+} from "./webrtc.js";
 
 const HEARTBEAT_INTERVAL_MS = 500;
 
@@ -39,6 +41,7 @@ const DRIVE_SEND_INTERVAL_MS = 50;
 
 let lastDriveSendTime = 0;
 let pendingDriveTimer = null;
+let videoConnection = null;
 
 const element = (id) => document.getElementById(id);
 
@@ -47,6 +50,33 @@ function clamp(value, minimum, maximum) {
         maximum,
         Math.max(minimum, value)
     );
+}
+
+function setVideoState(state) {
+    const panel = document.querySelector(
+        ".video-panel"
+    );
+
+    panel.dataset.videoState = state;
+
+    const status = document.querySelector(
+        ".video-status"
+    );
+
+    if (!status) {
+        return;
+    }
+
+    const labels = {
+        connecting: "Connecting camera…",
+        connected: "Camera connected",
+        disconnected: "Reconnecting camera…",
+        error: "Camera unavailable",
+        closed: "Camera disconnected",
+    };
+
+    status.textContent =
+        labels[state] ?? "Camera";
 }
 
 function shapeAxis(
@@ -365,9 +395,17 @@ function connect() {
     websocket.addEventListener(
         "message",
         (event) => {
-            const message = JSON.parse(
-                event.data
-            );
+            let message;
+
+            try {
+                message = JSON.parse(event.data);
+            } catch (error) {
+                console.error(
+                    "Invalid websocket message",
+                    error
+                );
+                return;
+            }
 
             if (message.type === "ready") {
                 state.ready = true;
@@ -408,6 +446,10 @@ function connect() {
                 );
 
                 emergencyStop();
+            }
+
+            if (message.type === "accepted") {
+                return;
             }
         }
     );
@@ -528,7 +570,7 @@ function configureKeyboard() {
 }
 
 function updateJoystickReadout() {
-  const throttle =
+    const throttle =
       effectiveThrottle()
       * (state.speed / 100);
 
@@ -918,8 +960,16 @@ function configureSafety() {
     );
 
     window.addEventListener(
-        "beforeunload",
-        emergencyStop
+      "beforeunload",
+          () => {
+              emergencyStop();
+
+              if (
+                  videoConnection !== null
+              ) {
+                  void videoConnection.close();
+              }
+          }
     );
 }
 
@@ -936,6 +986,18 @@ document.addEventListener(
         updateJoystickReadout();
         positionDriveStick();
         positionCameraStick();
+
+        videoConnection =
+            new VideoConnection(
+                element("drive-video"),
+                "/api/vision/offer",
+                {
+                    onStateChange:
+                        setVideoState,
+                }
+            );
+
+        videoConnection.connect();
 
         connect();
 

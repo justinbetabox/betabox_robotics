@@ -377,6 +377,36 @@
     background: #314354;
 }
 
+.video-status {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+    z-index: 2;
+
+    padding: 0.5rem 0.75rem;
+    border-radius: 999px;
+    background: rgb(5 8 11 / 76%);
+    color: #d8e1e8;
+    font-size: 0.78rem;
+    font-weight: 800;
+    backdrop-filter: blur(10px);
+}
+
+.video-panel[data-video-state="connected"]
+.video-status {
+    display: none;
+}
+
+.video-panel[data-video-state="error"]
+.video-status::after {
+    content: "Camera unavailable";
+}
+
+.video-panel[data-video-state="disconnected"]
+.video-status::after {
+    content: "Reconnecting camera…";
+}
+
 @media (max-width: 960px) {
     .drive-layout {
         grid-template-columns: 1fr;

@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import json
-from html import escape
 from uuid import uuid4
 
+import aiohttp
 from aiohttp import WSMsgType, web
+import asyncio
 
 from betabox_robotics.config import (
     PlatformConfig,
@@ -30,15 +31,8 @@ def parse_bool(
 async def drive_page(
     request: web.Request,
 ) -> web.Response:
-    config: PlatformConfig = request.app[
-        "platform_config"
-    ]
 
-    vision_url = escape(
-        config.network.vision_url
-    )
-
-    html = f"""<!doctype html>
+    html = """<!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
@@ -79,12 +73,19 @@ async def drive_page(
 
     <main class="drive-layout">
         <section class="video-panel">
-            <iframe
+            <div
+                class="video-status"
+                aria-live="polite"
+            >
+                Connecting camera…
+            </div>
+            <video
+                id="drive-video"
                 class="drive-video"
-                src="{vision_url}"
-                title="Betabox live camera"
-                allow="autoplay"
-            ></iframe>
+                autoplay
+                playsinline
+                muted
+            ></video>
 
             <div class="video-overlay">
                 <span id="drive-owner">
@@ -259,7 +260,10 @@ async def drive_page(
         </section>
     </main>
 
-    <script src="/static/drive.js"></script>
+    <script
+        type="module"
+        src="/static/drive.js"
+    ></script>
 </body>
 </html>
 """
@@ -452,3 +456,94 @@ def setup_drive_routes(
         "/ws/drive",
         drive_websocket,
     )
+
+    app.router.add_post(
+        "/api/vision/offer",
+        vision_offer_proxy,
+    )
+
+async def vision_offer_proxy(
+    request: web.Request,
+) -> web.Response:
+    config: PlatformConfig = request.app[
+        "platform_config"
+    ]
+
+    try:
+        offer = await request.json()
+
+        if not isinstance(offer, dict):
+            raise ValueError(
+                "offer must be a JSON object"
+            )
+
+        sdp = offer.get("sdp")
+        offer_type = offer.get("type")
+
+        if not isinstance(sdp, str) or not sdp:
+            raise ValueError(
+                "offer sdp must be a non-empty string"
+            )
+
+        if not isinstance(offer_type, str) or not offer_type:
+            raise ValueError(
+                "offer type must be a non-empty string"
+            )
+
+        vision_url = (
+            f"{config.network.vision_url}"
+            "/offer"
+        )
+
+        timeout = aiohttp.ClientTimeout(
+            total=10
+        )
+
+        async with aiohttp.ClientSession(
+            timeout=timeout
+        ) as session:
+            async with session.post(
+                vision_url,
+                json={
+                    "sdp": sdp,
+                    "type": offer_type,
+                },
+            ) as response:
+                response_data = await response.json()
+
+                if response.status >= 400:
+                    return web.json_response(
+                        {
+                            "error": (
+                                "Vision signaling request failed"
+                            ),
+                            "details": response_data,
+                        },
+                        status=response.status,
+                    )
+
+        return web.json_response(
+            response_data
+        )
+
+    except (
+        ValueError,
+        json.JSONDecodeError,
+    ) as exc:
+        return web.json_response(
+            {
+                "error": str(exc),
+            },
+            status=400,
+        )
+
+    except (
+        aiohttp.ClientError,
+        asyncio.TimeoutError,
+    ) as exc:
+        return web.json_response(
+            {
+                "error": str(exc),
+            },
+            status=502,
+        )

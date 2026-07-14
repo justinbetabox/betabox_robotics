@@ -2,11 +2,16 @@ from __future__ import annotations
 
 import subprocess
 from dataclasses import asdict, dataclass
-from pathlib import Path
 from typing import Any
 
-from betabox_robotics.vision import VisionClient, VisionClientError
-
+from betabox_robotics.config import (
+    DEFAULT_PLATFORM_CONFIG,
+    PlatformConfig,
+)
+from betabox_robotics.vision import (
+    VisionClient,
+    VisionClientError,
+)
 
 
 @dataclass(frozen=True)
@@ -62,6 +67,7 @@ class RobotHardwareStatus:
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
+
 def run(
     command: list[str],
     *,
@@ -78,17 +84,27 @@ def run(
     except Exception:
         return None
 
-def collect_i2c_status() -> I2CStatus:
-    device = Path("/dev/i2c-1")
+
+def collect_i2c_status(
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> I2CStatus:
+    device = config.verification.i2c_device
 
     if not device.exists():
         return I2CStatus(
             available=False,
             devices=[],
-            error="/dev/i2c-1 is missing",
+            error=f"{device} is missing",
         )
 
-    result = run(["i2cdetect", "-y", "1"], timeout=5)
+    result = run(
+        [
+            "i2cdetect",
+            "-y",
+            str(config.verification.i2c_bus),
+        ],
+        timeout=config.verification.command_timeout_seconds,
+    )
 
     if result is None:
         return I2CStatus(
@@ -98,7 +114,10 @@ def collect_i2c_status() -> I2CStatus:
         )
 
     if result.returncode != 0:
-        message = result.stderr.strip() or "i2cdetect failed"
+        message = (
+            result.stderr.strip()
+            or "i2cdetect failed"
+        )
 
         return I2CStatus(
             available=True,
@@ -112,27 +131,40 @@ def collect_i2c_status() -> I2CStatus:
         if ":" not in line:
             continue
 
-        _, values = line.split(":", maxsplit=1)
+        _, values = line.split(
+            ":",
+            maxsplit=1,
+        )
 
         for value in values.split():
             if value == "--":
                 continue
 
-            if len(value) == 2:
-                try:
-                    int(value, 16)
-                except ValueError:
-                    continue
+            if len(value) != 2:
+                continue
 
-                devices.append(f"0x{value.lower()}")
+            try:
+                int(value, 16)
+            except ValueError:
+                continue
+
+            devices.append(
+                f"0x{value.lower()}"
+            )
 
     return I2CStatus(
         available=True,
         devices=sorted(set(devices)),
     )
 
-def collect_audio_status() -> AudioStatus:
-    result = run(["aplay", "-l"], timeout=5)
+
+def collect_audio_status(
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> AudioStatus:
+    result = run(
+        ["aplay", "-l"],
+        timeout=config.verification.command_timeout_seconds,
+    )
 
     if result is None:
         return AudioStatus(
@@ -147,10 +179,20 @@ def collect_audio_status() -> AudioStatus:
         return AudioStatus(
             available=False,
             device=None,
-            error=output.strip() or "aplay failed",
+            error=(
+                output.strip()
+                or "aplay failed"
+            ),
         )
 
-    if "snd_rpi_hifiberry_dac" in output or "HifiBerry" in output:
+    detected = any(
+        identifier in output
+        for identifier in (
+            config.verification.hifiberry_identifiers
+        )
+    )
+
+    if detected:
         return AudioStatus(
             available=True,
             device="HifiBerry DAC",
@@ -159,11 +201,22 @@ def collect_audio_status() -> AudioStatus:
     return AudioStatus(
         available=False,
         device=None,
-        error="HifiBerry audio device was not detected",
+        error=(
+            "HifiBerry audio device "
+            "was not detected"
+        ),
     )
 
-def collect_vision_status() -> VisionStatus:
-    client = VisionClient()
+
+def collect_vision_status(
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> VisionStatus:
+    client = VisionClient(
+        base_url=config.network.vision_url,
+        timeout=float(
+            config.verification.command_timeout_seconds
+        ),
+    )
 
     try:
         statistics = client.statistics()
@@ -181,9 +234,12 @@ def collect_vision_status() -> VisionStatus:
         service_available=True,
         running=statistics.running,
         camera_running=statistics.camera.running,
-        camera_has_frame=statistics.camera.has_frame,
+        camera_has_frame=(
+            statistics.camera.has_frame
+        ),
         clients=statistics.streaming.clients,
     )
+
 
 def collect_robot_status() -> tuple[
     bool,
@@ -195,11 +251,21 @@ def collect_robot_status() -> tuple[
     grayscale_sensor = None
 
     try:
-        from betabox_robotics.robots.betabox_car import BETABOX_CAR
-        from betabox_robotics.sensors import Battery, Grayscale
+        from betabox_robotics.robots.betabox_car import (
+            BETABOX_CAR,
+        )
+        from betabox_robotics.sensors import (
+            Battery,
+            Grayscale,
+        )
 
-        battery_sensor = Battery.default(BETABOX_CAR)
-        grayscale_sensor = Grayscale.default(BETABOX_CAR)
+        battery_sensor = Battery.default(
+            BETABOX_CAR.sensors.battery
+        )
+
+        grayscale_sensor = Grayscale.default(
+            BETABOX_CAR.sensors.grayscale
+        )
 
     except Exception as exc:
         return (
@@ -208,27 +274,39 @@ def collect_robot_status() -> tuple[
                 available=False,
                 voltage=None,
                 state="unknown",
-                error="passive sensors could not be constructed",
+                error=(
+                    "passive sensors could "
+                    "not be constructed"
+                ),
             ),
             SensorStatus(
                 grayscale_available=False,
                 grayscale_values=None,
                 ultrasonic_configured=False,
-                error="passive sensors could not be constructed",
+                error=(
+                    "passive sensors could "
+                    "not be constructed"
+                ),
             ),
             str(exc),
         )
 
     try:
         try:
-            voltage = float(battery_sensor.voltage())
-            battery_state = str(battery_sensor.status())
+            voltage = float(
+                battery_sensor.voltage()
+            )
+
+            battery_state = (
+                battery_sensor.status().value
+            )
 
             battery = BatteryStatus(
                 available=True,
                 voltage=voltage,
                 state=battery_state,
             )
+
         except Exception as exc:
             battery = BatteryStatus(
                 available=False,
@@ -238,13 +316,18 @@ def collect_robot_status() -> tuple[
             )
 
         try:
-            grayscale_values = grayscale_sensor.read()
+            grayscale_values = (
+                grayscale_sensor.read()
+            )
 
             sensor_status = SensorStatus(
                 grayscale_available=True,
-                grayscale_values=grayscale_values,
+                grayscale_values=(
+                    grayscale_values
+                ),
                 ultrasonic_configured=True,
             )
+
         except Exception as exc:
             sensor_status = SensorStatus(
                 grayscale_available=False,
@@ -253,14 +336,26 @@ def collect_robot_status() -> tuple[
                 error=str(exc),
             )
 
-        return True, battery, sensor_status, None
+        return (
+            True,
+            battery,
+            sensor_status,
+            None,
+        )
 
     finally:
-        for component in (battery_sensor, grayscale_sensor):
+        for component in (
+            battery_sensor,
+            grayscale_sensor,
+        ):
             if component is None:
                 continue
 
-            close = getattr(component, "close", None)
+            close = getattr(
+                component,
+                "close",
+                None,
+            )
 
             if callable(close):
                 try:
@@ -268,10 +363,13 @@ def collect_robot_status() -> tuple[
                 except Exception:
                     pass
 
-def collect_hardware_status() -> RobotHardwareStatus:
-    i2c = collect_i2c_status()
-    audio = collect_audio_status()
-    vision = collect_vision_status()
+
+def collect_hardware_status(
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> RobotHardwareStatus:
+    i2c = collect_i2c_status(config)
+    audio = collect_audio_status(config)
+    vision = collect_vision_status(config)
 
     (
         robot_available,
@@ -290,11 +388,20 @@ def collect_hardware_status() -> RobotHardwareStatus:
         robot_error=robot_error,
     )
 
+
 def main() -> int:
     import json
 
-    status = collect_hardware_status()
-    print(json.dumps(status.to_dict(), indent=2))
+    config = DEFAULT_PLATFORM_CONFIG
+    status = collect_hardware_status(config)
+
+    print(
+        json.dumps(
+            status.to_dict(),
+            indent=2,
+        )
+    )
+
     return 0
 
 

@@ -109,7 +109,7 @@ def collect_status(
         for service in managed.values()
     }
 
-    hardware = collect_hardware_status()
+    hardware = collect_hardware_status(config)
     system_health = collect_system_health(config)
 
     return StatusReport(

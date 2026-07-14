@@ -112,6 +112,63 @@ class PlatformPathsConfig:
             self.sounds_dir,
         )
 
+@dataclass(frozen=True)
+class UsageThresholdConfig:
+    high_percent: float = 85.0
+    critical_percent: float = 95.0
+
+    def __post_init__(self) -> None:
+        if not 0.0 <= self.high_percent <= 100.0:
+            raise ValueError(
+                "high_percent must be between 0 and 100"
+            )
+
+        if not 0.0 <= self.critical_percent <= 100.0:
+            raise ValueError(
+                "critical_percent must be between 0 and 100"
+            )
+
+        if self.high_percent >= self.critical_percent:
+            raise ValueError(
+                "high_percent must be less than critical_percent"
+            )
+
+
+@dataclass(frozen=True)
+class TemperatureThresholdConfig:
+    high_celsius: float = 75.0
+    critical_celsius: float = 85.0
+
+    def __post_init__(self) -> None:
+        if self.high_celsius >= self.critical_celsius:
+            raise ValueError(
+                "high_celsius must be less than critical_celsius"
+            )
+
+
+@dataclass(frozen=True)
+class PlatformHealthConfig:
+    temperature: TemperatureThresholdConfig = (
+        TemperatureThresholdConfig()
+    )
+    memory: UsageThresholdConfig = UsageThresholdConfig()
+    disk: UsageThresholdConfig = UsageThresholdConfig()
+
+    disk_path: Path = Path("/")
+    ethernet_interface: str = "eth0"
+    wifi_interface: str = "wlan0"
+
+    def __post_init__(self) -> None:
+        if not self.ethernet_interface:
+            raise ValueError(
+                "ethernet_interface cannot be empty"
+            )
+
+        if not self.wifi_interface:
+            raise ValueError(
+                "wifi_interface cannot be empty"
+            )
+
 
 @dataclass(frozen=True)
 class PlatformConfig:
@@ -121,11 +178,13 @@ class PlatformConfig:
     """
 
     paths: PlatformPathsConfig
+    health: PlatformHealthConfig
 
     @classmethod
     def default(cls) -> "PlatformConfig":
         return cls(
             paths=PlatformPathsConfig.default(),
+            health=PlatformHealthConfig(),
         )
 
 

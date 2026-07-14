@@ -6,6 +6,11 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+from betabox_robotics.config import (
+    DEFAULT_PLATFORM_CONFIG,
+    PlatformConfig,
+)
+
 
 @dataclass(frozen=True)
 class TemperatureStatus:
@@ -65,7 +70,9 @@ class SystemHealthStatus:
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
-def collect_temperature_status() -> TemperatureStatus:
+def collect_temperature_status(
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> TemperatureStatus:
     path = Path("/sys/class/thermal/thermal_zone0/temp")
 
     try:
@@ -78,9 +85,11 @@ def collect_temperature_status() -> TemperatureStatus:
             error=str(exc),
         )
 
-    if celsius >= 85.0:
+    thresholds = config.health.temperature
+
+    if celsius >= thresholds.critical_celsius:
         state = "critical"
-    elif celsius >= 75.0:
+    elif celsius >= thresholds.high_celsius:
         state = "high"
     else:
         state = "normal"
@@ -125,7 +134,9 @@ def collect_throttling_status() -> ThrottlingStatus:
         throttled_occurred=bool(value & (1 << 18)),
     )
 
-def collect_memory_status() -> MemoryStatus:
+def collect_memory_status(
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> MemoryStatus:
     try:
         values: dict[str, int] = {}
 
@@ -142,9 +153,11 @@ def collect_memory_status() -> MemoryStatus:
             (total_kb - available_kb) / total_kb * 100.0
         )
 
-        if used_percent >= 95.0:
+        thresholds = config.health.memory
+
+        if used_percent >= thresholds.critical_percent:
             state = "critical"
-        elif used_percent >= 85.0:
+        elif used_percent >= thresholds.high_percent:
             state = "high"
         else:
             state = "normal"
@@ -165,15 +178,26 @@ def collect_memory_status() -> MemoryStatus:
             error=str(exc),
         )
 
-def collect_disk_status(path: str = "/") -> DiskStatus:
+def collect_disk_status(
+    path: str | Path | None = None,
+    *,
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> DiskStatus:
+    selected_path = (
+        config.health.disk_path
+        if path is None
+        else Path(path)
+    )
     try:
-        usage = shutil.disk_usage(path)
+        usage = shutil.disk_usage(selected_path)
         used = usage.total - usage.free
         used_percent = used / usage.total * 100.0
 
-        if used_percent >= 95.0:
+        thresholds = config.health.disk
+
+        if used_percent >= thresholds.critical_percent:
             state = "critical"
-        elif used_percent >= 85.0:
+        elif used_percent >= thresholds.high_percent:
             state = "high"
         else:
             state = "normal"
@@ -181,7 +205,7 @@ def collect_disk_status(path: str = "/") -> DiskStatus:
         gb = 1024**3
 
         return DiskStatus(
-            path=path,
+            path=str(selected_path),
             total_gb=round(usage.total / gb, 1),
             free_gb=round(usage.free / gb, 1),
             used_percent=round(used_percent, 1),
@@ -190,7 +214,7 @@ def collect_disk_status(path: str = "/") -> DiskStatus:
 
     except Exception as exc:
         return DiskStatus(
-            path=path,
+            path=str(selected_path),
             total_gb=None,
             free_gb=None,
             used_percent=None,
@@ -245,14 +269,20 @@ def collect_network_interface(
         connection=connection,
     )
 
-def collect_system_health() -> SystemHealthStatus:
+def collect_system_health(
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> SystemHealthStatus:
     return SystemHealthStatus(
-        temperature=collect_temperature_status(),
+        temperature=collect_temperature_status(config),
         throttling=collect_throttling_status(),
-        memory=collect_memory_status(),
-        disk=collect_disk_status("/"),
-        ethernet=collect_network_interface("eth0"),
-        wifi=collect_network_interface("wlan0"),
+        memory=collect_memory_status(config),
+        disk=collect_disk_status(config=config),
+        ethernet=collect_network_interface(
+            config.health.ethernet_interface
+        ),
+        wifi=collect_network_interface(
+            config.health.wifi_interface
+        ),
     )
 
 def run(

@@ -48,7 +48,11 @@ async def drive_page(
 
     <link
         rel="stylesheet"
-        href="/static/launchpad.css"
+        href="/static/tokens.css"
+    >
+    <link
+        rel="stylesheet"
+        href="/static/components.css"
     >
     <link
         rel="stylesheet"
@@ -310,6 +314,8 @@ async def drive_page(
             </p>
         </section>
     </main>
+
+    <script src="/static/theme.js"></script>
 
     <script
         type="module"

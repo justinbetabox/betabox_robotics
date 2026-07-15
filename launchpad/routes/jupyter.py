@@ -91,14 +91,9 @@ async def jupyter_page(
     >
     <title>Coding · Betabox Launchpad</title>
 
-    <link
-        rel="stylesheet"
-        href="/static/launchpad.css"
-    >
-    <link
-        rel="stylesheet"
-        href="/static/jupyter.css"
-    >
+    <link rel="stylesheet" href="/static/tokens.css">
+    <link rel="stylesheet" href="/static/components.css">
+    <link rel="stylesheet" href="/static/jupyter.css">
 </head>
 
 <body class="jupyter-page">
@@ -201,6 +196,8 @@ with BetaboxCar() as car:
     print(car.distance())</code></pre>
         </section>
     </main>
+
+    <script src="/static/theme.js"></script>
 
     <script
         type="module"

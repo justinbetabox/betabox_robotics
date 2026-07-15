@@ -6,8 +6,6 @@ from dataclasses import dataclass
 
 from math import isfinite
 
-from betabox_robotics import Robot
-
 
 @dataclass(frozen=True)
 class ControlState:
@@ -128,6 +126,7 @@ class ManualDriveController:
         self._last_heartbeat = 0.0
 
         self._lock = asyncio.Lock()
+        self._hardware_lock = asyncio.Lock()
         self._control_task: asyncio.Task | None = None
         self._watchdog_task: asyncio.Task | None = None
         self._closed = False
@@ -316,7 +315,17 @@ class ManualDriveController:
             self._last_applied_state = None
             self._state_generation += 1
 
-        await self._safe_neutralize()
+            robot = self._robot
+            self._robot = None
+
+        print(
+            f"manual-drive: releasing client {client_id}",
+            flush=True,
+        )
+
+        await self._stop_center_close(
+            robot
+        )
 
     async def close(self) -> None:
         if self._closed:
@@ -368,7 +377,48 @@ class ManualDriveController:
             robot = self._robot
             self._robot = None
 
-        if robot is not None:
+        await self._stop_center_close(
+            robot
+        )
+
+    async def _ensure_robot(self) -> None:
+        if self._robot is not None:
+            return
+
+        from betabox_robotics import BetaboxCar
+
+        robot = await asyncio.to_thread(
+            BetaboxCar,
+            owner="Manual Drive",
+        )
+
+        self._robot = robot
+
+
+    async def _stop_center_close(
+        self,
+        robot,
+    ) -> None:
+        if robot is None:
+            return
+
+        async with self._hardware_lock:
+            await asyncio.to_thread(
+                robot.close
+            )
+
+        print(
+            "manual-drive: robot hardware closed",
+            flush=True,
+        )
+
+    async def _safe_neutralize(self) -> None:
+        async with self._hardware_lock:
+            robot = self._robot
+
+            if robot is None:
+                return
+
             try:
                 await asyncio.to_thread(
                     robot.stop
@@ -380,51 +430,6 @@ class ManualDriveController:
                     )
                 except Exception:
                     pass
-
-                await asyncio.to_thread(
-                    robot.close
-                )
-
-    async def _ensure_robot(self) -> None:
-        if self._robot is not None:
-            return
-
-        robot = Robot.default()
-
-        try:
-            await asyncio.to_thread(
-                robot.start
-            )
-        except Exception:
-            await asyncio.to_thread(
-                robot.close
-            )
-            raise
-
-        self._robot = robot
-
-    async def _safe_neutralize(self) -> None:
-        """
-        Stop movement and center steering.
-
-        Used for emergency stop, disconnect, ownership release, watchdog
-        timeout, and application shutdown.
-        """
-
-        if self._robot is None:
-            return
-
-        try:
-            await asyncio.to_thread(
-                self._robot.stop
-            )
-        finally:
-            try:
-                await asyncio.to_thread(
-                    self._robot.center
-                )
-            except Exception:
-                pass
 
     async def _apply_steering_axis(
         self,
@@ -502,7 +507,7 @@ class ManualDriveController:
             while True:
                 await asyncio.sleep(0.1)
 
-                should_neutralize = False
+                robot = None
 
                 async with self._lock:
                     if self._owner is None:
@@ -513,16 +518,21 @@ class ManualDriveController:
                         - self._last_heartbeat
                     )
 
-                    if elapsed > self.heartbeat_timeout:
-                        self._owner = None
-                        self._last_heartbeat = 0.0
-                        self._desired_state = ControlState()
-                        self._last_applied_state = None
-                        self._state_generation += 1
-                        should_neutralize = True
+                    if elapsed <= self.heartbeat_timeout:
+                        continue
 
-                if should_neutralize:
-                    await self._safe_neutralize()
+                    self._owner = None
+                    self._last_heartbeat = 0.0
+                    self._desired_state = ControlState()
+                    self._last_applied_state = None
+                    self._state_generation += 1
+
+                    robot = self._robot
+                    self._robot = None
+
+                await self._stop_center_close(
+                    robot
+                )
 
         except asyncio.CancelledError:
             raise
@@ -569,10 +579,15 @@ class ManualDriveController:
                     and robot_ready
                     and state != last_applied
                 ):
-                    await self._apply_state(
-                        state,
-                        generation,
-                    )
+                    try:
+                        await self._apply_state(
+                            state,
+                            generation,
+                        )
+                    except DriveControlError:
+                        # Ownership may have been released
+                        # while this iteration was pending.
+                        pass
 
                 elapsed = (
                     time.monotonic()
@@ -604,56 +619,72 @@ class ManualDriveController:
         state: ControlState,
         generation: int,
     ) -> None:
-        async with self._lock:
-            previous = self._last_applied_state
+        async with self._hardware_lock:
+            async with self._lock:
+                if (
+                    self._owner is None
+                    or self._robot is None
+                    or generation
+                    != self._state_generation
+                ):
+                    return
 
-        steering_changed = (
-            previous is None
-            or state.steering != previous.steering
-        )
+                previous = (
+                    self._last_applied_state
+                )
 
-        throttle_changed = (
-            previous is None
-            or state.throttle != previous.throttle
-        )
-
-        camera_changed = (
-            previous is None
-            or state.camera_pan != previous.camera_pan
-            or state.camera_tilt != previous.camera_tilt
-        )
-
-        if steering_changed:
-            await self._apply_steering_axis(
-                state.steering
+            steering_changed = (
+                previous is None
+                or state.steering
+                != previous.steering
             )
+
+            throttle_changed = (
+                previous is None
+                or state.throttle
+                != previous.throttle
+            )
+
+            camera_changed = (
+                previous is None
+                or state.camera_pan
+                != previous.camera_pan
+                or state.camera_tilt
+                != previous.camera_tilt
+            )
+
+            if steering_changed:
+                await self._apply_steering_axis(
+                    state.steering
+                )
 
             if not await self._generation_is_current(
                 generation
             ):
                 return
 
-        if throttle_changed:
-            await self._apply_throttle(
-                state.throttle
-            )
+            if throttle_changed:
+                await self._apply_throttle(
+                    state.throttle
+                )
 
             if not await self._generation_is_current(
                 generation
             ):
                 return
 
-        if camera_changed:
-            await self._apply_camera_axes(
-                state.camera_pan,
-                state.camera_tilt,
-            )
+            if camera_changed:
+                await self._apply_camera_axes(
+                    state.camera_pan,
+                    state.camera_tilt,
+                )
 
-            if not await self._generation_is_current(
-                generation
-            ):
-                return
-
-        async with self._lock:
-            if generation == self._state_generation:
-                self._last_applied_state = state
+            async with self._lock:
+                if (
+                    self._owner is not None
+                    and generation
+                    == self._state_generation
+                ):
+                    self._last_applied_state = (
+                        state
+                    )

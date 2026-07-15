@@ -1,11 +1,11 @@
 from __future__ import annotations
 
+import asyncio
 import json
 from uuid import uuid4
 
 import aiohttp
 from aiohttp import WSMsgType, web
-import asyncio
 
 from betabox_robotics.config import (
     PlatformConfig,
@@ -14,6 +14,10 @@ from betabox_robotics.launchpad.drive_controller import (
     ControlState,
     DriveControlError,
     ManualDriveController,
+)
+
+from betabox_robotics.exceptions import (
+    RobotBusyError,
 )
 
 def parse_bool(
@@ -338,9 +342,45 @@ async def drive_websocket(
     client_id = uuid4().hex
 
     try:
-        claimed = await controller.claim(
-            client_id
-        )
+        try:
+            claimed = await controller.claim(
+                client_id
+            )
+
+        except RobotBusyError as exc:
+            await send_json_if_open(
+                websocket,
+                {
+                    "type": "unavailable",
+                    "message": str(exc),
+                },
+            )
+
+            await websocket.close(
+                code=4002,
+                message=b"robot hardware unavailable",
+            )
+
+            return websocket
+
+        except Exception as exc:
+            await send_json_if_open(
+                websocket,
+                {
+                    "type": "error",
+                    "message": (
+                        "Manual Drive could not start: "
+                        f"{exc}"
+                    ),
+                },
+            )
+
+            await websocket.close(
+                code=1011,
+                message=b"manual drive failed",
+            )
+
+            return websocket
 
         if not claimed:
             await websocket.send_json(
@@ -372,6 +412,9 @@ async def drive_websocket(
 
         async for message in websocket:
             if message.type == WSMsgType.TEXT:
+                if websocket.closed:
+                    break
+
                 await handle_drive_message(
                     websocket,
                     controller,
@@ -379,7 +422,12 @@ async def drive_websocket(
                     message.data,
                 )
 
-            elif message.type == WSMsgType.ERROR:
+            elif message.type in (
+                WSMsgType.CLOSE,
+                WSMsgType.CLOSING,
+                WSMsgType.CLOSED,
+                WSMsgType.ERROR,
+            ):
                 break
 
     finally:
@@ -389,6 +437,25 @@ async def drive_websocket(
 
     return websocket
 
+
+async def send_json_if_open(
+    websocket: web.WebSocketResponse,
+    data: dict,
+) -> bool:
+    if websocket.closed:
+        return False
+
+    try:
+        await websocket.send_json(
+            data
+        )
+        return True
+
+    except (
+        ConnectionResetError,
+        aiohttp.ClientConnectionError,
+    ):
+        return False
 
 async def handle_drive_message(
     websocket: web.WebSocketResponse,
@@ -411,10 +478,11 @@ async def handle_drive_message(
                 client_id
             )
 
-            await websocket.send_json(
+            await send_json_if_open(
+                websocket,
                 {
                     "type": "heartbeat",
-                }
+                },
             )
             return
 
@@ -423,10 +491,11 @@ async def handle_drive_message(
                 client_id
             )
 
-            await websocket.send_json(
+            await send_json_if_open(
+                websocket,
                 {
                     "type": "stopped",
-                }
+                },
             )
             return
 
@@ -463,19 +532,7 @@ async def handle_drive_message(
             state,
         )
 
-        await websocket.send_json(
-            {
-                "type": "accepted",
-                "state": {
-                    "throttle": state.throttle,
-                    "steering": state.steering,
-                    "camera_pan": state.camera_pan,
-                    "camera_tilt": state.camera_tilt,
-                    "headlights": state.headlights,
-                    "horn": state.horn,
-                },
-            }
-        )
+        return
 
     except (
         DriveControlError,
@@ -483,11 +540,12 @@ async def handle_drive_message(
         ValueError,
         json.JSONDecodeError,
     ) as exc:
-        await websocket.send_json(
+        await send_json_if_open(
+            websocket,
             {
                 "type": "error",
                 "message": str(exc),
-            }
+            },
         )
 
 

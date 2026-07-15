@@ -44,7 +44,7 @@ async def home(
                 description=(
                     "Open the JupyterLab coding environment."
                 ),
-                href=config.network.jupyterhub_url,
+                href="/jupyter",
             ),
             tool_card(
                 title="Live Camera",

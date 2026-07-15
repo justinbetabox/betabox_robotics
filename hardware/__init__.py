@@ -14,6 +14,10 @@ from .motor import Motor, MotorError, MotorMode
 from .pin import Pin, PinMode, Pull, Trigger
 from .pwm import PWM, PWMError
 from .servo import Servo, ServoError
+from .gpio import close_gpio_factory
+from .ownership import (
+    RobotOwnership,
+)
 
 __all__ = [
     "Pins",
@@ -42,4 +46,6 @@ __all__ = [
     "Motor",
     "MotorError",
     "MotorMode",
+    "close_gpio_factory",
+    "RobotOwnership",
 ]

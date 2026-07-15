@@ -674,7 +674,19 @@ function connect() {
                 emergencyStop();
             }
 
-            if (message.type === "accepted") {
+            if (message.type === "unavailable") {
+                state.ready = false;
+
+                setConnectionState(
+                    "Robot In Use",
+                    "status-busy"
+                );
+
+                element(
+                    "drive-owner"
+                ).textContent =
+                    message.message;
+
                 return;
             }
         }
@@ -682,11 +694,41 @@ function connect() {
 
     websocket.addEventListener(
         "close",
-        () => {
+        (event) => {
             state.ready = false;
             state.websocket = null;
 
             emergencyStop();
+
+            if (event.code === 4002) {
+                setConnectionState(
+                    "Robot In Use",
+                    "status-busy"
+                );
+
+                element(
+                    "drive-owner"
+                ).textContent =
+                    "The robot is currently being used "
+                    + "by another application.";
+
+                return;
+            }
+
+            if (event.code === 4001) {
+                setConnectionState(
+                    "Robot Busy",
+                    "status-busy"
+                );
+
+                element(
+                    "drive-owner"
+                ).textContent =
+                    "The robot is already being controlled "
+                    + "from another browser.";
+
+                return;
+            }
 
             setConnectionState(
                 "Disconnected",
@@ -1163,6 +1205,40 @@ function configureSpeed() {
     );
 }
 
+function releasePageControl() {
+    emergencyStop();
+
+    if (
+        state.websocket !== null &&
+        (
+            state.websocket.readyState
+            === WebSocket.OPEN ||
+            state.websocket.readyState
+            === WebSocket.CONNECTING
+        )
+    ) {
+        state.websocket.close(
+            1000,
+            "manual drive page closed"
+        );
+    }
+
+    if (videoConnection !== null) {
+        void videoConnection.close();
+    }
+}
+
+
+window.addEventListener(
+    "pagehide",
+    releasePageControl
+);
+
+window.addEventListener(
+    "beforeunload",
+    releasePageControl
+);
+
 function configureSafety() {
     element(
         "emergency-stop"
@@ -1183,19 +1259,6 @@ function configureSafety() {
     window.addEventListener(
         "blur",
         emergencyStop
-    );
-
-    window.addEventListener(
-      "beforeunload",
-          () => {
-              emergencyStop();
-
-              if (
-                  videoConnection !== null
-              ) {
-                  void videoConnection.close();
-              }
-          }
     );
 }
 

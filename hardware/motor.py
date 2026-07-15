@@ -164,15 +164,25 @@ class Motor:
 
     def close(self) -> None:
         if self.mode == MotorMode.PWM_DIR:
-            self.pwm.set_duty_cycle(0)
-            self.pwm.close()
-            self.direction.close()
+            try:
+                self.pwm.set_duty_cycle(0)
+            finally:
+                try:
+                    self.pwm.close()
+                finally:
+                    self.direction.close()
 
         elif self.mode == MotorMode.PWM_PWM:
-            self.pwm_a.set_duty_cycle(0)
-            self.pwm_b.set_duty_cycle(0)
-            self.pwm_a.close()
-            self.pwm_b.close()
+            try:
+                self.pwm_a.set_duty_cycle(0)
+            finally:
+                try:
+                    self.pwm_b.set_duty_cycle(0)
+                finally:
+                    try:
+                        self.pwm_a.close()
+                    finally:
+                        self.pwm_b.close()
 
     def deinit(self) -> None:
         self.close()

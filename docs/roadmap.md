@@ -76,6 +76,7 @@ A stable Robot API built from reusable subsystem implementations.
 -    [x] Deployment automation
 -    [x] System service installation
 -    [x] JupyterHub integration
+-    [x] Launchpad integration
 -    [x] Deployment verification
 
 ## Validation

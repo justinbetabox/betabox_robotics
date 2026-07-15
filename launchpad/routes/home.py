@@ -156,8 +156,8 @@ async def home(
             </span>
 
             <span class="hud-item">
-                <span class="hud-label">Temperature</span>
-                <strong id="hud-temperature">--</strong>
+                <span class="hud-label">Control</span>
+                <strong id="hud-control">--</strong>
             </span>
 
             <span class="hud-item hud-wide">
@@ -185,6 +185,26 @@ async def home(
             <div class="hud-detail">
                 <span>CPU Temperature</span>
                 <strong id="detail-temperature">--</strong>
+            </div>
+
+            <div class="hud-detail">
+                <span>Robot Control</span>
+                <strong id="detail-control">--</strong>
+            </div>
+
+            <div class="hud-detail">
+                <span>Network</span>
+                <strong id="detail-network">--</strong>
+            </div>
+
+            <div class="hud-detail">
+                <span>JupyterLab</span>
+                <strong id="detail-jupyter">--</strong>
+            </div>
+
+            <div class="hud-detail">
+                <span>Sensors</span>
+                <strong id="detail-sensors">--</strong>
             </div>
 
             <div class="hud-detail">

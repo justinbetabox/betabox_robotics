@@ -318,11 +318,6 @@ class ManualDriveController:
             robot = self._robot
             self._robot = None
 
-        print(
-            f"manual-drive: releasing client {client_id}",
-            flush=True,
-        )
-
         await self._stop_center_close(
             robot
         )
@@ -406,11 +401,6 @@ class ManualDriveController:
             await asyncio.to_thread(
                 robot.close
             )
-
-        print(
-            "manual-drive: robot hardware closed",
-            flush=True,
-        )
 
     async def _safe_neutralize(self) -> None:
         async with self._hardware_lock:

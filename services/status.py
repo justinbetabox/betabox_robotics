@@ -116,7 +116,9 @@ def collect_status(
         version=__version__,
         hostname=hostname(),
         ip_addresses=ip_addresses(),
-        i2c_available=Path("/dev/i2c-1").exists(),
+        i2c_available=(
+            config.verification.i2c_device.exists()
+        ),
         hifiberry_available=hifiberry_available(),
         media_paths={
             "pictures": str(config.paths.pictures_dir),
@@ -132,6 +134,7 @@ def collect_status(
 
 def format_boolean(value: bool) -> str:
     return "available" if value else "missing"
+
 
 def print_system_health(system_health: SystemHealthStatus) -> None:
     print()
@@ -187,6 +190,7 @@ def print_system_health(system_health: SystemHealthStatus) -> None:
         "Wi-Fi:        "
         + ("connected" if system_health.wifi.connected else "disconnected")
     )
+
 
 def print_hardware_status(hardware: RobotHardwareStatus) -> None:
     print()
@@ -312,6 +316,19 @@ def print_human(
         f"{'available' if report.jupyterhub_proxy_available else 'missing'}"
     )
     print(f"Port:     {config.network.jupyterhub_port}")
+
+    print()
+
+    print("Launchpad")
+    print("---------")
+    print(
+        "Service:  "
+        f"{report.services.get(config.services.launchpad, 'unknown')}"
+    )
+    print(f"Port:     {config.network.launchpad_port}")
+    print(
+        f"Endpoint: {config.network.launchpad_health_url}"
+    )
 
     print()
 

@@ -87,7 +87,7 @@ A stable Robot API built from reusable subsystem implementations.
 
 ------------------------------------------------------------------------
 
-# Phase 3 --- Platform Services ✅
+# Phase 3 --- Platform Services 🚧
 
 A stable operational platform built on top of the Betabox Robotics SDK. This phase establishes the services, diagnostics, configuration, recovery, and management infrastructure that support classroom operation.
 
@@ -129,15 +129,28 @@ A stable operational platform built on top of the Betabox Robotics SDK. This pha
 -    [x] Platform/Robot configuration separation
 -    [x] Dependency injection across services
 
+## Platform Security
+
+-    [ ] Authentication
+-    [ ] Authorization
+-    [ ] Role management
+
 ------------------------------------------------------------------------
 
-# Phase 4 --- Betabox Launchpad
+# Phase 4 --- Betabox Launchpad 🚧
 
 Browser-based platform management.
 
--    [ ] Dashboard
--    [ ] Robot status
--    [ ] Live video
+## Core
+
+-    [x] Dashboard
+-    [x] Robot status HUD
+-    [x] Manual Drive
+-    [x] Live Camera
+-    [ ] JupyterLab integration
+
+## Platform
+
 -    [ ] Diagnostics
 -    [ ] Monitoring
 -    [ ] Logs
@@ -149,6 +162,25 @@ Browser-based platform management.
 -    [ ] Restore
 -    [ ] Reset
 -    [ ] Configuration
+
+## Classroom
+
+-    [ ] Media browser
+-    [ ] Calibration
+-    [ ] Student tools
+-    [ ] Teacher authentication
+
+------------------------------------------------------------------------
+
+# Phase 4.5 --- Platform APIs
+
+External interfaces built on the Robot Platform.
+
+-    [ ] REST API
+-    [ ] WebSocket API
+-    [ ] Plugin architecture
+-    [ ] Remote control interfaces
+-    [ ] Future mobile app support
 
 ------------------------------------------------------------------------
 

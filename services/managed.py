@@ -56,6 +56,11 @@ def managed_services(
             title="Wi-Fi Fallback",
             unit=units.wifi_fallback,
         ),
+        "launchpad": ManagedService(
+            name="launchpad",
+            title="Launchpad",
+            unit=units.launchpad,
+        ),
     }
 
 

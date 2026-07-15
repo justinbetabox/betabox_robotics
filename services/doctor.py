@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import argparse
 from dataclasses import dataclass
 from typing import Literal
@@ -10,6 +12,10 @@ from betabox_robotics.services.hardware_status import RobotHardwareStatus
 from betabox_robotics.services.status import StatusReport, collect_status
 from betabox_robotics.services.system_health import (
     SystemHealthStatus,
+)
+from betabox_robotics.services.http_health import (
+    check_http_available,
+    check_json_health,
 )
 
 from betabox_robotics.config import (
@@ -44,6 +50,7 @@ def dedicated_service_units(
         config.services.video,
         config.services.jupyterhub,
         config.services.boot_announce,
+        config.services.launchpad,
     }
 
 def healthy(title: str, summary: str) -> Diagnosis:
@@ -250,30 +257,62 @@ def diagnose_jupyterhub(
     status: StatusReport,
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> Diagnosis:
-    proxy = results.get("jupyterhub:proxy")
+    proxy = results.get(
+        "jupyterhub:proxy"
+    )
+
     service_state = status.services.get(
         config.services.jupyterhub,
         "unknown",
     )
 
-    proxy_ok = bool(proxy and proxy.ok)
-    service_ok = service_state == "active"
+    proxy_ok = bool(
+        proxy and proxy.ok
+    )
 
-    if proxy_ok and service_ok:
+    service_ok = (
+        service_state == "active"
+    )
+
+    health_ok = False
+    health_message = (
+        "service is not active"
+    )
+
+    if service_ok:
+        health_ok, health_message = (
+            check_http_available(
+                config.network.jupyterhub_health_url,
+            )
+        )
+
+    if (
+        proxy_ok
+        and service_ok
+        and health_ok
+    ):
         return healthy(
             "JupyterHub",
-            "JupyterHub service and proxy are available.",
+            (
+                "JupyterHub service, proxy, "
+                "and HTTP endpoint are available."
+            ),
         )
 
     causes: list[str] = []
+
     affected = [
         "Student notebook access",
         "Robot Car kernel sessions",
     ]
+
     actions: list[str] = []
 
     if not proxy_ok:
-        causes.append("configurable-http-proxy is missing or unavailable.")
+        causes.append(
+            "configurable-http-proxy is missing or unavailable."
+        )
+
         actions.extend(
             [
                 "Install Node.js and npm.",
@@ -285,30 +324,54 @@ def diagnose_jupyterhub(
         causes.append(
             f"{config.services.jupyterhub} is {service_state}."
         )
+
         actions.extend(
             [
                 (
                     "Restart: sudo systemctl restart "
                     f"{config.services.jupyterhub}"
                 ),
-                "Check: betabox logs jupyterhub --journal-only",
+                (
+                    "Check: betabox logs "
+                    "jupyterhub --journal-only"
+                ),
             ]
         )
 
-    actions.append(
-        f"Check: curl -I "
-        f"{config.network.jupyterhub_health_url}"
-    )
+    elif not health_ok:
+        causes.append(
+            (
+                "JupyterHub service is active, "
+                "but its health endpoint failed: "
+                f"{health_message}."
+            )
+        )
+
+        actions.extend(
+            [
+                (
+                    "Check: curl --fail "
+                    f"{config.network.jupyterhub_health_url}"
+                ),
+                (
+                    "Check: betabox logs "
+                    "jupyterhub --journal-only"
+                ),
+            ]
+        )
 
     return Diagnosis(
         title="JupyterHub",
         ok=False,
         severity="error",
-        summary="JupyterHub is not fully available.",
+        summary=(
+            "JupyterHub is not fully available."
+        ),
         causes=causes,
         affected=affected,
         actions=actions,
     )
+
 
 def diagnose_robot_hardware(
     hardware: RobotHardwareStatus,
@@ -626,6 +689,85 @@ def diagnose_vision_hardware(
         "Vision service and camera pipeline are healthy.",
     )
 
+def diagnose_launchpad(
+    status: StatusReport,
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> Diagnosis:
+    unit = config.services.launchpad
+
+    service_state = status.services.get(
+        unit,
+        "unknown",
+    )
+
+    if service_state != "active":
+        return Diagnosis(
+            title="Launchpad",
+            ok=False,
+            severity="error",
+            summary=(
+                "Launchpad is not available because "
+                f"{unit} is {service_state}."
+            ),
+            causes=[
+                "The Launchpad service failed during startup.",
+                "The service unit or startup command is misconfigured.",
+                "Another process may already be using the Launchpad port.",
+            ],
+            affected=[
+                "Launchpad dashboard",
+                "Manual Drive",
+                "Live camera page",
+                "Browser-based platform tools",
+            ],
+            actions=[
+                "Run: betabox services",
+                "Run: betabox logs launchpad --journal-only",
+                f"Restart: sudo systemctl restart {unit}",
+            ],
+        )
+
+    health_ok, health_message = check_json_health(
+        config.network.launchpad_health_url,
+        expected_service="launchpad",
+    )
+
+    if health_ok:
+        return healthy(
+            "Launchpad",
+            "Launchpad service and HTTP API are healthy.",
+        )
+
+    return Diagnosis(
+        title="Launchpad",
+        ok=False,
+        severity="error",
+        summary=(
+            "Launchpad service is active, but its "
+            f"health endpoint failed: {health_message}."
+        ),
+        causes=[
+            "The aiohttp application did not start correctly.",
+            "The Launchpad event loop may be stalled.",
+            "The configured host or port may not match the service.",
+            "The health route may be missing or returning invalid data.",
+        ],
+        affected=[
+            "Launchpad dashboard",
+            "Manual Drive",
+            "Live camera page",
+            "Browser-based platform tools",
+        ],
+        actions=[
+            (
+                "Check: curl --fail "
+                f"{config.network.launchpad_health_url}"
+            ),
+            "Run: betabox logs launchpad --journal-only",
+            f"Restart: sudo systemctl restart {unit}",
+        ],
+    )
+
 def collect_diagnoses(
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> list[Diagnosis]:
@@ -653,6 +795,10 @@ def collect_diagnoses(
         diagnose_audio_hardware(hardware),
         vision,
         diagnose_jupyterhub(results, status, config),
+        diagnose_launchpad(
+                status,
+                config,
+            ),
         diagnose_boot_announce(status, config),
         diagnose_media(results),
         diagnose_services(status, config),

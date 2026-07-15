@@ -124,6 +124,53 @@ def check_executable(command: str) -> CheckResult:
         path if path else "not found",
     )
 
+def check_service_installed(
+    unit: str,
+) -> CheckResult:
+    path = Path(
+        "/etc/systemd/system"
+    ) / unit
+
+    return CheckResult(
+        f"service-installed:{unit}",
+        path.is_file(),
+        "installed" if path.is_file() else "unit file missing",
+    )
+
+
+def check_service_enabled(
+    unit: str,
+    *,
+    timeout: int = 5,
+) -> CheckResult:
+    result = run(
+        [
+            "systemctl",
+            "is-enabled",
+            unit,
+        ],
+        timeout=timeout,
+    )
+
+    if result is None:
+        return CheckResult(
+            f"service-enabled:{unit}",
+            False,
+            "systemctl command failed",
+        )
+
+    output = (
+        result.stdout.strip()
+        or result.stderr.strip()
+        or "unknown"
+    )
+
+    return CheckResult(
+        f"service-enabled:{unit}",
+        result.returncode == 0,
+        output,
+    )
+
 
 def collect_checks(
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
@@ -142,6 +189,20 @@ def collect_checks(
         check_command(
             ["betabox", "--help"],
             "cli:betabox",
+            timeout=(
+                verification.command_timeout_seconds
+            ),
+        )
+    )
+
+    checks.append(
+        check_command(
+            [
+                "betabox",
+                "launchpad",
+                "--help",
+            ],
+            "cli:betabox-launchpad",
             timeout=(
                 verification.command_timeout_seconds
             ),
@@ -175,6 +236,22 @@ def collect_checks(
     ):
         checks.append(
             check_executable(executable)
+        )
+
+    for unit in config.services.all_units:
+        checks.append(
+            check_service_installed(
+                unit
+            )
+        )
+
+        checks.append(
+            check_service_enabled(
+                unit,
+                timeout=(
+                    verification.command_timeout_seconds
+                ),
+            )
         )
 
     return checks

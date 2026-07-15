@@ -56,6 +56,11 @@
     font-weight: 800;
 }
 
+.drive-connection.status-paused {
+    background: #8a641c;
+    color: #ffffff;
+}
+
 
 /* Main layout */
 

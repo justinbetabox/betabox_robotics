@@ -142,6 +142,17 @@ class ManualDriveController:
             and self._owner is None
         )
 
+    async def owns(
+        self,
+        client_id: str,
+    ) -> bool:
+        async with self._lock:
+            return (
+                not self._closed
+                and self._owner == client_id
+                and self._robot is not None
+            )
+
     def _camera_axis_to_angle(
         self,
         value: float,

@@ -5,6 +5,7 @@ from .jupyter import setup_jupyter_routes
 from .services import setup_services_routes
 from .status import setup_status_routes
 from .diagnostics import setup_diagnostics_routes
+from .events import setup_events_routes
 
 
 __all__ = [
@@ -15,4 +16,5 @@ __all__ = [
     "setup_services_routes",
     "setup_status_routes",
     "setup_diagnostics_routes",
+    "setup_events_routes",
 ]

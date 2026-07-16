@@ -1,0 +1,69 @@
+from __future__ import annotations
+
+import asyncio
+
+from aiohttp import web
+
+from betabox_robotics.config import (
+    PlatformConfig,
+)
+from betabox_robotics.launchpad.routes.diagnostics_page import (
+    diagnostics_page,
+)
+from betabox_robotics.services.doctor import (
+    collect_doctor_report,
+)
+
+
+async def diagnostics_api(
+    request: web.Request,
+) -> web.Response:
+    """
+    Run the safe Betabox diagnostic checks and return the report.
+
+    Diagnostics may perform filesystem, hardware, HTTP, and systemd
+    checks, so collection runs in a worker thread rather than blocking
+    the aiohttp event loop.
+    """
+
+    config: PlatformConfig = request.app[
+        "platform_config"
+    ]
+
+    try:
+        report = await asyncio.to_thread(
+            collect_doctor_report,
+            config,
+        )
+    except Exception as exc:
+        return web.json_response(
+            {
+                "error": (
+                    "diagnostics_unavailable"
+                ),
+                "message": (
+                    "Unable to run platform "
+                    "diagnostics."
+                ),
+                "detail": str(exc),
+            },
+            status=500,
+        )
+
+    return web.json_response(
+        report.to_dict()
+    )
+
+
+def setup_diagnostics_routes(
+    app: web.Application,
+) -> None:
+    app.router.add_get(
+        "/diagnostics",
+        diagnostics_page,
+    )
+
+    app.router.add_get(
+        "/api/diagnostics",
+        diagnostics_api,
+    )

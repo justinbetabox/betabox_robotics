@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 import argparse
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Literal
 
 from betabox_robotics.services.managed import managed_services
@@ -42,6 +42,67 @@ class Diagnosis:
     causes: list[str]
     affected: list[str]
     actions: list[str]
+
+@dataclass(frozen=True)
+class DoctorReport:
+    """
+    Complete diagnostic report for the Betabox Platform.
+
+    This model is shared by the CLI and Launchpad diagnostics page.
+    """
+
+    diagnoses: list[Diagnosis]
+    critical: int
+    error: int
+    warning: int
+    healthy: int
+
+    @property
+    def total(self) -> int:
+        return len(self.diagnoses)
+
+    @property
+    def issues(self) -> int:
+        return (
+            self.critical
+            + self.error
+            + self.warning
+        )
+
+    @property
+    def ok(self) -> bool:
+        return self.issues == 0
+
+    @property
+    def overall(self) -> str:
+        if self.critical > 0:
+            return "critical"
+
+        if self.error > 0:
+            return "error"
+
+        if self.warning > 0:
+            return "warning"
+
+        return "healthy"
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "summary": {
+                "overall": self.overall,
+                "ok": self.ok,
+                "total": self.total,
+                "issues": self.issues,
+                "critical": self.critical,
+                "error": self.error,
+                "warning": self.warning,
+                "healthy": self.healthy,
+            },
+            "diagnoses": [
+                asdict(diagnosis)
+                for diagnosis in self.diagnoses
+            ],
+        }
 
 def dedicated_service_units(
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
@@ -402,12 +463,12 @@ def diagnose_robot_hardware(
             ],
         )
 
-    if not hardware.robot_available:
+    if not hardware.passive_hardware_available:
         return Diagnosis(
             title="Robot Hardware",
             ok=False,
             severity="critical",
-            summary=hardware.robot_error or "Robot hardware is unavailable.",
+            summary=hardware.passive_hardware_error or "Robot hardware is unavailable.",
             causes=[
                 "Robot HAT communication failed.",
                 "A required hardware component could not be constructed.",
@@ -968,20 +1029,45 @@ def diagnosis_counts(
         ),
     }
 
-def print_diagnoses(diagnoses: list[Diagnosis]) -> bool:
-    print()
-    print("Betabox Doctor")
-    print("==============")
-    print()
+def collect_doctor_report(
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> DoctorReport:
+    """
+    Collect and summarize all platform diagnoses.
+    """
+
+    diagnoses = collect_diagnoses(
+        config
+    )
 
     diagnoses = sorted(
         diagnoses,
         key=lambda diagnosis: (
             diagnosis.ok,
-            -SEVERITY_ORDER[diagnosis.severity],
+            -SEVERITY_ORDER[
+                diagnosis.severity
+            ],
             diagnosis.title,
         ),
     )
+
+    counts = diagnosis_counts(
+        diagnoses
+    )
+
+    return DoctorReport(
+        diagnoses=diagnoses,
+        critical=counts["critical"],
+        error=counts["error"],
+        warning=counts["warning"],
+        healthy=counts["healthy"],
+    )
+
+def print_diagnoses(diagnoses: list[Diagnosis]) -> bool:
+    print()
+    print("Betabox Doctor")
+    print("==============")
+    print()
 
     counts = diagnosis_counts(diagnoses)
 
@@ -1034,14 +1120,45 @@ def print_diagnoses(diagnoses: list[Diagnosis]) -> bool:
 
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="betabox doctor")
-    parser.parse_args(argv)
+def main(
+    argv: list[str] | None = None,
+) -> int:
+    parser = argparse.ArgumentParser(
+        prog="betabox doctor"
+    )
+
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help=(
+            "print the diagnostic report "
+            "as JSON"
+        ),
+    )
+
+    args = parser.parse_args(
+        argv
+    )
 
     config = DEFAULT_PLATFORM_CONFIG
 
-    diagnoses = collect_diagnoses(config)
-    return 0 if print_diagnoses(diagnoses) else 1
+    report = collect_doctor_report(
+        config
+    )
+
+    if args.json:
+        print(
+            json.dumps(
+                report.to_dict(),
+                indent=2,
+            )
+        )
+    else:
+        print_diagnoses(
+            report.diagnoses
+        )
+
+    return 0 if report.ok else 1
 
 
 if __name__ == "__main__":

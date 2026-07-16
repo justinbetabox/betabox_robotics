@@ -13,6 +13,7 @@ from betabox_robotics.config import (
 )
 from betabox_robotics.launchpad.routes import (
     setup_camera_routes,
+    setup_diagnostics_routes,
     setup_drive_routes,
     setup_home_routes,
     setup_jupyter_routes,
@@ -74,6 +75,7 @@ def create_app(
     )
 
     setup_home_routes(app)
+    setup_diagnostics_routes(app)
     setup_status_routes(app)
     setup_services_routes(app)
     setup_camera_routes(app)

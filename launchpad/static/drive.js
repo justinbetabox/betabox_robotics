@@ -109,11 +109,14 @@ function determineHealth(status) {
     const hardware =
         status.hardware ?? {};
 
-    const systemHealth =
-        status.system_health ?? {};
-
     const battery =
         hardware.battery ?? {};
+
+    const vision =
+        hardware.vision ?? {};
+
+    const systemHealth =
+        status.system_health ?? {};
 
     const temperature =
         systemHealth.temperature ?? {};
@@ -122,11 +125,10 @@ function determineHealth(status) {
         systemHealth.throttling ?? {};
 
     if (
-        hardware.robot_available === false ||
-        battery.state === "critical" ||
-        temperature.state === "critical" ||
-        throttling.undervoltage_now === true ||
-        throttling.throttled_now === true
+        battery.state === "critical"
+        || temperature.state === "critical"
+        || throttling.undervoltage_now === true
+        || throttling.throttled_now === true
     ) {
         return {
             label: "Needs Attention",
@@ -135,10 +137,10 @@ function determineHealth(status) {
     }
 
     if (
-        battery.available === false ||
-        battery.state === "low" ||
-        temperature.state === "high" ||
-        hardware.vision?.service_available === false
+        battery.available === false
+        || battery.state === "low"
+        || temperature.state === "high"
+        || vision.service_available === false
     ) {
         return {
             label: "Warning",

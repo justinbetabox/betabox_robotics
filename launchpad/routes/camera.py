@@ -2,80 +2,72 @@ from __future__ import annotations
 
 from aiohttp import web
 
+from betabox_robotics.launchpad.components import (
+    back_link,
+    page_heading,
+    status_pill,
+)
+from betabox_robotics.launchpad.layout import (
+    render_page,
+)
+
 
 async def camera_page(
     request: web.Request,
 ) -> web.Response:
-    html = """<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1"
-    >
-    <title>Live Camera · Betabox Launchpad</title>
+    body = f"""
+<header class="camera-header">
+    {back_link()}
 
-    <link
-        rel="stylesheet"
-        href="/static/tokens.css"
-    >
-    <link
-        rel="stylesheet"
-        href="/static/components.css"
-    >
-    <link
-        rel="stylesheet"
-        href="/static/camera.css"
-    >
-</head>
+    {page_heading(
+        eyebrow="Betabox Vision",
+        title="Live Camera",
+    )}
 
-<body class="camera-page">
-    <header class="camera-header">
-        <a class="back-link" href="/">
-            ← Launchpad
-        </a>
+    {status_pill(
+        element_id="camera-status",
+        text="Connecting…",
+        css_class=(
+            "camera-status "
+            "status-connecting"
+        ),
+    )}
+</header>
 
-        <div>
-            <p class="eyebrow">Betabox Vision</p>
-            <h1>Live Camera</h1>
+<main class="camera-main">
+    <section
+        class="camera-view"
+        data-video-state="connecting"
+    >
+        <video
+            id="live-camera"
+            class="camera-video"
+            autoplay
+            playsinline
+            muted
+        ></video>
+
+        <div class="camera-message">
+            Connecting camera…
         </div>
-
-        <div
-            id="camera-status"
-            class="camera-status status-connecting"
-        >
-            Connecting…
-        </div>
-    </header>
-
-    <main class="camera-main">
-        <section
-            class="camera-view"
-            data-video-state="connecting"
-        >
-            <video
-                id="live-camera"
-                class="camera-video"
-                autoplay
-                playsinline
-                muted
-            ></video>
-
-            <div class="camera-message">
-                Connecting camera…
-            </div>
-        </section>
-    </main>
-
-    <script src="/static/theme.js"></script>
-    <script
-        type="module"
-        src="/static/camera.js"
-    ></script>
-</body>
-</html>
+    </section>
+</main>
 """
+
+    html = render_page(
+        title=(
+            "Live Camera · "
+            "Betabox Launchpad"
+        ),
+        body=body,
+        body_class="camera-page",
+        stylesheets=(
+            "/static/camera.css",
+        ),
+        module_scripts=(
+            "/static/camera.js",
+        ),
+    )
 
     return web.Response(
         text=html,

@@ -3,9 +3,10 @@ from __future__ import annotations
 import fcntl
 import json
 import os
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import IO
+from typing import IO, Any
 
 from betabox_robotics.exceptions import (
     RobotBusyError,
@@ -15,6 +16,23 @@ from betabox_robotics.exceptions import (
 ROBOT_LOCK_PATH = Path(
     "/tmp/betabox-robot.lock"
 )
+
+@dataclass(frozen=True)
+class RobotOwnershipStatus:
+    available: bool
+    owner: str | None
+    pid: int | None
+    acquired_at: str | None
+    error: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "available": self.available,
+            "owner": self.owner,
+            "pid": self.pid,
+            "acquired_at": self.acquired_at,
+            "error": self.error,
+        }
 
 
 class RobotOwnership:
@@ -120,7 +138,7 @@ class RobotOwnership:
     def _read_owner(
         self,
         lock_file: IO[str],
-    ) -> dict:
+    ) -> dict[str, object]:
         try:
             lock_file.seek(0)
             value = json.load(
@@ -139,7 +157,9 @@ class RobotOwnership:
 
         return {}
 
-    def __enter__(self):
+    def __enter__(
+        self,
+    ) -> "RobotOwnership":
         self.acquire()
         return self
 
@@ -150,3 +170,110 @@ class RobotOwnership:
         traceback,
     ) -> None:
         self.release()
+
+def probe_robot_ownership(
+    lock_path: Path = ROBOT_LOCK_PATH,
+) -> RobotOwnershipStatus:
+    try:
+        lock_file = lock_path.open(
+            "a+",
+            encoding="utf-8",
+        )
+    except OSError as exc:
+        return RobotOwnershipStatus(
+            available=False,
+            owner=None,
+            pid=None,
+            acquired_at=None,
+            error=str(exc),
+        )
+
+    acquired = False
+
+    try:
+        try:
+            fcntl.flock(
+                lock_file.fileno(),
+                fcntl.LOCK_EX
+                | fcntl.LOCK_NB,
+            )
+            acquired = True
+
+        except BlockingIOError:
+            details = _read_lock_metadata(
+                lock_file
+            )
+
+            return RobotOwnershipStatus(
+                available=False,
+                owner=_optional_string(
+                    details.get("owner")
+                ),
+                pid=_optional_int(
+                    details.get("pid")
+                ),
+                acquired_at=_optional_string(
+                    details.get("acquired_at")
+                ),
+            )
+
+        return RobotOwnershipStatus(
+            available=True,
+            owner=None,
+            pid=None,
+            acquired_at=None,
+        )
+
+    finally:
+        if acquired:
+            try:
+                fcntl.flock(
+                    lock_file.fileno(),
+                    fcntl.LOCK_UN,
+                )
+            except OSError:
+                pass
+
+        lock_file.close()
+
+
+def _read_lock_metadata(
+    lock_file: IO[str],
+) -> dict[str, object]:
+    try:
+        lock_file.seek(0)
+        value = json.load(
+            lock_file
+        )
+
+        if isinstance(value, dict):
+            return value
+
+    except (
+        OSError,
+        ValueError,
+        json.JSONDecodeError,
+    ):
+        pass
+
+    return {}
+
+
+def _optional_string(
+    value: object,
+) -> str | None:
+    return (
+        value
+        if isinstance(value, str)
+        else None
+    )
+
+
+def _optional_int(
+    value: object,
+) -> int | None:
+    return (
+        value
+        if isinstance(value, int)
+        else None
+    )

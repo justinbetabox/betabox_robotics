@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from html import escape
-
 from aiohttp import web
 
+from betabox_robotics.launchpad.components import (
+    action_card,
+)
 
 def tool_card(
     *,
@@ -57,7 +58,7 @@ async def home(
 
     student_tools = "".join(
         [
-            tool_card(
+            action_card(
                 title="Manual Drive",
                 description=(
                     "Control movement, steering, and the camera "
@@ -66,9 +67,9 @@ async def home(
                 href="/drive",
                 category="Control",
                 accent="blue",
-                status="Open controls",
+                action="Open controls",
             ),
-            tool_card(
+            action_card(
                 title="Coding",
                 description=(
                     "Open JupyterLab to write Python and "
@@ -77,9 +78,9 @@ async def home(
                 href="/jupyter",
                 category="Build",
                 accent="green",
-                status="Open JupyterLab",
+                action="Open JupyterLab",
             ),
-            tool_card(
+            action_card(
                 title="Live Camera",
                 description=(
                     "View the robot's live camera feed."
@@ -87,9 +88,9 @@ async def home(
                 href="/camera",
                 category="Vision",
                 accent="orange",
-                status="View camera",
+                action="View camera",
             ),
-            tool_card(
+            action_card(
                 title="Media",
                 description=(
                     "Browse pictures, videos, recordings, "
@@ -98,9 +99,9 @@ async def home(
                 href="/media",
                 category="Create",
                 accent="pink",
-                status="Browse media",
+                action="Browse media",
             ),
-            tool_card(
+            action_card(
                 title="Calibration",
                 description=(
                     "Run guided calibration and hardware "
@@ -109,14 +110,14 @@ async def home(
                 href="/calibration",
                 category="Setup",
                 accent="blue",
-                status="Calibrate robot",
+                action="Calibrate robot",
             ),
         ]
     )
 
     information_tools = "".join(
         [
-            tool_card(
+            action_card(
                 title="Status",
                 description=(
                     "See detailed robot, hardware, network, "
@@ -125,9 +126,9 @@ async def home(
                 href="/status",
                 category="Understand",
                 accent="blue",
-                status="View status",
+                action="View status",
             ),
-            tool_card(
+            action_card(
                 title="Diagnostics",
                 description=(
                     "Run Verify and Doctor to find and "
@@ -136,9 +137,9 @@ async def home(
                 href="/diagnostics",
                 category="Troubleshoot",
                 accent="orange",
-                status="Run checks",
+                action="Run checks",
             ),
-            tool_card(
+            action_card(
                 title="Services",
                 description=(
                     "See which platform services are installed "
@@ -147,9 +148,9 @@ async def home(
                 href="/services",
                 category="Platform",
                 accent="blue",
-                status="View services",
+                action="View services",
             ),
-            tool_card(
+            action_card(
                 title="Configuration",
                 description=(
                     "Explore the robot and platform "
@@ -158,9 +159,9 @@ async def home(
                 href="/configuration",
                 category="Learn",
                 accent="green",
-                status="View configuration",
+                action="View configuration",
             ),
-            tool_card(
+            action_card(
                 title="Events",
                 description=(
                     "Review recent robot and platform activity."
@@ -168,7 +169,7 @@ async def home(
                 href="/events",
                 category="History",
                 accent="pink",
-                status="View events",
+                action="View events",
             ),
         ]
     )
@@ -291,11 +292,6 @@ async def home(
                 </div>
 
                 <div class="hud-detail">
-                    <span>Sensors</span>
-                    <strong id="detail-sensors">--</strong>
-                </div>
-
-                <div class="hud-detail">
                     <span>Memory</span>
                     <strong id="detail-memory">--</strong>
                 </div>
@@ -313,16 +309,6 @@ async def home(
                 <div class="hud-detail">
                     <span>Vision</span>
                     <strong id="detail-vision">--</strong>
-                </div>
-
-                <div class="hud-detail">
-                    <span>Audio</span>
-                    <strong id="detail-audio">--</strong>
-                </div>
-
-                <div class="hud-detail">
-                    <span>I²C</span>
-                    <strong id="detail-i2c">--</strong>
                 </div>
 
             </div>

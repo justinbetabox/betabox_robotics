@@ -1,30 +1,50 @@
-const statusBadge = document.querySelector(
+"use strict";
+
+
+function requireElement(selector) {
+    const found = document.querySelector(
+        selector
+    );
+
+    if (found === null) {
+        throw new Error(
+            `Missing required element: ${selector}`
+        );
+    }
+
+    return found;
+}
+
+
+const statusBadge = requireElement(
     "#jupyter-status"
 );
 
-const healthDot = document.querySelector(
+const healthDot = requireElement(
     "#jupyter-health-dot"
 );
 
-const serviceState = document.querySelector(
+const serviceState = requireElement(
     "#jupyter-service-state"
 );
 
-const httpState = document.querySelector(
+const httpState = requireElement(
     "#jupyter-http-state"
 );
 
-const portValue = document.querySelector(
+const portValue = requireElement(
     "#jupyter-port"
 );
 
-const openButton = document.querySelector(
+const openButton = requireElement(
     "#open-jupyter"
 );
 
-const message = document.querySelector(
+const message = requireElement(
     "#jupyter-message"
 );
+
+let updateInProgress = false;
 
 
 function setStatusClass(
@@ -45,9 +65,35 @@ function setStatusClass(
 }
 
 
+function serviceStateLabel(state) {
+    switch (state) {
+        case "active":
+            return "Running";
+
+        case "inactive":
+            return "Stopped";
+
+        case "failed":
+            return "Failed";
+
+        case "activating":
+            return "Starting";
+
+        case "deactivating":
+            return "Stopping";
+
+        default:
+            return "Unknown";
+    }
+}
+
+
 function buildJupyterUrl(port) {
-    const protocol = window.location.protocol;
-    const hostname = window.location.hostname;
+    const protocol =
+        window.location.protocol;
+
+    const hostname =
+        window.location.hostname;
 
     return (
         `${protocol}//${hostname}:${port}/hub/`
@@ -57,6 +103,7 @@ function buildJupyterUrl(port) {
 
 function disableButton() {
     openButton.href = "#";
+
     openButton.classList.add(
         "is-disabled"
     );
@@ -69,9 +116,10 @@ function disableButton() {
 
 
 function enableButton(port) {
-    openButton.href = buildJupyterUrl(
-        port
-    );
+    openButton.href =
+        buildJupyterUrl(
+            port
+        );
 
     openButton.classList.remove(
         "is-disabled"
@@ -85,6 +133,12 @@ function enableButton(port) {
 
 
 async function updateStatus() {
+    if (updateInProgress) {
+        return;
+    }
+
+    updateInProgress = true;
+
     try {
         const response = await fetch(
             "/api/jupyter/status",
@@ -99,29 +153,28 @@ async function updateStatus() {
             );
         }
 
-        const data = await response.json();
+        const data =
+            await response.json();
 
-        serviceState.textContent = (
-            data.state
-        );
+        serviceState.textContent =
+            serviceStateLabel(
+                data.state
+            );
 
-        httpState.textContent = (
+        httpState.textContent =
             data.responding
-                ? "responding"
-                : "unavailable"
-        );
+                ? "Responding"
+                : "Unavailable";
 
-        portValue.textContent = (
-            String(data.port)
-        );
+        portValue.textContent =
+            String(data.port);
 
         if (
             data.active
             && data.responding
         ) {
-            statusBadge.textContent = (
-                "Available"
-            );
+            statusBadge.textContent =
+                "Available";
 
             setStatusClass(
                 statusBadge,
@@ -137,9 +190,8 @@ async function updateStatus() {
                 data.port
             );
 
-            message.textContent = (
-                "JupyterLab is ready."
-            );
+            message.textContent =
+                "JupyterLab is ready.";
 
             return;
         }
@@ -147,9 +199,8 @@ async function updateStatus() {
         disableButton();
 
         if (!data.active) {
-            statusBadge.textContent = (
-                "Service Offline"
-            );
+            statusBadge.textContent =
+                "Service Offline";
 
             setStatusClass(
                 statusBadge,
@@ -161,18 +212,16 @@ async function updateStatus() {
                 "status-error",
             );
 
-            message.textContent = (
+            message.textContent =
                 "JupyterHub is not running. "
                 + "Ask a teacher to check the "
-                + "platform services."
-            );
+                + "platform services.";
 
             return;
         }
 
-        statusBadge.textContent = (
-            "Not Responding"
-        );
+        statusBadge.textContent =
+            "Not Responding";
 
         setStatusClass(
             statusBadge,
@@ -184,17 +233,15 @@ async function updateStatus() {
             "status-warning",
         );
 
-        message.textContent = (
+        message.textContent =
             "JupyterHub is running but its "
-            + "web interface is not responding."
-        );
+            + "web interface is not responding.";
 
     } catch (error) {
         disableButton();
 
-        statusBadge.textContent = (
-            "Status Unavailable"
-        );
+        statusBadge.textContent =
+            "Status Unavailable";
 
         setStatusClass(
             statusBadge,
@@ -206,23 +253,26 @@ async function updateStatus() {
             "status-error",
         );
 
-        serviceState.textContent = (
-            "unknown"
-        );
+        serviceState.textContent =
+            "Unknown";
 
-        httpState.textContent = (
-            "unknown"
-        );
+        httpState.textContent =
+            "Unknown";
 
-        message.textContent = (
+        portValue.textContent =
+            "--";
+
+        message.textContent =
             "Launchpad could not check "
-            + "JupyterHub status."
-        );
+            + "JupyterHub status.";
 
         console.error(
             "Jupyter status check failed:",
             error,
         );
+
+    } finally {
+        updateInProgress = false;
     }
 }
 
@@ -241,9 +291,21 @@ openButton.addEventListener(
 );
 
 
-updateStatus();
+document.addEventListener(
+    "visibilitychange",
+    () => {
+        if (!document.hidden) {
+            void updateStatus();
+        }
+    },
+);
+
+
+void updateStatus();
 
 window.setInterval(
-    updateStatus,
+    () => {
+        void updateStatus();
+    },
     10000,
 );

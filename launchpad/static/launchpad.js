@@ -1,6 +1,6 @@
 "use strict";
 
-const STATUS_INTERVAL_MS = 5000;
+const STATUS_REFRESH_INTERVAL_MS = 5000;
 
 const element = (id) => (
     document.getElementById(id)
@@ -221,45 +221,6 @@ function jupyterLabel(status) {
 }
 
 
-function sensorsLabel(status) {
-    const grayscaleAvailable = firstDefined(
-        objectValue(
-            status,
-            "hardware",
-            "sensors",
-            "grayscale_available",
-        ),
-        false,
-    );
-
-    const ultrasonicConfigured = firstDefined(
-        objectValue(
-            status,
-            "hardware",
-            "sensors",
-            "ultrasonic_configured",
-        ),
-        false,
-    );
-
-    if (
-        grayscaleAvailable
-        && ultrasonicConfigured
-    ) {
-        return "Ready";
-    }
-
-    if (
-        grayscaleAvailable
-        || ultrasonicConfigured
-    ) {
-        return "Partial";
-    }
-
-    return "Unavailable";
-}
-
-
 function normalizeHealthState(status) {
     const batteryState = String(
         firstDefined(
@@ -295,19 +256,9 @@ function normalizeHealthState(status) {
         false,
     );
 
-    const robotAvailable = firstDefined(
-        objectValue(
-            status,
-            "hardware",
-            "robot_available",
-        ),
-        false,
-    );
-
     if (
         batteryState === "critical"
         || temperatureState === "critical"
-        || robotAvailable === false
     ) {
         return {
             label: "Needs Attention",
@@ -442,26 +393,6 @@ function renderStatus(status) {
         false,
     );
 
-    const audioAvailable = firstDefined(
-        objectValue(
-            status,
-            "hardware",
-            "audio",
-            "available",
-        ),
-        false,
-    );
-
-    const i2cAvailable = firstDefined(
-        objectValue(
-            status,
-            "hardware",
-            "i2c",
-            "available",
-        ),
-        false,
-    );
-
     const batteryText = formatVoltage(
         batteryVoltage
     );
@@ -484,9 +415,6 @@ function renderStatus(status) {
         status
     );
 
-    const sensorsText = sensorsLabel(
-        status
-    );
 
     element(
         "hud-hostname"
@@ -532,10 +460,6 @@ function renderStatus(status) {
     ).textContent = jupyterText;
 
     element(
-        "detail-sensors"
-    ).textContent = sensorsText;
-
-    element(
         "detail-memory"
     ).textContent = formatPercent(
         memoryPercent
@@ -557,18 +481,6 @@ function renderStatus(status) {
         "detail-vision"
     ).textContent = availabilityLabel(
         visionRunning
-    );
-
-    element(
-        "detail-audio"
-    ).textContent = availabilityLabel(
-        audioAvailable
-    );
-
-    element(
-        "detail-i2c"
-    ).textContent = availabilityLabel(
-        i2cAvailable
     );
 
     setHealthState(
@@ -683,7 +595,7 @@ document.addEventListener(
 
         window.setInterval(
             refreshStatus,
-            STATUS_INTERVAL_MS,
+            STATUS_REFRESH_INTERVAL_MS,
         );
     },
 );

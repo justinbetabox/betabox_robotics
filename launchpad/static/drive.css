@@ -1,27 +1,30 @@
 .drive-body {
     /* Permanently dark operational palette */
-    --drive-page: #151b21;
-    --drive-header: #202c35;
-    --drive-panel: #232e37;
-    --drive-panel-raised: #2b3944;
-    --drive-panel-inset: #10171d;
+    --drive-crosshair: rgb(35 43 51 / 14%);
+    --drive-page: var(--color-page);
+    --drive-header: var(--color-surface);
+    --drive-panel: var(--color-surface);
+    --drive-panel-raised: var(--color-surface-raised);
+    --drive-panel-inset: var(--color-surface-inset);
 
-    --drive-border: rgb(255 255 255 / 14%);
-    --drive-border-strong: rgb(255 255 255 / 24%);
+    --drive-border: var(--color-border);
+    --drive-border-strong: var(--color-border-strong);
 
-    --drive-text: var(--brand-white);
-    --drive-text-muted: #a9b7c1;
-    --drive-text-soft: #82929e;
+    --drive-text: var(--color-text);
+    --drive-text-muted: var(--color-text-muted);
+    --drive-text-soft: var(--color-text-soft);
 
-    --drive-overlay: rgb(15 22 28 / 78%);
-    --drive-overlay-strong: rgb(9 14 18 / 88%);
+    --drive-overlay: var(--color-surface-overlay);
+    --drive-overlay-strong: var(--color-surface-overlay);
 
-    --drive-blue: var(--brand-blue);
-    --drive-blue-hover: #1495df;
+    --drive-blue: var(--color-primary);
+    --drive-blue-hover: var(--color-primary-hover);
 
-    --drive-healthy: var(--brand-green);
-    --drive-warning: var(--brand-orange);
-    --drive-critical: var(--brand-pink);
+    --drive-healthy: var(--color-healthy);
+    --drive-warning: var(--color-warning);
+    --drive-critical: var(--color-critical);
+
+    --drive-video-overlay: rgb(9 14 18 / 82%);
 
     display: grid;
     grid-template-rows:
@@ -38,6 +41,15 @@
     color: var(--drive-text);
 }
 
+:root[data-theme="dark"] .drive-body {
+    --drive-crosshair: rgb(255 255 255 / 12%);
+}
+
+@media (prefers-color-scheme: dark) {
+    :root:not([data-theme]) .drive-body {
+        --drive-crosshair: rgb(255 255 255 / 12%);
+    }
+}
 
 /* Header */
 
@@ -51,12 +63,7 @@
         1rem
         clamp(1rem, 3vw, 2.5rem);
 
-    background:
-        linear-gradient(
-            180deg,
-            #273844,
-            var(--drive-header)
-        );
+    background: var(--drive-header);
 
     border-bottom:
         1px solid var(--drive-border);
@@ -78,19 +85,19 @@
 .drive-header .eyebrow {
     margin-bottom: 0.3rem;
 
-    color: #8fcce9;
+    color: var(--brand-blue);
     text-align: center;
 }
 
 .drive-header .back-link {
-    color: var(--drive-text);
+    color: var(--brand-blue);
 
     font-weight: 800;
     text-decoration: none;
 }
 
 .drive-header .back-link:hover {
-    color: #8fcce9;
+    color: var(--color-primary-hover);
 }
 
 .drive-header .back-link:focus-visible {
@@ -119,25 +126,28 @@
 }
 
 .drive-connection.status-connecting {
-    border-color: var(--drive-blue);
-    background: #173c50;
+    border-color: var(--brand-blue);
+    background: var(--brand-blue-light);
+    color: var(--drive-text);
 }
 
 .drive-connection.status-connected {
-    border-color: var(--drive-healthy);
-    background: #183f32;
+    border-color: var(--brand-green);
+    background: var(--brand-green-light);
+    color: var(--drive-text);
 }
 
 .drive-connection.status-busy,
 .drive-connection.status-paused {
-    border-color: var(--drive-warning);
-    background: #4a3023;
+    border-color: var(--brand-orange);
+    background: var(--brand-orange-light);
     color: var(--drive-text);
 }
 
 .drive-connection.status-disconnected {
-    border-color: var(--drive-critical);
-    background: #4a2035;
+    border-color: var(--brand-pink);
+    background: var(--brand-pink-light);
+    color: var(--drive-text);
 }
 
 
@@ -345,6 +355,25 @@
     font-size: 0.82rem;
 }
 
+.drive-hud,
+.video-overlay,
+.video-status {
+    background: var(--drive-video-overlay);
+    color: var(--brand-white);
+    border-color: rgb(255 255 255 / 18%);
+}
+
+.drive-hud .drive-hud-value span {
+    color: rgb(255 255 255 / 68%);
+}
+
+.drive-hud .drive-hud-value strong {
+    color: var(--brand-white);
+}
+
+.video-status {
+    color: rgb(255 255 255 / 78%);
+}
 
 /* Control panel */
 
@@ -480,14 +509,14 @@
     background:
         radial-gradient(
             circle at center,
-            #2b3944 0 18%,
-            #202c35 18% 48%,
-            #182027 48% 100%
+            var(--color-surface-raised) 0 18%,
+            var(--color-surface-subtle) 18% 48%,
+            var(--color-surface-inset) 48% 100%
         );
 
     box-shadow:
-        inset 0 0 40px rgb(0 0 0 / 28%),
-        0 12px 30px rgb(0 0 0 / 24%);
+        inset 0 0 32px rgb(0 0 0 / 12%),
+        var(--shadow-small);
 
     cursor: grab;
     touch-action: none;
@@ -518,8 +547,7 @@
 
     content: "";
 
-    background:
-        rgb(255 255 255 / 10%);
+    background: var(--drive-crosshair);
 }
 
 .joystick-crosshair::before {
@@ -660,9 +688,9 @@
     background:
         radial-gradient(
             circle at center,
-            #313d47 0 18%,
-            #25313a 18% 48%,
-            #182027 48% 100%
+            var(--color-surface-raised) 0 18%,
+            var(--color-surface-subtle) 18% 48%,
+            var(--color-surface-inset) 48% 100%
         );
 }
 
@@ -704,8 +732,8 @@
 }
 
 .camera-center-button:hover {
-    background: #364753;
-    border-color: var(--drive-blue);
+    background: var(--color-surface-subtle);
+    border-color: var(--color-primary);
 }
 
 .camera-center-button:focus-visible {

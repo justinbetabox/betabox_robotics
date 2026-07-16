@@ -169,6 +169,8 @@ video {
 }
 
 .action-card {
+    --card-accent: var(--brand-blue);
+
     position: relative;
 
     display: flex;
@@ -182,6 +184,7 @@ video {
 
     background: var(--color-surface);
     border: 1px solid var(--color-border);
+    border-top: 5px solid var(--card-accent);
     border-radius: var(--radius-large);
 
     box-shadow: var(--shadow-small);
@@ -197,13 +200,16 @@ video {
 .action-card:hover {
     transform: translateY(-3px);
 
-    border-color: var(--brand-blue);
+    border-color: var(--color-primary);
+    border-top-color: var(--card-accent);
 
     box-shadow: var(--shadow-card);
 }
 
 .action-card:focus-visible {
-    outline: 3px solid rgb(0 125 198 / 28%);
+    outline:
+        3px solid var(--color-focus-ring);
+
     outline-offset: 3px;
 }
 
@@ -222,7 +228,6 @@ video {
 }
 
 .action-card-category {
-    color: var(--brand-blue);
 
     font-size: 0.7rem;
     font-weight: 900;
@@ -240,8 +245,12 @@ video {
     margin-top: auto;
     padding-top: 0.75rem;
 
-    color: var(--brand-blue);
     font-weight: 800;
+}
+
+.action-card-category,
+.action-card-footer {
+    color: var(--card-accent);
 }
 
 .action-card-arrow {
@@ -259,19 +268,19 @@ video {
 /* Accent cards */
 
 .action-card.accent-blue {
-    border-top: 5px solid var(--brand-blue);
+    --card-accent: var(--brand-blue);
 }
 
 .action-card.accent-orange {
-    border-top: 5px solid var(--brand-orange);
+    --card-accent: var(--brand-orange);
 }
 
 .action-card.accent-green {
-    border-top: 5px solid var(--brand-green);
+    --card-accent: var(--brand-green);
 }
 
 .action-card.accent-pink {
-    border-top: 5px solid var(--brand-pink);
+    --card-accent: var(--brand-pink);
 }
 
 
@@ -313,15 +322,22 @@ video {
     background: var(--color-primary-active);
 }
 
+.button:focus-visible {
+    outline:
+        3px solid var(--color-focus-ring);
+
+    outline-offset: 3px;
+}
+
 .button-secondary {
-    background: var(--brand-white);
+    background: var(--color-surface);
     border-color: var(--color-border-strong);
     color: var(--color-text);
 }
 
 .button-secondary:hover {
     background: var(--color-surface-subtle);
-    border-color: var(--brand-blue);
+    border-color: var(--color-primary);
 }
 
 .button-danger {
@@ -442,5 +458,21 @@ video {
 
     .button {
         width: 100%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+    }
+
+    .action-card:hover,
+    .button:active {
+        transform: none;
     }
 }

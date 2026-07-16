@@ -57,12 +57,12 @@ class VisionStatus:
 @dataclass(frozen=True)
 class RobotHardwareStatus:
     i2c: I2CStatus
-    robot_available: bool
+    passive_hardware_available: bool
     battery: BatteryStatus
     sensors: SensorStatus
     audio: AudioStatus
     vision: VisionStatus
-    robot_error: str | None = None
+    passive_hardware_error: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -241,26 +241,32 @@ def collect_vision_status(
     )
 
 
-def collect_robot_status() -> tuple[
+def collect_robot_status(
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> tuple[
     bool,
     BatteryStatus,
     SensorStatus,
     str | None,
 ]:
-    battery_sensor = None
     grayscale_sensor = None
+    ultrasonic_configured = False
+
+    battery = collect_battery_status(
+        config
+    )
 
     try:
         from betabox_robotics.robots.betabox_car import (
             BETABOX_CAR,
         )
         from betabox_robotics.sensors import (
-            Battery,
             Grayscale,
         )
 
-        battery_sensor = Battery.default(
-            BETABOX_CAR.sensors.battery
+        ultrasonic_configured = (
+            BETABOX_CAR.sensors.ultrasonic
+            is not None
         )
 
         grayscale_sensor = Grayscale.default(
@@ -270,19 +276,13 @@ def collect_robot_status() -> tuple[
     except Exception as exc:
         return (
             False,
-            BatteryStatus(
-                available=False,
-                voltage=None,
-                state="unknown",
-                error=(
-                    "passive sensors could "
-                    "not be constructed"
-                ),
-            ),
+            battery,
             SensorStatus(
                 grayscale_available=False,
                 grayscale_values=None,
-                ultrasonic_configured=False,
+                ultrasonic_configured=(
+                    ultrasonic_configured
+                ),
                 error=(
                     "passive sensors could "
                     "not be constructed"
@@ -293,66 +293,106 @@ def collect_robot_status() -> tuple[
 
     try:
         try:
-            voltage = float(
-                battery_sensor.voltage()
-            )
-
-            battery_state = (
-                battery_sensor.status().value
-            )
-
-            battery = BatteryStatus(
-                available=True,
-                voltage=voltage,
-                state=battery_state,
-            )
-
-        except Exception as exc:
-            battery = BatteryStatus(
-                available=False,
-                voltage=None,
-                state="unknown",
-                error=str(exc),
-            )
-
-        try:
             grayscale_values = (
                 grayscale_sensor.read()
             )
 
-            sensor_status = SensorStatus(
+            sensors = SensorStatus(
                 grayscale_available=True,
                 grayscale_values=(
                     grayscale_values
                 ),
-                ultrasonic_configured=True,
+                ultrasonic_configured=(
+                    ultrasonic_configured
+                ),
             )
 
         except Exception as exc:
-            sensor_status = SensorStatus(
+            sensors = SensorStatus(
                 grayscale_available=False,
                 grayscale_values=None,
-                ultrasonic_configured=True,
+                ultrasonic_configured=(
+                    ultrasonic_configured
+                ),
                 error=str(exc),
             )
 
+        passive_hardware_available = (
+            battery.available
+            and sensors.grayscale_available
+        )
+
+        passive_hardware_error = None
+
+        if not passive_hardware_available:
+            passive_hardware_error = (
+                battery.error
+                or sensors.error
+            )
+
         return (
-            True,
+            passive_hardware_available,
             battery,
-            sensor_status,
-            None,
+            sensors,
+            passive_hardware_error,
         )
 
     finally:
-        for component in (
-            battery_sensor,
-            grayscale_sensor,
-        ):
-            if component is None:
-                continue
-
+        if grayscale_sensor is not None:
             close = getattr(
-                component,
+                grayscale_sensor,
+                "close",
+                None,
+            )
+
+            if callable(close):
+                try:
+                    close()
+                except Exception:
+                    pass
+
+
+def collect_battery_status(
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> BatteryStatus:
+    battery_sensor = None
+
+    try:
+        from betabox_robotics.robots.betabox_car import (
+            BETABOX_CAR,
+        )
+        from betabox_robotics.sensors import Battery
+
+        battery_sensor = Battery.default(
+            BETABOX_CAR.sensors.battery
+        )
+
+        voltage = float(
+            battery_sensor.voltage()
+        )
+
+        state = (
+            battery_sensor.status().value
+        )
+
+        return BatteryStatus(
+            available=True,
+            voltage=voltage,
+            state=state,
+        )
+
+    except Exception as exc:
+        return BatteryStatus(
+            available=False,
+            voltage=None,
+            state="unknown",
+            error=str(exc),
+        )
+
+    finally:
+        if battery_sensor is not None:
+            close = getattr(
+                battery_sensor,
                 "close",
                 None,
             )
@@ -372,20 +412,20 @@ def collect_hardware_status(
     vision = collect_vision_status(config)
 
     (
-        robot_available,
+        passive_hardware_available,
         battery,
         sensors,
-        robot_error,
-    ) = collect_robot_status()
+        passive_hardware_error,
+    ) = collect_robot_status(config)
 
     return RobotHardwareStatus(
         i2c=i2c,
-        robot_available=robot_available,
+        passive_hardware_available=passive_hardware_available,
         battery=battery,
         sensors=sensors,
         audio=audio,
         vision=vision,
-        robot_error=robot_error,
+        passive_hardware_error=passive_hardware_error,
     )
 
 

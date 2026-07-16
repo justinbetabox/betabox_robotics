@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import socket
 import subprocess
 from dataclasses import asdict, dataclass
@@ -27,8 +28,6 @@ class StatusReport:
     version: str
     hostname: str
     ip_addresses: list[str]
-    i2c_available: bool
-    hifiberry_available: bool
     media_paths: dict[str, str]
     services: dict[str, str]
     jupyterhub_proxy_available: bool
@@ -84,19 +83,13 @@ def service_status(service: str) -> str:
     return result.stdout.strip() or "unknown"
 
 
-def hifiberry_available() -> bool:
-    result = run(["aplay", "-l"], timeout=5)
-
-    if result is None:
-        return False
-
-    output = result.stdout + result.stderr
-    return "snd_rpi_hifiberry_dac" in output or "HifiBerry" in output
-
-
-def executable_available(command: str) -> bool:
-    result = run(["which", command], timeout=3)
-    return bool(result and result.returncode == 0)
+def executable_available(
+    command: str,
+) -> bool:
+    return (
+        shutil.which(command)
+        is not None
+    )
 
 
 def collect_status(
@@ -116,10 +109,6 @@ def collect_status(
         version=__version__,
         hostname=hostname(),
         ip_addresses=ip_addresses(),
-        i2c_available=(
-            config.verification.i2c_device.exists()
-        ),
-        hifiberry_available=hifiberry_available(),
         media_paths={
             "pictures": str(config.paths.pictures_dir),
             "videos": str(config.paths.videos_dir),
@@ -198,8 +187,8 @@ def print_hardware_status(hardware: RobotHardwareStatus) -> None:
     print("--------------")
 
     print(
-        f"Robot:       "
-        f"{'available' if hardware.robot_available else 'unavailable'}"
+        f"Passive Hardware:       "
+        f"{'available' if hardware.passive_hardware_available else 'unavailable'}"
     )
 
     print(f"I²C bus:     {format_boolean(hardware.i2c.available)}")
@@ -275,8 +264,23 @@ def print_human(
     print()
     print("Platform")
     print("--------")
-    print(f"I2C:       {'available' if report.i2c_available else 'missing'}")
-    print(f"HifiBerry: {'available' if report.hifiberry_available else 'missing'}")
+    print(
+        "I2C:       "
+        + (
+            "available"
+            if report.hardware.i2c.available
+            else "missing"
+        )
+    )
+
+    print(
+        "HifiBerry: "
+        + (
+            "available"
+            if report.hardware.audio.available
+            else "missing"
+        )
+    )
 
     print_hardware_status(report.hardware)
     print_system_health(report.system_health)

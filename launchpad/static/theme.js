@@ -128,14 +128,10 @@ function configureThemeToggle() {
 }
 
 
-const initialTheme =
-    storedTheme();
-
-if (initialTheme !== null) {
-    applyTheme(
-        initialTheme
-    );
-}
+applyTheme(
+    storedTheme()
+    ?? systemTheme()
+);
 
 
 document.addEventListener(

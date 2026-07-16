@@ -8,6 +8,14 @@ from aiohttp import web
 from betabox_robotics.config import (
     PlatformConfig,
 )
+from betabox_robotics.launchpad.components import (
+    back_link,
+    page_heading,
+    status_pill,
+)
+from betabox_robotics.launchpad.layout import (
+    render_page,
+)
 from betabox_robotics.services.http_health import (
     check_http_available,
 )
@@ -81,131 +89,137 @@ async def jupyter_status(
 async def jupyter_page(
     request: web.Request,
 ) -> web.Response:
-    html = """<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1"
-    >
-    <title>Coding · Betabox Launchpad</title>
+    body = f"""
+<header class="jupyter-header">
+    {back_link()}
 
-    <link rel="stylesheet" href="/static/tokens.css">
-    <link rel="stylesheet" href="/static/components.css">
-    <link rel="stylesheet" href="/static/jupyter.css">
-</head>
+    {page_heading(
+        eyebrow="Betabox Coding",
+        title="JupyterLab",
+    )}
 
-<body class="jupyter-page">
-    <header class="jupyter-header">
-        <a class="back-link" href="/">
-            ← Launchpad
-        </a>
+    {status_pill(
+        element_id="jupyter-status",
+        text="Checking…",
+        css_class=(
+            "jupyter-status "
+            "status-connecting"
+        ),
+    )}
+</header>
 
-        <div>
-            <p class="eyebrow">Betabox Coding</p>
-            <h1>JupyterLab</h1>
-        </div>
+<main class="jupyter-main">
+    <section class="jupyter-card">
+        <div class="jupyter-card-heading">
+            <div>
+                <p class="eyebrow">
+                    Coding Environment
+                </p>
 
-        <div
-            id="jupyter-status"
-            class="jupyter-status status-connecting"
-        >
-            Checking…
-        </div>
-    </header>
-
-    <main class="jupyter-main">
-        <section class="jupyter-card">
-            <div class="jupyter-card-heading">
-                <div>
-                    <p class="eyebrow">Coding Environment</p>
-                    <h2>Program Your Robot</h2>
-                </div>
-
-                <span
-                    id="jupyter-health-dot"
-                    class="jupyter-health-dot status-unknown"
-                    aria-hidden="true"
-                ></span>
+                <h2>
+                    Program Your Robot
+                </h2>
             </div>
 
-            <p class="jupyter-description">
-                Open JupyterLab to write and run Python code
-                using the Betabox Robotics API.
-            </p>
+            <span
+                id="jupyter-health-dot"
+                class="
+                    jupyter-health-dot
+                    status-unknown
+                "
+                aria-hidden="true"
+            ></span>
+        </div>
 
-            <dl class="jupyter-details">
-                <div>
-                    <dt>Service</dt>
-                    <dd id="jupyter-service-state">
-                        Checking…
-                    </dd>
-                </div>
+        <p class="jupyter-description">
+            Open JupyterLab to write and run Python code
+            using the Betabox Robotics API.
+        </p>
 
-                <div>
-                    <dt>HTTP</dt>
-                    <dd id="jupyter-http-state">
-                        Checking…
-                    </dd>
-                </div>
+        <dl class="jupyter-details">
+            <div>
+                <dt>Service</dt>
+                <dd id="jupyter-service-state">
+                    Checking…
+                </dd>
+            </div>
 
-                <div>
-                    <dt>Port</dt>
-                    <dd id="jupyter-port">--</dd>
-                </div>
-            </dl>
+            <div>
+                <dt>HTTP</dt>
+                <dd id="jupyter-http-state">
+                    Checking…
+                </dd>
+            </div>
 
-            <a
-                id="open-jupyter"
-                class="jupyter-button is-disabled"
-                href="#"
-                aria-disabled="true"
-            >
-                Open JupyterLab
-            </a>
+            <div>
+                <dt>Port</dt>
+                <dd id="jupyter-port">
+                    --
+                </dd>
+            </div>
+        </dl>
 
-            <p
-                id="jupyter-message"
-                class="jupyter-message"
-            >
-                Checking JupyterHub…
-            </p>
-        </section>
+        <a
+            id="open-jupyter"
+            class="jupyter-button is-disabled"
+            href="#"
+            aria-disabled="true"
+        >
+            Open JupyterLab
+        </a>
 
-        <section class="ownership-card">
-            <p class="eyebrow">Robot Ownership</p>
-            <h2>Close Manual Drive Before Coding</h2>
+        <p
+            id="jupyter-message"
+            class="jupyter-message"
+        >
+            Checking JupyterHub…
+        </p>
+    </section>
 
-            <p>
-                Manual Drive and notebook code cannot control
-                the robot at the same time.
-            </p>
+    <section class="ownership-card">
+        <p class="eyebrow">
+            Robot Ownership
+        </p>
 
-            <p>
-                Close the Manual Drive page before creating a
-                <code>BetaboxCar</code> in JupyterLab. When your
-                notebook finishes, use a context manager or call
-                <code>car.close()</code> so Launchpad can use the
-                robot again.
-            </p>
+        <h2>
+            Close Manual Drive Before Coding
+        </h2>
 
-            <pre><code>from betabox_robotics import BetaboxCar
+        <p>
+            Manual Drive and notebook code cannot control
+            the robot at the same time.
+        </p>
+
+        <p>
+            Close the Manual Drive page before creating a
+            <code>BetaboxCar</code> in JupyterLab. When your
+            notebook finishes, use a context manager or call
+            <code>car.close()</code> so Launchpad can use the
+            robot again.
+        </p>
+
+        <pre><code>from betabox_robotics import BetaboxCar
 
 with BetaboxCar() as car:
     print(car.distance())</code></pre>
-        </section>
-    </main>
-
-    <script src="/static/theme.js"></script>
-
-    <script
-        type="module"
-        src="/static/jupyter.js"
-    ></script>
-</body>
-</html>
+    </section>
+</main>
 """
+
+    html = render_page(
+        title=(
+            "Coding · "
+            "Betabox Launchpad"
+        ),
+        body=body,
+        body_class="jupyter-page",
+        stylesheets=(
+            "/static/jupyter.css",
+        ),
+        module_scripts=(
+            "/static/jupyter.js",
+        ),
+    )
 
     return web.Response(
         text=html,

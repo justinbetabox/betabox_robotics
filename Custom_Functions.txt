@@ -1,0 +1,56 @@
+Custom Functions in the Code Base (Coding Toolbox for Students and Teachers)
+
+Startup/Launch instructions for SDC
+
+Motion Functions
+	car.forward(speed)     # drive forward, speed 0-100, default 50
+	car.backward(speed)    # drive backward, speed 0-100, default 50
+	car.left(angle)        # steer left, angle in degrees (default 30)
+	car.right(angle)       # steer right, angle in degrees (default 30)
+	car.stop()             # stop both motors
+
+Calling the Line Follower Module
+	#There is no single "follow line" function - build it from the line sensor reading plus the Motion Functions above, 
+	#called in a loop at the speed you choose:
+
+	car.line_status(threshold=0.5)     # read [left, middle, right] as 0 (floor) / 1 (line)
+
+	while True:
+	    left, middle, right = car.line_status()
+
+	    if middle == 1:
+	        car.forward(speed)         # line is centered, drive straight
+	    elif left == 1:
+	        car.left(angle)            # line drifted left, steer left
+	    elif right == 1:
+	        car.right(angle)           # line drifted right, steer right
+	    else:
+	        car.stop()                 # line lost, stop
+
+Calling Detector Function to Recognize Color
+	car.enable_detection("color")       # turn on the color detector
+	car.metadata("color")               # read the latest detections
+	car.disable_detection("color")      # turn off the color detector
+
+	detections = car.metadata("color").detections
+	if detections:
+	    print(detections[0].label)      # e.g. "red", "green", "blue"
+
+Calling Face Recognition Function
+	car.enable_detection("face")        # turn on the face detector
+	car.metadata("face")                # read the latest detections
+	car.disable_detection("face")       # turn off the face detector
+
+	faces = car.metadata("face").detections
+	print(f"{len(faces)} face(s) detected")
+
+Using Speaker to Emit Tones
+	car.play_note(note_or_frequency, duration)   # play a single tone
+	car.play_melody(notes, gap=0.0)              # play a list of (note, duration) tones
+	car.stop_audio()                             # stop whatever is currently playing
+
+	car.play_note("C5", 0.5)
+	car.play_melody([("C5", 0.2), ("D5", 0.2), ("E5", 0.2), ("G5", 0.4)], gap=0.05)
+
+Taking pictures
+	car.capture(filename="filename.jpg")

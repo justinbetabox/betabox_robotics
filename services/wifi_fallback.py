@@ -55,12 +55,13 @@ def nmcli_available() -> bool:
     )
 
 
-def ethernet_connected(iface: str) -> bool:
+def ethernet_connected(
+    iface: str,
+) -> bool:
     result = run(
         [
             "nmcli",
-            "-t",
-            "-f",
+            "-g",
             "GENERAL.STATE",
             "device",
             "show",
@@ -69,10 +70,15 @@ def ethernet_connected(iface: str) -> bool:
         timeout=5,
     )
 
-    if result is None:
+    if (
+        result is None
+        or result.returncode != 0
+    ):
         return False
 
-    return "connected" in result.stdout.lower()
+    state = result.stdout.strip()
+
+    return state.startswith("100")
 
 
 def wifi_has_ip(iface: str) -> bool:

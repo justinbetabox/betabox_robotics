@@ -6,6 +6,7 @@ import socket
 import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import Any
 
 from betabox_robotics.services.hardware_status import (
     RobotHardwareStatus,
@@ -19,6 +20,12 @@ from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
     PlatformConfig,
 )
+
+from betabox_robotics.hardware.ownership import (
+    RobotOwnershipStatus,
+    probe_robot_ownership,
+)
+
 from betabox_robotics.services.managed import managed_services
 from betabox_robotics.version import __version__
 
@@ -31,8 +38,12 @@ class StatusReport:
     media_paths: dict[str, str]
     services: dict[str, str]
     jupyterhub_proxy_available: bool
+    control: RobotOwnershipStatus
     hardware: RobotHardwareStatus
     system_health: SystemHealthStatus
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
 
 
 def run(command: list[str], timeout: int = 5) -> subprocess.CompletedProcess | None:
@@ -116,6 +127,7 @@ def collect_status(
         },
         services=services,
         jupyterhub_proxy_available=executable_available("configurable-http-proxy"),
+        control=probe_robot_ownership(),
         hardware=hardware,
         system_health=system_health,
     )
@@ -342,9 +354,12 @@ def main(argv: list[str] | None = None) -> int:
     report = collect_status(config)
 
     if argv and "--json" in argv:
-        print(json.dumps(asdict(report), indent=2))
-    else:
-        print_human(report, config)
+        print(
+            json.dumps(
+                report.to_dict(),
+                indent=2,
+            )
+        )
 
     return 0
 

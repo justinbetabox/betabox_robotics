@@ -317,8 +317,8 @@ def checks_from_hardware_status(
     checks.append(
         CheckResult(
             "hardware:robot",
-            hardware.robot_available,
-            hardware.robot_error or "robot hardware available",
+            hardware.passive_hardware_available,
+            hardware.passive_hardware_error or "robot hardware available",
         )
     )
 

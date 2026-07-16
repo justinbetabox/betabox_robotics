@@ -3,6 +3,20 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from enum import Enum
+
+
+class ServiceCategory(str, Enum):
+    BOOT = "boot"
+    BACKGROUND = "background"
+    WEB = "web"
+    NETWORK = "network"
+
+
+class ServiceStartup(str, Enum):
+    CONTINUOUS = "continuous"
+    ONESHOT = "oneshot"
+    CONDITIONAL = "conditional"
 
 @dataclass(frozen=True)
 class PlatformPathsConfig:
@@ -268,37 +282,130 @@ class PlatformNetworkConfig:
         )
 
 @dataclass(frozen=True)
-class PlatformServicesConfig:
+class ServiceDefinition:
     """
-    Names of system services managed by the Betabox Platform.
+    Describes a systemd service exposed by the Betabox Platform.
+
+    This metadata is safe for use by read-only interfaces such as the
+    Launchpad Services page.
     """
 
-    hostname: str = "set-hostname-from-serial.service"
-    boot_announce: str = "betabox-boot-announce.service"
-    monitor: str = "betabox-monitor.service"
-    jupyterhub: str = "jupyterhub.service"
-    video: str = "betabox-video.service"
-    wifi_fallback: str = "wifi-fallback.service"
-    launchpad: str = "betabox-launchpad.service"
+    unit: str
+    display_name: str
+    description: str
+    category: ServiceCategory
+    startup: ServiceStartup
 
     def __post_init__(self) -> None:
-        values = (
-            self.hostname,
-            self.boot_announce,
-            self.monitor,
-            self.jupyterhub,
-            self.video,
-            self.wifi_fallback,
-            self.launchpad,
-        )
+        for name, value in (
+            ("unit", self.unit),
+            ("display_name", self.display_name),
+            ("description", self.description),
+        ):
+            if not value:
+                raise ValueError(
+                    f"{name} cannot be empty"
+                )
 
-        if any(not value for value in values):
+
+@dataclass(frozen=True)
+class PlatformServicesConfig:
+    """
+    Systemd services used by the Betabox Platform.
+
+    Each configured service includes its systemd unit name and
+    read-only descriptive metadata for CLI and Launchpad interfaces.
+    """
+
+    hostname: ServiceDefinition = ServiceDefinition(
+        unit="set-hostname-from-serial.service",
+        display_name="Robot Hostname",
+        description=(
+            "Sets the robot hostname from "
+            "its Raspberry Pi serial number."
+        ),
+        category=ServiceCategory.BOOT,
+        startup=ServiceStartup.ONESHOT,
+    )
+
+    boot_announce: ServiceDefinition = ServiceDefinition(
+        unit="betabox-boot-announce.service",
+        display_name="Boot Announcer",
+        description=(
+            "Checks startup readiness and "
+            "announces the robot's status."
+        ),
+        category=ServiceCategory.BOOT,
+        startup=ServiceStartup.ONESHOT,
+    )
+
+    monitor: ServiceDefinition = ServiceDefinition(
+        unit="betabox-monitor.service",
+        display_name="Health Monitor",
+        description=(
+            "Continuously monitors platform "
+            "health and records important events."
+        ),
+        category=ServiceCategory.BACKGROUND,
+        startup=ServiceStartup.CONTINUOUS,
+    )
+
+    jupyterhub: ServiceDefinition = ServiceDefinition(
+        unit="jupyterhub.service",
+        display_name="JupyterHub",
+        description=(
+            "Provides browser-based Python "
+            "notebooks for robot programming."
+        ),
+        category=ServiceCategory.WEB,
+        startup=ServiceStartup.CONTINUOUS,
+    )
+
+    video: ServiceDefinition = ServiceDefinition(
+        unit="betabox-video.service",
+        display_name="Video Service",
+        description=(
+            "Runs the robot camera, streaming, "
+            "snapshot, and recording services."
+        ),
+        category=ServiceCategory.BACKGROUND,
+        startup=ServiceStartup.CONTINUOUS,
+    )
+
+    wifi_fallback: ServiceDefinition = ServiceDefinition(
+        unit="wifi-fallback.service",
+        display_name="Wi-Fi Fallback",
+        description=(
+            "Starts the robot access point when "
+            "no usable network connection exists."
+        ),
+        category=ServiceCategory.NETWORK,
+        startup=ServiceStartup.CONDITIONAL,
+    )
+
+    launchpad: ServiceDefinition = ServiceDefinition(
+        unit="betabox-launchpad.service",
+        display_name="Launchpad",
+        description=(
+            "Provides the local browser interface "
+            "for robot tools and platform status."
+        ),
+        category=ServiceCategory.WEB,
+        startup=ServiceStartup.CONTINUOUS,
+    )
+
+    def __post_init__(self) -> None:
+        units = self.all_units
+
+        if len(set(units)) != len(units):
             raise ValueError(
-                "service unit names cannot be empty"
+                "service unit names must be unique"
             )
 
     @property
-    def all_units(self) -> tuple[str, ...]:
+    def all_services(
+        self,
+    ) -> tuple[ServiceDefinition, ...]:
         return (
             self.hostname,
             self.boot_announce,
@@ -308,6 +415,32 @@ class PlatformServicesConfig:
             self.wifi_fallback,
             self.launchpad,
         )
+
+    @property
+    def all_units(
+        self,
+    ) -> tuple[str, ...]:
+        return tuple(
+            service.unit
+            for service in self.all_services
+        )
+
+    def get(
+        self,
+        unit: str,
+    ) -> ServiceDefinition | None:
+        """
+        Return metadata for a configured systemd unit.
+
+        Returns ``None`` when the unit is not part of the Betabox
+        service registry.
+        """
+
+        for service in self.all_services:
+            if service.unit == unit:
+                return service
+
+        return None
 
 
 @dataclass(frozen=True)

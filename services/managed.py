@@ -20,46 +20,46 @@ class ManagedService:
 def managed_services(
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> dict[str, ManagedService]:
-    units = config.services
+    services = config.services
 
     return {
         "hostname": ManagedService(
             name="hostname",
-            title="Hostname",
-            unit=units.hostname,
+            title=services.hostname.display_name,
+            unit=services.hostname.unit,
         ),
         "boot-announce": ManagedService(
             name="boot-announce",
-            title="Boot Announce",
-            unit=units.boot_announce,
+            title=services.boot_announce.display_name,
+            unit=services.boot_announce.unit,
             log_file=config.paths.boot_announce_log,
         ),
         "monitor": ManagedService(
             name="monitor",
-            title="Monitor",
-            unit=units.monitor,
+            title=services.monitor.display_name,
+            unit=services.monitor.unit,
             log_file=config.paths.monitor_log,
         ),
         "jupyterhub": ManagedService(
             name="jupyterhub",
-            title="JupyterHub",
-            unit=units.jupyterhub,
+            title=services.jupyterhub.display_name,
+            unit=services.jupyterhub.unit,
         ),
         "video": ManagedService(
             name="video",
-            title="Video",
-            unit=units.video,
+            title=services.video.display_name,
+            unit=services.video.unit,
             log_file=config.paths.video_log,
         ),
         "wifi-fallback": ManagedService(
             name="wifi-fallback",
-            title="Wi-Fi Fallback",
-            unit=units.wifi_fallback,
+            title=services.wifi_fallback.display_name,
+            unit=services.wifi_fallback.unit,
         ),
         "launchpad": ManagedService(
             name="launchpad",
-            title="Launchpad",
-            unit=units.launchpad,
+            title=services.launchpad.display_name,
+            unit=services.launchpad.unit,
         ),
     }
 

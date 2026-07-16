@@ -325,7 +325,7 @@ def print_human(
     print("----------")
     print(
         f"Service:  "
-        f"{report.services.get(config.services.jupyterhub, 'unknown')}"
+        f"{report.services.get(config.services.jupyterhub.unit, 'unknown')}"
     )
     print(
         f"Proxy:    "
@@ -339,7 +339,7 @@ def print_human(
     print("---------")
     print(
         "Service:  "
-        f"{report.services.get(config.services.launchpad, 'unknown')}"
+        f"{report.services.get(config.services.launchpad.unit, 'unknown')}"
     )
     print(f"Port:     {config.network.launchpad_port}")
     print(
@@ -349,7 +349,9 @@ def print_human(
     print()
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(
+    argv: list[str] | None = None,
+) -> int:
     config = DEFAULT_PLATFORM_CONFIG
     report = collect_status(config)
 
@@ -359,6 +361,11 @@ def main(argv: list[str] | None = None) -> int:
                 report.to_dict(),
                 indent=2,
             )
+        )
+    else:
+        print_human(
+            report,
+            config,
         )
 
     return 0

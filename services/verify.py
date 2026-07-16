@@ -253,7 +253,7 @@ def check_launchpad(
         [
             "systemctl",
             "is-active",
-            config.services.launchpad,
+            config.services.launchpad.unit,
         ],
         timeout=(
             config.verification.command_timeout_seconds
@@ -274,7 +274,7 @@ def check_launchpad(
             "launchpad:http",
             False,
             (
-                f"{config.services.launchpad} "
+                f"{config.services.launchpad.unit} "
                 f"is {state or 'not active'}"
             ),
         )

@@ -47,10 +47,10 @@ def dedicated_service_units(
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> set[str]:
     return {
-        config.services.video,
-        config.services.jupyterhub,
-        config.services.boot_announce,
-        config.services.launchpad,
+        config.services.video.unit,
+        config.services.jupyterhub.unit,
+        config.services.boot_announce.unit,
+        config.services.launchpad.unit,
     }
 
 def healthy(title: str, summary: str) -> Diagnosis:
@@ -72,7 +72,7 @@ def diagnose_boot_announce(
     status: StatusReport,
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> Diagnosis:
-    unit = config.services.boot_announce
+    unit = config.services.boot_announce.unit
 
     state = status.services.get(
         unit,
@@ -262,7 +262,7 @@ def diagnose_jupyterhub(
     )
 
     service_state = status.services.get(
-        config.services.jupyterhub,
+        config.services.jupyterhub.unit,
         "unknown",
     )
 
@@ -322,14 +322,14 @@ def diagnose_jupyterhub(
 
     if not service_ok:
         causes.append(
-            f"{config.services.jupyterhub} is {service_state}."
+            f"{config.services.jupyterhub.unit} is {service_state}."
         )
 
         actions.extend(
             [
                 (
                     "Restart: sudo systemctl restart "
-                    f"{config.services.jupyterhub}"
+                    f"{config.services.jupyterhub.unit}"
                 ),
                 (
                     "Check: betabox logs "
@@ -597,7 +597,7 @@ def diagnose_vision_hardware(
             severity="error",
             summary=vision.error or "Vision service is unavailable.",
             causes=[
-                f"{config.services.video} is stopped or failed.",
+                f"{config.services.video.unit} is stopped or failed.",
                 "The Vision API is not responding.",
                 "The service failed during camera startup.",
             ],
@@ -610,7 +610,7 @@ def diagnose_vision_hardware(
             actions=[
                 "Run: betabox services",
                 "Run: betabox logs video --journal-only",
-                f"Restart: sudo systemctl restart {config.services.video}",
+                f"Restart: sudo systemctl restart {config.services.video.unit}",
             ],
         )
 
@@ -631,7 +631,7 @@ def diagnose_vision_hardware(
                 "Detection",
             ],
             actions=[
-                f"Restart: sudo systemctl restart {config.services.video}",
+                f"Restart: sudo systemctl restart {config.services.video.unit}",
                 "Run: betabox logs video --journal-only",
                 "Check the camera ribbon cable.",
             ],
@@ -657,7 +657,7 @@ def diagnose_vision_hardware(
             actions=[
                 "Check the camera ribbon cable.",
                 "Check for another camera process.",
-                f"Restart: sudo systemctl restart {config.services.video}",
+                f"Restart: sudo systemctl restart {config.services.video.unit}",
             ],
         )
 
@@ -679,7 +679,7 @@ def diagnose_vision_hardware(
             ],
             actions=[
                 f"Check: {config.network.vision_url}/stats",
-                f"Restart: sudo systemctl restart {config.services.video}",
+                f"Restart: sudo systemctl restart {config.services.video.unit}",
                 "Review the video service logs.",
             ],
         )
@@ -693,7 +693,7 @@ def diagnose_launchpad(
     status: StatusReport,
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> Diagnosis:
-    unit = config.services.launchpad
+    unit = config.services.launchpad.unit
 
     service_state = status.services.get(
         unit,

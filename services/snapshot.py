@@ -131,7 +131,7 @@ def create_snapshot(
             [
                 "journalctl",
                 "-u",
-                config.services.monitor,
+                config.services.monitor.unit,
                 "-n",
                 "100",
                 "--no-pager",

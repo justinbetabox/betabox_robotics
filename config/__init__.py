@@ -5,11 +5,15 @@ from .platform import (
     PlatformNetworkConfig,
     PlatformPathsConfig,
     PlatformServicesConfig,
+    ServiceCategory,
+    ServiceDefinition,
+    ServiceStartup,
     TemperatureThresholdConfig,
     UsageThresholdConfig,
     PlatformVerificationConfig,
     PlatformMonitoringConfig,
     PlatformRuntimeConfig,
+
 )
 
 __all__ = [
@@ -24,4 +28,7 @@ __all__ = [
     "PlatformMonitoringConfig",
     "PlatformRuntimeConfig",
     "DEFAULT_PLATFORM_CONFIG",
+    "ServiceCategory",
+    "ServiceDefinition",
+    "ServiceStartup",
 ]

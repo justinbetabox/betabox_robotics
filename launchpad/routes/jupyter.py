@@ -51,7 +51,7 @@ async def jupyter_status(
         "platform_config"
     ]
 
-    unit = config.services.jupyterhub
+    unit = config.services.jupyterhub.unit
 
     state = await asyncio.to_thread(
         service_state,

@@ -41,7 +41,7 @@ async def status_api(
 
         jupyter_state = (
             summary.services.get(
-                config.services.jupyterhub,
+                config.services.jupyterhub.unit,
                 "unknown",
             )
         )

@@ -162,20 +162,39 @@ if ! nmcli connection show PiAP >/dev/null 2>&1; then
 fi
 
 echo "[9/10] Installing systemd services..."
-sudo mkdir -p /etc/systemd/system
-sudo cp "$SDK_DIR/deployment/systemd/betabox-boot-announce.service" /etc/systemd/system/
-sudo cp "$SDK_DIR/deployment/systemd/betabox-monitor.service" /etc/systemd/system/
-sudo cp "$SDK_DIR/deployment/systemd/jupyterhub.service" /etc/systemd/system/
-sudo cp "$SDK_DIR/deployment/systemd/set-hostname-from-serial.service" /etc/systemd/system/
-sudo cp "$SDK_DIR/deployment/systemd/wifi-fallback.service" /etc/systemd/system/
-sudo cp "$SDK_DIR/deployment/systemd/betabox-video.service" /etc/systemd/system/
+
+SYSTEMD_SOURCE="$SDK_DIR/deployment/systemd"
+SYSTEMD_TARGET="/etc/systemd/system"
+
+SERVICES=(
+    betabox-boot-announce.service
+    betabox-monitor.service
+    jupyterhub.service
+    set-hostname-from-serial.service
+    wifi-fallback.service
+    betabox-video.service
+    betabox-launchpad.service
+)
+
+sudo mkdir -p "$SYSTEMD_TARGET"
+
+for service in "${SERVICES[@]}"; do
+    echo "Installing $service..."
+
+    sudo install \
+        -m 0644 \
+        "$SYSTEMD_SOURCE/$service" \
+        "$SYSTEMD_TARGET/$service"
+done
+
+echo "Reloading systemd..."
 sudo systemctl daemon-reload
-sudo systemctl enable betabox-boot-announce.service
-sudo systemctl enable betabox-monitor.service
-sudo systemctl enable jupyterhub.service
-sudo systemctl enable set-hostname-from-serial.service
-sudo systemctl enable wifi-fallback.service
-sudo systemctl enable betabox-video.service
+
+for service in "${SERVICES[@]}"; do
+    echo "Enabling $service..."
+
+    sudo systemctl enable "$service"
+done
 
 echo "[10/10] Running install check..."
 python -m betabox_robotics.services.install_check
@@ -193,4 +212,11 @@ echo "  source $VENV_DIR/bin/activate"
 echo "  betabox verify"
 echo "  betabox status"
 echo "  betabox services"
+echo "  python -m betabox_robotics.examples.robots.betabox_car.basic_robot_demo"
+echo
+echo "Launchpad:"
+echo "  http://$(hostname).local:8088"
+echo "  http://$(hostname -I | awk '{print $1}'):8088"
+echo
+echo "Robot API example:"
 echo "  python -m betabox_robotics.examples.robots.betabox_car.basic_robot_demo"

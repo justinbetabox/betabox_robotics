@@ -48,7 +48,11 @@ async def drive_page(
 
     <link
         rel="stylesheet"
-        href="/static/launchpad.css"
+        href="/static/tokens.css"
+    >
+    <link
+        rel="stylesheet"
+        href="/static/components.css"
     >
     <link
         rel="stylesheet"
@@ -311,6 +315,8 @@ async def drive_page(
         </section>
     </main>
 
+    <script src="/static/theme.js"></script>
+
     <script
         type="module"
         src="/static/drive.js"
@@ -410,19 +416,36 @@ async def drive_websocket(
             }
         )
 
-        async for message in websocket:
-            if message.type == WSMsgType.TEXT:
-                if websocket.closed:
+        while not websocket.closed:
+            try:
+                message = await websocket.receive(
+                    timeout=0.25
+                )
+
+            except asyncio.TimeoutError:
+                still_owns_robot = await controller.owns(
+                    client_id
+                )
+
+                if not still_owns_robot:
+                    await websocket.close(
+                        code=4003,
+                        message=b"manual drive heartbeat timed out",
+                    )
                     break
 
+                continue
+
+            if message.type == WSMsgType.TEXT:
                 await handle_drive_message(
                     websocket,
                     controller,
                     client_id,
                     message.data,
                 )
+                continue
 
-            elif message.type in (
+            if message.type in (
                 WSMsgType.CLOSE,
                 WSMsgType.CLOSING,
                 WSMsgType.CLOSED,
@@ -431,9 +454,7 @@ async def drive_websocket(
                 break
 
     finally:
-        await controller.release(
-            client_id
-        )
+        await controller.release(client_id)
 
     return websocket
 

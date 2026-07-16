@@ -9,6 +9,9 @@ from betabox_robotics.services.hardware_status import (
     RobotHardwareStatus,
     collect_hardware_status,
 )
+from betabox_robotics.services.http_health import (
+    check_json_health,
+)
 
 from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
@@ -219,23 +222,10 @@ def check_robot_constructs() -> CheckResult:
     finally:
         if car is not None:
             try:
-                car.drive.stop()
+                car.close()
             except Exception:
                 pass
 
-            for subsystem in (
-                car.audio,
-                car.drive,
-                car.sensors,
-                car.system,
-            ):
-                close = getattr(subsystem, "close", None)
-
-                if callable(close):
-                    try:
-                        close()
-                    except Exception:
-                        pass
 
 def check_configurable_http_proxy() -> CheckResult:
     result = run(["configurable-http-proxy", "--version"])
@@ -253,6 +243,58 @@ def check_configurable_http_proxy() -> CheckResult:
         "jupyterhub:proxy",
         True,
         output or "installed",
+    )
+
+
+def check_launchpad(
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> CheckResult:
+    service_result = run(
+        [
+            "systemctl",
+            "is-active",
+            config.services.launchpad,
+        ],
+        timeout=(
+            config.verification.command_timeout_seconds
+        ),
+    )
+
+    if (
+        service_result is None
+        or service_result.returncode != 0
+    ):
+        state = (
+            service_result.stdout.strip()
+            if service_result is not None
+            else "unknown"
+        )
+
+        return CheckResult(
+            "launchpad:http",
+            False,
+            (
+                f"{config.services.launchpad} "
+                f"is {state or 'not active'}"
+            ),
+        )
+
+    ok, message = check_json_health(
+        config.network.launchpad_health_url,
+        expected_service="launchpad",
+        timeout=(
+            config.verification.command_timeout_seconds
+        ),
+    )
+
+    return CheckResult(
+        "launchpad:http",
+        ok,
+        (
+            "Launchpad responding"
+            if ok
+            else message
+        ),
     )
 
 def checks_from_hardware_status(
@@ -356,6 +398,7 @@ def checks_from_hardware_status(
 
     return checks
 
+
 def check_ultrasonic_read() -> CheckResult:
     try:
         from betabox_robotics.robots.betabox_car import BETABOX_CAR
@@ -393,6 +436,7 @@ def check_ultrasonic_read() -> CheckResult:
             str(exc),
         )
 
+
 def collect_checks(
     *,
     include_robot: bool = True,
@@ -402,15 +446,33 @@ def collect_checks(
 
     checks.extend(check_imports(config))
     checks.append(check_picamera2())
-    checks.append(check_configurable_http_proxy())
-    checks.append(check_speech_backend())
-    checks.extend(check_media_paths(config))
+    checks.append(
+        check_configurable_http_proxy()
+    )
+    checks.append(
+        check_launchpad(config)
+    )
+    checks.append(
+        check_speech_backend()
+    )
+    checks.extend(
+        check_media_paths(config)
+    )
 
-    hardware = collect_hardware_status(config)
-    checks.extend(checks_from_hardware_status(hardware))
+    hardware = collect_hardware_status(
+        config
+    )
+
+    checks.extend(
+        checks_from_hardware_status(
+            hardware
+        )
+    )
 
     if include_robot:
-        checks.append(check_robot_constructs())
+        checks.append(
+            check_robot_constructs()
+        )
 
     return checks
 

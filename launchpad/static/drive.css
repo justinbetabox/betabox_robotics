@@ -1,4 +1,28 @@
 .drive-body {
+    /* Permanently dark operational palette */
+    --drive-page: #151b21;
+    --drive-header: #202c35;
+    --drive-panel: #232e37;
+    --drive-panel-raised: #2b3944;
+    --drive-panel-inset: #10171d;
+
+    --drive-border: rgb(255 255 255 / 14%);
+    --drive-border-strong: rgb(255 255 255 / 24%);
+
+    --drive-text: var(--brand-white);
+    --drive-text-muted: #a9b7c1;
+    --drive-text-soft: #82929e;
+
+    --drive-overlay: rgb(15 22 28 / 78%);
+    --drive-overlay-strong: rgb(9 14 18 / 88%);
+
+    --drive-blue: var(--brand-blue);
+    --drive-blue-hover: #1495df;
+
+    --drive-healthy: var(--brand-green);
+    --drive-warning: var(--brand-orange);
+    --drive-critical: var(--brand-pink);
+
     display: grid;
     grid-template-rows:
         auto
@@ -10,8 +34,8 @@
     margin: 0;
     overflow: hidden;
 
-    background: #111820;
-    color: #f5f7f9;
+    background: var(--drive-page);
+    color: var(--drive-text);
 }
 
 
@@ -23,37 +47,97 @@
     align-items: center;
     gap: 1.5rem;
 
-    padding: 1rem clamp(1rem, 3vw, 2.5rem);
-    background: #17212b;
-    border-bottom: 1px solid #2b3742;
+    padding:
+        1rem
+        clamp(1rem, 3vw, 2.5rem);
+
+    background:
+        linear-gradient(
+            180deg,
+            #273844,
+            var(--drive-header)
+        );
+
+    border-bottom:
+        1px solid var(--drive-border);
+
+    box-shadow: var(--shadow-header);
 }
 
 .drive-header h1 {
     margin: 0;
-    font-size: clamp(1.6rem, 4vw, 2.5rem);
+
+    color: var(--drive-text);
+
+    font-size:
+        clamp(1.6rem, 4vw, 2.5rem);
+
     text-align: center;
 }
 
 .drive-header .eyebrow {
     margin-bottom: 0.3rem;
-    color: #8fa0ae;
+
+    color: #8fcce9;
     text-align: center;
 }
 
-.back-link {
-    color: #dce5eb;
-    font-weight: 700;
+.drive-header .back-link {
+    color: var(--drive-text);
+
+    font-weight: 800;
     text-decoration: none;
+}
+
+.drive-header .back-link:hover {
+    color: #8fcce9;
+}
+
+.drive-header .back-link:focus-visible {
+    outline:
+        3px solid rgb(0 125 198 / 50%);
+
+    outline-offset: 4px;
+    border-radius: var(--radius-small);
 }
 
 .drive-connection {
     justify-self: end;
 
     padding: 0.55rem 0.8rem;
-    border-radius: 999px;
+
+    border:
+        1px solid var(--drive-border);
+
+    border-radius: var(--radius-pill);
+
+    background: var(--drive-panel-raised);
+    color: var(--drive-text);
 
     font-size: 0.8rem;
-    font-weight: 800;
+    font-weight: 850;
+}
+
+.drive-connection.status-connecting {
+    border-color: var(--drive-blue);
+    background: #173c50;
+}
+
+.drive-connection.status-connected {
+    border-color: var(--drive-healthy);
+    background: #183f32;
+}
+
+.drive-connection.status-busy,
+.drive-connection.status-paused {
+    border-color: var(--drive-warning);
+    background: #4a3023;
+    color: var(--drive-text);
+}
+
+.drive-connection.status-disconnected {
+    border-color: var(--drive-critical);
+    background: #4a2035;
 }
 
 
@@ -64,6 +148,7 @@
     grid-template-columns:
         minmax(0, 1.55fr)
         minmax(420px, 0.85fr);
+
     gap: 1rem;
 
     min-width: 0;
@@ -85,9 +170,15 @@
     height: 100%;
 
     overflow: hidden;
-    border: 1px solid #35414c;
-    border-radius: 20px;
+
+    border:
+        1px solid var(--drive-border);
+
+    border-radius: var(--radius-large);
+
     background: #05080b;
+
+    box-shadow: var(--shadow-small);
 }
 
 .drive-video {
@@ -100,6 +191,7 @@
 
     border: 0;
     background: #000;
+
     object-fit: contain;
 }
 
@@ -114,10 +206,15 @@
     gap: 1rem;
 
     padding: 0.75rem 1rem;
-    border: 1px solid rgb(255 255 255 / 14%);
-    border-radius: 12px;
 
-    background: rgb(5 8 11 / 76%);
+    border:
+        1px solid var(--drive-border);
+
+    border-radius: var(--radius-medium);
+
+    background: var(--drive-overlay);
+    color: var(--drive-text);
+
     backdrop-filter: blur(10px);
 }
 
@@ -128,22 +225,31 @@
     z-index: 2;
 
     padding: 0.5rem 0.75rem;
-    border-radius: 999px;
 
-    background: rgb(5 8 11 / 76%);
-    color: #d8e1e8;
+    border:
+        1px solid var(--drive-border);
+
+    border-radius: var(--radius-pill);
+
+    background: var(--drive-overlay);
+    color: var(--drive-text-muted);
 
     font-size: 0.78rem;
-    font-weight: 800;
+    font-weight: 850;
 
     backdrop-filter: blur(10px);
-    transition: opacity 140ms ease;
+
+    transition:
+        opacity var(--transition-fast);
 }
 
 .video-panel[data-video-state="connected"] .video-status {
     opacity: 0;
     pointer-events: none;
 }
+
+
+/* Drive HUD */
 
 .drive-hud {
     position: absolute;
@@ -164,11 +270,13 @@
 
     overflow-x: auto;
 
-    border: 1px solid rgb(255 255 255 / 14%);
-    border-radius: 14px;
+    border:
+        1px solid var(--drive-border);
 
-    background: rgb(5 8 11 / 74%);
-    color: #ffffff;
+    border-radius: var(--radius-medium);
+
+    background: var(--drive-overlay);
+    color: var(--drive-text);
 
     backdrop-filter: blur(12px);
 }
@@ -180,50 +288,60 @@
 }
 
 .drive-hud-dot {
-    width: 0.7rem;
-    height: 0.7rem;
+    width: 0.75rem;
+    height: 0.75rem;
+
     flex: 0 0 auto;
 
     border-radius: 50%;
-    background: #89949e;
+
+    background: var(--color-neutral);
 
     box-shadow:
-        0 0 0 4px rgb(137 148 158 / 16%);
+        0 0 0 4px rgb(125 139 148 / 18%);
 }
 
 .drive-hud-dot.hud-healthy {
-    background: #39b54a;
+    background: var(--drive-healthy);
+
     box-shadow:
-        0 0 0 4px rgb(57 181 74 / 16%);
+        0 0 0 4px rgb(37 182 122 / 18%);
 }
 
 .drive-hud-dot.hud-warning {
-    background: #d59b22;
+    background: var(--drive-warning);
+
     box-shadow:
-        0 0 0 4px rgb(213 155 34 / 16%);
+        0 0 0 4px rgb(241 118 59 / 18%);
 }
 
 .drive-hud-dot.hud-critical {
-    background: #df4b55;
+    background: var(--drive-critical);
+
     box-shadow:
-        0 0 0 4px rgb(223 75 85 / 16%);
+        0 0 0 4px rgb(221 31 120 / 18%);
 }
 
 .drive-hud-value {
     display: grid;
     gap: 0.1rem;
+
     min-width: max-content;
 }
 
 .drive-hud-value span {
-    color: #9eabb6;
+    color: var(--drive-text-soft);
+
     font-size: 0.62rem;
-    font-weight: 800;
-    letter-spacing: 0.08em;
+    font-weight: 850;
+
+    letter-spacing: 0.06em;
     text-transform: uppercase;
 }
 
 .drive-hud-value strong {
+    color: var(--drive-text);
+
     font-size: 0.82rem;
 }
 
@@ -234,12 +352,14 @@
     display: grid;
     grid-template-columns:
         repeat(2, minmax(0, 1fr));
+
     grid-template-areas:
         "speed speed"
         "drive camera"
         "stop stop"
         "keyboard keyboard"
         "safety safety";
+
     grid-template-rows:
         auto
         minmax(0, 1fr)
@@ -257,22 +377,34 @@
     padding: 1rem;
     overflow: hidden;
 
-    border: 1px solid #35414c;
-    border-radius: 20px;
-    background: #17212b;
+    border:
+        1px solid var(--drive-border);
+
+    border-radius: var(--radius-large);
+
+    background: var(--drive-panel);
+
+    box-shadow: var(--shadow-small);
 }
+
+
+/* Speed control */
 
 .speed-control {
     grid-area: speed;
 
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    justify-content: space-between;
     gap: 1rem;
 }
 
 .speed-control input {
     width: min(260px, 55%);
+}
+
+.speed-control input[type="range"] {
+    accent-color: var(--brand-blue);
 }
 
 
@@ -289,12 +421,20 @@
 .joystick-section,
 .camera-control-section {
     display: grid;
-    align-content: start;
+    grid-template-rows:
+        auto
+        minmax(0, 1fr)
+        auto;
+
+    align-items: center;
+    align-content: center;
     justify-items: center;
     gap: 0.6rem;
 
     min-width: 0;
     min-height: 0;
+
+    overflow: hidden;
 }
 
 .joystick-section > div:first-child,
@@ -309,59 +449,84 @@
 
 .joystick-help {
     margin: 0;
-    color: #91a1ae;
+
+    color: var(--drive-text-soft);
+
     font-size: 0.75rem;
     line-height: 1.3;
 }
 
 
-/* Joystick */
+/* Joystick geometry and theme */
 
 .joystick {
     position: relative;
 
-    width: min(
-        100%,
-        clamp(145px, 25vh, 255px)
-    );
+    width:
+        min(
+            100%,
+            clamp(160px, 28vh, 250px)
+        );
+
     aspect-ratio: 1;
 
     overflow: hidden;
-    border: 2px solid #44515e;
+
+    border:
+        1px solid var(--drive-border-strong);
+
     border-radius: 50%;
 
     background:
         radial-gradient(
             circle at center,
-            #24313d 0 18%,
-            #1d2934 18% 48%,
-            #17212b 48% 100%
+            #2b3944 0 18%,
+            #202c35 18% 48%,
+            #182027 48% 100%
         );
 
     box-shadow:
-        inset 0 0 40px rgb(0 0 0 / 25%),
-        0 12px 30px rgb(0 0 0 / 20%);
+        inset 0 0 40px rgb(0 0 0 / 28%),
+        0 12px 30px rgb(0 0 0 / 24%);
 
     cursor: grab;
     touch-action: none;
     user-select: none;
 }
 
+.joystick:focus-visible {
+    outline:
+        3px solid rgb(0 125 198 / 48%);
+
+    outline-offset: 4px;
+}
+
 .joystick:active {
     cursor: grabbing;
+}
+
+.joystick-crosshair {
+    position: absolute;
+    inset: 0;
+
+    pointer-events: none;
 }
 
 .joystick-crosshair::before,
 .joystick-crosshair::after {
     position: absolute;
+
     content: "";
-    background: rgb(255 255 255 / 10%);
+
+    background:
+        rgb(255 255 255 / 10%);
 }
 
 .joystick-crosshair::before {
     top: 50%;
     right: 12%;
     left: 12%;
+
     height: 1px;
 }
 
@@ -369,6 +534,7 @@
     top: 12%;
     bottom: 12%;
     left: 50%;
+
     width: 1px;
 }
 
@@ -377,35 +543,43 @@
     top: 50%;
     left: 50%;
 
-    width: 30%;
+    width: 31%;
     aspect-ratio: 1;
 
-    border: 2px solid #79add3;
+    border:
+        2px solid #58b8ed;
+
     border-radius: 50%;
 
     background:
         radial-gradient(
             circle at 35% 30%,
-            #5f91b8,
-            #2e526d 70%
+            #58b8ed,
+            var(--brand-blue) 72%
         );
 
-    box-shadow:
-        0 8px 22px rgb(0 0 0 / 40%),
-        inset 0 1px 2px rgb(255 255 255 / 28%);
-
-    transform: translate(0, 0);
+    /*
+     * Keep centering separate from the transform property.
+     * drive.js updates transform to move the stick, so using
+     * transform for both centering and movement causes an offset.
+     */
     translate: -50% -50%;
 
+    box-shadow:
+        0 7px 18px rgb(0 0 0 / 34%);
+
     pointer-events: none;
+    will-change: transform;
 }
 
 .joystick-label {
     position: absolute;
 
-    color: #8fa0ad;
+    color: var(--drive-text-soft);
+
     font-size: 0.7rem;
     font-weight: 800;
+
     letter-spacing: 0.08em;
     text-transform: uppercase;
 
@@ -415,12 +589,14 @@
 .joystick-forward {
     top: 6%;
     left: 50%;
+
     transform: translateX(-50%);
 }
 
 .joystick-reverse {
     bottom: 6%;
     left: 50%;
+
     transform: translateX(-50%);
 }
 
@@ -444,21 +620,26 @@
 
 .joystick-readout {
     display: flex;
+    align-items: center;
     justify-content: center;
-    gap: 2rem;
+    gap: 1.5rem;
 
-    color: #91a1ae;
-    font-size: 0.8rem;
+    width: 100%;
+
+    color: var(--drive-text-soft);
+
+    font-size: 0.72rem;
 }
 
 .joystick-readout span {
     display: grid;
     gap: 0.25rem;
+
     text-align: center;
 }
 
 .joystick-readout strong {
-    color: #ffffff;
+    color: var(--drive-text);
 }
 
 
@@ -470,28 +651,31 @@
 }
 
 .camera-joystick {
-    width: min(
-        100%,
-        clamp(135px, 22vh, 220px)
-    );
+    width:
+        min(
+            100%,
+            clamp(145px, 24vh, 220px)
+        );
 
     background:
         radial-gradient(
             circle at center,
-            #283845 0 18%,
-            #202d38 18% 48%,
-            #17212b 48% 100%
+            #313d47 0 18%,
+            #25313a 18% 48%,
+            #182027 48% 100%
         );
 }
 
 .camera-stick {
-    border-color: #d6a968;
+    width: 29%;
+
+    border-color: #f6a47b;
 
     background:
         radial-gradient(
             circle at 35% 30%,
-            #d6a968,
-            #805f34 70%
+            #f6a47b,
+            var(--brand-orange) 72%
         );
 }
 
@@ -499,21 +683,36 @@
     justify-self: stretch;
 
     padding: 0.45rem 0.65rem;
-    border: 1px solid #52616e;
-    border-radius: 9px;
 
-    background: #24313d;
-    color: #ffffff;
+    border:
+        1px solid var(--drive-border-strong);
+
+    border-radius: var(--radius-small);
+
+    background: var(--drive-panel-raised);
+    color: var(--drive-text);
 
     font: inherit;
     font-size: 0.72rem;
     font-weight: 800;
 
     cursor: pointer;
+
+    transition:
+        background var(--transition-fast),
+        border-color var(--transition-fast);
 }
 
 .camera-center-button:hover {
-    background: #314354;
+    background: #364753;
+    border-color: var(--drive-blue);
+}
+
+.camera-center-button:focus-visible {
+    outline:
+        3px solid rgb(0 125 198 / 48%);
+
+    outline-offset: 3px;
 }
 
 
@@ -523,29 +722,50 @@
     grid-area: stop;
 
     display: flex;
-    justify-content: center;
     align-items: center;
+    justify-content: center;
     gap: 0.65rem;
 
     width: 100%;
     min-height: 52px;
 
-    border: 1px solid #d45b66;
-    border-radius: 14px;
+    border:
+        1px solid var(--brand-pink);
 
-    background: #a32430;
-    color: #ffffff;
+    border-radius: var(--radius-medium);
+
+    background: var(--brand-pink);
+    color: var(--brand-white);
 
     font: inherit;
     font-size: 1rem;
     font-weight: 900;
 
     cursor: pointer;
+
+    box-shadow:
+        0 8px 20px rgb(221 31 120 / 20%);
+
+    transition:
+        background var(--transition-fast),
+        transform var(--transition-fast);
 }
 
-.emergency-stop:hover,
+.emergency-stop:hover {
+    background: #bd1765;
+}
+
 .emergency-stop:active {
-    background: #c02e3c;
+    transform: translateY(1px);
+
+    background: #a41358;
+}
+
+.emergency-stop:focus-visible {
+    outline:
+        3px solid rgb(221 31 120 / 44%);
+
+    outline-offset: 3px;
 }
 
 .stop-icon {
@@ -563,24 +783,30 @@
     gap: 0.4rem 1rem;
 
     padding: 0.65rem 0.8rem;
-    border-radius: 10px;
 
-    background: #111820;
-    color: #acbac5;
+    border:
+        1px solid var(--drive-border);
+
+    border-radius: var(--radius-small);
+
+    background: var(--drive-panel-inset);
+    color: var(--drive-text-muted);
 
     font-size: 0.72rem;
 }
 
 .keyboard-help strong {
     width: 100%;
-    color: #ffffff;
+
+    color: var(--drive-text);
 }
 
 .drive-safety {
     grid-area: safety;
 
     margin: 0;
-    color: #92a2af;
+
+    color: var(--drive-text-soft);
 
     font-size: 0.7rem;
     line-height: 1.35;
@@ -614,17 +840,19 @@
     }
 
     .joystick {
-        width: min(
-            100%,
-            clamp(130px, 23vh, 190px)
-        );
+        width:
+            min(
+                100%,
+                clamp(130px, 23vh, 190px)
+            );
     }
 
     .camera-joystick {
-        width: min(
-            100%,
-            clamp(120px, 20vh, 170px)
-        );
+        width:
+            min(
+                100%,
+                clamp(120px, 20vh, 170px)
+            );
     }
 
     .joystick-help,
@@ -662,11 +890,17 @@
 
     .video-panel,
     .drive-video {
-        min-height: min(52dvh, 420px);
+        min-height:
+            min(52dvh, 420px);
     }
 
     .control-panel {
         height: auto;
+        overflow: visible;
+    }
+
+    .joystick-section,
+    .camera-control-section {
         overflow: visible;
     }
 }
@@ -676,7 +910,9 @@
 
 @media (max-width: 640px) {
     .drive-header {
-        grid-template-columns: 1fr auto;
+        grid-template-columns:
+            1fr
+            auto;
     }
 
     .drive-header > div:nth-child(2) {
@@ -690,7 +926,10 @@
     .drive-hud {
         right: 0.6rem;
         left: 0.6rem;
-        max-width: calc(100% - 1.2rem);
+
+        max-width:
+            calc(100% - 1.2rem);
+
         padding: 0.5rem 0.65rem;
         gap: 0.75rem;
     }
@@ -714,6 +953,7 @@
 
     .control-panel {
         grid-template-columns: 1fr;
+
         grid-template-areas:
             "speed"
             "drive"
@@ -728,11 +968,13 @@
     }
 
     .joystick {
-        width: min(82vw, 300px);
+        width:
+            min(82vw, 300px);
     }
 
     .camera-joystick {
-        width: min(68vw, 230px);
+        width:
+            min(68vw, 230px);
     }
 
     .joystick-readout {

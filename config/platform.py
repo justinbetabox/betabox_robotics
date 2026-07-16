@@ -149,6 +149,10 @@ class TemperatureThresholdConfig:
                 "high_celsius must be less than critical_celsius"
             )
 
+@dataclass(frozen=True)
+class LaunchpadConfig:
+    enabled: bool = True
+
 
 @dataclass(frozen=True)
 class PlatformHealthConfig:
@@ -250,6 +254,19 @@ class PlatformNetworkConfig:
             f"{self.launchpad_port}"
         )
 
+    @property
+    def launchpad_health_url(self) -> str:
+        return (
+            f"{self.launchpad_url}/api/health"
+        )
+
+    @property
+    def launchpad_bind_address(self) -> tuple[str, int]:
+        return (
+            self.bind_host,
+            self.launchpad_port,
+        )
+
 @dataclass(frozen=True)
 class PlatformServicesConfig:
     """
@@ -262,6 +279,7 @@ class PlatformServicesConfig:
     jupyterhub: str = "jupyterhub.service"
     video: str = "betabox-video.service"
     wifi_fallback: str = "wifi-fallback.service"
+    launchpad: str = "betabox-launchpad.service"
 
     def __post_init__(self) -> None:
         values = (
@@ -271,6 +289,7 @@ class PlatformServicesConfig:
             self.jupyterhub,
             self.video,
             self.wifi_fallback,
+            self.launchpad,
         )
 
         if any(not value for value in values):
@@ -287,6 +306,7 @@ class PlatformServicesConfig:
             self.jupyterhub,
             self.video,
             self.wifi_fallback,
+            self.launchpad,
         )
 
 
@@ -400,6 +420,7 @@ class PlatformConfig:
     verification: PlatformVerificationConfig
     monitoring: PlatformMonitoringConfig
     runtime: PlatformRuntimeConfig
+    launchpad: LaunchpadConfig
 
     @classmethod
     def default(cls) -> "PlatformConfig":
@@ -411,6 +432,7 @@ class PlatformConfig:
             verification=PlatformVerificationConfig(),
             monitoring=PlatformMonitoringConfig(),
             runtime=PlatformRuntimeConfig(),
+            launchpad=LaunchpadConfig(),
         )
 
 

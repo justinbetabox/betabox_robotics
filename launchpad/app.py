@@ -14,6 +14,7 @@ from betabox_robotics.launchpad.routes import (
     setup_home_routes,
     setup_status_routes,
     setup_camera_routes,
+    setup_jupyter_routes,
 )
 
 from betabox_robotics.launchpad.drive_controller import (
@@ -37,6 +38,16 @@ async def drive_controller_context(
     finally:
         await controller.close()
 
+async def health(
+    request: web.Request,
+) -> web.Response:
+    return web.json_response(
+        {
+            "service": "launchpad",
+            "status": "ok",
+        }
+    )
+
 def create_app(
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> web.Application:
@@ -52,12 +63,16 @@ def create_app(
     setup_status_routes(app)
     setup_drive_routes(app)
     setup_camera_routes(app)
+    setup_jupyter_routes(app)
+
 
     app.router.add_static(
         "/static/",
         STATIC_DIR,
         name="static",
     )
+
+    app.router.add_get("/api/health", health)
 
     return app
 
@@ -67,19 +82,23 @@ def main(
 ) -> int:
     config = DEFAULT_PLATFORM_CONFIG
 
+    default_host, default_port = (
+        config.network.launchpad_bind_address
+    )
+
     parser = argparse.ArgumentParser(
         prog="betabox launchpad"
     )
 
     parser.add_argument(
         "--host",
-        default=config.network.bind_host,
+        default=default_host,
     )
 
     parser.add_argument(
         "--port",
         type=int,
-        default=config.network.launchpad_port,
+        default=default_port,
     )
 
     args = parser.parse_args(argv)

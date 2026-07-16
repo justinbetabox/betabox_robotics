@@ -37,6 +37,9 @@ const state = {
     cameraJoystickActive: false,
     cameraJoystickX: 0,
     cameraJoystickY: 0,
+
+    controlPaused: false,
+    pageClosing: false,
 };
 
 const DRIVE_SEND_INTERVAL_MS = 50;
@@ -44,6 +47,8 @@ const DRIVE_SEND_INTERVAL_MS = 50;
 let lastDriveSendTime = 0;
 let pendingDriveTimer = null;
 let videoConnection = null;
+
+let driveConnection = null;
 
 const element = (id) => document.getElementById(id);
 
@@ -531,8 +536,10 @@ function sendDriveState(
         );
 }
 
-function emergencyStop() {
-    if (pendingDriveTimer !== null) {
+function resetLocalControls() {
+    if (
+        pendingDriveTimer !== null
+    ) {
         window.clearTimeout(
             pendingDriveTimer
         );
@@ -549,13 +556,32 @@ function emergencyStop() {
 
     state.lastCommand = "";
 
-    sendJson({
-        type: "stop",
-    });
-
-    element("drive-command").textContent =
-        "Stopped";
+    element(
+        "drive-command"
+    ).textContent = "Stopped";
 }
+
+
+function stopAndResetControls() {
+    if (
+        state.ready
+        && state.websocket !== null
+        && state.websocket.readyState
+            === WebSocket.OPEN
+    ) {
+        sendJson({
+            type: "stop",
+        });
+    }
+
+    resetLocalControls();
+}
+
+
+function emergencyStop() {
+    stopAndResetControls();
+}
+
 
 function setConnectionState(
     label,
@@ -581,6 +607,8 @@ function setConnectionState(
                 "Connected",
             "status-busy":
                 "Busy",
+            "status-paused":
+                "Paused",
             "status-disconnected":
                 "Disconnected",
         };
@@ -591,177 +619,668 @@ function setConnectionState(
     }
 }
 
-function connect() {
-    const scheme =
-        window.location.protocol === "https:"
-            ? "wss"
-            : "ws";
+class DriveConnection {
+    constructor(url) {
+        this.url = url;
+        this.websocket = null;
+        this.heartbeatTimer = null;
+        this.reconnectTimer = null;
+        this.reconnectDelayMs = 750;
+        this.resumeRequested = false;
+    }
 
-    const url =
-        `${scheme}://${window.location.host}/ws/drive`;
+    connect() {
+        if (
+            state.pageClosing
+            || document.hidden
+        ) {
+            return;
+        }
 
-    setConnectionState(
-        "Connecting…",
-        "status-connecting"
-    );
+        if (
+            this.websocket !== null
+            && (
+                this.websocket.readyState
+                    === WebSocket.OPEN
+                || this.websocket.readyState
+                    === WebSocket.CONNECTING
+            )
+        ) {
+            return;
+        }
 
-    const websocket = new WebSocket(url);
-    state.websocket = websocket;
+        this.cancelReconnect();
 
-    websocket.addEventListener(
-        "open",
-        () => {
-            setConnectionState(
-                "Requesting Control…",
-                "status-connecting"
+        state.controlPaused = false;
+
+        setConnectionState(
+            "Connecting…",
+            "status-connecting"
+        );
+
+        const websocket = new WebSocket(
+            this.url
+        );
+
+        this.websocket = websocket;
+        state.websocket = websocket;
+
+        websocket.addEventListener(
+            "open",
+            () => {
+                if (
+                    websocket
+                    !== this.websocket
+                ) {
+                    return;
+                }
+
+                setConnectionState(
+                    "Requesting Control…",
+                    "status-connecting"
+                );
+            }
+        );
+
+        websocket.addEventListener(
+            "message",
+            (event) => {
+                this.handleMessage(
+                    websocket,
+                    event
+                );
+            }
+        );
+
+        websocket.addEventListener(
+            "close",
+            (event) => {
+                this.handleClose(
+                    websocket,
+                    event
+                );
+            }
+        );
+
+        websocket.addEventListener(
+            "error",
+            () => {
+                if (
+                    websocket
+                    !== this.websocket
+                ) {
+                    return;
+                }
+
+                setConnectionState(
+                    "Connection Error",
+                    "status-disconnected"
+                );
+            }
+        );
+    }
+
+    handleMessage(
+        websocket,
+        event
+    ) {
+        if (
+            websocket
+            !== this.websocket
+        ) {
+            return;
+        }
+
+        let message;
+
+        try {
+            message = JSON.parse(
+                event.data
             );
+        } catch (error) {
+            console.error(
+                "Invalid websocket message",
+                error
+            );
+            return;
         }
-    );
 
-    websocket.addEventListener(
-        "message",
-        (event) => {
-            let message;
-
-            try {
-                message = JSON.parse(event.data);
-            } catch (error) {
-                console.error(
-                    "Invalid websocket message",
-                    error
-                );
-                return;
-            }
-
-            if (message.type === "ready") {
-                state.ready = true;
-
-                setConnectionState(
-                    "Control Active",
-                    "status-connected"
-                );
-
-                element(
-                    "drive-owner"
-                ).textContent =
-                    "You have control";
-
-                sendDriveState(true);
-                return;
-            }
-
-            if (message.type === "busy") {
-                state.ready = false;
-
-                setConnectionState(
-                    "Robot Busy",
-                    "status-busy"
-                );
-
-                element(
-                    "drive-owner"
-                ).textContent =
-                    message.message;
-
-                return;
-            }
-
-            if (message.type === "error") {
-                console.error(
-                    message.message
-                );
-
-                emergencyStop();
-            }
-
-            if (message.type === "unavailable") {
-                state.ready = false;
-
-                setConnectionState(
-                    "Robot In Use",
-                    "status-busy"
-                );
-
-                element(
-                    "drive-owner"
-                ).textContent =
-                    message.message;
-
-                return;
-            }
-        }
-    );
-
-    websocket.addEventListener(
-        "close",
-        (event) => {
-            state.ready = false;
-            state.websocket = null;
-
-            emergencyStop();
-
-            if (event.code === 4002) {
-                setConnectionState(
-                    "Robot In Use",
-                    "status-busy"
-                );
-
-                element(
-                    "drive-owner"
-                ).textContent =
-                    "The robot is currently being used "
-                    + "by another application.";
-
-                return;
-            }
-
-            if (event.code === 4001) {
-                setConnectionState(
-                    "Robot Busy",
-                    "status-busy"
-                );
-
-                element(
-                    "drive-owner"
-                ).textContent =
-                    "The robot is already being controlled "
-                    + "from another browser.";
-
-                return;
-            }
+        if (message.type === "ready") {
+            state.ready = true;
+            state.controlPaused = false;
 
             setConnectionState(
-                "Disconnected",
-                "status-disconnected"
+                "Control Active",
+                "status-connected"
             );
 
             element(
                 "drive-owner"
             ).textContent =
-                "Drive control disconnected";
-        }
-    );
+                "You have control";
 
-    websocket.addEventListener(
-        "error",
-        () => {
+            this.startHeartbeat();
+            sendDriveState(true);
+            return;
+        }
+
+        if (message.type === "busy") {
+            state.ready = false;
+
             setConnectionState(
-                "Connection Error",
-                "status-disconnected"
+                "Robot Busy",
+                "status-busy"
             );
-        }
-    );
-}
 
-function heartbeat() {
-    if (!state.ready) {
-        return;
+            element(
+                "drive-owner"
+            ).textContent =
+                message.message;
+
+            return;
+        }
+
+        if (message.type === "unavailable") {
+            state.ready = false;
+
+            setConnectionState(
+                "Robot In Use",
+                "status-busy"
+            );
+
+            element(
+                "drive-owner"
+            ).textContent =
+                message.message;
+
+            return;
+        }
+
+        if (message.type === "error") {
+            console.error(
+                message.message
+            );
+
+            stopAndResetControls();
+        }
     }
 
-    sendJson({
-        type: "heartbeat",
-    });
+    handleClose(
+        websocket,
+        event
+    ) {
+        if (
+            websocket
+            !== this.websocket
+        ) {
+            return;
+        }
+
+        this.stopHeartbeat();
+
+        this.websocket = null;
+        state.websocket = null;
+        state.ready = false;
+
+        resetLocalControls();
+
+        const shouldResume = (
+            this.resumeRequested
+            && !document.hidden
+            && !state.pageClosing
+        );
+
+        this.resumeRequested = false;
+
+        if (
+            state.pageClosing
+        ) {
+            return;
+        }
+
+        if (shouldResume) {
+            this.connect();
+            return;
+        }
+
+        if (
+            state.controlPaused
+            || document.hidden
+        ) {
+            setConnectionState(
+                "Control Paused",
+                "status-paused"
+            );
+
+            element(
+                "drive-owner"
+            ).textContent =
+                "Control paused while this tab is inactive.";
+
+            return;
+        }
+
+        if (event.code === 4002) {
+            setConnectionState(
+                "Robot In Use",
+                "status-busy"
+            );
+
+            element(
+                "drive-owner"
+            ).textContent =
+                "The robot is currently being used "
+                + "by another application.";
+
+            return;
+        }
+
+        if (event.code === 4001) {
+            setConnectionState(
+                "Robot Busy",
+                "status-busy"
+            );
+
+            element(
+                "drive-owner"
+            ).textContent =
+                "The robot is already being controlled "
+                + "from another browser.";
+
+            return;
+        }
+
+        if (event.code === 4003) {
+            setConnectionState(
+                "Control Lost",
+                "status-paused"
+            );
+
+            element(
+                "drive-owner"
+            ).textContent =
+                "Drive control expired because "
+                + "heartbeats stopped.";
+
+            this.scheduleReconnect();
+            return;
+        }
+
+        setConnectionState(
+            "Disconnected",
+            "status-disconnected"
+        );
+
+        element(
+            "drive-owner"
+        ).textContent =
+            "Drive control disconnected";
+
+        this.scheduleReconnect();
+    }
+
+    suspend() {
+        if (
+            state.pageClosing
+            || state.controlPaused
+        ) {
+            return;
+        }
+
+        state.controlPaused = true;
+        this.resumeRequested = false;
+
+        stopAndResetControls();
+
+        this.stopHeartbeat();
+        this.cancelReconnect();
+
+        const websocket =
+            this.websocket;
+
+        if (
+            websocket !== null
+            && websocket.readyState
+                === WebSocket.OPEN
+        ) {
+            websocket.close(
+                1000,
+                "manual drive tab inactive"
+            );
+
+        } else if (
+            websocket !== null
+            && websocket.readyState
+                === WebSocket.CONNECTING
+        ) {
+            websocket.close();
+        }
+
+        setConnectionState(
+            "Control Paused",
+            "status-paused"
+        );
+
+        element(
+            "drive-owner"
+        ).textContent =
+            "Control paused while this tab is inactive.";
+    }
+
+    resume() {
+        if (
+            state.pageClosing
+            || document.hidden
+        ) {
+            return;
+        }
+
+        state.controlPaused = false;
+        this.resumeRequested = true;
+
+        setConnectionState(
+            "Reconnecting…",
+            "status-connecting"
+        );
+
+        element(
+            "drive-owner"
+        ).textContent =
+            "Requesting robot control…";
+
+        if (
+            this.websocket !== null
+            && this.websocket.readyState
+                === WebSocket.CLOSING
+        ) {
+            return;
+        }
+
+        this.resumeRequested = false;
+        this.connect();
+    }
+
+    shutdown() {
+        state.pageClosing = true;
+        state.controlPaused = false;
+
+        stopAndResetControls();
+
+        this.stopHeartbeat();
+        this.cancelReconnect();
+
+        const websocket =
+            this.websocket;
+
+        state.ready = false;
+        state.websocket = null;
+
+        if (
+            websocket !== null
+            && (
+                websocket.readyState
+                    === WebSocket.OPEN
+                || websocket.readyState
+                    === WebSocket.CONNECTING
+            )
+        ) {
+            websocket.close(
+                1000,
+                "manual drive page closed"
+            );
+        }
+    }
+
+    startHeartbeat() {
+        this.stopHeartbeat();
+
+        this.heartbeatTimer =
+            window.setInterval(
+                () => {
+                    if (
+                        state.ready
+                        && !document.hidden
+                    ) {
+                        sendJson({
+                            type: "heartbeat",
+                        });
+                    }
+                },
+                HEARTBEAT_INTERVAL_MS
+            );
+    }
+
+    stopHeartbeat() {
+        if (
+            this.heartbeatTimer
+            === null
+        ) {
+            return;
+        }
+
+        window.clearInterval(
+            this.heartbeatTimer
+        );
+
+        this.heartbeatTimer = null;
+    }
+
+    scheduleReconnect() {
+        if (
+            state.pageClosing
+            || state.controlPaused
+            || document.hidden
+            || this.reconnectTimer !== null
+        ) {
+            return;
+        }
+
+        this.reconnectTimer =
+            window.setTimeout(
+                () => {
+                    this.reconnectTimer = null;
+                    this.connect();
+                },
+                this.reconnectDelayMs
+            );
+    }
+
+    cancelReconnect() {
+        if (
+            this.reconnectTimer
+            === null
+        ) {
+            return;
+        }
+
+        window.clearTimeout(
+            this.reconnectTimer
+        );
+
+        this.reconnectTimer = null;
+    }
 }
+
+class ManualDriveSession {
+    constructor() {
+        this.driveConnection = null;
+        this.videoConnection = null;
+        this.statusTimer = null;
+        this.started = false;
+    }
+
+    start() {
+        if (this.started) {
+            return;
+        }
+
+        this.started = true;
+
+        this.configureControls();
+        this.initializeInterface();
+        this.initializeVideo();
+        this.initializeDriveConnection();
+        this.configureLifecycle();
+        this.startStatusRefresh();
+    }
+
+    configureControls() {
+        configureKeyboard();
+        configureCameraJoystick();
+        configureJoystick();
+        configureSpeed();
+        configureSafety();
+    }
+
+    initializeInterface() {
+        updateCameraReadout();
+        updateJoystickReadout();
+        positionDriveStick();
+        positionCameraStick();
+    }
+
+    initializeVideo() {
+        this.videoConnection =
+            new VideoConnection(
+                element("drive-video"),
+                "/api/vision/offer",
+                {
+                    onStateChange:
+                        setVideoState,
+                }
+            );
+
+        videoConnection =
+            this.videoConnection;
+
+        this.videoConnection.connect();
+    }
+
+    initializeDriveConnection() {
+        const scheme =
+            window.location.protocol
+                === "https:"
+                ? "wss"
+                : "ws";
+
+        const url =
+            `${scheme}://`
+            + `${window.location.host}`
+            + "/ws/drive";
+
+        this.driveConnection =
+            new DriveConnection(
+                url
+            );
+
+        driveConnection =
+            this.driveConnection;
+
+        this.driveConnection.connect();
+    }
+
+    startStatusRefresh() {
+        refreshPlatformStatus();
+
+        this.statusTimer =
+            window.setInterval(
+                refreshPlatformStatus,
+                STATUS_REFRESH_INTERVAL_MS
+            );
+    }
+
+    stopStatusRefresh() {
+        if (
+            this.statusTimer === null
+        ) {
+            return;
+        }
+
+        window.clearInterval(
+            this.statusTimer
+        );
+
+        this.statusTimer = null;
+    }
+
+    suspend() {
+        if (!this.started) {
+            return;
+        }
+
+        this.driveConnection?.suspend();
+    }
+
+    resume() {
+        if (
+            !this.started
+            || document.hidden
+            || state.pageClosing
+        ) {
+            return;
+        }
+
+        this.driveConnection?.resume();
+
+        void refreshPlatformStatus();
+    }
+
+    stopMotion() {
+        stopAndResetControls();
+    }
+
+    shutdown() {
+        if (!this.started) {
+            return;
+        }
+
+        this.started = false;
+
+        this.stopStatusRefresh();
+
+        this.driveConnection?.shutdown();
+
+        if (this.videoConnection !== null) {
+            void this.videoConnection.close();
+        }
+    }
+
+    configureLifecycle() {
+        document.addEventListener(
+            "visibilitychange",
+            () => {
+                if (document.hidden) {
+                    this.suspend();
+                    return;
+                }
+
+                this.resume();
+            }
+        );
+
+        window.addEventListener(
+            "blur",
+            () => {
+                this.stopMotion();
+            }
+        );
+
+        window.addEventListener(
+            "pagehide",
+            () => {
+                this.shutdown();
+            }
+        );
+
+        window.addEventListener(
+            "beforeunload",
+            () => {
+                this.shutdown();
+            }
+        );
+    }
+}
+
 
 function keyboardControlForKey(key) {
     const normalized = key.toLowerCase();
@@ -1205,39 +1724,6 @@ function configureSpeed() {
     );
 }
 
-function releasePageControl() {
-    emergencyStop();
-
-    if (
-        state.websocket !== null &&
-        (
-            state.websocket.readyState
-            === WebSocket.OPEN ||
-            state.websocket.readyState
-            === WebSocket.CONNECTING
-        )
-    ) {
-        state.websocket.close(
-            1000,
-            "manual drive page closed"
-        );
-    }
-
-    if (videoConnection !== null) {
-        void videoConnection.close();
-    }
-}
-
-
-window.addEventListener(
-    "pagehide",
-    releasePageControl
-);
-
-window.addEventListener(
-    "beforeunload",
-    releasePageControl
-);
 
 function configureSafety() {
     element(
@@ -1246,60 +1732,17 @@ function configureSafety() {
         "click",
         emergencyStop
     );
-
-    document.addEventListener(
-        "visibilitychange",
-        () => {
-            if (document.hidden) {
-                emergencyStop();
-            }
-        }
-    );
-
-    window.addEventListener(
-        "blur",
-        emergencyStop
-    );
 }
+
+let manualDriveSession = null;
+
 
 document.addEventListener(
     "DOMContentLoaded",
     () => {
-        configureKeyboard();
-        configureCameraJoystick();
-        configureJoystick();
-        configureSpeed();
-        configureSafety();
-        updateCameraReadout();
+        manualDriveSession =
+            new ManualDriveSession();
 
-        updateJoystickReadout();
-        positionDriveStick();
-        positionCameraStick();
-
-        videoConnection =
-            new VideoConnection(
-                element("drive-video"),
-                "/api/vision/offer",
-                {
-                    onStateChange:
-                        setVideoState,
-                }
-            );
-
-        videoConnection.connect();
-
-        refreshPlatformStatus();
-
-        window.setInterval(
-            refreshPlatformStatus,
-            STATUS_REFRESH_INTERVAL_MS
-        );
-
-        connect();
-
-        window.setInterval(
-            heartbeat,
-            HEARTBEAT_INTERVAL_MS
-        );
+        manualDriveSession.start();
     }
 );

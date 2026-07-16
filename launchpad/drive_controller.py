@@ -142,6 +142,17 @@ class ManualDriveController:
             and self._owner is None
         )
 
+    async def owns(
+        self,
+        client_id: str,
+    ) -> bool:
+        async with self._lock:
+            return (
+                not self._closed
+                and self._owner == client_id
+                and self._robot is not None
+            )
+
     def _camera_axis_to_angle(
         self,
         value: float,
@@ -318,11 +329,6 @@ class ManualDriveController:
             robot = self._robot
             self._robot = None
 
-        print(
-            f"manual-drive: releasing client {client_id}",
-            flush=True,
-        )
-
         await self._stop_center_close(
             robot
         )
@@ -406,11 +412,6 @@ class ManualDriveController:
             await asyncio.to_thread(
                 robot.close
             )
-
-        print(
-            "manual-drive: robot hardware closed",
-            flush=True,
-        )
 
     async def _safe_neutralize(self) -> None:
         async with self._hardware_lock:

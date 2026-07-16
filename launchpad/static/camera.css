@@ -10,8 +10,8 @@
     margin: 0;
     overflow: hidden;
 
-    background: #111820;
-    color: #f5f7f9;
+    background: var(--color-page);
+    color: var(--color-text);
 }
 
 
@@ -23,41 +23,70 @@
     align-items: center;
     gap: 1.5rem;
 
-    padding: 1rem clamp(1rem, 3vw, 2.5rem);
-    background: #17212b;
-    border-bottom: 1px solid #2b3742;
+    padding:
+        1rem
+        clamp(1rem, 3vw, 2.5rem);
+
+    background: var(--color-surface);
+
+    border-bottom:
+        1px solid var(--color-border);
+
+    box-shadow: var(--shadow-header);
 }
 
 .camera-header h1 {
     margin: 0;
-    font-size: clamp(1.6rem, 4vw, 2.5rem);
+
+    color: var(--color-text);
+
+    font-size:
+        clamp(1.6rem, 4vw, 2.5rem);
+
     text-align: center;
 }
 
 .camera-header .eyebrow {
     margin-bottom: 0.3rem;
-    color: #8fa0ae;
+
+    color: var(--brand-blue);
     text-align: center;
 }
 
 .back-link {
-    color: #dce5eb;
-    font-weight: 700;
+    color: var(--brand-blue);
+
+    font-weight: 800;
     text-decoration: none;
 }
 
 .back-link:hover {
-    color: #ffffff;
+    color: var(--color-primary-hover);
+}
+
+.back-link:focus-visible {
+    outline:
+        3px solid var(--color-focus-ring);
+
+    outline-offset: 4px;
+    border-radius: var(--radius-small);
 }
 
 .camera-status {
     justify-self: end;
 
     padding: 0.55rem 0.8rem;
-    border-radius: 999px;
+
+    border:
+        1px solid var(--color-border);
+
+    border-radius: var(--radius-pill);
+
+    background: var(--color-surface-subtle);
+    color: var(--color-text);
 
     font-size: 0.8rem;
-    font-weight: 800;
+    font-weight: 850;
 }
 
 
@@ -70,6 +99,8 @@
 
     padding: 1rem;
     overflow: hidden;
+
+    background: var(--color-page);
 }
 
 .camera-view {
@@ -82,10 +113,14 @@
 
     overflow: hidden;
 
-    border: 1px solid #35414c;
-    border-radius: 20px;
+    border:
+        1px solid var(--color-border);
+
+    border-radius: var(--radius-large);
 
     background: #05080b;
+
+    box-shadow: var(--shadow-small);
 }
 
 .camera-video {
@@ -97,6 +132,7 @@
     min-height: 0;
 
     background: #000;
+
     object-fit: contain;
 }
 
@@ -106,21 +142,53 @@
     left: 1rem;
 
     padding: 0.55rem 0.8rem;
-    border-radius: 999px;
 
-    background: rgb(5 8 11 / 76%);
-    color: #d8e1e8;
+    border:
+        1px solid var(--color-border);
+
+    border-radius: var(--radius-pill);
+
+    background: var(--color-surface-overlay);
+    color: var(--color-text);
 
     font-size: 0.8rem;
-    font-weight: 800;
+    font-weight: 850;
+
+    box-shadow: var(--shadow-small);
 
     backdrop-filter: blur(10px);
+
+    transition:
+        opacity var(--transition-fast);
 }
 
 .camera-view[data-video-state="connected"]
 .camera-message {
     opacity: 0;
     pointer-events: none;
+}
+
+
+/* Connection states */
+
+.camera-status.status-connecting {
+    background: var(--brand-blue-light);
+    border-color: var(--brand-blue);
+}
+
+.camera-status.status-connected {
+    background: var(--brand-green-light);
+    border-color: var(--brand-green);
+}
+
+.camera-status.status-disconnected {
+    background: var(--brand-orange-light);
+    border-color: var(--brand-orange);
+}
+
+.camera-status.status-error {
+    background: var(--brand-pink-light);
+    border-color: var(--brand-pink);
 }
 
 
@@ -173,6 +241,17 @@
 
     .camera-status {
         padding: 0.45rem 0.65rem;
+
+        font-size: 0.72rem;
+    }
+
+    .camera-message {
+        top: 0.75rem;
+        left: 0.75rem;
+
+        max-width:
+            calc(100% - 1.5rem);
+
         font-size: 0.72rem;
     }
 }

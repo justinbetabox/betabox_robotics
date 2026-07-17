@@ -1,0 +1,57 @@
+{% extends "interior.html" %}
+
+{% block body_class %}
+    interior-body camera-page
+{% endblock %}
+
+{% block interior_styles %}
+    <link
+        rel="stylesheet"
+        href="/static/css/camera.css"
+    >
+{% endblock %}
+
+{% block header_actions %}
+    <div
+        id="camera-status"
+        class="
+            connection-status
+            status-connecting
+        "
+        role="status"
+        aria-live="polite"
+    >
+        Connecting…
+    </div>
+{% endblock %}
+
+{% block page_content %}
+    <section
+        class="camera-view"
+        data-video-state="connecting"
+        aria-label="Live robot camera"
+    >
+        <video
+            id="live-camera"
+            class="camera-video"
+            autoplay
+            playsinline
+            muted
+        ></video>
+
+        <div
+            class="camera-message"
+            role="status"
+            aria-live="polite"
+        >
+            Connecting camera…
+        </div>
+    </section>
+{% endblock %}
+
+{% block interior_scripts %}
+    <script
+        type="module"
+        src="/static/js/camera.js"
+    ></script>
+{% endblock %}

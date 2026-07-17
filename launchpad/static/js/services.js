@@ -103,6 +103,7 @@ function setLoadingState(
     loading
 ) {
     elements.refreshButton.disabled = loading;
+    elements.retryButton.disabled = loading;
 
     elements.refreshButton.textContent = (
         loading
@@ -417,7 +418,7 @@ function createServiceCard(
     );
 
     indicator.className = [
-        "status-indicator",
+        "status-dot",
         healthClass(service.health),
     ].join(" ");
 
@@ -542,7 +543,7 @@ function renderServices(
         );
 
         placeholder.className = (
-            "status-placeholder"
+            "empty-state"
         );
 
         placeholder.textContent = (
@@ -631,7 +632,7 @@ function createAttentionItem(
     );
 
     indicator.className = [
-        "status-indicator",
+        "status-dot",
         healthClass(service.health),
     ].join(" ");
 
@@ -749,9 +750,24 @@ async function loadServices() {
         );
 
         if (!response.ok) {
-            throw new Error(
-                `Services API returned HTTP ${response.status}.`
+            let message = (
+                `Services API returned HTTP `
+                + `${response.status}.`
             );
+
+            try {
+                const errorPayload = (
+                    await response.json()
+                );
+
+                if (errorPayload.message) {
+                    message = errorPayload.message;
+                }
+            } catch {
+                // Preserve the HTTP error message.
+            }
+
+            throw new Error(message);
         }
 
         const payload = await response.json();

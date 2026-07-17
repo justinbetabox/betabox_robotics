@@ -63,6 +63,10 @@ const elements = {
         "critical-count"
     ),
 
+    overviewIndicator: document.getElementById(
+        "events-overview-indicator"
+    ),
+
     listSummary: document.getElementById(
         "event-list-summary"
     ),
@@ -256,6 +260,26 @@ function severityClass(
 }
 
 
+function overviewStatusClass(
+    summary
+) {
+    if (
+        Number(summary.critical ?? 0) > 0
+        || Number(summary.error ?? 0) > 0
+    ) {
+        return "status-error";
+    }
+
+    if (
+        Number(summary.warning ?? 0) > 0
+    ) {
+        return "status-warning";
+    }
+
+    return "status-info";
+}
+
+
 function renderOverview(
     summary
 ) {
@@ -281,6 +305,17 @@ function renderOverview(
 
     elements.criticalCount.textContent = (
         summary.critical ?? 0
+    );
+
+    elements.overviewIndicator.classList.remove(
+        "status-info",
+        "status-warning",
+        "status-error",
+        "status-unknown"
+    );
+
+    elements.overviewIndicator.classList.add(
+        overviewStatusClass(summary)
     );
 }
 
@@ -720,6 +755,26 @@ async function loadEvents() {
         "Loading platform events…"
     );
 
+    elements.listSummary.textContent = (
+        "Loading…"
+    );
+
+    elements.eventsList.replaceChildren();
+
+    const loading = document.createElement(
+        "div"
+    );
+
+    loading.className = "events-empty";
+
+    loading.textContent = (
+        "Loading platform events…"
+    );
+
+    elements.eventsList.append(
+        loading
+    );
+
     try {
         const response = await fetch(
             buildApiUrl(),
@@ -803,36 +858,43 @@ async function loadEvents() {
 }
 
 
-function clearFilters() {
+async function clearFilters() {
     elements.severityFilter.value = "";
     elements.componentFilter.value = "";
     elements.limitFilter.value = "50";
 
-    loadEvents();
+    await loadEvents();
 }
 
 
 function setupEventListeners() {
     elements.refreshButton.addEventListener(
         "click",
-        loadEvents
+        () => {
+            void loadEvents();
+        }
     );
 
     elements.retryButton.addEventListener(
         "click",
-        loadEvents
+        () => {
+            void loadEvents();
+        }
     );
 
     elements.clearButton.addEventListener(
         "click",
-        clearFilters
+        () => {
+            void clearFilters();
+        }
     );
 
     elements.filterForm.addEventListener(
         "submit",
         event => {
             event.preventDefault();
-            loadEvents();
+
+            void loadEvents();
         }
     );
 }
@@ -840,7 +902,7 @@ function setupEventListeners() {
 
 function initializeEventsPage() {
     setupEventListeners();
-    loadEvents();
+    void loadEvents();
 }
 
 

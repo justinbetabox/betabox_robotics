@@ -2,23 +2,38 @@ from __future__ import annotations
 
 import asyncio
 
+import aiohttp_jinja2
+
 from aiohttp import web
 
-from betabox_robotics.config import PlatformConfig
+from betabox_robotics.config import (
+    PlatformConfig,
+)
 from betabox_robotics.services.http_health import (
     check_http_available,
 )
 from betabox_robotics.services.platform_summary import (
     collect_platform_summary,
 )
-
 from betabox_robotics.services.status import (
     collect_status,
 )
 
-from betabox_robotics.launchpad.routes.detailed_status import (
-    detailed_status_page,
-)
+
+async def status_page(
+    request: web.Request,
+) -> web.Response:
+    return aiohttp_jinja2.render_template(
+        "status.html",
+        request,
+        {
+            "page": {
+                "title": "Robot Status",
+                "eyebrow": "Platform Diagnostics",
+                "main_class": "status-layout",
+            },
+        },
+    )
 
 
 async def status_api(
@@ -39,16 +54,14 @@ async def status_api(
 
         payload = summary.to_dict()
 
-        jupyter_state = (
-            summary.services.get(
-                config.services.jupyterhub.unit,
-                "unknown",
-            )
+        jupyter_state = summary.services.get(
+            config.services.jupyterhub.unit,
+            "unknown",
         )
 
         jupyter_responding = False
         jupyter_message = (
-            "service is not active"
+            "Service is not active."
         )
 
         if jupyter_state == "active":
@@ -64,34 +77,57 @@ async def status_api(
             "active": (
                 jupyter_state == "active"
             ),
-            "responding": (
-                jupyter_responding
-            ),
+            "responding": jupyter_responding,
             "message": jupyter_message,
         }
 
         return payload
 
-    payload = await cache.get(
-        collect_payload
-    )
+    try:
+        payload = await cache.get(
+            collect_payload
+        )
+    except Exception as exc:
+        return web.json_response(
+            {
+                "error": "status_unavailable",
+                "message": (
+                    "Unable to collect platform status."
+                ),
+                "detail": str(exc),
+            },
+            status=500,
+        )
 
-    return web.json_response(
-        payload
-    )
+    return web.json_response(payload)
 
 
-async def detailed_status_api(
+async def status_report_api(
     request: web.Request,
 ) -> web.Response:
     config: PlatformConfig = request.app[
         "platform_config"
     ]
 
-    report = await asyncio.to_thread(
-        collect_status,
-        config,
-    )
+    try:
+        report = await asyncio.to_thread(
+            collect_status,
+            config,
+        )
+    except Exception as exc:
+        return web.json_response(
+            {
+                "error": (
+                    "status_report_unavailable"
+                ),
+                "message": (
+                    "Unable to collect the full "
+                    "platform status report."
+                ),
+                "detail": str(exc),
+            },
+            status=500,
+        )
 
     return web.json_response(
         report.to_dict()
@@ -103,15 +139,18 @@ def setup_status_routes(
 ) -> None:
     app.router.add_get(
         "/status",
-        detailed_status_page,
+        status_page,
+        name="status-page",
     )
 
     app.router.add_get(
         "/api/status",
         status_api,
+        name="status-api",
     )
 
     app.router.add_get(
-        "/api/status/detailed",
-        detailed_status_api,
+        "/api/status/report",
+        status_report_api,
+        name="detailed-status-api",
     )

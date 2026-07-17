@@ -1,0 +1,162 @@
+.camera-page {
+    display: grid;
+    grid-template-rows:
+        auto
+        minmax(0, 1fr);
+
+    width: 100%;
+    height: 100dvh;
+    min-height: 0;
+
+    overflow: hidden;
+}
+
+
+/* Camera area */
+
+.camera-main {
+    min-width: 0;
+    min-height: 0;
+
+    height: 100%;
+    padding: 1rem;
+
+    overflow: hidden;
+}
+
+.camera-view {
+    position: relative;
+
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+
+    overflow: hidden;
+
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-large);
+
+    background: #05080b;
+
+    box-shadow: var(--shadow-small);
+}
+
+.camera-video {
+    display: block;
+
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+
+    background: #000;
+
+    object-fit: contain;
+}
+
+.camera-message {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+
+    max-width:
+        calc(100% - 2rem);
+
+    padding: 0.55rem 0.8rem;
+
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-pill);
+
+    color: var(--color-text);
+    background: var(--color-surface-overlay);
+
+    font-size: 0.8rem;
+    font-weight: 850;
+
+    box-shadow: var(--shadow-small);
+
+    backdrop-filter: blur(10px);
+
+    transition:
+        opacity var(--transition-fast);
+}
+
+.camera-view[data-video-state="connected"]
+    .camera-message {
+    opacity: 0;
+    pointer-events: none;
+}
+
+
+/* Camera connection states */
+
+.connection-status.status-disconnected {
+    border-color: var(--color-warning);
+
+    color: var(--color-warning);
+    background: var(--brand-orange-light);
+}
+
+
+/* Compact layout */
+
+html[data-compact-layout="true"]
+    .camera-page
+    .interior-header {
+    padding-top: 0.55rem;
+    padding-bottom: 0.55rem;
+}
+
+html[data-compact-layout="true"]
+    .camera-main {
+    padding: 0.45rem;
+}
+
+
+/* Short browser windows */
+
+@media (
+    max-height: 700px
+) and (
+    min-width: 641px
+) {
+    .camera-page .interior-header {
+        padding-top: 0.6rem;
+        padding-bottom: 0.6rem;
+    }
+
+    .camera-page
+        .interior-header-title h1 {
+        font-size: 1.6rem;
+    }
+
+    .camera-page
+        .interior-header-title
+        .eyebrow {
+        display: none;
+    }
+
+    .camera-main {
+        padding: 0.65rem;
+    }
+}
+
+
+/* Phones */
+
+@media (max-width: 640px) {
+    .camera-main {
+        padding: 0.75rem;
+    }
+
+    .camera-message {
+        top: 0.75rem;
+        left: 0.75rem;
+
+        max-width:
+            calc(100% - 1.5rem);
+
+        font-size: 0.72rem;
+    }
+}

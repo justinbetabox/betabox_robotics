@@ -2,18 +2,33 @@ from __future__ import annotations
 
 import asyncio
 
+import aiohttp_jinja2
+
 from aiohttp import web
 
 from betabox_robotics.config import (
     PlatformConfig,
 )
-from betabox_robotics.launchpad.routes.services_page import (
-    services_page,
-)
 from betabox_robotics.services.services import (
     collect_services,
     service_summary,
 )
+
+
+async def services_page(
+    request: web.Request,
+) -> web.Response:
+    return aiohttp_jinja2.render_template(
+        "services.html",
+        request,
+        {
+            "page": {
+                "title": "Services",
+                "eyebrow": "Platform Services",
+                "main_class": "services-layout",
+            },
+        },
+    )
 
 
 async def services_api(
@@ -27,10 +42,23 @@ async def services_api(
         "platform_config"
     ]
 
-    statuses = await asyncio.to_thread(
-        collect_services,
-        config,
-    )
+    try:
+        statuses = await asyncio.to_thread(
+            collect_services,
+            config,
+        )
+    except Exception as exc:
+        return web.json_response(
+            {
+                "error": "services_unavailable",
+                "message": (
+                    "Unable to collect platform "
+                    "service information."
+                ),
+                "detail": str(exc),
+            },
+            status=500,
+        )
 
     payload = {
         "summary": service_summary(
@@ -42,9 +70,7 @@ async def services_api(
         ],
     }
 
-    return web.json_response(
-        payload
-    )
+    return web.json_response(payload)
 
 
 def setup_services_routes(
@@ -53,9 +79,11 @@ def setup_services_routes(
     app.router.add_get(
         "/services",
         services_page,
+        name="services-page",
     )
 
     app.router.add_get(
         "/api/services",
         services_api,
+        name="services-api",
     )

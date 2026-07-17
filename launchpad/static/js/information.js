@@ -669,36 +669,56 @@ function renderSoftware(
 function renderStorage(
     storage
 ) {
-    const usedPercent = Math.min(
-        100,
-        Math.max(
-            0,
-            Number(
-                storage.used_percent
-            ) || 0
-        )
+    const rawUsedPercent = Number(
+        storage.used_percent
     );
 
-    elements.storagePercent.textContent = (
-        `${usedPercent.toFixed(1)}% used`
+    const hasUsedPercent = (
+        Number.isFinite(rawUsedPercent)
+    );
+
+    const usedPercent = (
+        hasUsedPercent
+            ? Math.min(
+                100,
+                Math.max(
+                    0,
+                    rawUsedPercent
+                )
+            )
+            : 0
     );
 
     clearBadgeClasses(
         elements.storagePercent
     );
 
-    if (usedPercent >= 95) {
-        elements.storagePercent.classList.add(
-            "information-badge-error"
+    if (!hasUsedPercent) {
+        elements.storagePercent.textContent = (
+            "Unknown"
         );
-    } else if (usedPercent >= 85) {
+
         elements.storagePercent.classList.add(
-            "information-badge-warning"
+            "information-badge-neutral"
         );
     } else {
-        elements.storagePercent.classList.add(
-            "information-badge-healthy"
+        elements.storagePercent.textContent = (
+            `${usedPercent.toFixed(1)}% used`
         );
+
+        if (usedPercent >= 95) {
+            elements.storagePercent.classList.add(
+                "information-badge-error"
+            );
+        } else if (usedPercent >= 85) {
+            elements.storagePercent.classList.add(
+                "information-badge-warning"
+            );
+        } else {
+            elements.storagePercent.classList.add(
+                "information-badge-healthy"
+            );
+        }
     }
 
     elements.storageMeterFill.style.width = (
@@ -948,25 +968,14 @@ function applyAppearance(
             THEME_KEY
         );
 
-        const preferredTheme = (
-            window.matchMedia(
-                "(prefers-color-scheme: dark)"
-            ).matches
-                ? "dark"
-                : "light"
-        );
-
         if (
-            typeof window.applyTheme
+            typeof window.useSystemTheme
             === "function"
         ) {
-            window.applyTheme(
-                preferredTheme
-            );
+            window.useSystemTheme();
         } else {
-            document.documentElement.dataset.theme = (
-                preferredTheme
-            );
+            delete document.documentElement
+                .dataset.theme;
         }
 
         return;

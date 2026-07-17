@@ -1,5 +1,5 @@
 .drive-body {
-    /* Permanently dark operational palette */
+    /* Drive-specific aliases for the shared Launchpad palette */
     --drive-crosshair: rgb(35 43 51 / 14%);
     --drive-page: var(--color-page);
     --drive-header: var(--color-surface);
@@ -15,10 +15,6 @@
     --drive-text-soft: var(--color-text-soft);
 
     --drive-overlay: var(--color-surface-overlay);
-    --drive-overlay-strong: var(--color-surface-overlay);
-
-    --drive-blue: var(--color-primary);
-    --drive-blue-hover: var(--color-primary-hover);
 
     --drive-healthy: var(--color-healthy);
     --drive-warning: var(--color-warning);
@@ -54,8 +50,12 @@
 /* Header */
 
 .drive-header {
+    width: 100%;
     display: grid;
-    grid-template-columns: 1fr auto 1fr;
+    grid-template-columns:
+            minmax(0, 1fr)
+            auto
+            minmax(0, 1fr);
     align-items: center;
     gap: 1.5rem;
 
@@ -90,64 +90,20 @@
 }
 
 .drive-header .back-link {
-    color: var(--brand-blue);
-
-    font-weight: 800;
-    text-decoration: none;
+    justify-self: start;
 }
 
-.drive-header .back-link:hover {
-    color: var(--color-primary-hover);
+.drive-header-title {
+    min-width: 0;
+
+    justify-self: center;
+
+    text-align: center;
 }
 
-.drive-header .back-link:focus-visible {
-    outline:
-        3px solid rgb(0 125 198 / 50%);
-
-    outline-offset: 4px;
-    border-radius: var(--radius-small);
-}
-
-.drive-connection {
+.drive-header .connection-status {
+    grid-column: 3;
     justify-self: end;
-
-    padding: 0.55rem 0.8rem;
-
-    border:
-        1px solid var(--drive-border);
-
-    border-radius: var(--radius-pill);
-
-    background: var(--drive-panel-raised);
-    color: var(--drive-text);
-
-    font-size: 0.8rem;
-    font-weight: 850;
-}
-
-.drive-connection.status-connecting {
-    border-color: var(--brand-blue);
-    background: var(--brand-blue-light);
-    color: var(--drive-text);
-}
-
-.drive-connection.status-connected {
-    border-color: var(--brand-green);
-    background: var(--brand-green-light);
-    color: var(--drive-text);
-}
-
-.drive-connection.status-busy,
-.drive-connection.status-paused {
-    border-color: var(--brand-orange);
-    background: var(--brand-orange-light);
-    color: var(--drive-text);
-}
-
-.drive-connection.status-disconnected {
-    border-color: var(--brand-pink);
-    background: var(--brand-pink-light);
-    color: var(--drive-text);
 }
 
 
@@ -303,7 +259,9 @@
     flex: 0 0 auto;
 
     border-radius: 50%;
+}
 
+.drive-hud-dot.hud-unknown {
     background: var(--color-neutral);
 
     box-shadow:

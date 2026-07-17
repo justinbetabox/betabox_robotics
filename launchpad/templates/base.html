@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1"
+    >
+
+    <title>
+        {% block title %}
+            Betabox Launchpad
+        {% endblock %}
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="/static/css/tokens.css"
+    >
+
+    <link
+        rel="stylesheet"
+        href="/static/css/components.css"
+    >
+
+    {% block page_styles %}
+    {% endblock %}
+</head>
+
+<body class="{% block body_class %}{% endblock %}">
+    {% block body %}
+    {% endblock %}
+
+    <script src="/static/js/theme.js"></script>
+
+    {% block shared_scripts %}
+    {% endblock %}
+
+    {% block page_scripts %}
+    {% endblock %}
+</body>
+</html>

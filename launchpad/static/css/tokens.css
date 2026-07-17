@@ -42,6 +42,7 @@
     --color-primary: #007dc6;
     --color-primary-hover: #0069a7;
     --color-primary-active: #005487;
+    --color-primary-subtle: var(--brand-blue-light);
 
     /* Status */
     --color-healthy: #25b67a;

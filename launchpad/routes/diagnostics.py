@@ -2,17 +2,32 @@ from __future__ import annotations
 
 import asyncio
 
+import aiohttp_jinja2
+
 from aiohttp import web
 
 from betabox_robotics.config import (
     PlatformConfig,
 )
-from betabox_robotics.launchpad.routes.diagnostics_page import (
-    diagnostics_page,
-)
 from betabox_robotics.services.doctor import (
     collect_doctor_report,
 )
+
+
+async def diagnostics_page(
+    request: web.Request,
+) -> web.Response:
+    return aiohttp_jinja2.render_template(
+        "diagnostics.html",
+        request,
+        {
+            "page": {
+                "title": "Diagnostics",
+                "eyebrow": "Platform Health",
+                "main_class": "diagnostics-layout",
+            },
+        },
+    )
 
 
 async def diagnostics_api(
@@ -61,9 +76,11 @@ def setup_diagnostics_routes(
     app.router.add_get(
         "/diagnostics",
         diagnostics_page,
+        name="diagnostics-page",
     )
 
     app.router.add_get(
         "/api/diagnostics",
         diagnostics_api,
+        name="diagnostics-api",
     )

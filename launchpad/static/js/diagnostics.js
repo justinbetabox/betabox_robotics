@@ -381,7 +381,7 @@ function createDiagnosisCard(
     );
 
     indicator.className = [
-        "status-indicator",
+        "status-dot",
         statusClass(
             diagnosis.severity,
             diagnosis.ok
@@ -521,6 +521,7 @@ function renderIssues(
     );
 
     elements.issuesList.replaceChildren();
+    elements.issuesSummary.textContent = "";
 
     if (issues.length === 0) {
         elements.issuesSection.hidden = true;
@@ -618,6 +619,26 @@ async function runDiagnostics() {
 
     elements.updated.textContent = (
         "Running platform diagnostics…"
+    );
+
+    elements.issuesSection.hidden = true;
+    elements.issuesList.replaceChildren();
+    elements.issuesSummary.textContent = "";
+
+    elements.diagnosticsList.replaceChildren();
+
+    const loading = document.createElement(
+        "div"
+    );
+
+    loading.className = "diagnostics-empty";
+
+    loading.textContent = (
+        "Running platform diagnostics…"
+    );
+
+    elements.diagnosticsList.append(
+        loading
     );
 
     try {

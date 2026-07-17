@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}
+    {{ page.title }} · Betabox Launchpad
+{% endblock %}
+
+{% block page_styles %}
+    <link
+        rel="stylesheet"
+        href="/static/css/interior.css"
+    >
+
+    {% block interior_styles %}
+    {% endblock %}
+{% endblock %}
+
+{% block body_class %}
+    interior-body
+{% endblock %}
+
+{% block body %}
+    <header class="interior-header">
+        <a
+            class="back-link"
+            href="/"
+        >
+            ← Launchpad
+        </a>
+
+        <div class="interior-header-title">
+            {% if page.eyebrow %}
+                <p class="eyebrow">
+                    {{ page.eyebrow }}
+                </p>
+            {% endif %}
+
+            <h1>
+                {{ page.title }}
+            </h1>
+        </div>
+
+        <div class="interior-header-actions">
+            {% block header_actions %}
+            {% endblock %}
+        </div>
+    </header>
+
+    <main class="{{ page.main_class }}">
+        {% block page_content %}
+        {% endblock %}
+    </main>
+{% endblock %}
+
+{% block page_scripts %}
+    {% block interior_scripts %}
+    {% endblock %}
+{% endblock %}

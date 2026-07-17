@@ -198,55 +198,22 @@ function setOverallStatus(label, state) {
 
 
 function determineOverallStatus(data) {
-    const serviceStates = Object.values(
-        data.services ?? {},
+    const attentionItems = (
+        collectAttentionItems(data)
     );
 
-    const failedServices = serviceStates.filter(
-        (state) => state === "failed",
+    const hasCritical = attentionItems.some(
+        item => item.severity === "critical"
     );
 
-    const batteryState = (
-        data.hardware?.battery?.state
-    );
-
-    const temperatureState = (
-        data.system_health?.temperature?.state
-    );
-
-    const memoryState = (
-        data.system_health?.memory?.state
-    );
-
-    const diskState = (
-        data.system_health?.disk?.state
-    );
-
-    const throttling = (
-        data.system_health?.throttling ?? {}
-    );
-
-    if (
-        batteryState === "critical"
-        || temperatureState === "critical"
-        || memoryState === "critical"
-        || diskState === "critical"
-        || throttling.undervoltage_now
-    ) {
+    if (hasCritical) {
         return {
             label: "Critical",
             state: "critical",
         };
     }
 
-    if (
-        failedServices.length > 0
-        || batteryState === "low"
-        || temperatureState === "warning"
-        || memoryState === "warning"
-        || diskState === "warning"
-        || throttling.throttled_now
-    ) {
+    if (attentionItems.length > 0) {
         return {
             label: "Needs Attention",
             state: "warning",
@@ -379,10 +346,12 @@ function renderOverview(data) {
     );
 
     setText(
-        "audio-status",
+        "jupyter-status",
         jupyterhub.responding
             ? "Online"
-            : "Offline",
+            : jupyterhub.active
+                ? "Not Responding"
+                : "Offline",
     );
 
     renderServiceSummary(data);
@@ -411,7 +380,7 @@ function createAttentionItem(
     );
 
     indicator.className = (
-        `status-indicator status-${severity}`
+        `status-dot status-${severity}`
     );
 
     indicator.setAttribute(
@@ -1167,10 +1136,24 @@ async function loadStatus() {
         );
 
         if (!response.ok) {
-            throw new Error(
+            let message = (
                 `Status API returned HTTP `
-                + `${response.status}.`,
+                + `${response.status}.`
             );
+
+            try {
+                const errorPayload = (
+                    await response.json()
+                );
+
+                if (errorPayload.message) {
+                    message = errorPayload.message;
+                }
+            } catch {
+                // Keep the HTTP status message.
+            }
+
+            throw new Error(message);
         }
 
         const data = await response.json();
@@ -1231,25 +1214,33 @@ function startAutomaticRefresh() {
     }
 
     refreshTimer = window.setInterval(
-        loadStatus,
-        AUTO_REFRESH_INTERVAL_MS,
+        () => {
+            if (!document.hidden) {
+                void loadStatus();
+            }
+        },
+        AUTO_REFRESH_INTERVAL_MS
     );
 }
 
 
 function initialize() {
     getElement(
-        "refresh-status",
+        "refresh-status"
     )?.addEventListener(
         "click",
-        loadStatus,
+        () => {
+            void loadStatus();
+        }
     );
 
     getElement(
-        "retry-status",
+        "retry-status"
     )?.addEventListener(
         "click",
-        loadStatus,
+        () => {
+            void loadStatus();
+        }
     );
 
     document.addEventListener(
@@ -1259,17 +1250,24 @@ function initialize() {
                 document.visibilityState
                 === "visible"
             ) {
-                loadStatus();
+                void loadStatus();
             }
-        },
+        }
     );
 
     startAutomaticRefresh();
-    loadStatus();
+
+    void loadStatus();
 }
 
 
-document.addEventListener(
-    "DOMContentLoaded",
-    initialize,
-);
+if (
+    document.readyState === "loading"
+) {
+    document.addEventListener(
+        "DOMContentLoaded",
+        initialize
+    );
+} else {
+    initialize();
+}

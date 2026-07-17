@@ -1,38 +1,33 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
-
-from aiohttp import web
 
 from collections.abc import AsyncIterator
+from pathlib import Path
+
+import aiohttp_jinja2
+import jinja2
+
+from aiohttp import web
 
 from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
     PlatformConfig,
 )
-from betabox_robotics.launchpad.routes import (
-    setup_camera_routes,
-    setup_diagnostics_routes,
-    setup_drive_routes,
-    setup_events_routes,
-    setup_home_routes,
-    setup_information_routes,
-    setup_jupyter_routes,
-    setup_status_routes,
-    setup_services_routes,
-)
-
 from betabox_robotics.launchpad.drive_controller import (
     ManualDriveController,
 )
-
+from betabox_robotics.launchpad.routes import (
+    setup_routes,
+)
 from betabox_robotics.launchpad.status_cache import (
     StatusCache,
 )
 
 
-STATIC_DIR = Path(__file__).parent / "static"
+PACKAGE_DIR = Path(__file__).parent
+STATIC_DIR = PACKAGE_DIR / "static"
+TEMPLATES_DIR = PACKAGE_DIR / "templates"
 
 
 async def drive_controller_context(
@@ -66,6 +61,22 @@ def create_app(
 ) -> web.Application:
     app = web.Application()
 
+    aiohttp_jinja2.setup(
+        app,
+        loader=jinja2.FileSystemLoader(
+            TEMPLATES_DIR
+        ),
+        autoescape=jinja2.select_autoescape(
+            enabled_extensions=(
+                "html",
+                "htm",
+                "xml",
+            ),
+            default_for_string=True,
+            default=True,
+        ),
+    )
+
     app["platform_config"] = config
 
     app["status_cache"] = StatusCache(
@@ -76,15 +87,7 @@ def create_app(
         drive_controller_context
     )
 
-    setup_home_routes(app)
-    setup_diagnostics_routes(app)
-    setup_status_routes(app)
-    setup_services_routes(app)
-    setup_information_routes(app)
-    setup_events_routes(app)
-    setup_camera_routes(app)
-    setup_jupyter_routes(app)
-    setup_drive_routes(app)
+    setup_routes(app)
 
     app.router.add_static(
         "/static/",
@@ -95,6 +98,7 @@ def create_app(
     app.router.add_get(
         "/api/health",
         health,
+        name="health-api",
     )
 
     return app

@@ -6,6 +6,7 @@ from uuid import uuid4
 
 import aiohttp
 from aiohttp import WSMsgType, web
+import aiohttp_jinja2
 
 from betabox_robotics.config import (
     PlatformConfig,
@@ -32,302 +33,19 @@ def parse_bool(
         f"{name} must be a boolean"
     )
 
+
 async def drive_page(
     request: web.Request,
 ) -> web.Response:
-
-    html = """<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta
-        name="viewport"
-        content="width=device-width, initial-scale=1"
-    >
-    <title>Manual Drive · Betabox Launchpad</title>
-
-    <link
-        rel="stylesheet"
-        href="/static/tokens.css"
-    >
-    <link
-        rel="stylesheet"
-        href="/static/components.css"
-    >
-    <link
-        rel="stylesheet"
-        href="/static/drive.css"
-    >
-</head>
-
-<body class="drive-body">
-    <header class="drive-header">
-        <a class="back-link" href="/">
-            ← Launchpad
-        </a>
-
-        <div>
-            <p class="eyebrow">Robot Control</p>
-            <h1>Manual Drive</h1>
-        </div>
-
-        <div
-            id="drive-connection"
-            class="drive-connection status-connecting"
-        >
-            Connecting…
-        </div>
-    </header>
-
-    <main class="drive-layout">
-        <section class="video-panel">
-            <div
-                class="video-status"
-                aria-live="polite"
-            >
-                Connecting camera…
-            </div>
-            <div
-                id="drive-hud"
-                class="drive-hud"
-                aria-live="polite"
-            >
-                <div class="drive-hud-primary">
-                    <span
-                        id="hud-health-dot"
-                        class="drive-hud-dot hud-unknown"
-                    ></span>
-
-                    <div class="drive-hud-value">
-                        <span>Robot</span>
-                        <strong id="hud-health">
-                            Checking…
-                        </strong>
-                    </div>
-                </div>
-
-                <div class="drive-hud-value">
-                    <span>Battery</span>
-                    <strong id="hud-battery">
-                        --
-                    </strong>
-                </div>
-
-                <div class="drive-hud-value">
-                    <span>Temperature</span>
-                    <strong id="hud-temperature">
-                        --
-                    </strong>
-                </div>
-
-                <div class="drive-hud-value">
-                    <span>Drive</span>
-                    <strong id="hud-drive">
-                        Connecting
-                    </strong>
-                </div>
-
-                <div class="drive-hud-value">
-                    <span>Camera</span>
-                    <strong id="hud-camera">
-                        Connecting
-                    </strong>
-                </div>
-            </div>
-            <video
-                id="drive-video"
-                class="drive-video"
-                autoplay
-                playsinline
-                muted
-            ></video>
-
-            <div class="video-overlay">
-                <span id="drive-owner">
-                    Waiting for control…
-                </span>
-
-                <span id="drive-command">
-                    Stopped
-                </span>
-            </div>
-        </section>
-
-        <section class="control-panel">
-            <div class="speed-control">
-                <div>
-                    <p class="eyebrow">Drive Speed</p>
-                    <strong id="speed-value">40%</strong>
-                </div>
-
-                <input
-                    id="speed"
-                    type="range"
-                    min="0"
-                    max="100"
-                    step="5"
-                    value="40"
-                    aria-label="Drive speed"
-                >
-            </div>
-
-            <div class="joystick-section">
-                <div>
-                    <p class="eyebrow">Drive Control</p>
-                    <p class="joystick-help">
-                        Drag in any direction to drive and steer.
-                    </p>
-                </div>
-
-                <div
-                    id="drive-joystick"
-                    class="joystick"
-                    role="application"
-                    aria-label="Two-axis drive joystick"
-                    tabindex="0"
-                >
-                    <div class="joystick-crosshair" aria-hidden="true"></div>
-
-                    <div
-                        id="drive-stick"
-                        class="joystick-stick"
-                        aria-hidden="true"
-                    ></div>
-
-                    <span class="joystick-label joystick-forward">
-                        Forward
-                    </span>
-
-                    <span class="joystick-label joystick-reverse">
-                        Reverse
-                    </span>
-
-                    <span class="joystick-label joystick-left">
-                        Left
-                    </span>
-
-                    <span class="joystick-label joystick-right">
-                        Right
-                    </span>
-                </div>
-
-                <div class="joystick-readout">
-                    <span>
-                        Throttle
-                        <strong id="throttle-value">0%</strong>
-                    </span>
-
-                    <span>
-                        Steering
-                        <strong id="steering-value">Center</strong>
-                    </span>
-                </div>
-            </div>
-            <div class="camera-control-section">
-                <div class="camera-control-heading">
-                    <div>
-                        <p class="eyebrow">Camera Control</p>
-                        <p class="joystick-help">
-                            Drag to point the camera. It stays in position
-                            when released.
-                        </p>
-                    </div>
-
-                    <button
-                        id="camera-center"
-                        class="camera-center-button"
-                        type="button"
-                    >
-                        Center Camera
-                    </button>
-                </div>
-
-                <div
-                    id="camera-joystick"
-                    class="joystick camera-joystick"
-                    role="application"
-                    aria-label="Camera pan and tilt joystick"
-                    tabindex="0"
-                >
-                    <div
-                        class="joystick-crosshair"
-                        aria-hidden="true"
-                    ></div>
-
-                    <div
-                        id="camera-stick"
-                        class="joystick-stick camera-stick"
-                        aria-hidden="true"
-                    ></div>
-
-                    <span class="joystick-label joystick-forward">
-                        Up
-                    </span>
-
-                    <span class="joystick-label joystick-reverse">
-                        Down
-                    </span>
-
-                    <span class="joystick-label joystick-left">
-                        Left
-                    </span>
-
-                    <span class="joystick-label joystick-right">
-                        Right
-                    </span>
-                </div>
-
-                <div class="joystick-readout">
-                    <span>
-                        Pan
-                        <strong id="camera-pan-value">Center</strong>
-                    </span>
-
-                    <span>
-                        Tilt
-                        <strong id="camera-tilt-value">Center</strong>
-                    </span>
-                </div>
-            </div>
-
-            <button
-                id="emergency-stop"
-                class="emergency-stop"
-                type="button"
-            >
-                <span class="stop-icon">■</span>
-                Emergency Stop
-            </button>
-
-            <div class="keyboard-help">
-                <strong>Keyboard</strong>
-                <span>W / ↑ Forward</span>
-                <span>S / ↓ Reverse</span>
-                <span>A / ← Left</span>
-                <span>D / → Right</span>
-                <span>Space Stop</span>
-            </div>
-
-            <p class="drive-safety">
-                The robot stops automatically if this page disconnects
-                or stops sending control heartbeats.
-            </p>
-        </section>
-    </main>
-
-    <script src="/static/theme.js"></script>
-
-    <script
-        type="module"
-        src="/static/drive.js"
-    ></script>
-</body>
-</html>
-"""
-
-    return web.Response(
-        text=html,
-        content_type="text/html",
+    return aiohttp_jinja2.render_template(
+        "drive.html",
+        request,
+        {
+            "page": {
+                "title": "Manual Drive",
+                "eyebrow": "Robot Control",
+            },
+        },
     )
 
 
@@ -570,24 +288,6 @@ async def handle_drive_message(
         )
 
 
-def setup_drive_routes(
-    app: web.Application,
-) -> None:
-    app.router.add_get(
-        "/drive",
-        drive_page,
-    )
-
-    app.router.add_get(
-        "/ws/drive",
-        drive_websocket,
-    )
-
-    app.router.add_post(
-        "/api/vision/offer",
-        vision_offer_proxy,
-    )
-
 async def vision_offer_proxy(
     request: web.Request,
 ) -> web.Response:
@@ -673,3 +373,25 @@ async def vision_offer_proxy(
             },
             status=502,
         )
+
+
+def setup_drive_routes(
+    app: web.Application,
+) -> None:
+    app.router.add_get(
+        "/drive",
+        drive_page,
+        name="drive-page",
+    )
+
+    app.router.add_get(
+        "/ws/drive",
+        drive_websocket,
+        name="drive-websocket",
+    )
+
+    app.router.add_post(
+        "/api/vision/offer",
+        vision_offer_proxy,
+        name="vision-offer-api",
+    )

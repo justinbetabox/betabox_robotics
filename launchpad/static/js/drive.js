@@ -46,9 +46,6 @@ const DRIVE_SEND_INTERVAL_MS = 50;
 
 let lastDriveSendTime = 0;
 let pendingDriveTimer = null;
-let videoConnection = null;
-
-let driveConnection = null;
 
 const element = (id) => document.getElementById(id);
 
@@ -128,7 +125,6 @@ function determineHealth(status) {
         battery.state === "critical"
         || temperature.state === "critical"
         || throttling.undervoltage_now === true
-        || throttling.throttled_now === true
     ) {
         return {
             label: "Needs Attention",
@@ -139,7 +135,8 @@ function determineHealth(status) {
     if (
         battery.available === false
         || battery.state === "low"
-        || temperature.state === "high"
+        || temperature.state === "warning"
+        || throttling.throttled_now === true
         || vision.service_available === false
     ) {
         return {
@@ -213,14 +210,41 @@ async function refreshPlatformStatus() {
         );
 
         if (!response.ok) {
-            throw new Error(
+            let message =
                 `Status request failed: `
-                + response.status
-            );
+                + `HTTP ${response.status}`;
+
+            try {
+                const payload =
+                    await response.json();
+
+                if (
+                    payload
+                    && typeof payload.message
+                        === "string"
+                ) {
+                    message = payload.message;
+                }
+            } catch {
+                // Keep the HTTP status message.
+            }
+
+            throw new Error(message);
         }
 
         const status =
             await response.json();
+
+        if (
+            !status
+            || typeof status !== "object"
+            || Array.isArray(status)
+        ) {
+            throw new Error(
+                "Status API returned an "
+                + "invalid response."
+            );
+        }
 
         renderPlatformStatus(
             status
@@ -594,7 +618,7 @@ function setConnectionState(
     );
 
     connection.className =
-        `drive-connection ${cssClass}`;
+        `connection-status ${cssClass}`;
 
     connection.textContent = label;
 
@@ -1152,9 +1176,6 @@ class ManualDriveSession {
                 }
             );
 
-        videoConnection =
-            this.videoConnection;
-
         this.videoConnection.connect();
     }
 
@@ -1175,18 +1196,19 @@ class ManualDriveSession {
                 url
             );
 
-        driveConnection =
-            this.driveConnection;
-
         this.driveConnection.connect();
     }
 
     startStatusRefresh() {
-        refreshPlatformStatus();
+        void refreshPlatformStatus();
 
         this.statusTimer =
             window.setInterval(
-                refreshPlatformStatus,
+                () => {
+                    if (!document.hidden) {
+                        void refreshPlatformStatus();
+                    }
+                },
                 STATUS_REFRESH_INTERVAL_MS
             );
     }
@@ -1739,12 +1761,25 @@ function configureSafety() {
 let manualDriveSession = null;
 
 
-document.addEventListener(
-    "DOMContentLoaded",
-    () => {
-        manualDriveSession =
-            new ManualDriveSession();
-
-        manualDriveSession.start();
+function initialize() {
+    if (manualDriveSession !== null) {
+        return;
     }
-);
+
+    manualDriveSession =
+        new ManualDriveSession();
+
+    manualDriveSession.start();
+}
+
+
+if (
+    document.readyState === "loading"
+) {
+    document.addEventListener(
+        "DOMContentLoaded",
+        initialize
+    );
+} else {
+    initialize();
+}

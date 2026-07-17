@@ -1,0 +1,287 @@
+{% extends "interior.html" %}
+
+{% block interior_styles %}
+    <link
+        rel="stylesheet"
+        href="/static/css/status.css"
+    >
+{% endblock %}
+
+{% block header_actions %}
+    <div
+        id="status-connection"
+        class="
+            connection-status
+            status-connecting
+        "
+        role="status"
+        aria-live="polite"
+    >
+        Connecting…
+    </div>
+
+    <button
+        id="refresh-status"
+        class="button button-secondary"
+        type="button"
+    >
+        Refresh
+    </button>
+{% endblock %}
+
+{% block page_content %}
+    <section
+        class="
+            status-section
+            status-overview
+        "
+        aria-labelledby="overview-heading"
+    >
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">
+                    Current Condition
+                </p>
+
+                <h2 id="overview-heading">
+                    Overview
+                </h2>
+            </div>
+
+            <p
+                id="status-updated"
+                class="updated-time"
+            >
+                Waiting for platform status…
+            </p>
+        </div>
+
+        <div class="status-overview-grid">
+            <article
+                class="
+                    status-overview-card
+                    status-overview-card-primary
+                "
+            >
+                <span
+                    id="overall-indicator"
+                    class="
+                        status-dot
+                        status-unknown
+                    "
+                    aria-hidden="true"
+                ></span>
+
+                <div>
+                    <span
+                        class="status-overview-label"
+                    >
+                        Overall Health
+                    </span>
+
+                    <strong id="overall-status">
+                        Checking…
+                    </strong>
+                </div>
+            </article>
+
+            <article class="status-overview-card">
+                <span class="status-overview-label">
+                    Battery
+                </span>
+
+                <strong id="battery-status">
+                    --
+                </strong>
+            </article>
+
+            <article class="status-overview-card">
+                <span class="status-overview-label">
+                    CPU Temperature
+                </span>
+
+                <strong id="temperature-status">
+                    --
+                </strong>
+            </article>
+
+            <article class="status-overview-card">
+                <span class="status-overview-label">
+                    Robot Control
+                </span>
+
+                <strong id="robot-status">
+                    --
+                </strong>
+            </article>
+
+            <article class="status-overview-card">
+                <span class="status-overview-label">
+                    Camera
+                </span>
+
+                <strong id="vision-status">
+                    --
+                </strong>
+            </article>
+
+            <article class="status-overview-card">
+                <span class="status-overview-label">
+                    JupyterHub
+                </span>
+
+                <strong id="jupyter-status">
+                    --
+                </strong>
+            </article>
+
+            <article class="status-overview-card">
+                <span class="status-overview-label">
+                    Services
+                </span>
+
+                <strong id="services-status">
+                    --
+                </strong>
+            </article>
+        </div>
+    </section>
+
+    <section
+        id="attention-section"
+        class="
+            status-section
+            status-attention-section
+        "
+        aria-labelledby="attention-heading"
+        hidden
+    >
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">
+                    Action Required
+                </p>
+
+                <h2 id="attention-heading">
+                    Needs Attention
+                </h2>
+            </div>
+        </div>
+
+        <div
+            id="attention-list"
+            class="attention-list"
+        ></div>
+    </section>
+
+    <section
+        class="status-section"
+        aria-labelledby="hardware-heading"
+    >
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">
+                    Robot
+                </p>
+
+                <h2 id="hardware-heading">
+                    Hardware and Control
+                </h2>
+            </div>
+        </div>
+
+        <div
+            id="hardware-status"
+            class="detail-grid"
+        >
+            <p class="empty-state">
+                Loading hardware information…
+            </p>
+        </div>
+    </section>
+
+    <section
+        class="status-section"
+        aria-labelledby="system-heading"
+    >
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">
+                    Raspberry Pi
+                </p>
+
+                <h2 id="system-heading">
+                    System Resources
+                </h2>
+            </div>
+        </div>
+
+        <div
+            id="system-status"
+            class="detail-grid"
+        >
+            <p class="empty-state">
+                Loading system information…
+            </p>
+        </div>
+    </section>
+
+    <section
+        class="status-section"
+        aria-labelledby="network-heading"
+    >
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">
+                    Connectivity
+                </p>
+
+                <h2 id="network-heading">
+                    Network
+                </h2>
+            </div>
+        </div>
+
+        <div
+            id="network-status"
+            class="detail-grid"
+        >
+            <p class="empty-state">
+                Loading network information…
+            </p>
+        </div>
+    </section>
+
+    <section
+        id="status-error-panel"
+        class="error-panel"
+        aria-labelledby="status-error-heading"
+        hidden
+    >
+        <div>
+            <p class="eyebrow">
+                Status Unavailable
+            </p>
+
+            <h2 id="status-error-heading">
+                Unable to load platform status
+            </h2>
+
+            <p id="status-error-message">
+                The Status API did not respond.
+            </p>
+        </div>
+
+        <button
+            id="retry-status"
+            class="button button-primary"
+            type="button"
+        >
+            Try Again
+        </button>
+    </section>
+{% endblock %}
+
+{% block interior_scripts %}
+    <script src="/static/js/status.js"></script>
+{% endblock %}

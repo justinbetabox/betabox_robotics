@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+
+{% block title %}
+    Betabox Launchpad
+{% endblock %}
+
+{% block page_styles %}
+    <link
+        rel="stylesheet"
+        href="/static/css/home.css"
+    >
+{% endblock %}
+
+{% macro action_card(card) %}
+    <a
+        class="
+            action-card
+            accent-{{ card.accent }}
+        "
+        href="{{ card.href }}"
+    >
+        <span class="action-card-category">
+            {{ card.category }}
+        </span>
+
+        <h3>
+            {{ card.title }}
+        </h3>
+
+        <p>
+            {{ card.description }}
+        </p>
+
+        <div class="action-card-footer">
+            <span>
+                {{ card.action }}
+            </span>
+
+            <span
+                class="action-card-arrow"
+                aria-hidden="true"
+            >
+                →
+            </span>
+        </div>
+    </a>
+{% endmacro %}
+
+{% block body_class %}
+    launchpad-home
+{% endblock %}
+
+{% block body %}
+    <header class="launchpad-header">
+        <div class="launchpad-header-inner">
+            <div class="brand">
+                <p class="eyebrow">Betabox Robotics</p>
+                <h1>Launchpad</h1>
+
+                <div class="robot-identity">
+                    <strong id="hud-hostname">
+                        Connecting…
+                    </strong>
+
+                    <span id="hud-ip"></span>
+                </div>
+            </div>
+
+            <div class="launchpad-header-actions">
+                <button
+                    id="theme-toggle"
+                    class="theme-toggle"
+                    type="button"
+                >
+                    Dark Mode
+                </button>
+
+                <button
+                    id="hud-toggle"
+                    class="hud"
+                    type="button"
+                    aria-expanded="false"
+                    aria-controls="hud-details"
+                >
+                    <span
+                        id="hud-health-dot"
+                        class="
+                            hud-health-dot
+                            status-unknown
+                        "
+                    ></span>
+
+                    <span class="hud-item hud-overall">
+                        <span class="hud-label">
+                            Robot
+                        </span>
+
+                        <strong id="hud-health">
+                            Checking…
+                        </strong>
+                    </span>
+
+                    <span class="hud-item">
+                        <span class="hud-label">
+                            Battery
+                        </span>
+
+                        <strong id="hud-battery">
+                            --
+                        </strong>
+                    </span>
+
+                    <span class="hud-item">
+                        <span class="hud-label">
+                            Control
+                        </span>
+
+                        <strong id="hud-control">
+                            --
+                        </strong>
+                    </span>
+
+                    <span class="hud-item hud-wide">
+                        <span class="hud-label">
+                            Camera
+                        </span>
+
+                        <strong id="hud-camera">
+                            --
+                        </strong>
+                    </span>
+
+                    <span
+                        class="hud-expand-icon"
+                        aria-hidden="true"
+                    >
+                        ▾
+                    </span>
+                </button>
+            </div>
+        </div>
+
+        <section
+            id="hud-details"
+            class="hud-details"
+            hidden
+        >
+            <div class="hud-detail-grid">
+                <div class="hud-detail">
+                    <span>Battery</span>
+                    <strong id="detail-battery">
+                        --
+                    </strong>
+                </div>
+
+                <div class="hud-detail">
+                    <span>CPU Temperature</span>
+                    <strong id="detail-temperature">
+                        --
+                    </strong>
+                </div>
+
+                <div class="hud-detail">
+                    <span>Robot Control</span>
+                    <strong id="detail-control">
+                        --
+                    </strong>
+                </div>
+
+                <div class="hud-detail">
+                    <span>Network</span>
+                    <strong id="detail-network">
+                        --
+                    </strong>
+                </div>
+
+                <div class="hud-detail">
+                    <span>JupyterLab</span>
+                    <strong id="detail-jupyter">
+                        --
+                    </strong>
+                </div>
+
+                <div class="hud-detail">
+                    <span>Memory</span>
+                    <strong id="detail-memory">
+                        --
+                    </strong>
+                </div>
+
+                <div class="hud-detail">
+                    <span>Disk</span>
+                    <strong id="detail-disk">
+                        --
+                    </strong>
+                </div>
+
+                <div class="hud-detail">
+                    <span>Camera</span>
+                    <strong id="detail-camera">
+                        --
+                    </strong>
+                </div>
+
+                <div class="hud-detail">
+                    <span>Vision</span>
+                    <strong id="detail-vision">
+                        --
+                    </strong>
+                </div>
+            </div>
+
+            <p
+                id="hud-updated"
+                class="hud-updated"
+            >
+                Waiting for platform status…
+            </p>
+        </section>
+    </header>
+
+    <main class="page-content">
+        <div class="content-container section-stack">
+            <section>
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">
+                            Learn and Build
+                        </p>
+
+                        <h2 class="section-title">
+                            Use Your Robot
+                        </h2>
+                    </div>
+                </div>
+
+                <div class="card-grid">
+                    {% for card in student_tools %}
+                        {{ action_card(card) }}
+                    {% endfor %}
+                </div>
+            </section>
+
+            <section>
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">
+                            Explore and Troubleshoot
+                        </p>
+
+                        <h2 class="section-title">
+                            Understand Your Robot
+                        </h2>
+                    </div>
+                </div>
+
+                <div class="card-grid">
+                    {% for card in information_tools %}
+                        {{ action_card(card) }}
+                    {% endfor %}
+                </div>
+            </section>
+
+            <section class="admin-preview">
+                <div>
+                    <p class="eyebrow">
+                        Administrator
+                    </p>
+
+                    <h2 class="section-title">
+                        Platform Management
+                    </h2>
+
+                    <p>
+                        Recovery, service controls, and
+                        configuration editing require
+                        administrator access.
+                    </p>
+                </div>
+
+                <button
+                    class="button button-secondary"
+                    type="button"
+                >
+                    Administrator Sign In
+                </button>
+            </section>
+        </div>
+    </main>
+{% endblock %}
+
+{% block page_scripts %}
+    <script src="/static/js/home.js"></script>
+{% endblock %}

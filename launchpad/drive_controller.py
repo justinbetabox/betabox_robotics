@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import asyncio
 import time
-from dataclasses import dataclass
 
+from dataclasses import dataclass
 from math import isfinite
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from betabox_robotics import BetaboxCar
 
 
 @dataclass(frozen=True)
@@ -127,8 +131,8 @@ class ManualDriveController:
 
         self._lock = asyncio.Lock()
         self._hardware_lock = asyncio.Lock()
-        self._control_task: asyncio.Task | None = None
-        self._watchdog_task: asyncio.Task | None = None
+        self._control_task: asyncio.Task[None] | None = None
+        self._watchdog_task: asyncio.Task[None] | None = None
         self._closed = False
 
     @property
@@ -207,13 +211,21 @@ class ManualDriveController:
         )
 
     async def start(self) -> None:
-        if self._watchdog_task is None:
+        self._require_open()
+
+        if (
+            self._watchdog_task is None
+            or self._watchdog_task.done()
+        ):
             self._watchdog_task = asyncio.create_task(
                 self._watchdog_loop(),
                 name="LaunchpadDriveWatchdog",
             )
 
-        if self._control_task is None:
+        if (
+            self._control_task is None
+            or self._control_task.done()
+        ):
             self._control_task = asyncio.create_task(
                 self._control_loop(),
                 name="LaunchpadControlState",
@@ -235,6 +247,8 @@ class ManualDriveController:
 
             self._claiming = client_id
 
+        claim_succeeded = False
+
         try:
             await self._ensure_robot()
             await self._safe_neutralize()
@@ -248,21 +262,33 @@ class ManualDriveController:
                 self._last_applied_state = None
                 self._state_generation += 1
 
+                claim_succeeded = True
+
             return True
 
-        except Exception:
-            async with self._lock:
-                if self._owner == client_id:
-                    self._owner = None
-
-                self._last_heartbeat = 0.0
-
-            raise
-
         finally:
+            robot = None
+
             async with self._lock:
                 if self._claiming == client_id:
                     self._claiming = None
+
+                if not claim_succeeded:
+                    if self._owner == client_id:
+                        self._owner = None
+
+                    self._last_heartbeat = 0.0
+                    self._desired_state = ControlState()
+                    self._last_applied_state = None
+                    self._state_generation += 1
+
+                    robot = self._robot
+                    self._robot = None
+
+            if robot is not None:
+                await self._stop_center_close(
+                    robot
+                )
 
     async def heartbeat(
         self,
@@ -352,22 +378,10 @@ class ManualDriveController:
             task.cancel()
 
         if tasks:
-            results = await asyncio.gather(
+            await asyncio.gather(
                 *tasks,
                 return_exceptions=True,
             )
-
-            for result in results:
-                if isinstance(
-                    result,
-                    asyncio.CancelledError,
-                ):
-                    continue
-
-                if isinstance(result, Exception):
-                    # Cleanup must continue even if a worker
-                    # had already failed.
-                    pass
 
         self._watchdog_task = None
         self._control_task = None
@@ -555,7 +569,9 @@ class ManualDriveController:
                 "manual drive controller is closed"
             )
 
-    def _require_robot(self):
+    def _require_robot(
+        self,
+    ) -> "BetaboxCar":
         if self._robot is None:
             raise DriveControlError(
                 "robot is not started"

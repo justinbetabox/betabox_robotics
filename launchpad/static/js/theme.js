@@ -32,6 +32,24 @@ function storedTheme() {
     return null;
 }
 
+function useSystemTheme() {
+    window.localStorage.removeItem(
+        THEME_STORAGE_KEY
+    );
+
+    delete root.dataset.theme;
+
+    document.dispatchEvent(
+        new CustomEvent(
+            "betabox:theme-changed",
+            {
+                detail: {
+                    theme: systemTheme(),
+                },
+            }
+        )
+    );
+}
 
 function systemTheme() {
     return window.matchMedia(
@@ -174,6 +192,8 @@ function configureThemeToggle() {
 }
 
 window.applyTheme = applyTheme;
+window.useSystemTheme = useSystemTheme;
+
 window.applyLaunchpadPreferences = (
     applyLaunchpadPreferences
 );
@@ -183,15 +203,44 @@ window.betaboxPreferences = {
     applyLaunchpadPreferences,
     activeTheme,
     systemTheme,
+    useSystemTheme,
 };
 
 
-applyTheme(
-    storedTheme()
-    ?? systemTheme()
-);
+const initialTheme = storedTheme();
+
+if (initialTheme !== null) {
+    applyTheme(initialTheme);
+} else {
+    useSystemTheme();
+}
 
 applyLaunchpadPreferences();
+
+const systemThemeQuery = window.matchMedia(
+    "(prefers-color-scheme: dark)"
+);
+
+systemThemeQuery.addEventListener(
+    "change",
+    () => {
+        if (
+            storedTheme() === null
+            && !root.dataset.theme
+        ) {
+            document.dispatchEvent(
+                new CustomEvent(
+                    "betabox:theme-changed",
+                    {
+                        detail: {
+                            theme: systemTheme(),
+                        },
+                    }
+                )
+            );
+        }
+    }
+);
 
 document.addEventListener(
     "DOMContentLoaded",

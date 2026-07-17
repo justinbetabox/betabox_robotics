@@ -2,17 +2,32 @@ from __future__ import annotations
 
 import asyncio
 
+import aiohttp_jinja2
+
 from aiohttp import web
 
 from betabox_robotics.config import (
     PlatformConfig,
 )
-from betabox_robotics.launchpad.routes.information_page import (
-    information_page,
-)
 from betabox_robotics.services.platform_information import (
     collect_platform_information,
 )
+
+
+async def information_page(
+    request: web.Request,
+) -> web.Response:
+    return aiohttp_jinja2.render_template(
+        "information.html",
+        request,
+        {
+            "page": {
+                "title": "Information",
+                "eyebrow": "Robot Details",
+                "main_class": "information-layout",
+            },
+        },
+    )
 
 
 async def information_api(
@@ -37,9 +52,7 @@ async def information_api(
     except Exception as exc:
         return web.json_response(
             {
-                "error": (
-                    "information_unavailable"
-                ),
+                "error": "information_unavailable",
                 "message": (
                     "Unable to collect platform "
                     "information."
@@ -60,9 +73,11 @@ def setup_information_routes(
     app.router.add_get(
         "/information",
         information_page,
+        name="information-page",
     )
 
     app.router.add_get(
         "/api/information",
         information_api,
+        name="information-api",
     )

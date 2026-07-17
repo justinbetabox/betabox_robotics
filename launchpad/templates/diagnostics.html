@@ -1,0 +1,264 @@
+{% extends "interior.html" %}
+
+{% block interior_styles %}
+    <link
+        rel="stylesheet"
+        href="/static/css/diagnostics.css"
+    >
+{% endblock %}
+
+{% block header_actions %}
+    <div
+        id="diagnostics-connection"
+        class="
+            connection-status
+            status-connecting
+        "
+        role="status"
+        aria-live="polite"
+    >
+        Ready
+    </div>
+
+    <button
+        id="run-diagnostics"
+        class="button button-primary"
+        type="button"
+    >
+        Run Diagnostics
+    </button>
+{% endblock %}
+
+{% block page_content %}
+    <section
+        class="
+            diagnostics-section
+            diagnostics-overview
+        "
+        aria-labelledby="overview-heading"
+    >
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">
+                    Current Condition
+                </p>
+
+                <h2 id="overview-heading">
+                    Overview
+                </h2>
+            </div>
+
+            <p
+                id="diagnostics-updated"
+                class="updated-time"
+            >
+                Diagnostics have not run yet.
+            </p>
+        </div>
+
+        <div class="diagnostics-overview-grid">
+            <article
+                class="
+                    diagnostics-overview-card
+                    diagnostics-overview-card-primary
+                "
+            >
+                <span
+                    id="overall-indicator"
+                    class="
+                        status-dot
+                        status-unknown
+                    "
+                    aria-hidden="true"
+                ></span>
+
+                <div>
+                    <span
+                        class="
+                            diagnostics-overview-label
+                        "
+                    >
+                        Overall Result
+                    </span>
+
+                    <strong id="overall-status">
+                        Not Run
+                    </strong>
+                </div>
+            </article>
+
+            <article class="diagnostics-overview-card">
+                <span
+                    class="
+                        diagnostics-overview-label
+                    "
+                >
+                    Healthy
+                </span>
+
+                <strong id="healthy-count">
+                    --
+                </strong>
+            </article>
+
+            <article class="diagnostics-overview-card">
+                <span
+                    class="
+                        diagnostics-overview-label
+                    "
+                >
+                    Warnings
+                </span>
+
+                <strong id="warning-count">
+                    --
+                </strong>
+            </article>
+
+            <article class="diagnostics-overview-card">
+                <span
+                    class="
+                        diagnostics-overview-label
+                    "
+                >
+                    Errors
+                </span>
+
+                <strong id="error-count">
+                    --
+                </strong>
+            </article>
+
+            <article class="diagnostics-overview-card">
+                <span
+                    class="
+                        diagnostics-overview-label
+                    "
+                >
+                    Critical
+                </span>
+
+                <strong id="critical-count">
+                    --
+                </strong>
+            </article>
+
+            <article class="diagnostics-overview-card">
+                <span
+                    class="
+                        diagnostics-overview-label
+                    "
+                >
+                    Total Checks
+                </span>
+
+                <strong id="total-count">
+                    --
+                </strong>
+            </article>
+        </div>
+    </section>
+
+    <section
+        id="issues-section"
+        class="
+            diagnostics-section
+            diagnostics-issues-section
+        "
+        aria-labelledby="issues-heading"
+        hidden
+    >
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">
+                    Review Recommended
+                </p>
+
+                <h2 id="issues-heading">
+                    Issues Found
+                </h2>
+            </div>
+
+            <p
+                id="issues-summary"
+                class="updated-time"
+            ></p>
+        </div>
+
+        <div
+            id="issues-list"
+            class="diagnostics-list"
+        ></div>
+    </section>
+
+    <section
+        class="diagnostics-section"
+        aria-labelledby="results-heading"
+    >
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">
+                    Platform Checks
+                </p>
+
+                <h2 id="results-heading">
+                    Diagnostic Results
+                </h2>
+            </div>
+
+            <p class="updated-time">
+                Safe, read-only platform checks
+            </p>
+        </div>
+
+        <div
+            id="diagnostics-list"
+            class="diagnostics-list"
+        >
+            <div class="diagnostics-empty">
+                <strong>
+                    Ready to check the robot
+                </strong>
+
+                <p>
+                    Run diagnostics to inspect platform
+                    health, hardware, services, networking,
+                    media paths, and classroom tools.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <section
+        id="diagnostics-error-panel"
+        class="error-panel"
+        aria-labelledby="diagnostics-error-heading"
+        hidden
+    >
+        <div>
+            <p class="eyebrow">
+                Diagnostics Unavailable
+            </p>
+
+            <h2 id="diagnostics-error-heading">
+                Unable to run diagnostics
+            </h2>
+
+            <p id="diagnostics-error-message">
+                The Diagnostics API did not respond.
+            </p>
+        </div>
+
+        <button
+            id="retry-diagnostics"
+            class="button button-primary"
+            type="button"
+        >
+            Try Again
+        </button>
+    </section>
+{% endblock %}
+
+{% block interior_scripts %}
+    <script src="/static/js/diagnostics.js"></script>
+{% endblock %}

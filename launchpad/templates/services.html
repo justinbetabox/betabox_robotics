@@ -1,0 +1,225 @@
+{% extends "interior.html" %}
+
+{% block interior_styles %}
+    <link
+        rel="stylesheet"
+        href="/static/css/services.css"
+    >
+{% endblock %}
+
+{% block header_actions %}
+    <div
+        id="services-connection"
+        class="
+            connection-status
+            status-connecting
+        "
+        role="status"
+        aria-live="polite"
+    >
+        Connecting…
+    </div>
+
+    <button
+        id="refresh-services"
+        class="button button-secondary"
+        type="button"
+    >
+        Refresh
+    </button>
+{% endblock %}
+
+{% block page_content %}
+    <section
+        class="services-section services-overview"
+        aria-labelledby="overview-heading"
+    >
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">
+                    Current Condition
+                </p>
+
+                <h2 id="overview-heading">
+                    Overview
+                </h2>
+            </div>
+
+            <p
+                id="services-updated"
+                class="updated-time"
+            >
+                Waiting for service status…
+            </p>
+        </div>
+
+        <div class="services-overview-grid">
+            <article
+                class="
+                    services-overview-card
+                    services-overview-card-primary
+                "
+            >
+                <span
+                    id="overall-indicator"
+                    class="
+                        status-dot
+                        status-unknown
+                    "
+                    aria-hidden="true"
+                ></span>
+
+                <div>
+                    <span class="services-overview-label">
+                        Overall Status
+                    </span>
+
+                    <strong id="overall-status">
+                        Checking…
+                    </strong>
+                </div>
+            </article>
+
+            <article class="services-overview-card">
+                <span class="services-overview-label">
+                    Healthy
+                </span>
+
+                <strong id="healthy-count">
+                    --
+                </strong>
+            </article>
+
+            <article class="services-overview-card">
+                <span class="services-overview-label">
+                    Warnings
+                </span>
+
+                <strong id="warning-count">
+                    --
+                </strong>
+            </article>
+
+            <article class="services-overview-card">
+                <span class="services-overview-label">
+                    Errors
+                </span>
+
+                <strong id="error-count">
+                    --
+                </strong>
+            </article>
+
+            <article class="services-overview-card">
+                <span class="services-overview-label">
+                    Unknown
+                </span>
+
+                <strong id="unknown-count">
+                    --
+                </strong>
+            </article>
+
+            <article class="services-overview-card">
+                <span class="services-overview-label">
+                    Total Services
+                </span>
+
+                <strong id="total-count">
+                    --
+                </strong>
+            </article>
+        </div>
+    </section>
+
+    <section
+        id="attention-section"
+        class="
+            services-section
+            services-attention-section
+        "
+        aria-labelledby="attention-heading"
+        hidden
+    >
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">
+                    Action Required
+                </p>
+
+                <h2 id="attention-heading">
+                    Needs Attention
+                </h2>
+            </div>
+        </div>
+
+        <div
+            id="attention-list"
+            class="attention-list"
+        ></div>
+    </section>
+
+    <section
+        class="services-section"
+        aria-labelledby="services-heading"
+    >
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">
+                    Robot Platform
+                </p>
+
+                <h2 id="services-heading">
+                    Platform Services
+                </h2>
+            </div>
+
+            <p class="updated-time">
+                These services provide the core features
+                of your robot.
+            </p>
+        </div>
+
+        <div
+            id="services-list"
+            class="services-grid"
+        >
+            <p class="empty-state">
+                Loading platform services…
+            </p>
+        </div>
+    </section>
+
+    <section
+        id="services-error-panel"
+        class="error-panel"
+        aria-labelledby="services-error-heading"
+        hidden
+    >
+        <div>
+            <p class="eyebrow">
+                Services Unavailable
+            </p>
+
+            <h2 id="services-error-heading">
+                Unable to load platform services
+            </h2>
+
+            <p id="services-error-message">
+                The Services API did not respond.
+            </p>
+        </div>
+
+        <button
+            id="retry-services"
+            class="button button-primary"
+            type="button"
+        >
+            Try Again
+        </button>
+    </section>
+{% endblock %}
+
+{% block interior_scripts %}
+    <script src="/static/js/services.js"></script>
+{% endblock %}

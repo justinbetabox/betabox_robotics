@@ -1,6 +1,128 @@
+.services-layout {
+    display: grid;
+    gap: 1.5rem;
+
+    width: min(
+        100%,
+        var(--content-width)
+    );
+
+    margin-inline: auto;
+    padding: 1.5rem;
+}
+
+
+/* Sections */
+
+.services-section {
+    display: grid;
+    gap: 1rem;
+}
+
+.services-section h2 {
+    margin: 0;
+
+    color: var(--color-text);
+
+    font-size:
+        clamp(1.35rem, 3vw, 1.8rem);
+
+    line-height: var(--line-height-heading);
+}
+
+
+/* Overview */
+
+.services-overview-grid {
+    display: grid;
+    grid-template-columns:
+        repeat(
+            auto-fit,
+            minmax(145px, 1fr)
+        );
+
+    gap: 0.85rem;
+}
+
+.services-overview-card {
+    display: grid;
+    align-content: center;
+    gap: 0.35rem;
+
+    min-height: 110px;
+    padding: 1rem;
+
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-large);
+
+    background: var(--color-surface-raised);
+
+    box-shadow: var(--shadow-small);
+}
+
+.services-overview-card-primary {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+
+    grid-column:
+        span 2;
+
+    border-color: var(--color-primary);
+
+    background:
+        linear-gradient(
+            135deg,
+            var(--color-primary-subtle),
+            var(--color-surface-raised)
+        );
+}
+
+.services-overview-card-primary
+    .status-dot {
+    width: 0.8rem;
+    height: 0.8rem;
+}
+
+.services-overview-label {
+    color: var(--color-text-soft);
+
+    font-size: 0.72rem;
+    font-weight: 750;
+    letter-spacing: 0.06em;
+    line-height: 1.2;
+    text-transform: uppercase;
+}
+
+.services-overview-card strong {
+    color: var(--color-text);
+
+    font-size: 1.15rem;
+    line-height: 1.25;
+}
+
+
+/* Services */
+
 .services-grid {
     display: grid;
     gap: 1rem;
+}
+
+.service-card {
+    display: grid;
+    gap: 1rem;
+
+    padding: 1.1rem;
+
+    border: 1px solid var(--color-border);
+    border-left:
+        5px solid var(--color-neutral);
+    border-radius: var(--radius-large);
+
+    background: var(--color-surface-raised);
+
+    box-shadow: var(--shadow-small);
 }
 
 .service-card-healthy {
@@ -34,9 +156,7 @@
     min-width: 0;
 }
 
-.service-card-identity .status-indicator {
-    flex: 0 0 auto;
-
+.service-card-identity .status-dot {
     margin-top: 0.3rem;
 }
 
@@ -66,7 +186,6 @@
 
     font-size: var(--font-size-small);
     line-height: 1.4;
-
     overflow-wrap: anywhere;
 }
 
@@ -78,6 +197,9 @@
     line-height: 1.55;
 }
 
+
+/* Service state */
+
 .service-state-badge {
     display: inline-flex;
     align-items: center;
@@ -86,7 +208,6 @@
     flex: 0 0 auto;
 
     min-height: 2rem;
-
     padding: 0.35rem 0.7rem;
 
     border: 1px solid transparent;
@@ -128,6 +249,9 @@
     background: var(--color-surface-subtle);
 }
 
+
+/* Metadata */
+
 .service-meta {
     display: grid;
     grid-template-columns:
@@ -168,6 +292,9 @@
     line-height: 1.35;
 }
 
+
+/* Attention */
+
 .attention-list {
     display: grid;
     gap: 0.75rem;
@@ -186,9 +313,7 @@
     background: var(--brand-pink-light);
 }
 
-.attention-item .status-indicator {
-    flex: 0 0 auto;
-
+.attention-item .status-dot {
     margin-top: 0.25rem;
 }
 
@@ -208,9 +333,26 @@
     line-height: 1.5;
 }
 
+
+/* Compact layout */
+
+html[data-compact-layout="true"]
+    .services-layout {
+    gap: 0.75rem;
+    padding: 0.75rem;
+}
+
+html[data-compact-layout="true"]
+    .services-overview-grid,
 html[data-compact-layout="true"]
     .services-grid {
     gap: 0.55rem;
+}
+
+html[data-compact-layout="true"]
+    .services-overview-card {
+    min-height: 85px;
+    padding: 0.7rem;
 }
 
 html[data-compact-layout="true"]
@@ -234,6 +376,9 @@ html[data-compact-layout="true"]
     padding: 0.65rem;
 }
 
+
+/* Responsive behavior */
+
 @media (min-width: 760px) {
     .services-grid {
         grid-template-columns:
@@ -245,6 +390,14 @@ html[data-compact-layout="true"]
 }
 
 @media (max-width: 720px) {
+    .services-layout {
+        padding: 1rem;
+    }
+
+    .services-overview-card-primary {
+        grid-column: auto;
+    }
+
     .service-card-header {
         align-items: stretch;
         flex-direction: column;

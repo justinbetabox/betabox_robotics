@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import asyncio
 
+import aiohttp_jinja2
+
 from aiohttp import web
 
 from betabox_robotics.config import (
     PlatformConfig,
-)
-from betabox_robotics.launchpad.routes.events_page import (
-    events_page,
 )
 from betabox_robotics.services.events import (
     collect_event_report,
@@ -63,6 +62,22 @@ def parse_optional_filter(
     value = value.strip()
 
     return value or None
+
+
+async def events_page(
+    request: web.Request,
+) -> web.Response:
+    return aiohttp_jinja2.render_template(
+        "events.html",
+        request,
+        {
+            "page": {
+                "title": "Events",
+                "eyebrow": "Platform Activity",
+                "main_class": "events-layout",
+            },
+        },
+    )
 
 
 async def events_api(
@@ -155,9 +170,11 @@ def setup_events_routes(
     app.router.add_get(
         "/events",
         events_page,
+        name="events-page",
     )
 
     app.router.add_get(
         "/api/events",
         events_api,
+        name="events-api",
     )

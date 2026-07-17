@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import time
 
 from dataclasses import dataclass
 from math import isfinite
 from typing import TYPE_CHECKING
 
-import asyncio
 
 if TYPE_CHECKING:
     from betabox_robotics import BetaboxCar

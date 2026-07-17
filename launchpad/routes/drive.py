@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import json
 
 from uuid import uuid4
 
 import aiohttp
 import aiohttp_jinja2
-import asyncio
 
 from aiohttp import WSMsgType, web
 

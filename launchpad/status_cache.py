@@ -1,11 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import time
 from typing import Callable
 
 from dataclasses import dataclass, field
-
-import asyncio
 
 
 Payload = dict[str, object]

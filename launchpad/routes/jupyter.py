@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import subprocess
 
 import aiohttp_jinja2
-import asyncio
 
 from aiohttp import web
 

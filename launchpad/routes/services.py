@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-import aiohttp_jinja2
 import asyncio
+
+import aiohttp_jinja2
 
 from aiohttp import web
 

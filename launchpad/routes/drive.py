@@ -1,25 +1,29 @@
 from __future__ import annotations
 
-import asyncio
 import json
+
 from uuid import uuid4
 
 import aiohttp
-from aiohttp import WSMsgType, web
 import aiohttp_jinja2
+import asyncio
+
+from aiohttp import WSMsgType, web
 
 from betabox_robotics.config import (
     PlatformConfig,
 )
+
+from betabox_robotics.exceptions import (
+    RobotBusyError,
+)
+
 from betabox_robotics.launchpad.drive_controller import (
     ControlState,
     DriveControlError,
     ManualDriveController,
 )
 
-from betabox_robotics.exceptions import (
-    RobotBusyError,
-)
 
 def parse_bool(
     value: object,

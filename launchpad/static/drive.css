@@ -169,7 +169,6 @@
     overflow: hidden;
 }
 
-
 /* Video */
 
 .video-panel {
@@ -840,6 +839,50 @@
     line-height: 1.35;
 }
 
+html[data-compact-layout="true"]
+    .drive-header {
+    padding-top: 0.55rem;
+    padding-bottom: 0.55rem;
+}
+
+html[data-compact-layout="true"]
+    .drive-layout {
+    gap: 0.5rem;
+    padding: 0.5rem;
+}
+
+html[data-compact-layout="true"]
+    .control-panel {
+    gap: 0.4rem;
+    padding: 0.6rem;
+}
+
+html[data-compact-layout="true"]
+    .drive-hud {
+    gap: 0.55rem;
+    padding: 0.4rem 0.55rem;
+}
+
+html[data-compact-layout="true"]
+    .video-overlay {
+    right: 0.5rem;
+    bottom: 0.5rem;
+    left: 0.5rem;
+
+    padding: 0.45rem 0.6rem;
+}
+
+html[data-compact-layout="true"]
+    .keyboard-help {
+    padding: 0.4rem 0.55rem;
+}
+
+html[data-compact-layout="true"]
+    .joystick-section,
+html[data-compact-layout="true"]
+    .camera-control-section {
+    gap: 0.35rem;
+}
 
 /* Short desktop windows */
 

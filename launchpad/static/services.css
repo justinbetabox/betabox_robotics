@@ -3,21 +3,6 @@
     gap: 1rem;
 }
 
-.service-card {
-    display: grid;
-    gap: 1rem;
-
-    padding: 1.25rem;
-
-    border: 1px solid var(--color-border);
-    border-left-width: 0.35rem;
-    border-radius: var(--radius-large);
-
-    background: var(--color-surface-raised);
-
-    box-shadow: var(--shadow-small);
-}
-
 .service-card-healthy {
     border-left-color: var(--color-healthy);
 }
@@ -221,6 +206,32 @@
     color: var(--color-text-muted);
 
     line-height: 1.5;
+}
+
+html[data-compact-layout="true"]
+    .services-grid {
+    gap: 0.55rem;
+}
+
+html[data-compact-layout="true"]
+    .service-card {
+    gap: 0.55rem;
+    padding: 0.75rem;
+}
+
+html[data-compact-layout="true"]
+    .service-meta {
+    gap: 0.4rem;
+}
+
+html[data-compact-layout="true"]
+    .service-meta-item {
+    padding: 0.5rem;
+}
+
+html[data-compact-layout="true"]
+    .attention-item {
+    padding: 0.65rem;
 }
 
 @media (min-width: 760px) {

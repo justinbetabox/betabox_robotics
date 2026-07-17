@@ -89,7 +89,6 @@
     font-weight: 850;
 }
 
-
 /* Main camera area */
 
 .camera-main {
@@ -191,6 +190,16 @@
     border-color: var(--brand-pink);
 }
 
+html[data-compact-layout="true"]
+    .camera-header {
+    padding-top: 0.55rem;
+    padding-bottom: 0.55rem;
+}
+
+html[data-compact-layout="true"]
+    .camera-main {
+    padding: 0.45rem;
+}
 
 /* Short browser windows */
 

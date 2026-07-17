@@ -168,6 +168,11 @@ video {
     gap: 1rem;
 }
 
+html[data-larger-text="true"] {
+    font-size: 112.5%;
+}
+
+
 .action-card {
     --card-accent: var(--brand-blue);
 
@@ -439,6 +444,105 @@ video {
     border-left-color: var(--brand-green);
 }
 
+/* ========================================
+   Global Launchpad preferences
+   ======================================== */
+
+html[data-larger-text="true"] {
+    font-size: 112.5%;
+}
+
+html[data-reduced-motion="true"] *,
+html[data-reduced-motion="true"] *::before,
+html[data-reduced-motion="true"] *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+}
+
+
+/* Global compact layout */
+
+html[data-compact-layout="true"]
+    .page-content {
+    padding-block: 1rem;
+}
+
+html[data-compact-layout="true"]
+    .section-stack {
+    gap: 1rem;
+}
+
+html[data-compact-layout="true"]
+    .section-heading {
+    gap: 0.6rem;
+    margin-bottom: 0.6rem;
+}
+
+html[data-compact-layout="true"]
+    .card-grid {
+    gap: 0.6rem;
+}
+
+html[data-compact-layout="true"]
+    .action-card {
+    min-height: 150px;
+    gap: 0.45rem;
+    padding: 0.85rem;
+}
+
+html[data-compact-layout="true"]
+    .action-card h3 {
+    font-size: 1.2rem;
+}
+
+html[data-compact-layout="true"]
+    .action-card p {
+    line-height: 1.4;
+}
+
+html[data-compact-layout="true"]
+    .action-card-footer {
+    padding-top: 0.25rem;
+}
+
+html[data-compact-layout="true"]
+    .panel {
+    padding: 0.85rem;
+}
+
+html[data-compact-layout="true"]
+    .status-layout {
+    gap: 0.75rem;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+}
+
+html[data-compact-layout="true"]
+    .status-overview,
+html[data-compact-layout="true"]
+    .status-section,
+html[data-compact-layout="true"]
+    .status-error-panel {
+    padding: 0.8rem;
+}
+
+html[data-compact-layout="true"]
+    .overview-grid,
+html[data-compact-layout="true"]
+    .detail-grid,
+html[data-compact-layout="true"]
+    .attention-list {
+    gap: 0.55rem;
+}
+
+html[data-compact-layout="true"]
+    .overview-card {
+    min-height: auto;
+    padding: 0.65rem;
+}
+
 
 /* Responsive behavior */
 
@@ -448,7 +552,7 @@ video {
         flex-direction: column;
     }
 
-    .card-grid {
+-grid {
         grid-template-columns: 1fr;
     }
 

@@ -151,15 +151,14 @@ async def home(
                 action="View services",
             ),
             action_card(
-                title="Configuration",
+                title="Information",
                 description=(
-                    "Explore the robot and platform "
-                    "configuration safely."
+                    "View robot information and adjust your Launchpad preferences."
                 ),
-                href="/configuration",
+                href="/information",
                 category="Learn",
                 accent="green",
-                action="View configuration",
+                action="View information",
             ),
             action_card(
                 title="Events",

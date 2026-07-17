@@ -245,6 +245,44 @@
     border-left-color: var(--color-critical);
 }
 
+html[data-compact-layout="true"]
+    .diagnostics-list {
+    gap: 0.5rem;
+}
+
+html[data-compact-layout="true"]
+    .diagnosis-card {
+    gap: 0.5rem;
+    padding: 0.65rem;
+}
+
+html[data-compact-layout="true"]
+    .diagnosis-card-compact {
+    gap: 0.4rem;
+    padding: 0.55rem 0.65rem;
+}
+
+html[data-compact-layout="true"]
+    .diagnosis-header {
+    gap: 0.55rem;
+}
+
+html[data-compact-layout="true"]
+    .diagnosis-details summary {
+    padding-top: 0.45rem;
+}
+
+html[data-compact-layout="true"]
+    .diagnosis-detail-grid {
+    gap: 0.45rem;
+    padding-top: 0.5rem;
+}
+
+html[data-compact-layout="true"]
+    .diagnosis-detail {
+    padding: 0.55rem;
+}
+
 @media (min-width: 800px) {
     .diagnosis-detail-grid {
         grid-template-columns:

@@ -3,6 +3,15 @@
 const THEME_STORAGE_KEY =
     "betabox-launchpad-theme";
 
+const REDUCED_MOTION_STORAGE_KEY =
+    "betabox-launchpad-reduced-motion";
+
+const LARGER_TEXT_STORAGE_KEY =
+    "betabox-launchpad-larger-text";
+
+const COMPACT_LAYOUT_STORAGE_KEY =
+    "betabox-launchpad-compact-layout";
+
 const root =
     document.documentElement;
 
@@ -38,6 +47,43 @@ function activeTheme() {
         root.dataset.theme
         || storedTheme()
         || systemTheme()
+    );
+}
+
+
+function storedBooleanPreference(
+    key
+) {
+    return (
+        window.localStorage.getItem(key)
+        === "true"
+    );
+}
+
+
+function applyLaunchpadPreferences() {
+    root.dataset.reducedMotion = (
+        storedBooleanPreference(
+            REDUCED_MOTION_STORAGE_KEY
+        )
+            ? "true"
+            : "false"
+    );
+
+    root.dataset.largerText = (
+        storedBooleanPreference(
+            LARGER_TEXT_STORAGE_KEY
+        )
+            ? "true"
+            : "false"
+    );
+
+    root.dataset.compactLayout = (
+        storedBooleanPreference(
+            COMPACT_LAYOUT_STORAGE_KEY
+        )
+            ? "true"
+            : "false"
     );
 }
 
@@ -127,12 +173,25 @@ function configureThemeToggle() {
     updateLabel();
 }
 
+window.applyTheme = applyTheme;
+window.applyLaunchpadPreferences = (
+    applyLaunchpadPreferences
+);
+
+window.betaboxPreferences = {
+    applyTheme,
+    applyLaunchpadPreferences,
+    activeTheme,
+    systemTheme,
+};
+
 
 applyTheme(
     storedTheme()
     ?? systemTheme()
 );
 
+applyLaunchpadPreferences();
 
 document.addEventListener(
     "DOMContentLoaded",

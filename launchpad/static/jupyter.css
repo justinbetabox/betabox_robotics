@@ -321,6 +321,36 @@
     background: var(--color-critical);
 }
 
+html[data-compact-layout="true"]
+    .jupyter-main {
+    gap: 0.65rem;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+}
+
+html[data-compact-layout="true"]
+    .jupyter-card,
+html[data-compact-layout="true"]
+    .ownership-card {
+    padding: 0.85rem;
+}
+
+html[data-compact-layout="true"]
+    .jupyter-details {
+    gap: 0.4rem;
+    margin-top: 0.75rem;
+    margin-bottom: 0.75rem;
+}
+
+html[data-compact-layout="true"]
+    .jupyter-details div {
+    padding: 0.55rem;
+}
+
+html[data-compact-layout="true"]
+    .ownership-card pre {
+    padding: 0.65rem;
+}
 
 /* Phones and small tablets */
 

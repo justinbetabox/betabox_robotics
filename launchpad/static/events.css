@@ -300,6 +300,40 @@
     white-space: pre-wrap;
 }
 
+html[data-compact-layout="true"]
+    .events-filter-form {
+    gap: 0.55rem;
+}
+
+html[data-compact-layout="true"]
+    .events-list {
+    gap: 0.5rem;
+}
+
+html[data-compact-layout="true"]
+    .event-content {
+    gap: 0.5rem;
+    padding: 0.65rem 0.75rem;
+}
+
+html[data-compact-layout="true"]
+    .event-details summary {
+    padding-top: 0.45rem;
+}
+
+html[data-compact-layout="true"]
+    .event-detail-content {
+    gap: 0.45rem;
+    padding-top: 0.5rem;
+}
+
+html[data-compact-layout="true"]
+    .event-detail-row,
+html[data-compact-layout="true"]
+    .event-detail-block {
+    padding: 0.55rem;
+}
+
 @media (min-width: 760px) {
     .events-filter-form {
         grid-template-columns:

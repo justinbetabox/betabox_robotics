@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import shutil
 import socket
-from statistics import harmonic_mean
 import subprocess
 from dataclasses import asdict, dataclass
 from typing import Any

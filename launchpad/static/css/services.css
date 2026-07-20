@@ -61,12 +61,12 @@
 }
 
 .services-overview-card-primary {
-    display: flex;
-    align-items: center;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: start;
     gap: 0.85rem;
 
-    grid-column:
-        span 2;
+    grid-column: span 2;
 
     border-color: var(--color-primary);
 
@@ -76,6 +76,12 @@
             var(--color-primary-subtle),
             var(--color-surface-raised)
         );
+}
+
+.services-overview-card-primary > div {
+    display: grid;
+    gap: 0.3rem;
+    align-content: start;
 }
 
 .services-overview-card-primary
@@ -97,7 +103,7 @@
 .services-overview-card strong {
     color: var(--color-text);
 
-    font-size: 1.15rem;
+    font-size: 1.35rem;
     line-height: 1.25;
 }
 

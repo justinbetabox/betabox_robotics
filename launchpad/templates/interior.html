@@ -39,10 +39,12 @@
             </h1>
         </div>
 
+        {% block header_actions_wrapper %}
         <div class="interior-header-actions">
             {% block header_actions %}
             {% endblock %}
         </div>
+        {% endblock %}
     </header>
 
     <main class="{{ page.main_class }}">

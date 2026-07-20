@@ -1,5 +1,33 @@
 const MEDIA_API_URL = "/api/media";
 
+const MEDIA_UPLOAD_API_URL = (
+    "/api/media/upload"
+);
+
+const MAX_UPLOAD_FILES = 10;
+
+const MAX_UPLOAD_FILE_SIZE = (
+    25
+    * 1024
+    * 1024
+);
+
+const UPLOAD_EXTENSIONS = new Set([
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".webp",
+    ".mp3",
+    ".wav",
+    ".ogg",
+    ".m4a",
+]);
+
+const VIDEO_EXTENSIONS = new Set([
+    ".mp4",
+    ".webm",
+]);
+
 const CATEGORY_LABELS = {
     pictures: "Picture",
     videos: "Video",
@@ -22,6 +50,7 @@ const state = {
     previewFile: null,
     deleteFile: null,
     loading: false,
+    uploading: false,
 };
 
 
@@ -155,6 +184,48 @@ const elements = {
     deleteConfirmButton: document.querySelector(
         "#media-delete-confirm"
     ),
+    uploadOpenButton: document.querySelector(
+        "#media-upload-open"
+    ),
+    uploadDialog: document.querySelector(
+        "#media-upload-dialog"
+    ),
+    uploadForm: document.querySelector(
+        "#media-upload-form"
+    ),
+    uploadCloseButton: document.querySelector(
+        "#media-upload-close"
+    ),
+    uploadCancelButton: document.querySelector(
+        "#media-upload-cancel"
+    ),
+    uploadConfirmButton: document.querySelector(
+        "#media-upload-confirm"
+    ),
+    uploadInput: document.querySelector(
+        "#media-upload-input"
+    ),
+    uploadDropzone: document.querySelector(
+        "#media-upload-dropzone"
+    ),
+    uploadSelection: document.querySelector(
+        "#media-upload-selection"
+    ),
+    uploadSelectionCount: document.querySelector(
+        "#media-upload-selection-count"
+    ),
+    uploadFileList: document.querySelector(
+        "#media-upload-file-list"
+    ),
+    uploadClearButton: document.querySelector(
+        "#media-upload-clear"
+    ),
+    uploadResult: document.querySelector(
+        "#media-upload-result"
+    ),
+    uploadError: document.querySelector(
+        "#media-upload-error"
+    ),
 };
 
 
@@ -167,6 +238,7 @@ function assertRequiredElements() {
         emptyState: elements.emptyState,
         previewDialog: elements.previewDialog,
         deleteDialog: elements.deleteDialog,
+        uploadDialog: elements.uploadDialog,
     };
 
     for (
@@ -1537,6 +1609,485 @@ function safeCount(value) {
     return Math.floor(number);
 }
 
+function filenameExtension(
+    filename
+) {
+    const index = filename.lastIndexOf(".");
+
+    if (
+        index < 0
+        || index === filename.length - 1
+    ) {
+        return "";
+    }
+
+    return filename
+        .slice(index)
+        .toLocaleLowerCase();
+}
+
+
+function validateUploadFile(
+    file
+) {
+    const extension = filenameExtension(
+        file.name
+    );
+
+    if (VIDEO_EXTENSIONS.has(extension)) {
+        return "Videos cannot be uploaded.";
+    }
+
+    if (!UPLOAD_EXTENSIONS.has(extension)) {
+        return (
+            "This file is not a supported "
+            + "picture or sound."
+        );
+    }
+
+    if (file.size === 0) {
+        return "The file is empty.";
+    }
+
+    if (
+        file.size
+        > MAX_UPLOAD_FILE_SIZE
+    ) {
+        return (
+            "The file exceeds the 25 MB "
+            + "upload limit."
+        );
+    }
+
+    return null;
+}
+
+
+function selectedUploadFiles() {
+    return Array.from(
+        elements.uploadInput?.files ?? []
+    );
+}
+
+
+function setUploadError(
+    message
+) {
+    if (!elements.uploadError) {
+        return;
+    }
+
+    elements.uploadError.textContent = (
+        message
+    );
+
+    elements.uploadError.hidden = !message;
+}
+
+
+function clearUploadResult() {
+    if (elements.uploadResult) {
+        elements.uploadResult.textContent = "";
+        elements.uploadResult.hidden = true;
+    }
+
+    setUploadError("");
+}
+
+
+function updateUploadSelection() {
+    const files = selectedUploadFiles();
+
+    clearUploadResult();
+
+    if (
+        !elements.uploadSelection
+        || !elements.uploadFileList
+    ) {
+        return;
+    }
+
+    elements.uploadFileList.replaceChildren();
+
+    if (files.length === 0) {
+        elements.uploadSelection.hidden = true;
+
+        if (elements.uploadConfirmButton) {
+            elements.uploadConfirmButton.disabled = true;
+        }
+
+        return;
+    }
+
+    elements.uploadSelection.hidden = false;
+
+    if (elements.uploadSelectionCount) {
+        elements.uploadSelectionCount.textContent = (
+            `${files.length} `
+            + pluralize(
+                files.length,
+                "file selected",
+                "files selected"
+            )
+        );
+    }
+
+    let hasInvalidFile = (
+        files.length > MAX_UPLOAD_FILES
+    );
+
+    for (const file of files) {
+        const error = validateUploadFile(file);
+
+        if (error) {
+            hasInvalidFile = true;
+        }
+
+        const item = document.createElement("li");
+
+        item.className = (
+            error
+                ? "media-upload-file is-invalid"
+                : "media-upload-file is-valid"
+        );
+
+        const details = document.createElement(
+            "div"
+        );
+
+        const name = document.createElement(
+            "strong"
+        );
+
+        name.textContent = file.name;
+
+        const metadata = document.createElement(
+            "span"
+        );
+
+        metadata.textContent = (
+            error
+                ? error
+                : formatBytes(file.size)
+        );
+
+        details.append(
+            name,
+            metadata
+        );
+
+        const indicator = document.createElement(
+            "span"
+        );
+
+        indicator.className = (
+            "media-upload-file-status"
+        );
+
+        indicator.textContent = (
+            error
+                ? "×"
+                : "✓"
+        );
+
+        item.append(
+            details,
+            indicator
+        );
+
+        elements.uploadFileList.append(item);
+    }
+
+    if (files.length > MAX_UPLOAD_FILES) {
+        setUploadError(
+            "Only 10 files can be uploaded at once."
+        );
+    }
+
+    if (elements.uploadConfirmButton) {
+        elements.uploadConfirmButton.disabled = (
+            hasInvalidFile
+            || state.uploading
+        );
+    }
+}
+
+
+function resetUploadDialog() {
+    state.uploading = false;
+
+    if (elements.uploadForm) {
+        elements.uploadForm.reset();
+    }
+
+    if (elements.uploadConfirmButton) {
+        elements.uploadConfirmButton.disabled = true;
+        elements.uploadConfirmButton.textContent = (
+            "Upload Files"
+        );
+    }
+
+    if (elements.uploadCancelButton) {
+        elements.uploadCancelButton.disabled = false;
+    }
+
+    if (elements.uploadCloseButton) {
+        elements.uploadCloseButton.disabled = false;
+    }
+
+    if (elements.uploadSelection) {
+        elements.uploadSelection.hidden = true;
+    }
+
+    if (elements.uploadFileList) {
+        elements.uploadFileList.replaceChildren();
+    }
+
+    clearUploadResult();
+}
+
+
+function openUploadDialog() {
+    resetUploadDialog();
+
+    if (
+        typeof elements.uploadDialog
+            .showModal
+        === "function"
+    ) {
+        elements.uploadDialog.showModal();
+    }
+}
+
+
+function closeUploadDialog() {
+    if (
+        state.uploading
+        || !elements.uploadDialog
+    ) {
+        return;
+    }
+
+    if (elements.uploadDialog.open) {
+        elements.uploadDialog.close();
+    }
+
+    resetUploadDialog();
+}
+
+async function uploadMedia(
+    event
+) {
+    event.preventDefault();
+
+    if (state.uploading) {
+        return;
+    }
+
+    const files = selectedUploadFiles();
+
+    if (files.length === 0) {
+        setUploadError(
+            "Choose at least one file."
+        );
+
+        return;
+    }
+
+    if (files.length > MAX_UPLOAD_FILES) {
+        setUploadError(
+            "Only 10 files can be uploaded at once."
+        );
+
+        return;
+    }
+
+    for (const file of files) {
+        const error = validateUploadFile(file);
+
+        if (error) {
+            setUploadError(
+                `${file.name}: ${error}`
+            );
+
+            return;
+        }
+    }
+
+    const formData = new FormData();
+
+    for (const file of files) {
+        formData.append(
+            "files",
+            file,
+            file.name
+        );
+    }
+
+    state.uploading = true;
+    setUploadError("");
+
+    if (elements.uploadConfirmButton) {
+        elements.uploadConfirmButton.disabled = true;
+        elements.uploadConfirmButton.textContent = (
+            "Uploading…"
+        );
+    }
+
+    if (elements.uploadCancelButton) {
+        elements.uploadCancelButton.disabled = true;
+    }
+
+    if (elements.uploadCloseButton) {
+        elements.uploadCloseButton.disabled = true;
+    }
+
+    try {
+        const response = await fetch(
+            MEDIA_UPLOAD_API_URL,
+            {
+                method: "POST",
+                headers: {
+                    Accept: "application/json",
+                },
+                body: formData,
+            }
+        );
+
+        const payload = await response.json();
+
+        const uploaded = (
+            Array.isArray(payload.uploaded)
+                ? payload.uploaded
+                : []
+        );
+
+        const failed = (
+            Array.isArray(payload.failed)
+                ? payload.failed
+                : []
+        );
+
+        if (
+            !response.ok
+            && uploaded.length === 0
+        ) {
+            const failureMessage = (
+                failed.length > 0
+                    ? failed
+                        .map(
+                            (failure) => (
+                                `${failure.name}: `
+                                + failure.reason
+                            )
+                        )
+                        .join(" ")
+                    : (
+                        payload.reason
+                        || payload.error
+                        || "The files could not be uploaded."
+                    )
+            );
+
+            throw new Error(
+                failureMessage
+            );
+        }
+
+        if (elements.uploadResult) {
+            const resultParts = [];
+
+            if (uploaded.length > 0) {
+                resultParts.push(
+                    `Uploaded ${uploaded.length} `
+                    + pluralize(
+                        uploaded.length,
+                        "file",
+                        "files"
+                    )
+                    + "."
+                );
+            }
+
+            if (failed.length > 0) {
+                resultParts.push(
+                    `${failed.length} `
+                    + pluralize(
+                        failed.length,
+                        "file failed",
+                        "files failed"
+                    )
+                    + "."
+                );
+            }
+
+            elements.uploadResult.textContent = (
+                resultParts.join(" ")
+            );
+
+            elements.uploadResult.hidden = false;
+        }
+
+        announce(
+            `Uploaded ${uploaded.length} `
+            + pluralize(
+                uploaded.length,
+                "media file",
+                "media files"
+            )
+            + "."
+        );
+
+        await loadMedia({
+            announceResult: false,
+        });
+
+        if (failed.length === 0) {
+            window.setTimeout(
+                closeUploadDialog,
+                500
+            );
+        } else {
+            setUploadError(
+                failed
+                    .map(
+                        (failure) => (
+                            `${failure.name}: `
+                            + failure.reason
+                        )
+                    )
+                    .join(" ")
+            );
+        }
+    } catch (error) {
+        setUploadError(
+            errorMessage(
+                error,
+                "The files could not be uploaded."
+            )
+        );
+    } finally {
+        state.uploading = false;
+
+        if (elements.uploadConfirmButton) {
+            elements.uploadConfirmButton.textContent = (
+                "Upload Files"
+            );
+
+            elements.uploadConfirmButton.disabled = (
+                selectedUploadFiles().length === 0
+            );
+        }
+
+        if (elements.uploadCancelButton) {
+            elements.uploadCancelButton.disabled = false;
+        }
+
+        if (elements.uploadCloseButton) {
+            elements.uploadCloseButton.disabled = false;
+        }
+    }
+}
 
 async function loadMedia({
     announceResult = true,
@@ -1864,6 +2415,71 @@ function bindEvents() {
     elements.deleteConfirmButton?.addEventListener(
         "click",
         deleteSelectedFile
+    );
+
+    elements.uploadOpenButton?.addEventListener(
+        "click",
+        openUploadDialog
+    );
+
+    elements.uploadCloseButton?.addEventListener(
+        "click",
+        closeUploadDialog
+    );
+
+    elements.uploadCancelButton?.addEventListener(
+        "click",
+        closeUploadDialog
+    );
+
+    elements.uploadInput?.addEventListener(
+        "change",
+        updateUploadSelection
+    );
+
+    elements.uploadClearButton?.addEventListener(
+        "click",
+        () => {
+            if (elements.uploadInput) {
+                elements.uploadInput.value = "";
+            }
+
+            updateUploadSelection();
+        }
+    );
+
+    elements.uploadForm?.addEventListener(
+        "submit",
+        uploadMedia
+    );
+
+    elements.uploadDialog.addEventListener(
+        "cancel",
+        (event) => {
+            if (state.uploading) {
+                event.preventDefault();
+                return;
+            }
+
+            resetUploadDialog();
+        }
+    );
+
+    elements.uploadDialog.addEventListener(
+        "close",
+        resetUploadDialog
+    );
+
+    elements.uploadDialog.addEventListener(
+        "click",
+        (event) => {
+            if (
+                event.target
+                === elements.uploadDialog
+            ) {
+                closeUploadDialog();
+            }
+        }
     );
 }
 

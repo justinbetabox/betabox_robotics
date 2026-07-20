@@ -14,10 +14,8 @@ Introduction
 ========================================================= */
 
 .media-introduction {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1.5rem;
+    display: grid;
+    gap: 0.5rem;
 }
 
 .media-introduction .section-title {
@@ -664,6 +662,219 @@ List mode
 Dialogs
 ========================================================= */
 
+/* Upload dialog */
+
+.media-upload-dialog {
+    width:
+        min(
+            36rem,
+            calc(100% - 2rem)
+        );
+}
+
+.media-upload-content {
+    padding: 1.1rem;
+
+    display: grid;
+    gap: 1rem;
+}
+
+.media-upload-dropzone {
+    min-height: 12rem;
+    padding: 1.5rem;
+
+    display: grid;
+    place-items: center;
+    align-content: center;
+    gap: 0.45rem;
+
+    color: var(--color-text-muted);
+    text-align: center;
+
+    background: var(--color-surface-inset);
+    border: 2px dashed var(--color-border-strong);
+    border-radius: var(--radius-large);
+
+    cursor: pointer;
+
+    transition:
+        color var(--transition-fast),
+        background-color var(--transition-fast),
+        border-color var(--transition-fast);
+}
+
+.media-upload-dropzone:hover {
+    color: var(--color-text);
+
+    background: var(--color-surface-subtle);
+    border-color: var(--color-primary);
+}
+
+.media-upload-dropzone:focus-within {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+
+.media-upload-icon {
+    width: 3rem;
+    height: 3rem;
+
+    display: grid;
+    place-items: center;
+
+    color: var(--color-primary);
+
+    background: var(--color-primary-subtle);
+    border-radius: 50%;
+
+    font-size: 1.4rem;
+    font-weight: 800;
+}
+
+.media-upload-dropzone strong {
+    color: var(--color-text);
+
+    font-size: 1rem;
+}
+
+.media-upload-formats {
+    color: var(--color-text-soft);
+
+    font-size: var(--font-size-small);
+}
+
+.media-upload-dropzone input {
+    position: absolute;
+
+    width: 1px;
+    height: 1px;
+
+    overflow: hidden;
+
+    clip: rect(0 0 0 0);
+    clip-path: inset(50%);
+
+    white-space: nowrap;
+}
+
+.media-upload-selection {
+    display: grid;
+    gap: 0.65rem;
+}
+
+.media-upload-selection-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+
+.media-upload-selection-header strong {
+    color: var(--color-text);
+}
+
+.media-upload-clear {
+    padding: 0;
+
+    color: var(--color-primary);
+
+    background: transparent;
+    border: 0;
+
+    cursor: pointer;
+
+    font: inherit;
+    font-size: var(--font-size-small);
+    font-weight: 700;
+}
+
+.media-upload-clear:hover {
+    text-decoration: underline;
+}
+
+.media-upload-file-list {
+    max-height: 14rem;
+    margin: 0;
+    padding: 0;
+
+    overflow: auto;
+
+    display: grid;
+    gap: 0.5rem;
+
+    list-style: none;
+}
+
+.media-upload-file {
+    padding: 0.7rem 0.8rem;
+
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+
+    background: var(--color-surface-subtle);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-medium);
+}
+
+.media-upload-file > div {
+    min-width: 0;
+
+    display: grid;
+    gap: 0.2rem;
+}
+
+.media-upload-file strong {
+    overflow: hidden;
+
+    color: var(--color-text);
+
+    font-size: 0.88rem;
+
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.media-upload-file span {
+    color: var(--color-text-muted);
+
+    font-size: 0.76rem;
+}
+
+.media-upload-file-status {
+    flex: 0 0 auto;
+
+    font-size: 1rem;
+    font-weight: 800;
+}
+
+.media-upload-file.is-valid
+    .media-upload-file-status {
+    color: var(--color-healthy);
+}
+
+.media-upload-file.is-invalid {
+    border-color: var(--color-critical);
+}
+
+.media-upload-file.is-invalid
+    .media-upload-file-status {
+    color: var(--color-critical);
+}
+
+.media-upload-result {
+    padding: 0.75rem;
+
+    color: var(--color-healthy);
+
+    background: var(--brand-green-light);
+    border: 1px solid var(--color-healthy);
+    border-radius: var(--radius-small);
+
+    line-height: 1.5;
+}
+
 .media-dialog {
     width:
         min(
@@ -925,6 +1136,7 @@ Responsive layout
 
 
 @media (max-width: 520px) {
+
     .media-summary {
         grid-template-columns:
             minmax(0, 1fr);

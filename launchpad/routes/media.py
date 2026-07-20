@@ -5,6 +5,7 @@ import mimetypes
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 from urllib.parse import quote
 
 import aiohttp_jinja2
@@ -45,6 +46,26 @@ MEDIA_TYPES: dict[str, str] = {
     "sounds": "audio",
 }
 
+UPLOAD_CATEGORIES = frozenset(
+    {
+        "pictures",
+        "sounds",
+    }
+)
+
+MAX_UPLOAD_FILES = 10
+
+MAX_UPLOAD_FILE_SIZE = (
+    25
+    * 1024
+    * 1024
+)
+
+UPLOAD_CHUNK_SIZE = (
+    64
+    * 1024
+)
+
 
 @dataclass(frozen=True)
 class MediaItem:
@@ -71,6 +92,18 @@ class MediaItem:
             "download_url": self.download_url,
         }
 
+@dataclass(frozen=True)
+class MediaUploadFailure:
+    name: str
+    reason: str
+
+    def to_dict(
+        self,
+    ) -> dict[str, str]:
+        return {
+            "name": self.name,
+            "reason": self.reason,
+        }
 
 def category_directories(
     config: PlatformConfig,
@@ -181,6 +214,85 @@ def media_extension_allowed(
         in allowed_extensions
     )
 
+def upload_category(
+    filename: str,
+) -> str | None:
+    suffix = Path(filename).suffix.lower()
+
+    for category in UPLOAD_CATEGORIES:
+        if (
+            suffix
+            in MEDIA_EXTENSIONS[category]
+        ):
+            return category
+
+    return None
+
+def upload_rejection_reason(
+    filename: str,
+) -> str:
+    suffix = Path(filename).suffix.lower()
+
+    if (
+        suffix
+        in MEDIA_EXTENSIONS["videos"]
+    ):
+        return "Videos cannot be uploaded."
+
+    if not suffix:
+        return (
+            "The file does not have a supported "
+            "extension."
+        )
+
+    return (
+        "Only JPG, JPEG, PNG, WebP, MP3, WAV, "
+        "OGG, and M4A files can be uploaded."
+    )
+
+def upload_content_type_allowed(
+    category: str,
+    content_type: str | None,
+) -> bool:
+    if not content_type:
+        return True
+
+    normalized = (
+        content_type
+        .split(
+            ";",
+            maxsplit=1,
+        )[0]
+        .strip()
+        .lower()
+    )
+
+    if (
+        normalized
+        in {
+            "",
+            "application/octet-stream",
+        }
+    ):
+        return True
+
+    if category == "pictures":
+        return normalized.startswith(
+            "image/"
+        )
+
+    if category == "sounds":
+        return (
+            normalized.startswith(
+                "audio/"
+            )
+            or normalized
+            in {
+                "application/ogg",
+            }
+        )
+
+    return False
 
 def media_mime_type(
     path: Path,
@@ -251,6 +363,108 @@ def build_media_item(
         ),
     )
 
+def unique_media_path(
+    directory: Path,
+    filename: str,
+) -> Path:
+    directory.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    original = Path(filename)
+
+    stem = original.stem
+    suffix = original.suffix.lower()
+
+    candidate = (
+        directory
+        / f"{stem}{suffix}"
+    )
+
+    if not candidate.exists():
+        return candidate
+
+    sequence = 2
+
+    while True:
+        candidate = (
+            directory
+            / f"{stem}-{sequence}{suffix}"
+        )
+
+        if not candidate.exists():
+            return candidate
+
+        sequence += 1
+
+async def save_uploaded_file(
+    field: Any,
+    destination: Path,
+) -> int:
+    bytes_written = 0
+
+    temporary_path = destination.with_name(
+        f".{destination.name}.uploading"
+    )
+
+    try:
+        with temporary_path.open("xb") as output:
+            while True:
+                chunk = await field.read_chunk(
+                    size=UPLOAD_CHUNK_SIZE
+                )
+
+                if not chunk:
+                    break
+
+                bytes_written += len(chunk)
+
+                if (
+                    bytes_written
+                    > MAX_UPLOAD_FILE_SIZE
+                ):
+                    raise ValueError(
+                        "The file exceeds the "
+                        "25 MB upload limit."
+                    )
+
+                output.write(chunk)
+
+        if bytes_written == 0:
+            raise ValueError(
+                "The uploaded file is empty."
+            )
+
+        temporary_path.replace(
+            destination
+        )
+
+        return bytes_written
+    except BaseException:
+        try:
+            temporary_path.unlink(
+                missing_ok=True
+            )
+        except OSError:
+            pass
+
+        raise
+
+def upload_failure(
+    failures: list[MediaUploadFailure],
+    filename: str,
+    reason: str,
+) -> None:
+    failures.append(
+        MediaUploadFailure(
+            name=(
+                filename
+                or "Unnamed file"
+            ),
+            reason=reason,
+        )
+    )
 
 def list_category_media(
     category: str,
@@ -391,6 +605,220 @@ async def media_api(
         }
     )
 
+async def upload_media(
+    request: web.Request,
+) -> web.Response:
+    config: PlatformConfig = request.app[
+        "platform_config"
+    ]
+
+    if not request.content_type.startswith(
+        "multipart/"
+    ):
+        raise web.HTTPBadRequest(
+            reason=(
+                "media uploads must use "
+                "multipart form data"
+            )
+        )
+
+    try:
+        reader = await request.multipart()
+    except (ValueError, OSError) as exc:
+        raise web.HTTPBadRequest(
+            reason=(
+                "the upload request could not "
+                "be read"
+            )
+        ) from exc
+
+    uploaded: list[MediaItem] = []
+
+    failures: list[
+        MediaUploadFailure
+    ] = []
+
+    submitted_files = 0
+
+    while True:
+        try:
+            field = await reader.next()
+        except (ValueError, OSError) as exc:
+            raise web.HTTPBadRequest(
+                reason=(
+                    "the upload request could not "
+                    "be read"
+                )
+            ) from exc
+
+        if field is None:
+            break
+
+        if (
+            field.name != "files"
+            or not field.filename
+        ):
+            continue
+
+        submitted_files += 1
+
+        original_filename = Path(
+            field.filename
+        ).name
+
+        if (
+            submitted_files
+            > MAX_UPLOAD_FILES
+        ):
+            upload_failure(
+                failures,
+                original_filename,
+                (
+                    "Only 10 files can be "
+                    "uploaded at once."
+                ),
+            )
+
+            continue
+
+        try:
+            validate_filename(
+                original_filename
+            )
+        except web.HTTPException as exc:
+            upload_failure(
+                failures,
+                original_filename,
+                exc.reason
+                or "Invalid media filename.",
+            )
+
+            continue
+
+        category = upload_category(
+            original_filename
+        )
+
+        if category is None:
+            upload_failure(
+                failures,
+                original_filename,
+                upload_rejection_reason(
+                    original_filename
+                ),
+            )
+
+            continue
+
+        if not upload_content_type_allowed(
+            category,
+            field.headers.get(
+                "Content-Type"
+            ),
+        ):
+            upload_failure(
+                failures,
+                original_filename,
+                (
+                    "The file type does not match "
+                    "its extension."
+                ),
+            )
+
+            continue
+
+        directory = require_category(
+            config,
+            category,
+        )
+
+        destination = unique_media_path(
+            directory,
+            original_filename,
+        )
+
+        if not media_extension_allowed(
+            category,
+            destination,
+        ):
+            upload_failure(
+                failures,
+                original_filename,
+                "Unsupported media format.",
+            )
+
+            continue
+
+        try:
+            await save_uploaded_file(
+                field,
+                destination,
+            )
+
+            uploaded.append(
+                build_media_item(
+                    category,
+                    destination,
+                )
+            )
+        except ValueError as exc:
+            upload_failure(
+                failures,
+                original_filename,
+                str(exc),
+            )
+        except FileExistsError:
+            upload_failure(
+                failures,
+                original_filename,
+                (
+                    "A temporary upload with this "
+                    "name already exists."
+                ),
+            )
+        except OSError:
+            upload_failure(
+                failures,
+                original_filename,
+                (
+                    "The file could not be saved "
+                    "on the robot."
+                ),
+            )
+
+    if submitted_files == 0:
+        raise web.HTTPBadRequest(
+            reason=(
+                "the upload does not contain "
+                "any files"
+            )
+        )
+
+    status = (
+        201
+        if uploaded
+        else 400
+    )
+
+    return web.json_response(
+        {
+            "uploaded": [
+                item.to_dict()
+                for item in uploaded
+            ],
+            "failed": [
+                failure.to_dict()
+                for failure in failures
+            ],
+            "uploaded_count": len(
+                uploaded
+            ),
+            "failed_count": len(
+                failures
+            ),
+        },
+        status=status,
+    )
 
 async def media_file(
     request: web.Request,
@@ -518,6 +946,12 @@ def setup_media_routes(
         "/api/media",
         media_api,
         name="media-api",
+    )
+
+    app.router.add_post(
+        "/api/media/upload",
+        upload_media,
+        name="media-upload-api",
     )
 
     app.router.add_get(

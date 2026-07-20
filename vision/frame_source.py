@@ -127,15 +127,29 @@ class FrameSource:
             if sleep_time > 0:
                 time.sleep(sleep_time)
 
-    def _publish(self, frame: Frame) -> None:
+    def _publish(
+        self,
+        frame: Frame,
+    ) -> None:
         with self._consumer_lock:
             consumers = list(self._consumers)
 
         for consumer in consumers:
             try:
                 consumer.on_frame(frame)
+
             except Exception as exc:
-                self._last_error = exc
+                wrapped = FrameSourceError(
+                    f"{type(consumer).__name__} "
+                    f"failed: {exc}"
+                )
+
+                self._last_error = wrapped
+
+                print(
+                    f"Vision consumer error: {wrapped}",
+                    flush=True,
+                )
 
     def close(self) -> None:
         self.stop()

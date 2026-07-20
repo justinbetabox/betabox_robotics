@@ -1,0 +1,675 @@
+{% extends "interior.html" %}
+
+
+{% block interior_styles %}
+    <link
+        rel="stylesheet"
+        href="/static/css/media.css"
+    >
+{% endblock %}
+
+
+{% block page_content %}
+    <section
+        class="media-introduction"
+        aria-labelledby="media-heading"
+    >
+        <div>
+            <p class="eyebrow">
+                Robot Files
+            </p>
+
+            <h2
+                id="media-heading"
+                class="section-title"
+            >
+                Browse captured media
+            </h2>
+
+            <p class="page-description">
+                View pictures, recordings, and sounds
+                stored on this robot.
+            </p>
+        </div>
+
+        <button
+            id="media-refresh"
+            class="
+                button
+                button-secondary
+            "
+            type="button"
+        >
+            Refresh
+        </button>
+    </section>
+
+
+    <section
+        class="media-summary"
+        aria-label="Media summary"
+    >
+        <article class="media-summary-card">
+            <span class="media-summary-label">
+                All Files
+            </span>
+
+            <strong
+                id="media-total-count"
+                class="media-summary-value"
+            >
+                —
+            </strong>
+        </article>
+
+        <article class="media-summary-card">
+            <span class="media-summary-label">
+                Pictures
+            </span>
+
+            <strong
+                id="media-picture-count"
+                class="media-summary-value"
+            >
+                —
+            </strong>
+        </article>
+
+        <article class="media-summary-card">
+            <span class="media-summary-label">
+                Videos
+            </span>
+
+            <strong
+                id="media-video-count"
+                class="media-summary-value"
+            >
+                —
+            </strong>
+        </article>
+
+        <article class="media-summary-card">
+            <span class="media-summary-label">
+                Sounds
+            </span>
+
+            <strong
+                id="media-sound-count"
+                class="media-summary-value"
+            >
+                —
+            </strong>
+        </article>
+
+        <article class="media-summary-card">
+            <span class="media-summary-label">
+                Storage Used
+            </span>
+
+            <strong
+                id="media-total-size"
+                class="media-summary-value"
+            >
+                —
+            </strong>
+        </article>
+    </section>
+
+
+    <section
+        class="media-browser panel"
+        aria-labelledby="media-browser-heading"
+    >
+        <div class="media-toolbar">
+            <div>
+                <h2 class="media-toolbar-title">
+                    Media Library
+                </h2>
+
+                <p
+                    id="media-result-summary"
+                    class="media-result-summary"
+                >
+                    0 files
+                </p>
+            </div>
+        </div>
+
+
+        <div class="media-controls">
+            <div
+                class="media-category-filters"
+                aria-label="Media categories"
+            >
+                <button
+                    class="
+                        media-filter
+                        is-active
+                    "
+                    type="button"
+                    data-media-category="all"
+                    aria-pressed="true"
+                >
+                    All
+
+                    <span
+                        id="media-filter-all-count"
+                        class="media-filter-count"
+                    >
+                        0
+                    </span>
+                </button>
+
+                <button
+                    class="media-filter"
+                    type="button"
+                    data-media-category="pictures"
+                    aria-pressed="false"
+                >
+                    Pictures
+
+                    <span
+                        id="media-filter-picture-count"
+                        class="media-filter-count"
+                    >
+                        0
+                    </span>
+                </button>
+
+                <button
+                    class="media-filter"
+                    type="button"
+                    data-media-category="videos"
+                    aria-pressed="false"
+                >
+                    Videos
+
+                    <span
+                        id="media-filter-video-count"
+                        class="media-filter-count"
+                    >
+                        0
+                    </span>
+                </button>
+
+                <button
+                    class="media-filter"
+                    type="button"
+                    data-media-category="sounds"
+                    aria-pressed="false"
+                >
+                    Sounds
+
+                    <span
+                        id="media-filter-sound-count"
+                        class="media-filter-count"
+                    >
+                        0
+                    </span>
+                </button>
+            </div>
+
+
+            <div class="media-query-controls">
+                <label class="media-search">
+                    <span class="media-search-icon" aria-hidden="true">
+                        ⌕
+                    </span>
+
+                    <span class="sr-only">
+                        Search media
+                    </span>
+
+                    <input
+                        id="media-search"
+                        type="search"
+                        placeholder="Search media"
+                        autocomplete="off"
+                    >
+                </label>
+
+                <label class="media-sort">
+                    <span class="sr-only">
+                        Sort media
+                    </span>
+
+                    <select id="media-sort">
+                        <option value="newest">
+                            Newest first
+                        </option>
+
+                        <option value="oldest">
+                            Oldest first
+                        </option>
+
+                        <option value="name-ascending">
+                            Name A–Z
+                        </option>
+
+                        <option value="name-descending">
+                            Name Z–A
+                        </option>
+
+                        <option value="size-descending">
+                            Largest first
+                        </option>
+
+                        <option value="size-ascending">
+                            Smallest first
+                        </option>
+                    </select>
+                </label>
+                <div
+                    class="media-view-controls"
+                    role="group"
+                    aria-label="Media view"
+                >
+                    <button
+                        id="media-grid-view"
+                        class="
+                            media-view-button
+                            is-active
+                        "
+                        type="button"
+                        data-media-view="grid"
+                        aria-pressed="true"
+                        title="Grid view"
+                    >
+                        ⊞
+                    </button>
+
+                    <button
+                        id="media-list-view"
+                        class="media-view-button"
+                        type="button"
+                        data-media-view="list"
+                        aria-pressed="false"
+                        title="List view"
+                    >
+                        ☰
+                    </button>
+                </div>
+            </div>
+        </div>
+
+
+        <div
+            id="media-loading"
+            class="media-state"
+            role="status"
+        >
+            <div
+                class="media-loading-spinner"
+                aria-hidden="true"
+            ></div>
+
+            <div>
+                <h3>
+                    Loading media
+                </h3>
+
+                <p>
+                    Checking the robot for pictures,
+                    videos, and sounds.
+                </p>
+            </div>
+        </div>
+
+
+        <div
+            id="media-error"
+            class="error-panel"
+            role="alert"
+            hidden
+        >
+            <div>
+                <p class="eyebrow">
+                    Media Unavailable
+                </p>
+
+                <h2>
+                    Media could not be loaded
+                </h2>
+
+                <p id="media-error-message">
+                    Launchpad could not read the
+                    robot's media files.
+                </p>
+            </div>
+
+            <button
+                id="media-retry"
+                class="button"
+                type="button"
+            >
+                Try Again
+            </button>
+        </div>
+
+
+        <div
+            id="media-empty"
+            class="media-state"
+            hidden
+        >
+            <div
+                class="media-empty-icon"
+                aria-hidden="true"
+            >
+                ◫
+            </div>
+
+            <div>
+                <h3 id="media-empty-title">
+                    No media yet
+                </h3>
+
+                <p id="media-empty-message">
+                    Pictures, recordings, and sounds
+                    created on this robot will appear
+                    here.
+                </p>
+            </div>
+        </div>
+
+
+        <div
+            id="media-items"
+            class="
+                media-items
+                media-grid
+            "
+            aria-live="polite"
+            hidden
+        ></div>
+    </section>
+
+
+    <p
+        id="media-announcement"
+        class="sr-only"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+    ></p>
+
+
+    <template id="media-card-template">
+        <article class="media-card">
+            <button
+                class="media-preview-button"
+                type="button"
+            >
+                <div class="media-thumbnail">
+                    <img
+                        class="media-thumbnail-image"
+                        alt=""
+                        loading="eager"
+                        decoding="async"
+                        hidden
+                    >
+
+                    <video
+                        class="media-thumbnail-video"
+                        muted
+                        preload="auto"
+                        playsinline
+                        hidden
+                    ></video>
+
+                    <div
+                        class="
+                            media-thumbnail-placeholder
+                        "
+                        aria-hidden="true"
+                    >
+                        <span
+                            class="media-placeholder-icon"
+                        >
+                            ♪
+                        </span>
+                    </div>
+
+                    <span class="media-type-label">
+                        Media
+                    </span>
+
+                    <span
+                        class="media-play-indicator"
+                        aria-hidden="true"
+                        hidden
+                    >
+                        ▶
+                    </span>
+                </div>
+            </button>
+
+            <div class="media-card-content">
+                <div class="media-card-details">
+                    <h3 class="media-card-name">
+                        Media file
+                    </h3>
+
+                    <p class="media-card-metadata">
+                        <span class="media-card-date">
+                            —
+                        </span>
+
+                        <span aria-hidden="true">
+                            ·
+                        </span>
+
+                        <span class="media-card-size">
+                            —
+                        </span>
+                    </p>
+                </div>
+
+                <div class="media-card-actions">
+                    <a
+                        class="
+                            media-action-button
+                            media-download-button
+                        "
+                        href="#"
+                        download
+                        aria-label="Download media"
+                        title="Download"
+                    >
+                        <span aria-hidden="true">
+                            ↓
+                        </span>
+                    </a>
+
+                    <button
+                        class="
+                            media-action-button
+                            media-delete-button
+                        "
+                        type="button"
+                        aria-label="Delete media"
+                        title="Delete"
+                    >
+                        <span aria-hidden="true">
+                            ×
+                        </span>
+                    </button>
+                </div>
+            </div>
+        </article>
+    </template>
+
+
+    <dialog
+        id="media-preview-dialog"
+        class="
+            media-dialog
+            media-preview-dialog
+        "
+        aria-labelledby="media-preview-title"
+    >
+        <div class="media-dialog-header">
+            <div>
+                <p
+                    id="media-preview-category"
+                    class="eyebrow"
+                >
+                    Media
+                </p>
+
+                <h2 id="media-preview-title">
+                    Preview
+                </h2>
+            </div>
+
+            <button
+                id="media-preview-close"
+                class="media-dialog-close"
+                type="button"
+                aria-label="Close media preview"
+            >
+                ×
+            </button>
+        </div>
+
+        <div
+            id="media-preview-content"
+            class="media-preview-content"
+        >
+            <img
+                id="media-preview-image"
+                class="media-preview-image"
+                alt=""
+                hidden
+            >
+
+            <video
+                id="media-preview-video"
+                class="media-preview-video"
+                controls
+                playsinline
+                hidden
+            ></video>
+
+            <audio
+                id="media-preview-audio"
+                class="media-preview-audio"
+                controls
+                hidden
+            ></audio>
+        </div>
+
+        <div class="media-preview-footer">
+            <div class="media-preview-metadata">
+                <span id="media-preview-date">
+                    —
+                </span>
+
+                <span aria-hidden="true">
+                    ·
+                </span>
+
+                <span id="media-preview-size">
+                    —
+                </span>
+            </div>
+
+            <a
+                id="media-preview-download"
+                class="button"
+                href="#"
+                download
+            >
+                Download
+            </a>
+        </div>
+    </dialog>
+
+
+    <dialog
+        id="media-delete-dialog"
+        class="
+            media-dialog
+            media-delete-dialog
+        "
+        aria-labelledby="media-delete-title"
+    >
+        <form method="dialog">
+            <div class="media-dialog-header">
+                <div>
+                    <p class="eyebrow">
+                        Delete Media
+                    </p>
+
+                    <h2 id="media-delete-title">
+                        Delete this file?
+                    </h2>
+                </div>
+
+                <button
+                    class="media-dialog-close"
+                    type="submit"
+                    value="cancel"
+                    aria-label="Close delete confirmation"
+                >
+                    ×
+                </button>
+            </div>
+
+            <div class="media-delete-content">
+                <p>
+                    <strong id="media-delete-name">
+                        This media file
+                    </strong>
+
+                    will be permanently removed from
+                    the robot.
+                </p>
+
+                <p class="notice notice-warning">
+                    This action cannot be undone.
+                </p>
+
+                <p
+                    id="media-delete-error"
+                    class="media-delete-error"
+                    role="alert"
+                    hidden
+                ></p>
+            </div>
+
+            <div class="media-dialog-actions">
+                <button
+                    id="media-delete-cancel"
+                    class="
+                        button
+                        button-secondary
+                    "
+                    type="submit"
+                    value="cancel"
+                >
+                    Cancel
+                </button>
+
+                <button
+                    id="media-delete-confirm"
+                    class="
+                        button
+                        button-danger
+                    "
+                    type="button"
+                >
+                    Delete File
+                </button>
+            </div>
+        </form>
+    </dialog>
+{% endblock %}
+
+
+{% block interior_scripts %}
+    <script
+        type="module"
+        src="/static/js/media.js"
+    ></script>
+{% endblock %}

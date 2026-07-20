@@ -29,33 +29,58 @@ class VisionService:
     when running as betabox-video.service.
     """
 
-    def __init__(self, config: VisionServiceConfig | None = None) -> None:
-        self.config = config or VisionServiceConfig()
-        self.frame_source = FrameSource(fps=self.config.fps)
+    def __init__(
+        self,
+        config: VisionServiceConfig | None = None,
+    ) -> None:
+        self.config = (
+            config
+            or VisionServiceConfig()
+        )
+
+        self.frame_source = FrameSource(
+            fps=self.config.fps,
+        )
+
         self.metadata_bus = MetadataBus()
-        self.detection = DetectionManager(self.metadata_bus)
         self.overlay = OverlayRenderer()
-        self.frame_source.register_consumer(self.detection)
+
+        self.detection = DetectionManager(
+            self.metadata_bus,
+        )
+
         self.recording = RecordingService(
             fps=self.config.fps,
             metadata_bus=self.metadata_bus,
             overlay=self.overlay,
         )
-        self.frame_source.register_consumer(self.recording)
-        self.overlay = OverlayRenderer()
+
         self.streamer = WebRTCStreamer(
             fps=self.config.fps,
             metadata_bus=self.metadata_bus,
             overlay=self.overlay,
         )
-        self.snapshot = SnapshotService(self.frame_source)
+
+        self.snapshot = SnapshotService(
+            self.frame_source,
+        )
+
+        self.frame_source.register_consumer(
+            self.detection,
+        )
+        self.frame_source.register_consumer(
+            self.recording,
+        )
+        self.frame_source.register_consumer(
+            self.streamer,
+        )
+
         self.server = WebRTCSignalingServer(
             self,
             host=self.config.host,
             port=self.config.port,
         )
 
-        self.frame_source.register_consumer(self.streamer)
         self._running = False
 
     def start(self) -> None:
@@ -78,10 +103,6 @@ class VisionService:
 
         if self.recording.is_recording():
             self.recording.stop()
-
-        self.frame_source.unregister_consumer(self.streamer)
-        self.frame_source.unregister_consumer(self.detection)
-        self.frame_source.unregister_consumer(self.recording)
 
         self.frame_source.stop()
         self._running = False

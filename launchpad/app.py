@@ -23,6 +23,12 @@ from betabox_robotics.launchpad.routes import (
 from betabox_robotics.launchpad.status_cache import (
     StatusCache,
 )
+from betabox_robotics.calibration import (
+    CalibrationManager,
+)
+from betabox_robotics.services.calibration import (
+    CalibrationService,
+)
 
 
 PACKAGE_DIR = Path(__file__).parent
@@ -33,7 +39,13 @@ TEMPLATES_DIR = PACKAGE_DIR / "templates"
 async def drive_controller_context(
     app: web.Application,
 ) -> AsyncIterator[None]:
-    controller = ManualDriveController()
+    calibration_manager: CalibrationManager = (
+        app["calibration_manager"]
+    )
+
+    controller = ManualDriveController(
+        calibration_manager
+    )
 
     await controller.start()
 
@@ -78,6 +90,22 @@ def create_app(
     )
 
     app["platform_config"] = config
+
+    calibration_manager = CalibrationManager(
+        config.paths.calibration_file
+    )
+
+    calibration_service = CalibrationService(
+        calibration_manager
+    )
+
+    app["calibration_manager"] = (
+        calibration_manager
+    )
+
+    app["calibration_service"] = (
+        calibration_service
+    )
 
     app["status_cache"] = StatusCache(
         ttl_seconds=3.0

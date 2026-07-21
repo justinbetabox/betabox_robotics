@@ -16,6 +16,9 @@ class CameraMountStatus:
     pan: float
     tilt: float
 
+    pan_offset: float
+    tilt_offset: float
+
     pan_min: float
     pan_max: float
 
@@ -37,6 +40,9 @@ class CameraMount:
     def __init__(
         self,
         config: CameraMountConfig,
+        *,
+        pan_offset: float = 0.0,
+        tilt_offset: float = 0.0,
     ) -> None:
         self.config = config
 
@@ -44,6 +50,7 @@ class CameraMount:
             config.pan_servo,
             min_angle=config.pan_min_angle,
             max_angle=config.pan_max_angle,
+            offset=pan_offset,
         )
 
         try:
@@ -51,6 +58,7 @@ class CameraMount:
                 config.tilt_servo,
                 min_angle=config.tilt_min_angle,
                 max_angle=config.tilt_max_angle,
+                offset=tilt_offset,
             )
         except Exception:
             self._pan_servo.close()
@@ -70,8 +78,15 @@ class CameraMount:
     def default(
         cls,
         config: CameraMountConfig,
+        *,
+        pan_offset: float = 0.0,
+        tilt_offset: float = 0.0,
     ) -> "CameraMount":
-        return cls(config)
+        return cls(
+            config,
+            pan_offset=pan_offset,
+            tilt_offset=tilt_offset,
+        )
 
     @property
     def closed(self) -> bool:
@@ -170,6 +185,15 @@ class CameraMount:
 
         self._tilt = requested
 
+    @property
+    def pan_offset(self) -> float:
+        return self._pan_servo.offset
+
+
+    @property
+    def tilt_offset(self) -> float:
+        return self._tilt_servo.offset
+
     def center(
         self,
         *,
@@ -187,6 +211,8 @@ class CameraMount:
         return CameraMountStatus(
             pan=self._pan,
             tilt=self._tilt,
+            pan_offset=self.pan_offset,
+            tilt_offset=self.tilt_offset,
             pan_min=self.config.pan_min_angle,
             pan_max=self.config.pan_max_angle,
             tilt_min=self.config.tilt_min_angle,

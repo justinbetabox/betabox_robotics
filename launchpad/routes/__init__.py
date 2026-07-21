@@ -8,6 +8,7 @@ from .jupyter import setup_jupyter_routes
 from .services import setup_services_routes
 from .status import setup_status_routes
 from .media import setup_media_routes
+from .calibration import setup_calibration_routes
 
 
 def setup_routes(
@@ -23,6 +24,7 @@ def setup_routes(
     setup_jupyter_routes(app)
     setup_drive_routes(app)
     setup_media_routes(app)
+    setup_calibration_routes(app)
 
 
 __all__ = [
@@ -37,4 +39,5 @@ __all__ = [
     "setup_routes",
     "setup_services_routes",
     "setup_status_routes",
+    "setup_calibration_routes",
 ]

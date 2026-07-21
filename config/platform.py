@@ -62,6 +62,13 @@ class PlatformPathsConfig:
         return self.home / ".local" / "state" / "betabox"
 
     @property
+    def calibration_file(self) -> Path:
+        return (
+            self.state_dir
+            / "calibration.json"
+        )
+
+    @property
     def events_file(self) -> Path:
         return self.state_dir / "events.jsonl"
 

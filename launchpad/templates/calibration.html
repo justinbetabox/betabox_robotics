@@ -1,0 +1,629 @@
+{% extends "interior.html" %}
+
+{% block interior_styles %}
+    <link
+        rel="stylesheet"
+        href="/static/css/calibration.css"
+    >
+{% endblock %}
+
+{% block header_actions %}
+    <div
+        id="calibration-connection"
+        class="
+            connection-status
+            status-connecting
+        "
+        role="status"
+        aria-live="polite"
+    >
+        Loading…
+    </div>
+
+    <button
+        id="refresh-calibration"
+        class="
+            button
+            button-secondary
+        "
+        type="button"
+    >
+        Refresh
+    </button>
+{% endblock %}
+
+{% block page_content %}
+    <div class="calibration-layout">
+        <section
+            class="calibration-intro"
+            aria-labelledby="calibration-heading"
+        >
+            <div>
+                <p class="eyebrow">
+                    Robot Setup
+                </p>
+
+                <h2 id="calibration-heading">
+                    Calibration Settings
+                </h2>
+
+                <p class="page-description">
+                    View the saved steering, motor, and
+                    line sensor calibration used by this robot.
+                </p>
+            </div>
+
+            <div class="calibration-intro-status">
+                <span
+                    id="calibration-source"
+                    class="
+                        status-badge
+                    "
+                >
+                    Checking
+                </span>
+
+                <p
+                    id="calibration-updated"
+                    class="updated-time"
+                >
+                    Loading calibration…
+                </p>
+            </div>
+        </section>
+
+        <div
+            id="calibration-loading"
+            class="panel calibration-state"
+            role="status"
+        >
+            <div
+                class="calibration-spinner"
+                aria-hidden="true"
+            ></div>
+
+            <div>
+                <h2>
+                    Loading calibration
+                </h2>
+
+                <p>
+                    Reading the robot's saved calibration settings.
+                </p>
+            </div>
+        </div>
+
+        <div
+            id="calibration-content"
+            class="calibration-grid"
+            hidden
+        >
+            <section
+                class="panel form-section"
+                aria-labelledby="steering-heading"
+            >
+                <div class="form-section-heading">
+                    <div>
+                        <p class="eyebrow">
+                            Direction Control
+                        </p>
+
+                        <h2 id="steering-heading">
+                            Steering
+                        </h2>
+                    </div>
+
+                    <span
+                        id="steering-status"
+                        class="
+                            status-badge
+                        "
+                    >
+                        Checking
+                    </span>
+                </div>
+
+                <p class="form-description">
+                    The steering offset corrects the wheel
+                    center position.
+                </p>
+
+                <div class="form-field">
+                    <label
+                        for="steering-offset-input"
+                        class="form-label"
+                    >
+                        Center Offset
+                    </label>
+
+                    <div class="stepper">
+                        <button
+                            id="steering-decrease"
+                            class="stepper-button"
+                            type="button"
+                            aria-label="Decrease steering center offset"
+                        >
+                            −
+                        </button>
+
+                        <output
+                            id="steering-offset"
+                            class="stepper-value"
+                        >
+                            —
+                        </output>
+
+                        <button
+                            id="steering-increase"
+                            class="stepper-button"
+                            type="button"
+                            aria-label="Increase steering center offset"
+                        >
+                            +
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button
+                        id="steering-reset"
+                        class="button button-secondary"
+                        type="button"
+                    >
+                        Reset
+                    </button>
+
+                    <button
+                        id="steering-save"
+                        class="button"
+                        type="button"
+                    >
+                        Save
+                    </button>
+                </div>
+
+                <p
+                    id="steering-message"
+                    class="form-message"
+                    role="status"
+                    aria-live="polite"
+                ></p>
+            </section>
+
+            <section
+                class="panel form-section"
+                aria-labelledby="camera-heading"
+            >
+                <div class="form-section-heading">
+                    <div>
+                        <p class="eyebrow">
+                            Camera Alignment
+                        </p>
+
+                        <h2 id="camera-heading">
+                            Camera Mount
+                        </h2>
+                    </div>
+
+                    <span
+                        id="camera-status"
+                        class="
+                            status-badge
+                        "
+                    >
+                        Checking
+                    </span>
+                </div>
+
+                <p class="form-description">
+                    Pan and tilt offsets compensate for
+                    mechanical servo alignment.
+                </p>
+
+                <div class="form-field">
+                    <span class="form-label">
+                        Pan Offset
+                    </span>
+
+                    <div class="stepper">
+                        <button
+                            id="camera-pan-decrease"
+                            class="stepper-button"
+                            type="button"
+                            aria-label="Decrease camera pan offset"
+                        >
+                            −
+                        </button>
+
+                        <output
+                            id="camera-pan-offset"
+                            class="stepper-value"
+                        >
+                            —
+                        </output>
+
+                        <button
+                            id="camera-pan-increase"
+                            class="stepper-button"
+                            type="button"
+                            aria-label="Increase camera pan offset"
+                        >
+                            +
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-field">
+                    <span class="form-label">
+                        Tilt Offset
+                    </span>
+
+                    <div class="stepper">
+                        <button
+                            id="camera-tilt-decrease"
+                            class="stepper-button"
+                            type="button"
+                            aria-label="Decrease camera tilt offset"
+                        >
+                            −
+                        </button>
+
+                        <output
+                            id="camera-tilt-offset"
+                            class="stepper-value"
+                        >
+                            —
+                        </output>
+
+                        <button
+                            id="camera-tilt-increase"
+                            class="stepper-button"
+                            type="button"
+                            aria-label="Increase camera tilt offset"
+                        >
+                            +
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button
+                        id="camera-reset"
+                        class="button button-secondary"
+                        type="button"
+                    >
+                        Reset
+                    </button>
+
+                    <button
+                        id="camera-save"
+                        class="button"
+                        type="button"
+                    >
+                        Save
+                    </button>
+                </div>
+
+                <p
+                    id="camera-message"
+                    class="form-message"
+                    role="status"
+                    aria-live="polite"
+                ></p>
+
+
+            </section>
+
+            <section
+                class="panel form-section"
+                aria-labelledby="motors-heading"
+            >
+                <div class="form-section-heading">
+                    <div>
+                        <p class="eyebrow">
+                            Drive Balance
+                        </p>
+
+                        <h2 id="motors-heading">
+                            Motor Trim
+                        </h2>
+                    </div>
+
+                    <span
+                        id="motors-status"
+                        class="
+                            status-badge
+                        "
+                    >
+                        Checking
+                    </span>
+                </div>
+
+                <p class="form-description">
+                    Motor trim reduces one side slightly to help
+                    the robot drive straight.
+                </p>
+
+                <div class="form-field">
+                    <span class="form-label">
+                        Left Motor
+                    </span>
+
+                    <div class="stepper">
+                        <button
+                            id="left-trim-decrease"
+                            class="stepper-button"
+                            type="button"
+                            aria-label="Decrease left motor trim"
+                        >
+                            −
+                        </button>
+
+                        <output
+                            id="left-motor-trim"
+                            class="stepper-value"
+                        >
+                            —
+                        </output>
+
+                        <button
+                            id="left-trim-increase"
+                            class="stepper-button"
+                            type="button"
+                            aria-label="Increase left motor trim"
+                        >
+                            +
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-field">
+                    <span class="form-label">
+                        Right Motor
+                    </span>
+
+                    <div class="stepper">
+                        <button
+                            id="right-trim-decrease"
+                            class="stepper-button"
+                            type="button"
+                            aria-label="Decrease right motor trim"
+                        >
+                            −
+                        </button>
+
+                        <output
+                            id="right-motor-trim"
+                            class="stepper-value"
+                        >
+                            —
+                        </output>
+
+                        <button
+                            id="right-trim-increase"
+                            class="stepper-button"
+                            type="button"
+                            aria-label="Increase right motor trim"
+                        >
+                            +
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button
+                        id="motors-reset"
+                        class="button button-secondary"
+                        type="button"
+                    >
+                        Reset
+                    </button>
+
+                    <button
+                        id="motors-preview"
+                        class="button button-secondary"
+                        type="button"
+                    >
+                        Preview
+                    </button>
+
+                    <button
+                        id="motors-save"
+                        class="button"
+                        type="button"
+                    >
+                        Save
+                    </button>
+                </div>
+
+                <p
+                    id="motors-message"
+                    class="form-message"
+                    role="status"
+                    aria-live="polite"
+                ></p>
+
+            </section>
+
+            <section
+                class="
+                    panel
+                    form-section
+                    calibration-grayscale-section
+                "
+                aria-labelledby="grayscale-heading"
+            >
+                <div class="form-section-heading">
+                    <div>
+                        <p class="eyebrow">
+                            Surface Detection
+                        </p>
+
+                        <h2 id="grayscale-heading">
+                            Line Sensor
+                        </h2>
+                    </div>
+
+                    <span
+                        id="grayscale-status"
+                        class="
+                            status-badge
+                        "
+                    >
+                        Checking
+                    </span>
+                </div>
+
+                <p class="form-description">
+                    Floor and line reference values are used
+                    to normalize the three grayscale sensors.
+                </p>
+
+                <div class="reading-grid">
+                    <div class="reading-card">
+                        <div class="reading-card-heading">
+                            <div>
+                                <span class="form-label">
+                                    Floor Reference
+                                </span>
+
+                                <p class="form-hint">
+                                    Position all three sensors over the
+                                    normal floor surface.
+                                </p>
+                            </div>
+
+                            <button
+                                id="grayscale-capture-floor"
+                                class="button button-secondary"
+                                type="button"
+                            >
+                                Capture Floor
+                            </button>
+                        </div>
+
+                        <div
+                            id="grayscale-floor"
+                            class="reading-values"
+                            aria-label="Floor sensor readings"
+                        >
+                            <span>—</span>
+                            <span>—</span>
+                            <span>—</span>
+                        </div>
+                    </div>
+
+                    <div class="reading-card">
+                        <div class="reading-card-heading">
+                            <div>
+                                <span class="form-label">
+                                    Line Reference
+                                </span>
+
+                                <p class="form-hint">
+                                    Position all three sensors over the
+                                    line surface.
+                                </p>
+                            </div>
+
+                            <button
+                                id="grayscale-capture-line"
+                                class="button button-secondary"
+                                type="button"
+                            >
+                                Capture Line
+                            </button>
+                        </div>
+
+                        <div
+                            id="grayscale-line"
+                            class="reading-values"
+                            aria-label="Line sensor readings"
+                        >
+                            <span>—</span>
+                            <span>—</span>
+                            <span>—</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button
+                        id="grayscale-clear"
+                        class="button button-secondary"
+                        type="button"
+                    >
+                        Clear
+                    </button>
+
+                    <button
+                        id="grayscale-reset"
+                        class="button button-secondary"
+                        type="button"
+                    >
+                        Reset
+                    </button>
+
+                    <button
+                        id="grayscale-save"
+                        class="button"
+                        type="button"
+                    >
+                        Save
+                    </button>
+                </div>
+
+                <p
+                    id="grayscale-message"
+                    class="form-message"
+                    role="status"
+                    aria-live="polite"
+                ></p>
+            </section>
+        </div>
+
+        <section
+            id="calibration-error"
+            class="error-panel"
+            aria-labelledby="calibration-error-heading"
+            hidden
+        >
+            <div>
+                <p class="eyebrow">
+                    Calibration Unavailable
+                </p>
+
+                <h2 id="calibration-error-heading">
+                    Unable to load calibration
+                </h2>
+
+                <p id="calibration-error-message">
+                    Launchpad could not read the robot's
+                    calibration settings.
+                </p>
+            </div>
+
+            <button
+                id="retry-calibration"
+                class="button"
+                type="button"
+            >
+                Try Again
+            </button>
+        </section>
+    </div>
+    <p
+        id="calibration-announcement"
+        class="sr-only"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+    ></p>
+{% endblock %}
+
+{% block interior_scripts %}
+    <script
+        type="module"
+        src="/static/js/calibration.js"
+    ></script>
+{% endblock %}

@@ -19,6 +19,10 @@ from betabox_robotics.hardware import (
     close_gpio_factory,
 )
 
+from betabox_robotics.calibration import (
+    RobotCalibration,
+)
+
 from .car import CarRobot
 from .config import (
     AudioConfig,
@@ -103,10 +107,17 @@ class BetaboxCar(CarRobot):
         config: RobotConfig = BETABOX_CAR,
         *,
         owner: str = "Python application",
+        calibration: RobotCalibration | None = None,
     ) -> None:
         super().__init__()
 
         self.config = config
+
+        self.calibration = (
+            RobotCalibration.default()
+            if calibration is None
+            else calibration
+        )
 
         self.drive = None
         self.sensors = None
@@ -123,15 +134,53 @@ class BetaboxCar(CarRobot):
 
         try:
             self.drive = Drive.default(
-                config.drive
+                config.drive,
+                left_trim=(
+                    self.calibration.motors.left_trim
+                ),
+                right_trim=(
+                    self.calibration.motors.right_trim
+                ),
+                steering_offset=(
+                    self.calibration.steering.offset
+                ),
             )
 
             self.sensors = Sensors.default(
                 config.sensors
             )
 
+            grayscale_calibration = (
+                self.calibration.grayscale
+            )
+
+            if grayscale_calibration.calibrated:
+                floor = grayscale_calibration.floor
+                line = grayscale_calibration.line
+
+                if floor is None or line is None:
+                    raise ValueError(
+                        "calibrated grayscale data must "
+                        "contain floor and line values"
+                    )
+
+                self.sensors.grayscale.set_calibration(
+                    floor,
+                    line,
+                )
+
             self.camera_mount = CameraMount.default(
-                config.camera_mount
+                config.camera_mount,
+                pan_offset=(
+                    self.calibration
+                    .camera_mount
+                    .pan_offset
+                ),
+                tilt_offset=(
+                    self.calibration
+                    .camera_mount
+                    .tilt_offset
+                ),
             )
 
             self.vision = VisionClient.default(

@@ -7,6 +7,9 @@ from dataclasses import dataclass
 from math import isfinite
 from typing import TYPE_CHECKING
 
+from betabox_robotics.calibration import (
+    CalibrationManager,
+)
 
 if TYPE_CHECKING:
     from betabox_robotics import BetaboxCar
@@ -75,12 +78,26 @@ class ManualDriveController:
 
     def __init__(
         self,
+        calibration_manager: CalibrationManager,
         *,
         heartbeat_timeout: float = 1.0,
         update_hz: float = 20.0,
         maximum_speed: int = 100,
         steering_angle: float = 30.0,
     ) -> None:
+        if not isinstance(
+            calibration_manager,
+            CalibrationManager,
+        ):
+            raise TypeError(
+                "calibration_manager must be a "
+                "CalibrationManager"
+            )
+
+        self.calibration_manager = (
+            calibration_manager
+        )
+
         if heartbeat_timeout <= 0:
             raise ValueError(
                 "heartbeat_timeout must be greater than 0"
@@ -406,10 +423,8 @@ class ManualDriveController:
         if self._robot is not None:
             return
 
-        from betabox_robotics import BetaboxCar
-
         robot = await asyncio.to_thread(
-            BetaboxCar,
+            self.calibration_manager.create_car,
             owner="Manual Drive",
         )
 

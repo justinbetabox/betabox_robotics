@@ -12,6 +12,7 @@ class DriveStatus:
     closed: bool
     left_trim: float
     right_trim: float
+    steering_offset: float
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -67,6 +68,7 @@ class Drive:
         right_trim: float | None = None,
         steering_min: float | None = None,
         steering_max: float | None = None,
+        steering_offset: float = 0.0,
     ) -> "Drive":
         left_cfg = config.left_motor
         right_cfg = config.right_motor
@@ -104,6 +106,7 @@ class Drive:
                 if steering_max is None
                 else steering_max
             ),
+            offset=steering_offset,
         )
 
         return cls(
@@ -172,6 +175,7 @@ class Drive:
             closed=self.closed,
             left_trim=self.left_trim,
             right_trim=self.right_trim,
+            steering_offset=self.steering.offset,
         )
 
     @staticmethod

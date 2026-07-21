@@ -29,14 +29,14 @@ STUDENT_TOOLS = (
         "action": "Open JupyterLab",
     },
     {
-        "title": "Live Camera",
+        "title": "Vision",
         "description": (
-            "View the robot's live camera feed."
+            "View the robot's live vision feed."
         ),
         "href": "/camera",
         "category": "Vision",
         "accent": "orange",
-        "action": "View camera",
+        "action": "View vision",
     },
     {
         "title": "Media",

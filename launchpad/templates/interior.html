@@ -39,7 +39,7 @@
             </h1>
         </div>
 
-        {% block header_actions_wrapper %}
+        {% block header %}
         <div class="interior-header-actions">
             {% block header_actions %}
             {% endblock %}
@@ -47,7 +47,12 @@
         {% endblock %}
     </header>
 
-    <main class="{{ page.main_class }}">
+    <main
+        class="
+            interior-content
+            {{ page.main_class }}
+        "
+    >
         {% block page_content %}
         {% endblock %}
     </main>

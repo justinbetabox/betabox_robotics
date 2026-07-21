@@ -1,11 +1,24 @@
 "use strict";
 
+
+/* Constants */
+
 const STATUS_REFRESH_INTERVAL_MS = 5000;
+
+
+/* Page state */
+let requestInProgress = false;
+let refreshTimer = null;
+
+
+/* DOM helpers */
 
 const element = (id) => (
     document.getElementById(id)
 );
 
+
+/* Data helpers */
 
 function objectValue(
     object,
@@ -28,7 +41,6 @@ function objectValue(
     return current;
 }
 
-
 function firstDefined(
     ...values
 ) {
@@ -41,6 +53,8 @@ function firstDefined(
 }
 
 
+/* Formatting */
+
 function formatVoltage(value) {
     const voltage = Number(value);
 
@@ -51,7 +65,6 @@ function formatVoltage(value) {
     return `${voltage.toFixed(2)} V`;
 }
 
-
 function formatTemperature(value) {
     const temperature = Number(value);
 
@@ -61,7 +74,6 @@ function formatTemperature(value) {
 
     return `${temperature.toFixed(1)} °C`;
 }
-
 
 function formatPercent(value) {
     const percent = Number(value);
@@ -74,71 +86,83 @@ function formatPercent(value) {
 }
 
 
-function availabilityLabel(
-    available,
-    healthyText = "Ready",
-) {
-    if (available === true) {
-        return healthyText;
-    }
-
-    if (available === false) {
-        return "Offline";
-    }
-
-    return "--";
-}
-
+/* Classification */
 
 function controlLabel(status) {
-    const owner = firstDefined(
+    const control = (
         objectValue(
             status,
             "control",
-            "owner",
-        ),
-        null,
+        ) ?? {}
     );
 
-    const available = firstDefined(
-        objectValue(
-            status,
-            "control",
-            "available",
-        ),
-        true,
-    );
-
-    if (
-        available === true
-        || !owner
-    ) {
+    if (control.available === true) {
         return "Available";
     }
 
-    const normalized = String(
-        owner
-    ).toLowerCase();
+    if (control.owner) {
+        const owner = String(
+            control.owner,
+        );
 
-    if (
-        normalized.includes(
-            "manual drive"
-        )
-    ) {
-        return "Manual Drive";
+        const normalized = owner.toLowerCase();
+
+        if (
+            normalized.includes(
+                "manual drive",
+            )
+        ) {
+            return "Manual Drive";
+        }
+
+        if (
+            normalized.includes(
+                "python",
+            )
+        ) {
+            return "Python App";
+        }
+
+        return owner;
     }
 
-    if (
-        normalized.includes(
-            "python"
-        )
-    ) {
-        return "Python App";
+    if (control.available === false) {
+        return "In Use";
     }
 
-    return String(owner);
+    return "Unavailable";
 }
 
+function visionLabel(status) {
+    const vision = (
+        objectValue(
+            status,
+            "hardware",
+            "vision",
+        )
+        ?? {}
+    );
+
+    if (!vision.service_available) {
+        return "Unavailable";
+    }
+
+    if (
+        vision.camera_running
+        && vision.camera_has_frame
+    ) {
+        return "Ready";
+    }
+
+    if (
+        vision.running
+        || vision.camera_running
+    ) {
+        return "Starting";
+    }
+
+    return "Offline";
+}
 
 function networkLabel(status) {
     const ethernetConnected = firstDefined(
@@ -171,7 +195,6 @@ function networkLabel(status) {
 
     return "Disconnected";
 }
-
 
 function jupyterLabel(status) {
     const active = firstDefined(
@@ -219,7 +242,6 @@ function jupyterLabel(status) {
 
     return "Unavailable";
 }
-
 
 function normalizeHealthState(status) {
     const batteryState = String(
@@ -284,6 +306,8 @@ function normalizeHealthState(status) {
 }
 
 
+/* UI helpers */
+
 function setHealthState(state) {
     const dot = element(
         "hud-health-dot"
@@ -305,6 +329,25 @@ function setHealthState(state) {
     ).textContent = state.label;
 }
 
+function updateTimestamp() {
+    element(
+        "hud-updated"
+    ).textContent = (
+        `Updated ${
+            new Date().toLocaleTimeString()
+        }`
+    );
+}
+
+function clearTimestamp() {
+    element(
+        "hud-updated"
+    ).textContent =
+        "Could not retrieve platform status.";
+}
+
+
+/* Rendering */
 
 function renderStatus(status) {
     const hostname = firstDefined(
@@ -373,24 +416,8 @@ function renderStatus(status) {
         ),
     );
 
-    const cameraRunning = firstDefined(
-        objectValue(
-            status,
-            "hardware",
-            "vision",
-            "camera_running",
-        ),
-        false,
-    );
-
-    const visionRunning = firstDefined(
-        objectValue(
-            status,
-            "hardware",
-            "vision",
-            "running",
-        ),
-        false,
+    const visionText = visionLabel(
+        status,
     );
 
     const batteryText = formatVoltage(
@@ -433,11 +460,8 @@ function renderStatus(status) {
     ).textContent = controlText;
 
     element(
-        "hud-camera"
-    ).textContent = availabilityLabel(
-        cameraRunning,
-        "Ready",
-    );
+        "hud-vision"
+    ).textContent = visionText;
 
     element(
         "detail-battery"
@@ -472,30 +496,15 @@ function renderStatus(status) {
     );
 
     element(
-        "detail-camera"
-    ).textContent = availabilityLabel(
-        cameraRunning
-    );
-
-    element(
         "detail-vision"
-    ).textContent = availabilityLabel(
-        visionRunning
-    );
+    ).textContent = visionText;
 
     setHealthState(
         normalizeHealthState(status)
     );
 
-    element(
-        "hud-updated"
-    ).textContent = (
-        `Updated ${
-            new Date().toLocaleTimeString()
-        }`
-    );
+    updateTimestamp();
 }
-
 
 function renderDisconnected() {
     setHealthState(
@@ -506,22 +515,62 @@ function renderDisconnected() {
     );
 
     element(
+        "hud-battery"
+    ).textContent = "--";
+
+    element(
         "hud-control"
     ).textContent = "Unknown";
 
     element(
-        "hud-camera"
+        "hud-vision"
     ).textContent = "Unknown";
 
     element(
-        "hud-updated"
-    ).textContent = (
-        "Could not retrieve platform status."
-    );
+        "detail-battery"
+    ).textContent = "--";
+
+    element(
+        "detail-temperature"
+    ).textContent = "--";
+
+    element(
+        "detail-control"
+    ).textContent = "Unknown";
+
+    element(
+        "detail-network"
+    ).textContent = "Unknown";
+
+    element(
+        "detail-jupyter"
+    ).textContent = "Unknown";
+
+    element(
+        "detail-memory"
+    ).textContent = "--";
+
+    element(
+        "detail-disk"
+    ).textContent = "--";
+
+    element(
+        "detail-vision"
+    ).textContent = "Unknown";
+
+    clearTimestamp();
 }
 
 
-async function refreshStatus() {
+/* API */
+
+async function loadStatus() {
+    if (requestInProgress) {
+        return;
+    }
+
+    requestInProgress = true;
+
     try {
         const response = await fetch(
             "/api/status",
@@ -554,9 +603,13 @@ async function refreshStatus() {
         );
 
         renderDisconnected();
+    } finally {
+        requestInProgress = false;
     }
 }
 
+
+/* UI */
 
 function configureHudToggle() {
     const button = element(
@@ -587,15 +640,70 @@ function configureHudToggle() {
 }
 
 
-document.addEventListener(
-    "DOMContentLoaded",
-    () => {
-        configureHudToggle();
-        refreshStatus();
+/* Refresh lifecycle */
 
-        window.setInterval(
-            refreshStatus,
-            STATUS_REFRESH_INTERVAL_MS,
-        );
-    },
+function startAutomaticRefresh() {
+    stopAutomaticRefresh();
+
+    refreshTimer = window.setInterval(
+        () => {
+            void loadStatus();
+        },
+        STATUS_REFRESH_INTERVAL_MS
+    );
+}
+
+function stopAutomaticRefresh() {
+    if (refreshTimer === null) {
+        return;
+    }
+
+    window.clearInterval(
+        refreshTimer
+    );
+
+    refreshTimer = null;
+}
+
+
+/* Initialization */
+
+function initializeHomePage() {
+    configureHudToggle();
+
+    startAutomaticRefresh();
+
+    void loadStatus();
+}
+
+
+/* Event listeners */
+
+if (
+    document.readyState === "loading"
+) {
+    document.addEventListener(
+        "DOMContentLoaded",
+        initializeHomePage
+    );
+} else {
+    initializeHomePage();
+}
+
+document.addEventListener(
+    "visibilitychange",
+    () => {
+        if (document.hidden) {
+            stopAutomaticRefresh();
+            return;
+        }
+
+        startAutomaticRefresh();
+        void loadStatus();
+    }
+);
+
+window.addEventListener(
+    "beforeunload",
+    stopAutomaticRefresh
 );

@@ -14,6 +14,52 @@
         {% endblock %}
     </title>
 
+    <script>
+    (() => {
+        const root = document.documentElement;
+
+        const readStoredValue = (key) => {
+            try {
+                return window.localStorage.getItem(key);
+            } catch {
+                return null;
+            }
+        };
+
+        const theme = readStoredValue(
+            "betabox-launchpad-theme"
+        );
+
+        if (
+            theme === "light"
+            || theme === "dark"
+        ) {
+            root.dataset.theme = theme;
+        }
+
+        root.dataset.reducedMotion =
+            readStoredValue(
+                "betabox-launchpad-reduced-motion"
+            ) === "true"
+                ? "true"
+                : "false";
+
+        root.dataset.largerText =
+            readStoredValue(
+                "betabox-launchpad-larger-text"
+            ) === "true"
+                ? "true"
+                : "false";
+
+        root.dataset.compactLayout =
+            readStoredValue(
+                "betabox-launchpad-compact-layout"
+            ) === "true"
+                ? "true"
+                : "false";
+    })();
+    </script>
+
     <link
         rel="stylesheet"
         href="/static/css/tokens.css"

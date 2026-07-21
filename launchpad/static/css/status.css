@@ -9,7 +9,10 @@
         );
 
     margin-inline: auto;
-    padding: 1rem 1.5rem 3rem;
+    padding:
+        1rem
+        var(--page-padding)
+        3rem;
 }
 
 

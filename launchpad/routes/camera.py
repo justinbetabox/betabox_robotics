@@ -13,7 +13,7 @@ async def camera_page(
         request,
         {
             "page": {
-                "title": "Live Camera",
+                "title": "Vision",
                 "eyebrow": "Betabox Vision",
                 "main_class": "camera-main",
             },

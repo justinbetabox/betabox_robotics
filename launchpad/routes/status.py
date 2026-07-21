@@ -152,5 +152,5 @@ def setup_status_routes(
     app.router.add_get(
         "/api/status/report",
         status_report_api,
-        name="detailed-status-api",
+        name="status-report-api",
     )

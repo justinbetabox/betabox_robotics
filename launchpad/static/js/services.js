@@ -1,6 +1,19 @@
 "use strict";
 
+
+/* Constants */
+
 const SERVICES_API_URL = "/api/services";
+const REFRESH_INTERVAL_MS = 30000;
+
+
+/* Page state */
+
+let requestInProgress = false;
+let refreshTimer = null;
+
+
+/* DOM helpers */
 
 const elements = {
     connection: document.getElementById(
@@ -69,6 +82,229 @@ const elements = {
 };
 
 
+/* Formatting */
+
+function formatTimestamp(
+    date
+) {
+    return new Intl.DateTimeFormat(
+        undefined,
+        {
+            hour: "numeric",
+            minute: "2-digit",
+            second: "2-digit",
+        }
+    ).format(date);
+}
+
+function formatLabel(
+    value
+) {
+    if (!value) {
+        return "Unknown";
+    }
+
+    return String(value)
+        .replaceAll("-", " ")
+        .replaceAll("_", " ")
+        .replace(
+            /\b\w/g,
+            character => character.toUpperCase()
+        );
+}
+
+function stateLabel(
+    state
+) {
+    const labels = {
+        running: "Running",
+        completed: "Completed",
+        waiting: "Waiting",
+        starting: "Starting",
+        stopping: "Stopping",
+        reloading: "Reloading",
+        inactive: "Inactive",
+        failed: "Failed",
+        "not-installed": "Not Installed",
+        unknown: "Unknown",
+    };
+
+    return labels[state] || formatLabel(state);
+}
+
+function startupLabel(
+    startup
+) {
+    const labels = {
+        continuous: "Continuous",
+        oneshot: "One-Time Startup",
+        conditional: "Conditional",
+    };
+
+    return (
+        labels[startup]
+        || formatLabel(startup)
+    );
+}
+
+function categoryLabel(
+    category
+) {
+    const labels = {
+        boot: "Boot Service",
+        background: "Background Service",
+        web: "Web Service",
+        network: "Network Service",
+    };
+
+    return (
+        labels[category]
+        || formatLabel(category)
+    );
+}
+
+
+/* Classification */
+
+function healthClass(
+    health
+) {
+    if (health === "healthy") {
+        return "status-healthy";
+    }
+
+    if (health === "warning") {
+        return "status-warning";
+    }
+
+    if (health === "error") {
+        return "status-error";
+    }
+
+    return "status-unknown";
+}
+
+function serviceCardClass(
+    health
+) {
+    if (health === "healthy") {
+        return "service-card-healthy";
+    }
+
+    if (health === "warning") {
+        return "service-card-warning";
+    }
+
+    if (health === "error") {
+        return "service-card-error";
+    }
+
+    return "service-card-unknown";
+}
+
+function overallState(
+    summary
+) {
+    const errorCount = Number(
+        summary.error || 0
+    );
+
+    const warningCount = Number(
+        summary.warning || 0
+    );
+
+    const unknownCount = Number(
+        summary.unknown || 0
+    );
+
+    if (errorCount > 0) {
+        return {
+            label: "Critical",
+            className: "status-error",
+        };
+    }
+
+    if (
+        warningCount > 0
+        || unknownCount > 0
+    ) {
+        return {
+            label: "Needs Attention",
+            className: "status-warning",
+        };
+    }
+
+    return {
+        label: "Healthy",
+        className: "status-healthy",
+    };
+}
+
+function serviceNeedsAttention(
+    service
+) {
+    return (
+        service.health === "error"
+        || service.health === "warning"
+        || service.health === "unknown"
+    );
+}
+
+function attentionMessage(
+    service
+) {
+    if (service.state === "failed") {
+        return (
+            `${service.display_name} encountered `
+            + "an error."
+        );
+    }
+
+    if (service.state === "not-installed") {
+        return (
+            `${service.display_name} is not `
+            + "installed."
+        );
+    }
+
+    if (service.state === "inactive") {
+        return (
+            `${service.display_name} is not `
+            + "running."
+        );
+    }
+
+    if (
+        service.state === "starting"
+        || service.state === "stopping"
+        || service.state === "reloading"
+    ) {
+        return (
+            `${service.display_name} is currently `
+            + `${stateLabel(service.state).toLowerCase()}.`
+        );
+    }
+
+    return (
+        `${service.display_name} has an `
+        + "unknown service state."
+    );
+}
+
+
+/* UI helpers */
+
+function updateTimestamp() {
+    elements.updated.textContent = (
+        `Updated ${formatTimestamp(new Date())}`
+    );
+}
+
+function clearTimestamp() {
+    elements.updated.textContent =
+        "Service status unavailable";
+}
+
 function setConnectionState(
     state,
     label
@@ -98,7 +334,6 @@ function setConnectionState(
     connection.textContent = label;
 }
 
-
 function setLoadingState(
     loading
 ) {
@@ -119,7 +354,6 @@ function setLoadingState(
     }
 }
 
-
 function showError(
     message
 ) {
@@ -135,172 +369,12 @@ function showError(
     );
 }
 
-
 function hideError() {
     elements.errorPanel.hidden = true;
 }
 
 
-function formatTimestamp(
-    date
-) {
-    return new Intl.DateTimeFormat(
-        undefined,
-        {
-            hour: "numeric",
-            minute: "2-digit",
-            second: "2-digit",
-        }
-    ).format(date);
-}
-
-
-function formatLabel(
-    value
-) {
-    if (!value) {
-        return "Unknown";
-    }
-
-    return String(value)
-        .replaceAll("-", " ")
-        .replaceAll("_", " ")
-        .replace(
-            /\b\w/g,
-            character => character.toUpperCase()
-        );
-}
-
-
-function stateLabel(
-    state
-) {
-    const labels = {
-        running: "Running",
-        completed: "Completed",
-        waiting: "Waiting",
-        starting: "Starting",
-        stopping: "Stopping",
-        reloading: "Reloading",
-        inactive: "Inactive",
-        failed: "Failed",
-        "not-installed": "Not Installed",
-        unknown: "Unknown",
-    };
-
-    return labels[state] || formatLabel(state);
-}
-
-
-function startupLabel(
-    startup
-) {
-    const labels = {
-        continuous: "Continuous",
-        oneshot: "One-Time Startup",
-        conditional: "Conditional",
-    };
-
-    return (
-        labels[startup]
-        || formatLabel(startup)
-    );
-}
-
-
-function categoryLabel(
-    category
-) {
-    const labels = {
-        boot: "Boot Service",
-        background: "Background Service",
-        web: "Web Service",
-        network: "Network Service",
-    };
-
-    return (
-        labels[category]
-        || formatLabel(category)
-    );
-}
-
-
-function healthClass(
-    health
-) {
-    if (health === "healthy") {
-        return "status-healthy";
-    }
-
-    if (health === "warning") {
-        return "status-warning";
-    }
-
-    if (health === "error") {
-        return "status-error";
-    }
-
-    return "status-unknown";
-}
-
-
-function serviceCardClass(
-    health
-) {
-    if (health === "healthy") {
-        return "service-card-healthy";
-    }
-
-    if (health === "warning") {
-        return "service-card-warning";
-    }
-
-    if (health === "error") {
-        return "service-card-error";
-    }
-
-    return "service-card-unknown";
-}
-
-
-function overallState(
-    summary
-) {
-    const errorCount = Number(
-        summary.error || 0
-    );
-
-    const warningCount = Number(
-        summary.warning || 0
-    );
-
-    const unknownCount = Number(
-        summary.unknown || 0
-    );
-
-    if (errorCount > 0) {
-        return {
-            label: "Needs Attention",
-            className: "status-error",
-        };
-    }
-
-    if (
-        warningCount > 0
-        || unknownCount > 0
-    ) {
-        return {
-            label: "Check Services",
-            className: "status-warning",
-        };
-    }
-
-    return {
-        label: "All Services Healthy",
-        className: "status-healthy",
-    };
-}
-
+/* Rendering */
 
 function renderOverview(
     summary
@@ -345,7 +419,6 @@ function renderOverview(
     );
 }
 
-
 function createMetaItem(
     label,
     value
@@ -383,7 +456,6 @@ function createMetaItem(
 
     return item;
 }
-
 
 function createServiceCard(
     service
@@ -528,7 +600,6 @@ function createServiceCard(
     return article;
 }
 
-
 function renderServices(
     services
 ) {
@@ -564,60 +635,6 @@ function renderServices(
     }
 }
 
-
-function serviceNeedsAttention(
-    service
-) {
-    return (
-        service.health === "error"
-        || service.health === "warning"
-        || service.health === "unknown"
-    );
-}
-
-
-function attentionMessage(
-    service
-) {
-    if (service.state === "failed") {
-        return (
-            `${service.display_name} encountered `
-            + "an error."
-        );
-    }
-
-    if (service.state === "not-installed") {
-        return (
-            `${service.display_name} is not `
-            + "installed."
-        );
-    }
-
-    if (service.state === "inactive") {
-        return (
-            `${service.display_name} is not `
-            + "running."
-        );
-    }
-
-    if (
-        service.state === "starting"
-        || service.state === "stopping"
-        || service.state === "reloading"
-    ) {
-        return (
-            `${service.display_name} is currently `
-            + `${stateLabel(service.state).toLowerCase()}.`
-        );
-    }
-
-    return (
-        `${service.display_name} has an `
-        + "unknown service state."
-    );
-}
-
-
 function createAttentionItem(
     service
 ) {
@@ -625,7 +642,12 @@ function createAttentionItem(
         "article"
     );
 
-    item.className = "attention-item";
+    item.className = [
+        "attention-item",
+        service.health === "warning"
+            ? "attention-warning"
+            : "attention-critical",
+    ].join(" ");
 
     const indicator = document.createElement(
         "span"
@@ -676,7 +698,6 @@ function createAttentionItem(
     return item;
 }
 
-
 function renderAttention(
     services
 ) {
@@ -703,6 +724,22 @@ function renderAttention(
     elements.attentionSection.hidden = false;
 }
 
+function renderPage(payload) {
+    renderOverview(
+        payload.summary
+    );
+
+    renderAttention(
+        payload.services
+    );
+
+    renderServices(
+        payload.services
+    );
+}
+
+
+/* Validation */
 
 function validatePayload(
     payload
@@ -733,7 +770,14 @@ function validatePayload(
 }
 
 
+/* API */
+
 async function loadServices() {
+    if (requestInProgress) {
+        return;
+    }
+
+    requestInProgress = true;
     setLoadingState(true);
     hideError();
 
@@ -774,25 +818,13 @@ async function loadServices() {
 
         validatePayload(payload);
 
-        renderOverview(
-            payload.summary
-        );
+        renderPage(payload);
 
-        renderAttention(
-            payload.services
-        );
-
-        renderServices(
-            payload.services
-        );
-
-        elements.updated.textContent = (
-            `Updated ${formatTimestamp(new Date())}`
-        );
+        updateTimestamp();
 
         setConnectionState(
             "connected",
-            "Connected"
+            "Live"
         );
     } catch (error) {
         console.error(
@@ -808,33 +840,66 @@ async function loadServices() {
 
         showError(message);
 
-        elements.updated.textContent = (
-            "Service status unavailable"
-        );
+        clearTimestamp();
     } finally {
+        requestInProgress = false;
         setLoadingState(false);
     }
 }
 
 
+/* UI */
+
 function setupEventListeners() {
     elements.refreshButton.addEventListener(
         "click",
-        loadServices
+        () => {
+            void loadServices();
+        }
     );
 
     elements.retryButton.addEventListener(
         "click",
-        loadServices
+        () => {
+            void loadServices();
+        }
     );
 }
 
 
-function initializeServicesPage() {
-    setupEventListeners();
-    loadServices();
+/* Refresh lifecycle */
+
+function startAutomaticRefresh() {
+    stopAutomaticRefresh();
+
+    refreshTimer = window.setInterval(
+        () => {
+            void loadServices();
+        },
+        REFRESH_INTERVAL_MS
+    );
 }
 
+function stopAutomaticRefresh() {
+    if (refreshTimer === null) {
+        return;
+    }
+
+    window.clearInterval(refreshTimer);
+    refreshTimer = null;
+}
+
+
+/* Initialization */
+
+function initializeServicesPage() {
+    setupEventListeners();
+    startAutomaticRefresh();
+    void loadServices();
+}
+
+
+/* Event listeners */
 
 if (
     document.readyState === "loading"
@@ -846,3 +911,21 @@ if (
 } else {
     initializeServicesPage();
 }
+
+document.addEventListener(
+    "visibilitychange",
+    () => {
+        if (document.hidden) {
+            stopAutomaticRefresh();
+            return;
+        }
+
+        startAutomaticRefresh();
+        void loadServices();
+    }
+);
+
+window.addEventListener(
+    "beforeunload",
+    stopAutomaticRefresh
+);

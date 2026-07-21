@@ -88,6 +88,18 @@ video {
 }
 
 
+/* Timestamps */
+
+.timestamp {
+    margin: 0;
+
+    color: var(--color-text-soft);
+
+    font-size: var(--font-size-small);
+    text-align: right;
+}
+
+
 /* Layout */
 
 .content-container {
@@ -167,6 +179,7 @@ video {
     line-height: var(--line-height-body);
     text-align: center;
 }
+
 
 /* Forms */
 
@@ -278,6 +291,7 @@ video {
     color: var(--color-critical);
 }
 
+
 /* Numeric steppers */
 
 .stepper {
@@ -377,6 +391,7 @@ video {
     text-align: center;
 }
 
+
 /* Reading cards */
 
 .reading-grid {
@@ -453,7 +468,8 @@ video {
     font-variant-numeric: tabular-nums;
 }
 
-/* Card grids */
+
+/* Action cards */
 
 .card-grid {
     display: grid;
@@ -651,6 +667,41 @@ video {
 }
 
 
+/* Navigation */
+
+/* Back links */
+
+.back-link {
+    display: inline-flex;
+    align-items: center;
+
+    width: fit-content;
+
+    color: var(--color-primary);
+
+    font-weight: 800;
+    text-decoration: none;
+
+    transition:
+        color var(--transition-fast),
+        transform var(--transition-fast);
+}
+
+.back-link:hover {
+    color: var(--color-primary-hover);
+
+    transform: translateX(-3px);
+}
+
+.back-link:focus-visible {
+    border-radius: var(--radius-small);
+
+    outline:
+        3px solid var(--color-focus-ring);
+
+    outline-offset: 4px;
+}
+
 /* URL lists */
 
 .url-list {
@@ -727,38 +778,8 @@ video {
     color: var(--color-primary);
 }
 
-/* Back links */
 
-.back-link {
-    display: inline-flex;
-    align-items: center;
-
-    width: fit-content;
-
-    color: var(--color-primary);
-
-    font-weight: 800;
-    text-decoration: none;
-
-    transition:
-        color var(--transition-fast),
-        transform var(--transition-fast);
-}
-
-.back-link:hover {
-    color: var(--color-primary-hover);
-
-    transform: translateX(-3px);
-}
-
-.back-link:focus-visible {
-    border-radius: var(--radius-small);
-
-    outline:
-        3px solid var(--color-focus-ring);
-
-    outline-offset: 4px;
-}
+/* Status */
 
 /* Connection status */
 
@@ -823,7 +844,6 @@ video {
     background: var(--brand-pink-light);
     color: var(--color-critical);
 }
-
 
 /* Status indicators */
 
@@ -912,6 +932,8 @@ video {
 }
 
 
+/* Notifications */
+
 /* Notices */
 
 .notice {
@@ -939,7 +961,6 @@ video {
 .notice-success {
     border-left-color: var(--brand-green);
 }
-
 
 /* Error panels */
 
@@ -989,16 +1010,7 @@ video {
 }
 
 
-/* Update timestamps */
-
-.updated-time {
-    margin: 0;
-
-    color: var(--color-text-soft);
-
-    font-size: var(--font-size-small);
-    text-align: right;
-}
+/* Accessibility and utilities */
 
 .sr-only {
     position: absolute;
@@ -1037,7 +1049,6 @@ html[data-reduced-motion="true"] *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
 }
-
 
 /* Global compact layout */
 
@@ -1092,8 +1103,29 @@ html[data-compact-layout="true"]
 
 /* Responsive behavior */
 
+html[data-compact-layout="true"]
+    .form-section {
+    gap: 0.8rem;
+}
+
+html[data-compact-layout="true"]
+    .reading-card {
+    gap: 0.6rem;
+    padding: 0.75rem;
+}
+
+html[data-compact-layout="true"]
+    .stepper-button,
+html[data-compact-layout="true"]
+    .stepper-value {
+    min-height: 44px;
+}
+
+
+/* Responsive behavior */
+
 @media (max-width: 640px) {
-    .section-heading {
+.section-heading {
         align-items: flex-start;
         flex-direction: column;
     }
@@ -1132,7 +1164,7 @@ html[data-compact-layout="true"]
         width: 100%;
     }
 
-    .updated-time {
+    .timestamp {
         text-align: left;
     }
 
@@ -1142,44 +1174,8 @@ html[data-compact-layout="true"]
 
         font-size: 0.75rem;
     }
-}
 
-@media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
-        scroll-behavior: auto !important;
-        transition-duration: 0.01ms !important;
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-    }
-
-    .action-card:hover,
-    .button:active {
-        transform: none;
-    }
-}
-
-html[data-compact-layout="true"]
-    .form-section {
-    gap: 0.8rem;
-}
-
-html[data-compact-layout="true"]
-    .reading-card {
-    gap: 0.6rem;
-    padding: 0.75rem;
-}
-
-html[data-compact-layout="true"]
-    .stepper-button,
-html[data-compact-layout="true"]
-    .stepper-value {
-    min-height: 44px;
-}
-
-@media (max-width: 640px) {
-    .form-section-heading {
+.form-section-heading {
         align-items: flex-start;
     }
 
@@ -1202,5 +1198,21 @@ html[data-compact-layout="true"]
 
     .reading-card-heading .button {
         width: 100%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+    }
+
+    .action-card:hover,
+    .button:active {
+        transform: none;
     }
 }

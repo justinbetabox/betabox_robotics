@@ -1,5 +1,7 @@
 "use strict";
 
+/* Constants */
+
 const THEME_STORAGE_KEY =
     "betabox-launchpad-theme";
 
@@ -12,15 +14,54 @@ const LARGER_TEXT_STORAGE_KEY =
 const COMPACT_LAYOUT_STORAGE_KEY =
     "betabox-launchpad-compact-layout";
 
+
+/* DOM elements */
+
 const root =
     document.documentElement;
 
 
-function storedTheme() {
-    const value =
-        window.localStorage.getItem(
-            THEME_STORAGE_KEY
+/* Storage helpers */
+
+function readStoredValue(key) {
+    try {
+        return window.localStorage.getItem(key);
+    } catch {
+        return null;
+    }
+}
+
+function writeStoredValue(
+    key,
+    value,
+) {
+    try {
+        window.localStorage.setItem(
+            key,
+            value,
         );
+    } catch {
+        // Ignore storage failures.
+    }
+}
+
+function removeStoredValue(key) {
+    try {
+        window.localStorage.removeItem(
+            key,
+        );
+    } catch {
+        // Ignore storage failures.
+    }
+}
+
+
+/* Theme helpers */
+
+function storedTheme() {
+    const value = readStoredValue(
+        THEME_STORAGE_KEY,
+    );
 
     if (
         value === "light"
@@ -32,8 +73,24 @@ function storedTheme() {
     return null;
 }
 
+function systemTheme() {
+    return window.matchMedia(
+        "(prefers-color-scheme: dark)"
+    ).matches
+        ? "dark"
+        : "light";
+}
+
+function activeTheme() {
+    return (
+        root.dataset.theme
+        || storedTheme()
+        || systemTheme()
+    );
+}
+
 function useSystemTheme() {
-    window.localStorage.removeItem(
+    removeStoredValue(
         THEME_STORAGE_KEY
     );
 
@@ -51,33 +108,12 @@ function useSystemTheme() {
     );
 }
 
-function systemTheme() {
-    return window.matchMedia(
-        "(prefers-color-scheme: dark)"
-    ).matches
-        ? "dark"
-        : "light";
+
+/* Preference helpers */
+
+function storedBooleanPreference(key) {
+    return readStoredValue(key) === "true";
 }
-
-
-function activeTheme() {
-    return (
-        root.dataset.theme
-        || storedTheme()
-        || systemTheme()
-    );
-}
-
-
-function storedBooleanPreference(
-    key
-) {
-    return (
-        window.localStorage.getItem(key)
-        === "true"
-    );
-}
-
 
 function applyLaunchpadPreferences() {
     root.dataset.reducedMotion = (
@@ -106,6 +142,8 @@ function applyLaunchpadPreferences() {
 }
 
 
+/* Theme actions */
+
 function applyTheme(
     theme,
     {
@@ -122,7 +160,7 @@ function applyTheme(
     root.dataset.theme = theme;
 
     if (persist) {
-        window.localStorage.setItem(
+        writeStoredValue(
             THEME_STORAGE_KEY,
             theme
         );
@@ -140,7 +178,6 @@ function applyTheme(
     );
 }
 
-
 function toggleTheme() {
     applyTheme(
         activeTheme() === "dark"
@@ -152,6 +189,8 @@ function toggleTheme() {
     );
 }
 
+
+/* UI */
 
 function configureThemeToggle() {
     const toggle =
@@ -191,6 +230,9 @@ function configureThemeToggle() {
     updateLabel();
 }
 
+
+/* Public API */
+
 window.applyTheme = applyTheme;
 window.useSystemTheme = useSystemTheme;
 
@@ -207,6 +249,8 @@ window.betaboxPreferences = {
 };
 
 
+/* Startup */
+
 const initialTheme = storedTheme();
 
 if (initialTheme !== null) {
@@ -220,6 +264,9 @@ applyLaunchpadPreferences();
 const systemThemeQuery = window.matchMedia(
     "(prefers-color-scheme: dark)"
 );
+
+
+/* Event listeners */
 
 systemThemeQuery.addEventListener(
     "change",

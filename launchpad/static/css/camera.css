@@ -12,7 +12,7 @@
 }
 
 
-/* Camera area */
+/* Vision viewport */
 
 .camera-main {
     min-width: 0;
@@ -89,7 +89,7 @@
 }
 
 
-/* Camera connection states */
+/* Vision connection states */
 
 .connection-status.status-disconnected {
     border-color: var(--color-warning);

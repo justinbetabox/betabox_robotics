@@ -1,5 +1,8 @@
 "use strict";
 
+
+/* Constants */
+
 const STATUS_API_URL = "/api/status";
 const AUTO_REFRESH_INTERVAL_MS = 30_000;
 
@@ -20,18 +23,18 @@ const SERVICE_LABELS = {
         "Launchpad",
 };
 
+
+/* Page state */
+
 let requestInProgress = false;
 let refreshTimer = null;
 
 
-/*
- * Basic helpers
- */
+/* DOM helpers */
 
 function getElement(id) {
     return document.getElementById(id);
 }
-
 
 function setText(id, value) {
     const element = getElement(id);
@@ -42,10 +45,19 @@ function setText(id, value) {
 }
 
 
-function formatBoolean(value) {
-    return value ? "Yes" : "No";
-}
+/* Formatting */
 
+function formatBoolean(value) {
+    if (value === true) {
+        return "Yes";
+    }
+
+    if (value === false) {
+        return "No";
+    }
+
+    return "Unavailable";
+}
 
 function formatState(value) {
     if (
@@ -64,7 +76,6 @@ function formatState(value) {
         );
 }
 
-
 function formatVoltage(value) {
     if (typeof value !== "number") {
         return "Unavailable";
@@ -72,7 +83,6 @@ function formatVoltage(value) {
 
     return `${value.toFixed(2)} V`;
 }
-
 
 function formatTemperature(value) {
     if (typeof value !== "number") {
@@ -82,7 +92,6 @@ function formatTemperature(value) {
     return `${value.toFixed(1)} °C`;
 }
 
-
 function formatPercent(value) {
     if (typeof value !== "number") {
         return "Unavailable";
@@ -91,7 +100,6 @@ function formatPercent(value) {
     return `${value.toFixed(1)}%`;
 }
 
-
 function formatMegabytes(value) {
     if (typeof value !== "number") {
         return "Unavailable";
@@ -99,7 +107,6 @@ function formatMegabytes(value) {
 
     return `${value} MB`;
 }
-
 
 function formatGigabytes(value) {
     if (typeof value !== "number") {
@@ -110,14 +117,49 @@ function formatGigabytes(value) {
 }
 
 
+/* Classification */
+
 function serviceDisplayName(name) {
     return SERVICE_LABELS[name] ?? name;
 }
 
+function visionLabel(vision) {
+    if (!vision.service_available) {
+        return "Unavailable";
+    }
 
-/*
- * Status classification
- */
+    if (
+        vision.camera_running
+        && vision.camera_has_frame
+    ) {
+        return "Ready";
+    }
+
+    if (
+        vision.running
+        || vision.camera_running
+    ) {
+        return "Starting";
+    }
+
+    return "Offline";
+}
+
+function controlLabel(control) {
+    if (control.available === true) {
+        return "Available";
+    }
+
+    if (control.owner) {
+        return String(control.owner);
+    }
+
+    if (control.available === false) {
+        return "In Use";
+    }
+
+    return "Unavailable";
+}
 
 function statusClass(state) {
     const normalized = String(state ?? "")
@@ -169,34 +211,6 @@ function statusClass(state) {
     return "unknown";
 }
 
-
-function setOverallStatus(label, state) {
-    setText(
-        "overall-status",
-        label,
-    );
-
-    const indicator = getElement(
-        "overall-indicator",
-    );
-
-    if (!indicator) {
-        return;
-    }
-
-    indicator.classList.remove(
-        "status-healthy",
-        "status-warning",
-        "status-critical",
-        "status-unknown",
-    );
-
-    indicator.classList.add(
-        `status-${statusClass(state)}`,
-    );
-}
-
-
 function determineOverallStatus(data) {
     const attentionItems = (
         collectAttentionItems(data)
@@ -227,9 +241,100 @@ function determineOverallStatus(data) {
 }
 
 
-/*
- * Generic detail cards
- */
+/* UI helpers */
+
+function setOverallStatus(label, state) {
+    setText(
+        "overall-status",
+        label,
+    );
+
+    const indicator = getElement(
+        "overall-indicator",
+    );
+
+    if (!indicator) {
+        return;
+    }
+
+    indicator.classList.remove(
+        "status-healthy",
+        "status-warning",
+        "status-critical",
+        "status-unknown",
+    );
+
+    indicator.classList.add(
+        `status-${statusClass(state)}`,
+    );
+}
+
+function markStatusStale() {
+    setText(
+        "status-updated",
+        "Status may be out of date.",
+    );
+}
+
+function updateTimestamp() {
+    setText(
+        "status-updated",
+        `Updated ${new Date().toLocaleString()}`,
+    );
+}
+
+function setConnectionState(
+    state,
+    text,
+) {
+    const connection = getElement(
+        "status-connection",
+    );
+
+    if (!connection) {
+        return;
+    }
+
+    connection.classList.remove(
+        "status-connecting",
+        "status-connected",
+        "status-error",
+    );
+
+    connection.classList.add(
+        `status-${state}`,
+    );
+
+    connection.textContent = text;
+}
+
+function showError(message) {
+    const panel = getElement(
+        "status-error-panel",
+    );
+
+    setText(
+        "status-error-message",
+        message,
+    );
+
+    if (panel) {
+        panel.hidden = false;
+    }
+}
+
+function hideError() {
+    const panel = getElement(
+        "status-error-panel",
+    );
+
+    if (panel) {
+        panel.hidden = true;
+    }
+}
+
+
+/* Rendering */
 
 function createDetailItem(label, value) {
     const item = document.createElement(
@@ -260,7 +365,6 @@ function createDetailItem(label, value) {
     return item;
 }
 
-
 function renderDetailItems(
     containerId,
     items,
@@ -283,10 +387,46 @@ function renderDetailItems(
     }
 }
 
+function renderServiceSummary(data) {
+    const states = Object.values(
+        data.services ?? {},
+    );
 
-/*
- * Overview
- */
+    const activeCount = states.filter(
+        (state) => state === "active",
+    ).length;
+
+    const failedCount = states.filter(
+        (state) => state === "failed",
+    ).length;
+
+    const otherCount = (
+        states.length
+        - activeCount
+        - failedCount
+    );
+
+    const parts = [
+        `${activeCount} active`,
+    ];
+
+    if (failedCount > 0) {
+        parts.push(
+            `${failedCount} failed`,
+        );
+    }
+
+    if (otherCount > 0) {
+        parts.push(
+            `${otherCount} other`,
+        );
+    }
+
+    setText(
+        "services-status",
+        parts.join(" · "),
+    );
+}
 
 function renderOverview(data) {
     const overall = determineOverallStatus(
@@ -330,19 +470,12 @@ function renderOverview(data) {
 
     setText(
         "robot-status",
-        control.available
-            ? "Available"
-            : "Unavailable",
+        controlLabel(control),
     );
 
     setText(
         "vision-status",
-        vision.camera_running
-            && vision.camera_has_frame
-            ? "Online"
-            : vision.running
-                ? "Starting"
-                : "Offline",
+        visionLabel(vision),
     );
 
     setText(
@@ -356,11 +489,6 @@ function renderOverview(data) {
 
     renderServiceSummary(data);
 }
-
-
-/*
- * Attention section
- */
 
 function createAttentionItem(
     title,
@@ -416,7 +544,6 @@ function createAttentionItem(
 
     return item;
 }
-
 
 function collectAttentionItems(data) {
     const items = [];
@@ -490,9 +617,9 @@ function collectAttentionItems(data) {
 
     if (!vision.service_available) {
         items.push({
-            title: "Video Service Unavailable",
+            title: "Vision Service Unavailable",
             message: (
-                "The robot video service could not "
+                "The robot vision service could not "
                 + "be reached."
             ),
             severity: "critical",
@@ -502,9 +629,9 @@ function collectAttentionItems(data) {
         || !vision.camera_has_frame
     ) {
         items.push({
-            title: "Camera Not Ready",
+            title: "Vision Not Ready",
             message: (
-                "The video service is available, "
+                "The vision service is available, "
                 + "but the camera is not producing "
                 + "a usable frame."
             ),
@@ -514,7 +641,7 @@ function collectAttentionItems(data) {
 
     if (vision.error) {
         items.push({
-            title: "Camera Error",
+            title: "Vision Error",
             message: String(vision.error),
             severity: "warning",
         });
@@ -678,7 +805,6 @@ function collectAttentionItems(data) {
     return items;
 }
 
-
 function renderAttention(data) {
     const section = getElement(
         "attention-section",
@@ -716,11 +842,6 @@ function renderAttention(data) {
     section.hidden = false;
 }
 
-
-/*
- * Hardware and control
- */
-
 function renderHardware(data) {
     const battery = (
         data.hardware?.battery ?? {}
@@ -731,12 +852,6 @@ function renderHardware(data) {
     );
 
     const control = data.control ?? {};
-
-    let controlOwner = "None";
-
-    if (control.owner) {
-        controlOwner = String(control.owner);
-    }
 
     renderDetailItems(
         "hardware-status",
@@ -750,51 +865,36 @@ function renderHardware(data) {
                 formatState(battery.state),
             ],
             [
-                "Battery Available",
-                formatBoolean(
-                    Boolean(battery.available),
-                ),
-            ],
-            [
                 "Control Available",
-                formatBoolean(
-                    Boolean(control.available),
-                ),
+                formatBoolean(control.available),
             ],
             [
                 "Control Owner",
-                controlOwner,
+                control.owner
+                    ? String(control.owner)
+                    : "None",
             ],
             [
-                "Camera Service",
+                "Vision Service",
                 vision.service_available
                     ? "Available"
                     : "Unavailable",
             ],
             [
-                "Camera Running",
-                formatBoolean(
-                    Boolean(vision.camera_running),
-                ),
+                "Vision Running",
+                formatBoolean(vision.camera_running),
             ],
             [
-                "Camera Has Frame",
-                formatBoolean(
-                    Boolean(vision.camera_has_frame),
-                ),
+                "Vision Frame Available",
+                formatBoolean(vision.camera_has_frame),
             ],
             [
-                "Video Clients",
+                "Vision Clients",
                 String(vision.clients ?? 0),
             ],
         ],
     );
 }
-
-
-/*
- * System resources
- */
 
 function renderSystem(data) {
     const health = data.system_health ?? {};
@@ -907,11 +1007,6 @@ function renderSystem(data) {
     );
 }
 
-
-/*
- * Network
- */
-
 function renderNetwork(data) {
     const health = data.system_health ?? {};
 
@@ -940,9 +1035,7 @@ function renderNetwork(data) {
             ],
             [
                 "Ethernet Connected",
-                formatBoolean(
-                    Boolean(ethernet.connected),
-                ),
+                formatBoolean(ethernet.connected),
             ],
             [
                 "Ethernet State",
@@ -961,9 +1054,7 @@ function renderNetwork(data) {
             ],
             [
                 "Wi-Fi Connected",
-                formatBoolean(
-                    Boolean(wifi.connected),
-                ),
+                formatBoolean(wifi.connected),
             ],
             [
                 "Wi-Fi State",
@@ -979,76 +1070,6 @@ function renderNetwork(data) {
     );
 }
 
-
-/*
- * Page state
- */
-
-function updateTimestamp() {
-    setText(
-        "status-updated",
-        `Updated ${new Date().toLocaleString()}`,
-    );
-}
-
-
-function setConnectionState(
-    state,
-    text,
-) {
-    const element = getElement(
-        "status-connection",
-    );
-
-    if (!element) {
-        return;
-    }
-
-    element.classList.remove(
-        "status-connecting",
-        "status-connected",
-        "status-error",
-    );
-
-    element.classList.add(
-        `status-${state}`,
-    );
-
-    element.textContent = text;
-}
-
-
-function showError(message) {
-    const panel = getElement(
-        "status-error-panel",
-    );
-
-    setText(
-        "status-error-message",
-        message,
-    );
-
-    if (panel) {
-        panel.hidden = false;
-    }
-}
-
-
-function hideError() {
-    const panel = getElement(
-        "status-error-panel",
-    );
-
-    if (panel) {
-        panel.hidden = true;
-    }
-}
-
-
-/*
- * Full render
- */
-
 function renderStatus(data) {
     renderOverview(data);
     renderAttention(data);
@@ -1058,50 +1079,23 @@ function renderStatus(data) {
     updateTimestamp();
 }
 
-function renderServiceSummary(data) {
-    const states = Object.values(
-        data.services ?? {},
-    );
 
-    const activeCount = states.filter(
-        (state) => state === "active",
-    ).length;
+/* Validation */
 
-    const failedCount = states.filter(
-        (state) => state === "failed",
-    ).length;
-
-    const otherCount = (
-        states.length
-        - activeCount
-        - failedCount
-    );
-
-    const parts = [
-        `${activeCount} active`,
-    ];
-
-    if (failedCount > 0) {
-        parts.push(
-            `${failedCount} failed`,
+function validatePayload(data) {
+    if (
+        !data
+        || typeof data !== "object"
+        || Array.isArray(data)
+    ) {
+        throw new Error(
+            "Status API returned an invalid response."
         );
     }
-
-    if (otherCount > 0) {
-        parts.push(
-            `${otherCount} other`,
-        );
-    }
-
-    setText(
-        "services-status",
-        parts.join(" · "),
-    );
 }
 
-/*
- * API loading
- */
+
+/* API */
 
 async function loadStatus() {
     if (requestInProgress) {
@@ -1150,7 +1144,7 @@ async function loadStatus() {
                     message = errorPayload.message;
                 }
             } catch {
-                // Keep the HTTP status message.
+                // Preserve the HTTP error message.
             }
 
             throw new Error(message);
@@ -1158,16 +1152,7 @@ async function loadStatus() {
 
         const data = await response.json();
 
-        if (
-            !data
-            || typeof data !== "object"
-            || Array.isArray(data)
-        ) {
-            throw new Error(
-                "Status API returned an "
-                + "invalid response.",
-            );
-        }
+        validatePayload(data);
 
         renderStatus(data);
         hideError();
@@ -1181,6 +1166,8 @@ async function loadStatus() {
             "Unable to load platform status:",
             error,
         );
+
+        markStatusStale();
 
         showError(
             error instanceof Error
@@ -1202,29 +1189,35 @@ async function loadStatus() {
 }
 
 
-/*
- * Initialization
- */
+/* Refresh lifecycle */
 
 function startAutomaticRefresh() {
-    if (refreshTimer !== null) {
-        window.clearInterval(
-            refreshTimer,
-        );
-    }
+    stopAutomaticRefresh();
 
     refreshTimer = window.setInterval(
         () => {
-            if (!document.hidden) {
-                void loadStatus();
-            }
+            void loadStatus();
         },
         AUTO_REFRESH_INTERVAL_MS
     );
 }
 
+function stopAutomaticRefresh() {
+    if (refreshTimer === null) {
+        return;
+    }
 
-function initialize() {
+    window.clearInterval(
+        refreshTimer
+    );
+
+    refreshTimer = null;
+}
+
+
+/* Initialization */
+
+function initializeStatusPage() {
     getElement(
         "refresh-status"
     )?.addEventListener(
@@ -1243,31 +1236,39 @@ function initialize() {
         }
     );
 
-    document.addEventListener(
-        "visibilitychange",
-        () => {
-            if (
-                document.visibilityState
-                === "visible"
-            ) {
-                void loadStatus();
-            }
-        }
-    );
-
     startAutomaticRefresh();
 
     void loadStatus();
 }
 
 
+/* Event listeners */
+
 if (
     document.readyState === "loading"
 ) {
     document.addEventListener(
         "DOMContentLoaded",
-        initialize
+        initializeStatusPage
     );
 } else {
-    initialize();
+    initializeStatusPage();
 }
+
+document.addEventListener(
+    "visibilitychange",
+    () => {
+        if (document.hidden) {
+            stopAutomaticRefresh();
+            return;
+        }
+
+        startAutomaticRefresh();
+        void loadStatus();
+    }
+);
+
+window.addEventListener(
+    "beforeunload",
+    stopAutomaticRefresh
+);

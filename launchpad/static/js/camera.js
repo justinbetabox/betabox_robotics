@@ -1,7 +1,42 @@
+"use strict";
+
 import {
     VideoConnection,
 } from "./webrtc.js";
 
+/* Constants */
+
+const VIDEO_STATE_LABELS = {
+    connecting: "Connecting…",
+    connected: "Connected",
+    disconnected: "Reconnecting…",
+    error: "Unavailable",
+    closed: "Disconnected",
+};
+
+const VIDEO_STATE_CLASSES = {
+    connecting: "status-connecting",
+    connected: "status-connected",
+    disconnected: "status-disconnected",
+    error: "status-error",
+    closed: "status-disconnected",
+};
+
+const VIDEO_STATE_MESSAGES = {
+    connecting: "Connecting vision…",
+    connected: "",
+    disconnected: "Reconnecting vision…",
+    error: "Vision unavailable",
+    closed: "Vision disconnected",
+};
+
+
+/* Page state */
+
+let videoConnection = null;
+
+
+/* DOM elements */
 
 const video = document.getElementById(
     "live-camera"
@@ -19,29 +54,13 @@ const message = document.querySelector(
     ".camera-message"
 );
 
-let videoConnection = null;
 
+/* UI Helpers */
 
 function setVideoState(
     state
 ) {
     view.dataset.videoState = state;
-
-    const labels = {
-        connecting: "Connecting…",
-        connected: "Connected",
-        disconnected: "Reconnecting…",
-        error: "Unavailable",
-        closed: "Disconnected",
-    };
-
-    const classes = {
-        connecting: "status-connecting",
-        connected: "status-connected",
-        disconnected: "status-disconnected",
-        error: "status-error",
-        closed: "status-disconnected",
-    };
 
     status.classList.remove(
         "status-connecting",
@@ -51,36 +70,23 @@ function setVideoState(
     );
 
     status.classList.add(
-        classes[state]
+        VIDEO_STATE_CLASSES[state]
         ?? "status-error"
     );
 
     status.textContent = (
-        labels[state]
+        VIDEO_STATE_LABELS[state]
         ?? "Unknown"
     );
 
     message.textContent = (
-        {
-            connecting:
-                "Connecting camera…",
-
-            connected:
-                "",
-
-            disconnected:
-                "Reconnecting camera…",
-
-            error:
-                "Camera unavailable",
-
-            closed:
-                "Camera disconnected",
-        }[state]
-        ?? "Camera status unknown"
+        VIDEO_STATE_MESSAGES[state]
+        ?? "Vision status unknown"
     );
 }
 
+
+/* Initialization */
 
 function initializeCameraPage() {
     videoConnection = (
@@ -109,6 +115,8 @@ if (
     initializeCameraPage();
 }
 
+
+/* Cleanup */
 
 window.addEventListener(
     "beforeunload",

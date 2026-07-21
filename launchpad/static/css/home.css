@@ -157,6 +157,10 @@
     background: var(--brand-pink);
 }
 
+.hud-health-dot.status-unknown {
+    background: var(--color-neutral);
+}
+
 .hud-details {
     width:
         min(
@@ -206,6 +210,11 @@
 }
 
 .hud-detail span {
+    display: flex;
+    align-items: flex-start;
+
+    min-height: 2.4em;
+
     color: rgb(255 255 255 / 66%);
 
     font-size: 0.72rem;

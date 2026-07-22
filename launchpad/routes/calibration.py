@@ -266,11 +266,7 @@ async def calibration_page(
             "page": {
                 "title": "Calibration",
                 "eyebrow": "Robot Setup",
-                "main_class": (
-                    "content-container "
-                    "page-content "
-                    "calibration-layout"
-                ),
+                "main_class": "page-layout calibration-layout"
             },
         },
     )

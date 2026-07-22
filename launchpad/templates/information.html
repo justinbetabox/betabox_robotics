@@ -31,30 +31,32 @@
 
 {% block page_content %}
     <section
-        class="information-intro"
+        class="page-section"
         aria-labelledby="information-heading"
     >
-        <div>
-            <p class="eyebrow">
-                About This Robot
-            </p>
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">
+                    About This Robot
+                </p>
 
-            <h2 id="information-heading">
-                Platform Information
-            </h2>
+                <h2 id="information-heading">
+                    Platform Information
+                </h2>
 
-            <p>
-                View this robot's identity, network addresses,
-                software versions, storage, and available features.
+                <p class="information-description">
+                    View this robot's identity, network addresses,
+                    software versions, storage, and available features.
+                </p>
+            </div>
+
+            <p
+                id="information-updated"
+                class="timestamp"
+            >
+                Loading platform information…
             </p>
         </div>
-
-        <p
-            id="information-updated"
-            class="updated-time"
-        >
-            Loading platform information…
-        </p>
     </section>
 
     <div class="information-columns">

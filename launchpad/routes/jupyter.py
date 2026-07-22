@@ -90,7 +90,7 @@ async def jupyter_page(
             "page": {
                 "title": "JupyterLab",
                 "eyebrow": "Betabox Coding",
-                "main_class": "jupyter-main",
+                "main_class": "page-layout jupyter-layout",
             },
         },
     )

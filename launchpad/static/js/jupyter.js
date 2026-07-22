@@ -1,9 +1,20 @@
 "use strict";
 
+
+/* Constants */
+
 const JUPYTER_STATUS_URL = (
     "/api/jupyter/status"
 );
 
+
+/* Page state */
+
+let requestInProgress = false;
+let refreshTimer = null;
+
+
+/* DOM helpers */
 
 function requireElement(
     selector
@@ -20,7 +31,6 @@ function requireElement(
 
     return found;
 }
-
 
 const elements = {
     status: requireElement(
@@ -52,9 +62,39 @@ const elements = {
     ),
 };
 
-let updateInProgress = false;
-let updateTimer = null;
 
+/* Formatting */
+
+function serviceStateLabel(
+    state
+) {
+    const labels = {
+        active: "Running",
+        inactive: "Stopped",
+        failed: "Failed",
+        activating: "Starting",
+        deactivating: "Stopping",
+    };
+
+    return labels[state] || "Unknown";
+}
+
+function buildJupyterUrl(
+    port
+) {
+    const protocol = window.location.protocol;
+    const hostname = window.location.hostname;
+
+    return (
+        `${protocol}//${hostname}:${port}/hub/`
+    );
+}
+
+
+/* Classification */
+
+
+/* UI helpers */
 
 function setStatusClass(
     element,
@@ -74,34 +114,6 @@ function setStatusClass(
     );
 }
 
-
-function serviceStateLabel(
-    state
-) {
-    const labels = {
-        active: "Running",
-        inactive: "Stopped",
-        failed: "Failed",
-        activating: "Starting",
-        deactivating: "Stopping",
-    };
-
-    return labels[state] || "Unknown";
-}
-
-
-function buildJupyterUrl(
-    port
-) {
-    const protocol = window.location.protocol;
-    const hostname = window.location.hostname;
-
-    return (
-        `${protocol}//${hostname}:${port}/hub/`
-    );
-}
-
-
 function disableButton() {
     elements.openButton.href = "#";
 
@@ -119,7 +131,6 @@ function disableButton() {
         "-1"
     );
 }
-
 
 function enableButton(
     port
@@ -143,10 +154,31 @@ function enableButton(
 }
 
 
+/* Rendering */
+
+function renderLoading() {
+    elements.status.textContent = "Loading…";
+
+    setStatusClass(
+        elements.status,
+        "status-connecting"
+    );
+
+    setStatusClass(
+        elements.healthDot,
+        "status-unknown"
+    );
+
+    disableButton();
+
+    elements.message.textContent =
+        "Checking JupyterHub…";
+}
+
 function renderAvailable(
     data
 ) {
-    elements.status.textContent = "Available";
+    elements.status.textContent = "Live";
 
     setStatusClass(
         elements.status,
@@ -164,7 +196,6 @@ function renderAvailable(
         "JupyterLab is ready."
     );
 }
-
 
 function renderServiceOffline() {
     elements.status.textContent = (
@@ -190,7 +221,6 @@ function renderServiceOffline() {
     );
 }
 
-
 function renderNotResponding() {
     elements.status.textContent = (
         "Not Responding"
@@ -213,7 +243,6 @@ function renderNotResponding() {
         + "web interface is not responding."
     );
 }
-
 
 function renderUnavailable() {
     elements.status.textContent = (
@@ -248,6 +277,23 @@ function renderUnavailable() {
     );
 }
 
+function renderServiceInfo(
+    data
+) {
+    elements.serviceState.textContent =
+        serviceStateLabel(data.state);
+
+    elements.httpState.textContent =
+        data.responding
+            ? "Responding"
+            : "Unavailable";
+
+    elements.port.textContent =
+        String(data.port);
+}
+
+
+/* Validation */
 
 function validatePayload(
     data
@@ -287,12 +333,16 @@ function validatePayload(
 }
 
 
-async function updateStatus() {
-    if (updateInProgress) {
+/* API */
+
+async function loadJupyterStatus() {
+    if (requestInProgress) {
         return;
     }
 
-    updateInProgress = true;
+    requestInProgress = true;
+
+    renderLoading();
 
     try {
         const response = await fetch(
@@ -317,19 +367,7 @@ async function updateStatus() {
 
         validatePayload(data);
 
-        elements.serviceState.textContent = (
-            serviceStateLabel(data.state)
-        );
-
-        elements.httpState.textContent = (
-            data.responding
-                ? "Responding"
-                : "Unavailable"
-        );
-
-        elements.port.textContent = (
-            String(data.port)
-        );
+        renderServiceInfo(data);
 
         if (
             data.active
@@ -349,12 +387,14 @@ async function updateStatus() {
             error
         );
     } finally {
-        updateInProgress = false;
+        requestInProgress = false;
     }
 }
 
 
-function initializeJupyterPage() {
+/* UI */
+
+function setupUI() {
     elements.openButton.addEventListener(
         "click",
         event => {
@@ -367,45 +407,44 @@ function initializeJupyterPage() {
             }
         }
     );
+}
 
-    document.addEventListener(
-        "visibilitychange",
+
+/* Refresh lifecycle */
+
+function startAutomaticRefresh() {
+    stopAutomaticRefresh();
+
+    refreshTimer = window.setInterval(
         () => {
-            if (!document.hidden) {
-                void updateStatus();
-            }
-        }
-    );
-
-    void updateStatus();
-
-    updateTimer = window.setInterval(
-        () => {
-            if (!document.hidden) {
-                void updateStatus();
-            }
+            void loadJupyterStatus();
         },
         10000
     );
 }
 
-
-function cleanupJupyterPage() {
-    if (updateTimer !== null) {
-        window.clearInterval(
-            updateTimer
-        );
-
-        updateTimer = null;
+function stopAutomaticRefresh() {
+    if (refreshTimer === null) {
+        return;
     }
+
+    window.clearInterval(refreshTimer);
+    refreshTimer = null;
 }
 
 
-window.addEventListener(
-    "beforeunload",
-    cleanupJupyterPage
-);
+/* Initialization */
 
+function initializeJupyterPage() {
+    setupUI();
+
+    startAutomaticRefresh();
+
+    void loadJupyterStatus();
+}
+
+
+/* Event listeners */
 
 if (
     document.readyState === "loading"
@@ -417,3 +456,21 @@ if (
 } else {
     initializeJupyterPage();
 }
+
+document.addEventListener(
+    "visibilitychange",
+    () => {
+        if (document.hidden) {
+            stopAutomaticRefresh();
+            return;
+        }
+
+        startAutomaticRefresh();
+        void loadJupyterStatus();
+    }
+);
+
+window.addEventListener(
+    "beforeunload",
+    stopAutomaticRefresh
+);

@@ -74,7 +74,7 @@ async def events_page(
             "page": {
                 "title": "Events",
                 "eyebrow": "Platform Activity",
-                "main_class": "events-layout",
+                "main_class": "page-layout events-layout",
             },
         },
     )

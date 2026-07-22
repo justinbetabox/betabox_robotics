@@ -24,7 +24,7 @@ async def diagnostics_page(
             "page": {
                 "title": "Diagnostics",
                 "eyebrow": "Platform Health",
-                "main_class": "diagnostics-layout",
+                "main_class": "page-layout diagnostics-layout",
             },
         },
     )
@@ -50,17 +50,13 @@ async def diagnostics_api(
             collect_doctor_report,
             config,
         )
-    except Exception as exc:
+    except Exception:
         return web.json_response(
             {
-                "error": (
-                    "diagnostics_unavailable"
-                ),
+                "error": "diagnostics_unavailable",
                 "message": (
-                    "Unable to run platform "
-                    "diagnostics."
+                    "Unable to run platform diagnostics."
                 ),
-                "detail": str(exc),
             },
             status=500,
         )

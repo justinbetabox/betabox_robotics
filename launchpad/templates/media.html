@@ -33,119 +33,126 @@
 
 {% block page_content %}
     <section
-        class="media-introduction"
-        aria-labelledby="media-heading"
+        class="
+            page-section
+        "
+        aria-labelledby="media-overview-heading"
     >
-        <div>
-            <p class="eyebrow">
-                Robot Files
-            </p>
+        <div class="section-heading">
+            <div>
+                <p class="eyebrow">
+                    Robot Files
+                </p>
 
-            <h2
-                id="media-heading"
-                class="section-title"
-            >
-                Browse captured media
-            </h2>
+                <h2 id="media-overview-heading">
+                    Overview
+                </h2>
+            </div>
 
-            <p class="page-description">
-                View pictures, recordings, and sounds
+            <p class="timestamp">
+                Pictures, recordings, and sounds
                 stored on this robot.
             </p>
         </div>
 
+        <div
+            class="overview-grid"
+            aria-label="Media summary"
+        >
+            <article class="overview-card">
+                <span class="overview-label">
+                    All Files
+                </span>
+
+                <strong
+                    id="media-total-count"
+                    class="overview-value"
+                >
+                    —
+                </strong>
+            </article>
+
+            <article class="overview-card">
+                <span class="overview-label">
+                    Pictures
+                </span>
+
+                <strong
+                    id="media-picture-count"
+                    class="overview-value"
+                >
+                    —
+                </strong>
+            </article>
+
+            <article class="overview-card">
+                <span class="overview-label">
+                    Videos
+                </span>
+
+                <strong
+                    id="media-video-count"
+                    class="overview-value"
+                >
+                    —
+                </strong>
+            </article>
+
+            <article class="overview-card">
+                <span class="overview-label">
+                    Sounds
+                </span>
+
+                <strong
+                    id="media-sound-count"
+                    class="overview-value"
+                >
+                    —
+                </strong>
+            </article>
+
+            <article class="overview-card">
+                <span class="overview-label">
+                    Storage Used
+                </span>
+
+                <strong
+                    id="media-total-size"
+                    class="overview-value"
+                >
+                    —
+                </strong>
+            </article>
+        </div>
     </section>
 
 
     <section
-        class="media-summary"
-        aria-label="Media summary"
+        class="
+            page-section
+        "
+        aria-labelledby="media-library-heading"
     >
-        <article class="media-summary-card">
-            <span class="media-summary-label">
-                All Files
-            </span>
-
-            <strong
-                id="media-total-count"
-                class="media-summary-value"
-            >
-                —
-            </strong>
-        </article>
-
-        <article class="media-summary-card">
-            <span class="media-summary-label">
-                Pictures
-            </span>
-
-            <strong
-                id="media-picture-count"
-                class="media-summary-value"
-            >
-                —
-            </strong>
-        </article>
-
-        <article class="media-summary-card">
-            <span class="media-summary-label">
-                Videos
-            </span>
-
-            <strong
-                id="media-video-count"
-                class="media-summary-value"
-            >
-                —
-            </strong>
-        </article>
-
-        <article class="media-summary-card">
-            <span class="media-summary-label">
-                Sounds
-            </span>
-
-            <strong
-                id="media-sound-count"
-                class="media-summary-value"
-            >
-                —
-            </strong>
-        </article>
-
-        <article class="media-summary-card">
-            <span class="media-summary-label">
-                Storage Used
-            </span>
-
-            <strong
-                id="media-total-size"
-                class="media-summary-value"
-            >
-                —
-            </strong>
-        </article>
-    </section>
-
-
-    <section
-        class="media-browser panel"
-        aria-labelledby="media-browser-heading"
-    >
-        <div class="media-toolbar">
+        <div class="section-heading">
             <div>
-                <h2 class="media-toolbar-title">
+                <p class="eyebrow">
+                    Browse and Manage
+                </p>
+
+                <h2 id="media-library-heading">
                     Media Library
                 </h2>
-
-                <p
-                    id="media-result-summary"
-                    class="media-result-summary"
-                >
-                    0 files
-                </p>
             </div>
+
+            <p
+                id="media-result-summary"
+                class="timestamp"
+            >
+                0 files
+            </p>
         </div>
+
+        <div class="media-browser panel">
 
 
         <div class="media-controls">
@@ -394,7 +401,8 @@
             aria-live="polite"
             hidden
         ></div>
-    </section>
+    </div>
+</section>
 
 
     <p

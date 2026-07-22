@@ -1,65 +1,12 @@
 .events-layout {
-    display: grid;
     gap: 1.5rem;
-
-    width:
-        min(
-            100%,
-            var(--content-width)
-        );
-
-    margin-inline: auto;
-    padding: 1.5rem;
 }
 
 
 /* Sections */
 
-.events-section {
-    display: grid;
-    gap: 1rem;
-}
-
-.events-section h2 {
-    margin: 0;
-
-    color: var(--color-text);
-
-    font-size:
-        clamp(1.35rem, 3vw, 1.8rem);
-
-    line-height: var(--line-height-heading);
-}
-
 
 /* Overview */
-
-.events-overview-grid {
-    display: grid;
-    grid-template-columns:
-        repeat(
-            auto-fit,
-            minmax(145px, 1fr)
-        );
-
-    gap: 0.85rem;
-}
-
-.events-overview-card {
-    display: grid;
-    align-content: center;
-    gap: 0.35rem;
-
-    min-height: 110px;
-    padding: 1rem;
-
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-large);
-
-    background: var(--color-surface-raised);
-
-    box-shadow: var(--shadow-small);
-}
 
 .events-overview-card-primary {
     display: flex;
@@ -67,20 +14,13 @@
     gap: 0.85rem;
 
     grid-column: span 2;
-
-    border-color: var(--color-primary);
-
-    background:
-        linear-gradient(
-            135deg,
-            var(--color-primary-subtle),
-            var(--color-surface-raised)
-        );
 }
 
 .events-overview-card-primary > div {
     display: grid;
     gap: 0.2rem;
+
+    min-width: 0;
 }
 
 .events-overview-card-primary
@@ -88,24 +28,6 @@
     width: 0.8rem;
     height: 0.8rem;
 }
-
-.events-overview-label {
-    color: var(--color-text-soft);
-
-    font-size: 0.72rem;
-    font-weight: 750;
-    letter-spacing: 0.06em;
-    line-height: 1.2;
-    text-transform: uppercase;
-}
-
-.events-overview-card strong {
-    color: var(--color-text);
-
-    font-size: 1.15rem;
-    line-height: 1.25;
-}
-
 
 /* Filters */
 
@@ -432,7 +354,6 @@
 html[data-compact-layout="true"]
     .events-layout {
     gap: 0.75rem;
-    padding: 0.75rem;
 }
 
 html[data-compact-layout="true"]
@@ -441,16 +362,8 @@ html[data-compact-layout="true"]
 }
 
 html[data-compact-layout="true"]
-    .events-overview-grid,
-html[data-compact-layout="true"]
     .events-list {
     gap: 0.5rem;
-}
-
-html[data-compact-layout="true"]
-    .events-overview-card {
-    min-height: 85px;
-    padding: 0.7rem;
 }
 
 html[data-compact-layout="true"]
@@ -498,10 +411,6 @@ html[data-compact-layout="true"]
 }
 
 @media (max-width: 640px) {
-    .events-layout {
-        padding: 1rem;
-    }
-
     .events-overview-card-primary {
         grid-column: auto;
     }

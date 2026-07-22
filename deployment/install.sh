@@ -64,6 +64,7 @@ python -m pip install --no-deps \
 
 python -m pip install \
     aiohttp \
+    aiohttp-jinja2 \
     aiortc \
     smbus2 \
     gpiozero

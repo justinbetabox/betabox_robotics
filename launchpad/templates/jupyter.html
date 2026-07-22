@@ -22,8 +22,8 @@
 {% endblock %}
 
 {% block page_content %}
-    <section class="jupyter-card">
-        <div class="jupyter-card-heading">
+    <section class="page-section jupyter-card">
+        <div class="section-heading jupyter-card-heading">
             <div>
                 <p class="eyebrow">
                     Coding Environment
@@ -50,32 +50,41 @@
         </p>
 
         <dl class="jupyter-details">
-            <div>
-                <dt>
+            <div class="detail-card">
+                <dt class="detail-label">
                     Service
                 </dt>
 
-                <dd id="jupyter-service-state">
+                <dd
+                    id="jupyter-service-state"
+                    class="detail-value"
+                >
                     Checking…
                 </dd>
             </div>
 
-            <div>
-                <dt>
+            <div class="detail-card">
+                <dt class="detail-label">
                     HTTP
                 </dt>
 
-                <dd id="jupyter-http-state">
+                <dd
+                    id="jupyter-http-state"
+                    class="detail-value"
+                >
                     Checking…
                 </dd>
             </div>
 
-            <div>
-                <dt>
+            <div class="detail-card">
+                <dt class="detail-label">
                     Port
                 </dt>
 
-                <dd id="jupyter-port">
+                <dd
+                    id="jupyter-port"
+                    class="detail-value"
+                >
                     --
                 </dd>
             </div>
@@ -105,7 +114,7 @@
         </p>
     </section>
 
-    <section class="ownership-card">
+    <section class="page-section ownership-card">
         <p class="eyebrow">
             Robot Ownership
         </p>

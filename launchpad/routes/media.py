@@ -526,11 +526,7 @@ async def media_page(
             "page": {
                 "title": "Media",
                 "eyebrow": "Robot Files",
-                "main_class": (
-                    "content-container "
-                    "page-content "
-                    "media-page"
-                ),
+                "main_class": "page-layout media-page"
             },
         },
     )

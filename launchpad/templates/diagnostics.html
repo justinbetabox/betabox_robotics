@@ -17,7 +17,7 @@
         role="status"
         aria-live="polite"
     >
-        Ready
+        Checking...
     </div>
 
     <button
@@ -25,15 +25,14 @@
         class="button"
         type="button"
     >
-        Run Diagnostics
+        Run
     </button>
 {% endblock %}
 
 {% block page_content %}
     <section
         class="
-            diagnostics-section
-            diagnostics-overview
+            page-section
         "
         aria-labelledby="overview-heading"
     >
@@ -50,16 +49,17 @@
 
             <p
                 id="diagnostics-updated"
-                class="updated-time"
+                class="timestamp"
             >
                 Diagnostics have not run yet.
             </p>
         </div>
 
-        <div class="diagnostics-overview-grid">
+        <div class="overview-grid">
             <article
                 class="
-                    diagnostics-overview-card
+                    overview-card
+                    overview-card-primary
                     diagnostics-overview-card-primary
                 "
             >
@@ -75,84 +75,102 @@
                 <div>
                     <span
                         class="
-                            diagnostics-overview-label
+                            overview-label
                         "
                     >
                         Overall Result
                     </span>
 
-                    <strong id="overall-status">
+                    <strong
+                        class="overview-value"
+                        id="overall-status"
+                    >
                         Not Run
                     </strong>
                 </div>
             </article>
 
-            <article class="diagnostics-overview-card">
+            <article class="overview-card">
                 <span
                     class="
-                        diagnostics-overview-label
+                        overview-label
                     "
                 >
                     Healthy
                 </span>
 
-                <strong id="healthy-count">
+                <strong
+                    class="overview-value"
+                    id="healthy-count"
+                >
                     --
                 </strong>
             </article>
 
-            <article class="diagnostics-overview-card">
+            <article class="overview-card">
                 <span
                     class="
-                        diagnostics-overview-label
+                        overview-label
                     "
                 >
                     Warnings
                 </span>
 
-                <strong id="warning-count">
+                <strong
+                    class="overview-value"
+                    id="warning-count"
+                >
                     --
                 </strong>
             </article>
 
-            <article class="diagnostics-overview-card">
+            <article class="overview-card">
                 <span
                     class="
-                        diagnostics-overview-label
+                        overview-label
                     "
                 >
                     Errors
                 </span>
 
-                <strong id="error-count">
+                <strong
+                    class="overview-value"
+                    id="error-count"
+                >
                     --
                 </strong>
             </article>
 
-            <article class="diagnostics-overview-card">
+            <article class="overview-card">
                 <span
                     class="
-                        diagnostics-overview-label
+                        overview-label
                     "
                 >
                     Critical
                 </span>
 
-                <strong id="critical-count">
+                <strong
+                    class="overview-value"
+                    id="critical-count"
+                >
                     --
                 </strong>
             </article>
 
-            <article class="diagnostics-overview-card">
+            <article class="overview-card">
                 <span
                     class="
-                        diagnostics-overview-label
+                        overview-label
                     "
                 >
                     Total Checks
                 </span>
 
-                <strong id="total-count">
+                <strong
+                    class="overview-value"
+                    id="total-count"
+                >
                     --
                 </strong>
             </article>
@@ -162,7 +180,7 @@
     <section
         id="issues-section"
         class="
-            diagnostics-section
+            page-section
             diagnostics-issues-section
         "
         aria-labelledby="issues-heading"
@@ -181,7 +199,7 @@
 
             <p
                 id="issues-summary"
-                class="updated-time"
+                class="timestamp"
             ></p>
         </div>
 
@@ -192,7 +210,7 @@
     </section>
 
     <section
-        class="diagnostics-section"
+        class="page-section"
         aria-labelledby="results-heading"
     >
         <div class="section-heading">
@@ -206,7 +224,7 @@
                 </h2>
             </div>
 
-            <p class="updated-time">
+            <p class="timestamp">
                 Safe, read-only platform checks
             </p>
         </div>

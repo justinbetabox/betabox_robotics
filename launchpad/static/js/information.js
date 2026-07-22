@@ -1,5 +1,8 @@
 "use strict";
 
+
+/* Constants */
+
 const INFORMATION_API_URL = "/api/information";
 
 const THEME_KEY = "betabox-launchpad-theme";
@@ -15,6 +18,16 @@ const LARGER_TEXT_KEY =
 const COMPACT_LAYOUT_KEY =
     "betabox-launchpad-compact-layout";
 
+const REFRESH_INTERVAL_MS = 30000;
+
+
+/* Page state */
+
+let requestInProgress = false;
+let refreshTimer = null;
+
+
+/* DOM helpers */
 
 const elements = {
     connection: document.getElementById(
@@ -167,72 +180,7 @@ const elements = {
 };
 
 
-function setConnectionState(
-    state,
-    label
-) {
-    elements.connection.classList.remove(
-        "status-connecting",
-        "status-connected",
-        "status-error"
-    );
-
-    if (state === "connected") {
-        elements.connection.classList.add(
-            "status-connected"
-        );
-    } else if (state === "error") {
-        elements.connection.classList.add(
-            "status-error"
-        );
-    } else {
-        elements.connection.classList.add(
-            "status-connecting"
-        );
-    }
-
-    elements.connection.textContent = label;
-}
-
-
-function setLoadingState(
-    loading
-) {
-    elements.refreshButton.disabled = loading;
-    elements.retryButton.disabled = loading;
-
-    elements.refreshButton.textContent = (
-        loading
-            ? "Refreshing…"
-            : "Refresh"
-    );
-
-    if (loading) {
-        setConnectionState(
-            "connecting",
-            "Loading…"
-        );
-    }
-}
-
-
-function showError(
-    message
-) {
-    elements.errorMessage.textContent = message;
-    elements.errorPanel.hidden = false;
-
-    setConnectionState(
-        "error",
-        "Unavailable"
-    );
-}
-
-
-function hideError() {
-    elements.errorPanel.hidden = true;
-}
-
+/* Formatting */
 
 function formatUpdatedTime(
     date
@@ -246,7 +194,6 @@ function formatUpdatedTime(
         }
     ).format(date);
 }
-
 
 function displayValue(
     value,
@@ -262,7 +209,6 @@ function displayValue(
 
     return String(value);
 }
-
 
 function formatBytes(
     value
@@ -312,6 +258,8 @@ function formatBytes(
 }
 
 
+/* Classification */
+
 function clearBadgeClasses(
     badge
 ) {
@@ -322,7 +270,6 @@ function clearBadgeClasses(
         "information-badge-neutral"
     );
 }
-
 
 function setAvailabilityBadge(
     badge,
@@ -356,6 +303,84 @@ function setAvailabilityBadge(
 }
 
 
+/* UI helpers */
+
+function setConnectionState(
+    state,
+    label
+) {
+    elements.connection.classList.remove(
+        "status-connecting",
+        "status-connected",
+        "status-error"
+    );
+
+    if (state === "connected") {
+        elements.connection.classList.add(
+            "status-connected"
+        );
+    } else if (state === "error") {
+        elements.connection.classList.add(
+            "status-error"
+        );
+    } else {
+        elements.connection.classList.add(
+            "status-connecting"
+        );
+    }
+
+    elements.connection.textContent = label;
+}
+
+function setLoadingState(
+    loading
+) {
+    elements.refreshButton.disabled = loading;
+    elements.retryButton.disabled = loading;
+
+    elements.refreshButton.textContent = (
+        loading
+            ? "Refreshing…"
+            : "Refresh"
+    );
+
+    if (loading) {
+        setConnectionState(
+            "connecting",
+            "Loading…"
+        );
+    }
+}
+
+function showError(
+    message
+) {
+    elements.errorMessage.textContent = message;
+    elements.errorPanel.hidden = false;
+
+    setConnectionState(
+        "error",
+        "Unavailable"
+    );
+}
+
+function hideError() {
+    elements.errorPanel.hidden = true;
+}
+
+function updateTimestamp() {
+    elements.updated.textContent =
+        `Updated ${formatUpdatedTime(new Date())}`;
+}
+
+function clearTimestamp() {
+    elements.updated.textContent =
+        "Information unavailable";
+}
+
+
+/* Rendering */
+
 function createValueItem(
     value
 ) {
@@ -369,6 +394,52 @@ function createValueItem(
     return item;
 }
 
+function createUrlItem(
+    value
+) {
+    const item = document.createElement(
+        "div"
+    );
+
+    item.className = "url-item";
+
+    const link = document.createElement(
+        "a"
+    );
+
+    link.href = value;
+    link.textContent = value;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+
+    const copyButton = document.createElement(
+        "button"
+    );
+
+    copyButton.className = (
+        "url-copy-button"
+    );
+
+    copyButton.type = "button";
+    copyButton.textContent = "Copy";
+
+    copyButton.addEventListener(
+        "click",
+        () => {
+            copyText(
+                value,
+                copyButton
+            );
+        }
+    );
+
+    item.append(
+        link,
+        copyButton
+    );
+
+    return item;
+}
 
 function renderValueList(
     container,
@@ -391,6 +462,407 @@ function renderValueList(
     }
 }
 
+function renderUrlList(
+    container,
+    values
+) {
+    container.replaceChildren();
+
+    if (
+        !Array.isArray(values)
+        || values.length === 0
+    ) {
+        container.textContent = "Not available";
+        return;
+    }
+
+    for (const value of values) {
+        container.append(
+            createUrlItem(value)
+        );
+    }
+}
+
+function renderRobot(
+    robot
+) {
+    elements.robotModel.textContent = (
+        displayValue(robot.model)
+    );
+
+    elements.robotHostname.textContent = (
+        displayValue(robot.hostname)
+    );
+
+    elements.robotIdentifier.textContent = (
+        displayValue(robot.identifier)
+    );
+
+    const available = (
+        robot.control_available
+    );
+
+    elements.robotControl.textContent = (
+        available
+            ? "Available for student code"
+            : "Currently in use"
+    );
+
+    setAvailabilityBadge(
+        elements.robotControlBadge,
+        available,
+        {
+            availableLabel: "Available",
+            unavailableLabel: "In Use",
+        }
+    );
+
+    setAvailabilityBadge(
+        elements.featureRobotControl,
+        available,
+        {
+            availableLabel: "Available",
+            unavailableLabel: "In Use",
+        }
+    );
+}
+
+function renderNetwork(
+    network
+) {
+    elements.networkHostname.textContent = (
+        displayValue(network.hostname)
+    );
+
+    renderValueList(
+        elements.ipAddresses,
+        network.ip_addresses
+    );
+
+    renderUrlList(
+        elements.launchpadUrls,
+        network.launchpad_urls
+    );
+
+    renderUrlList(
+        elements.jupyterhubUrls,
+        network.jupyterhub_urls
+    );
+
+    renderUrlList(
+        elements.visionUrls,
+        network.vision_urls
+    );
+}
+
+function renderSoftware(
+    software
+) {
+    elements.softwareVersion.textContent = (
+        displayValue(
+            software.betabox_robotics_version
+        )
+    );
+
+    elements.pythonVersion.textContent = (
+        displayValue(
+            software.python_version
+        )
+    );
+
+    elements.operatingSystem.textContent = (
+        displayValue(
+            software.operating_system
+        )
+    );
+
+    elements.architecture.textContent = (
+        displayValue(
+            software.architecture
+        )
+    );
+}
+
+function renderStorage(
+    storage
+) {
+    const rawUsedPercent = Number(
+        storage.used_percent
+    );
+
+    const hasUsedPercent = (
+        Number.isFinite(rawUsedPercent)
+    );
+
+    const usedPercent = (
+        hasUsedPercent
+            ? Math.min(
+                100,
+                Math.max(
+                    0,
+                    rawUsedPercent
+                )
+            )
+            : 0
+    );
+
+    clearBadgeClasses(
+        elements.storagePercent
+    );
+
+    if (!hasUsedPercent) {
+        elements.storagePercent.textContent = (
+            "Unknown"
+        );
+
+        elements.storagePercent.classList.add(
+            "information-badge-neutral"
+        );
+    } else {
+        elements.storagePercent.textContent = (
+            `${usedPercent.toFixed(1)}% used`
+        );
+
+        if (usedPercent >= 95) {
+            elements.storagePercent.classList.add(
+                "information-badge-error"
+            );
+        } else if (usedPercent >= 85) {
+            elements.storagePercent.classList.add(
+                "information-badge-warning"
+            );
+        } else {
+            elements.storagePercent.classList.add(
+                "information-badge-healthy"
+            );
+        }
+    }
+
+    elements.storageMeterFill.style.width = (
+        `${usedPercent}%`
+    );
+
+    const track = (
+        elements.storageMeterFill
+        .parentElement
+    );
+
+    if (track !== null) {
+        track.setAttribute(
+            "aria-valuenow",
+            String(
+                Math.round(usedPercent)
+            )
+        );
+    }
+
+    elements.storageUsed.textContent = (
+        formatBytes(storage.used_bytes)
+    );
+
+    elements.storageAvailable.textContent = (
+        formatBytes(
+            storage.available_bytes
+        )
+    );
+
+    elements.storageTotal.textContent = (
+        formatBytes(storage.total_bytes)
+    );
+}
+
+function renderFeatures(
+    features
+) {
+    setAvailabilityBadge(
+        elements.featureVisionService,
+        features.vision_service_available,
+        {
+            availableLabel: "Running",
+            unavailableLabel: "Unavailable",
+        }
+    );
+
+    setAvailabilityBadge(
+        elements.featureCamera,
+        features.camera_ready,
+        {
+            availableLabel: "Ready",
+            unavailableLabel: "Not Ready",
+        }
+    );
+
+    setAvailabilityBadge(
+        elements.featureJupyterhub,
+        features.jupyterhub_available,
+        {
+            availableLabel: "Installed",
+            unavailableLabel: "Unavailable",
+        }
+    );
+}
+
+function renderMedia(
+    media
+) {
+    setAvailabilityBadge(
+        elements.mediaPictures,
+        media.pictures_available,
+        {
+            availableLabel: "Ready",
+            unavailableLabel: "Missing",
+        }
+    );
+
+    setAvailabilityBadge(
+        elements.mediaVideos,
+        media.videos_available,
+        {
+            availableLabel: "Ready",
+            unavailableLabel: "Missing",
+        }
+    );
+
+    setAvailabilityBadge(
+        elements.mediaSounds,
+        media.sounds_available,
+        {
+            availableLabel: "Ready",
+            unavailableLabel: "Missing",
+        }
+    );
+}
+
+function renderLoadingState() {
+    elements.updated.textContent =
+        "Loading platform information…";
+}
+
+
+/* Validation */
+
+function validatePayload(
+    payload
+) {
+    const sections = [
+        "robot",
+        "network",
+        "software",
+        "storage",
+        "media",
+        "features",
+    ];
+
+    if (
+        !payload
+        || typeof payload !== "object"
+    ) {
+        throw new Error(
+            "The Information API returned an invalid response."
+        );
+    }
+
+    for (const section of sections) {
+        if (
+            !payload[section]
+            || typeof payload[section]
+            !== "object"
+        ) {
+            throw new Error(
+                `The information response is missing ${section}.`
+            );
+        }
+    }
+}
+
+
+/* API */
+
+async function loadInformation() {
+    if (requestInProgress) {
+        return;
+    }
+
+    requestInProgress = true;
+
+    setLoadingState(true);
+    hideError();
+
+    renderLoadingState();
+
+    try {
+        const response = await fetch(
+            INFORMATION_API_URL,
+            {
+                method: "GET",
+                headers: {
+                    Accept: "application/json",
+                },
+                cache: "no-store",
+            }
+        );
+
+        if (!response.ok) {
+            let message = (
+                `Information API returned HTTP `
+                + `${response.status}.`
+            );
+
+            try {
+                const errorPayload = (
+                    await response.json()
+                );
+
+                if (errorPayload.message) {
+                    message = errorPayload.message;
+                }
+            } catch {
+                // Preserve the HTTP error message.
+            }
+
+            throw new Error(message);
+        }
+
+        const payload = await response.json();
+
+        validatePayload(payload);
+
+        renderRobot(payload.robot);
+        renderNetwork(payload.network);
+        renderSoftware(payload.software);
+        renderStorage(payload.storage);
+        renderMedia(payload.media);
+        renderFeatures(payload.features);
+
+        updateTimestamp();
+
+        setConnectionState(
+            "connected",
+            "Live"
+        );
+    } catch (error) {
+        console.error(
+            "Unable to load platform information:",
+            error
+        );
+
+        const message = (
+            error instanceof Error
+                ? error.message
+                : "The Information API did not respond."
+        );
+
+        showError(message);
+
+        clearTimestamp();
+    } finally {
+        requestInProgress = false;
+        setLoadingState(false);
+    }
+}
+
+
+/* UI */
 
 async function copyText(
     value,
@@ -492,453 +964,6 @@ async function copyText(
     }
 }
 
-
-function createUrlItem(
-    value
-) {
-    const item = document.createElement(
-        "div"
-    );
-
-    item.className = "url-item";
-
-    const link = document.createElement(
-        "a"
-    );
-
-    link.href = value;
-    link.textContent = value;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-
-    const copyButton = document.createElement(
-        "button"
-    );
-
-    copyButton.className = (
-        "url-copy-button"
-    );
-
-    copyButton.type = "button";
-    copyButton.textContent = "Copy";
-
-    copyButton.addEventListener(
-        "click",
-        () => {
-            copyText(
-                value,
-                copyButton
-            );
-        }
-    );
-
-    item.append(
-        link,
-        copyButton
-    );
-
-    return item;
-}
-
-
-function renderUrlList(
-    container,
-    values
-) {
-    container.replaceChildren();
-
-    if (
-        !Array.isArray(values)
-        || values.length === 0
-    ) {
-        container.textContent = "Not available";
-        return;
-    }
-
-    for (const value of values) {
-        container.append(
-            createUrlItem(value)
-        );
-    }
-}
-
-
-function renderRobot(
-    robot
-) {
-    elements.robotModel.textContent = (
-        displayValue(robot.model)
-    );
-
-    elements.robotHostname.textContent = (
-        displayValue(robot.hostname)
-    );
-
-    elements.robotIdentifier.textContent = (
-        displayValue(robot.identifier)
-    );
-
-    const available = (
-        robot.control_available
-    );
-
-    elements.robotControl.textContent = (
-        available
-            ? "Available for student code"
-            : "Currently in use"
-    );
-
-    setAvailabilityBadge(
-        elements.robotControlBadge,
-        available,
-        {
-            availableLabel: "Available",
-            unavailableLabel: "In Use",
-        }
-    );
-
-    setAvailabilityBadge(
-        elements.featureRobotControl,
-        available,
-        {
-            availableLabel: "Available",
-            unavailableLabel: "In Use",
-        }
-    );
-}
-
-
-function renderNetwork(
-    network
-) {
-    elements.networkHostname.textContent = (
-        displayValue(network.hostname)
-    );
-
-    renderValueList(
-        elements.ipAddresses,
-        network.ip_addresses
-    );
-
-    renderUrlList(
-        elements.launchpadUrls,
-        network.launchpad_urls
-    );
-
-    renderUrlList(
-        elements.jupyterhubUrls,
-        network.jupyterhub_urls
-    );
-
-    renderUrlList(
-        elements.visionUrls,
-        network.vision_urls
-    );
-}
-
-
-function renderSoftware(
-    software
-) {
-    elements.softwareVersion.textContent = (
-        displayValue(
-            software.betabox_robotics_version
-        )
-    );
-
-    elements.pythonVersion.textContent = (
-        displayValue(
-            software.python_version
-        )
-    );
-
-    elements.operatingSystem.textContent = (
-        displayValue(
-            software.operating_system
-        )
-    );
-
-    elements.architecture.textContent = (
-        displayValue(
-            software.architecture
-        )
-    );
-}
-
-
-function renderStorage(
-    storage
-) {
-    const rawUsedPercent = Number(
-        storage.used_percent
-    );
-
-    const hasUsedPercent = (
-        Number.isFinite(rawUsedPercent)
-    );
-
-    const usedPercent = (
-        hasUsedPercent
-            ? Math.min(
-                100,
-                Math.max(
-                    0,
-                    rawUsedPercent
-                )
-            )
-            : 0
-    );
-
-    clearBadgeClasses(
-        elements.storagePercent
-    );
-
-    if (!hasUsedPercent) {
-        elements.storagePercent.textContent = (
-            "Unknown"
-        );
-
-        elements.storagePercent.classList.add(
-            "information-badge-neutral"
-        );
-    } else {
-        elements.storagePercent.textContent = (
-            `${usedPercent.toFixed(1)}% used`
-        );
-
-        if (usedPercent >= 95) {
-            elements.storagePercent.classList.add(
-                "information-badge-error"
-            );
-        } else if (usedPercent >= 85) {
-            elements.storagePercent.classList.add(
-                "information-badge-warning"
-            );
-        } else {
-            elements.storagePercent.classList.add(
-                "information-badge-healthy"
-            );
-        }
-    }
-
-    elements.storageMeterFill.style.width = (
-        `${usedPercent}%`
-    );
-
-    const track = (
-        elements.storageMeterFill
-        .parentElement
-    );
-
-    if (track !== null) {
-        track.setAttribute(
-            "aria-valuenow",
-            String(
-                Math.round(usedPercent)
-            )
-        );
-    }
-
-    elements.storageUsed.textContent = (
-        formatBytes(storage.used_bytes)
-    );
-
-    elements.storageAvailable.textContent = (
-        formatBytes(
-            storage.available_bytes
-        )
-    );
-
-    elements.storageTotal.textContent = (
-        formatBytes(storage.total_bytes)
-    );
-}
-
-
-function renderFeatures(
-    features
-) {
-    setAvailabilityBadge(
-        elements.featureVisionService,
-        features.vision_service_available,
-        {
-            availableLabel: "Running",
-            unavailableLabel: "Unavailable",
-        }
-    );
-
-    setAvailabilityBadge(
-        elements.featureCamera,
-        features.camera_ready,
-        {
-            availableLabel: "Ready",
-            unavailableLabel: "Not Ready",
-        }
-    );
-
-    setAvailabilityBadge(
-        elements.featureJupyterhub,
-        features.jupyterhub_available,
-        {
-            availableLabel: "Installed",
-            unavailableLabel: "Unavailable",
-        }
-    );
-}
-
-
-function renderMedia(
-    media
-) {
-    setAvailabilityBadge(
-        elements.mediaPictures,
-        media.pictures_available,
-        {
-            availableLabel: "Ready",
-            unavailableLabel: "Missing",
-        }
-    );
-
-    setAvailabilityBadge(
-        elements.mediaVideos,
-        media.videos_available,
-        {
-            availableLabel: "Ready",
-            unavailableLabel: "Missing",
-        }
-    );
-
-    setAvailabilityBadge(
-        elements.mediaSounds,
-        media.sounds_available,
-        {
-            availableLabel: "Ready",
-            unavailableLabel: "Missing",
-        }
-    );
-}
-
-
-function validatePayload(
-    payload
-) {
-    const sections = [
-        "robot",
-        "network",
-        "software",
-        "storage",
-        "media",
-        "features",
-    ];
-
-    if (
-        !payload
-        || typeof payload !== "object"
-    ) {
-        throw new Error(
-            "The Information API returned an invalid response."
-        );
-    }
-
-    for (const section of sections) {
-        if (
-            !payload[section]
-            || typeof payload[section]
-            !== "object"
-        ) {
-            throw new Error(
-                `The information response is missing ${section}.`
-            );
-        }
-    }
-}
-
-
-async function loadInformation() {
-    setLoadingState(true);
-    hideError();
-
-    elements.updated.textContent = (
-        "Loading platform information…"
-    );
-
-    try {
-        const response = await fetch(
-            INFORMATION_API_URL,
-            {
-                method: "GET",
-                headers: {
-                    Accept: "application/json",
-                },
-                cache: "no-store",
-            }
-        );
-
-        if (!response.ok) {
-            let message = (
-                `Information API returned HTTP `
-                + `${response.status}.`
-            );
-
-            try {
-                const errorPayload = (
-                    await response.json()
-                );
-
-                if (errorPayload.message) {
-                    message = errorPayload.message;
-                }
-            } catch {
-                // Preserve the HTTP error message.
-            }
-
-            throw new Error(message);
-        }
-
-        const payload = await response.json();
-
-        validatePayload(payload);
-
-        renderRobot(payload.robot);
-        renderNetwork(payload.network);
-        renderSoftware(payload.software);
-        renderStorage(payload.storage);
-        renderMedia(payload.media);
-        renderFeatures(payload.features);
-
-        elements.updated.textContent = (
-            `Updated ${
-                formatUpdatedTime(new Date())
-            }`
-        );
-
-        setConnectionState(
-            "connected",
-            "Connected"
-        );
-    } catch (error) {
-        console.error(
-            "Unable to load platform information:",
-            error
-        );
-
-        const message = (
-            error instanceof Error
-                ? error.message
-                : "The Information API did not respond."
-        );
-
-        showError(message);
-
-        elements.updated.textContent = (
-            "Information unavailable"
-        );
-    } finally {
-        setLoadingState(false);
-    }
-}
-
-
 function preferenceBoolean(
     key
 ) {
@@ -947,7 +972,6 @@ function preferenceBoolean(
         === "true"
     );
 }
-
 
 function saveBooleanPreference(
     key,
@@ -1182,7 +1206,6 @@ function resetPreferences() {
     );
 }
 
-
 function setupEventListeners() {
     elements.refreshButton.addEventListener(
         "click",
@@ -1227,12 +1250,39 @@ function setupEventListeners() {
 }
 
 
+/* Refresh lifecycle */
+
+function startAutomaticRefresh() {
+    stopAutomaticRefresh();
+
+    refreshTimer = window.setInterval(
+        () => {
+            void loadInformation();
+        },
+        REFRESH_INTERVAL_MS
+    );
+}
+
+function stopAutomaticRefresh() {
+    if (refreshTimer === null) {
+        return;
+    }
+
+    window.clearInterval(refreshTimer);
+    refreshTimer = null;
+}
+
+
+/* Initialization */
+
 function initializeInformationPage() {
     loadPreferences();
     setupEventListeners();
-    loadInformation();
-}
 
+    startAutomaticRefresh();
+
+    void loadInformation();
+}
 
 if (
     document.readyState === "loading"
@@ -1244,3 +1294,21 @@ if (
 } else {
     initializeInformationPage();
 }
+
+document.addEventListener(
+    "visibilitychange",
+    () => {
+        if (document.hidden) {
+            stopAutomaticRefresh();
+            return;
+        }
+
+        startAutomaticRefresh();
+        void loadInformation();
+    }
+);
+
+window.addEventListener(
+    "beforeunload",
+    stopAutomaticRefresh
+);

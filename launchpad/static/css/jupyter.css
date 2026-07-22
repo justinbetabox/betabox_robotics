@@ -1,42 +1,13 @@
-.jupyter-main {
-    display: grid;
+.jupyter-layout {
     grid-template-columns:
         minmax(0, 1.2fr)
         minmax(18rem, 0.8fr);
 
     align-items: start;
-    gap: 1.25rem;
-
-    width:
-        min(
-            var(--content-width),
-            calc(
-                100%
-                - (2 * var(--page-padding))
-            )
-        );
-
-    margin-inline: auto;
-    padding-block:
-        clamp(1.25rem, 4vw, 2.5rem);
 }
 
 
 /* Cards */
-
-.jupyter-card,
-.ownership-card {
-    padding:
-        clamp(1.25rem, 3vw, 2rem);
-
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-large);
-
-    color: var(--color-text);
-    background: var(--color-surface-raised);
-
-    box-shadow: var(--shadow-small);
-}
 
 .jupyter-card-heading {
     display: flex;
@@ -51,13 +22,6 @@
     height: 0.8rem;
 
     margin-top: 0.45rem;
-}
-
-.jupyter-card h2,
-.ownership-card h2 {
-    margin-top: 0;
-
-    color: var(--color-text);
 }
 
 .jupyter-description,
@@ -89,32 +53,8 @@
     margin: 1.5rem 0;
 }
 
-.jupyter-details div {
-    padding: 0.9rem;
-
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-medium);
-
-    background: var(--color-surface-subtle);
-}
-
-.jupyter-details dt {
-    margin-bottom: 0.35rem;
-
-    color: var(--color-text-muted);
-
-    font-size: 0.75rem;
-    font-weight: 850;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-}
-
 .jupyter-details dd {
     margin: 0;
-
-    color: var(--color-text);
-
-    font-weight: 850;
 }
 
 
@@ -150,24 +90,8 @@
 /* Compact layout */
 
 html[data-compact-layout="true"]
-    .jupyter-main {
+    .jupyter-layout {
     gap: 0.65rem;
-    padding-block: 0.75rem;
-}
-
-html[data-compact-layout="true"]
-    .jupyter-card,
-html[data-compact-layout="true"]
-    .ownership-card {
-    padding: 0.85rem;
-}
-
-html[data-compact-layout="true"]
-    .jupyter-details {
-    gap: 0.4rem;
-
-    margin-top: 0.75rem;
-    margin-bottom: 0.75rem;
 }
 
 html[data-compact-layout="true"]
@@ -184,16 +108,8 @@ html[data-compact-layout="true"]
 /* Phones and small tablets */
 
 @media (max-width: 760px) {
-    .jupyter-main {
+    .jupyter-layout {
         grid-template-columns: 1fr;
-
-        width:
-            min(
-                calc(100% - 1.5rem),
-                42rem
-            );
-
-        padding-block: 1rem;
     }
 
     .jupyter-details {

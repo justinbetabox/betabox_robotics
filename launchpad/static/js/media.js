@@ -1,3 +1,7 @@
+"use strict";
+
+
+/* Constants */
 const MEDIA_API_URL = "/api/media";
 
 const MEDIA_UPLOAD_API_URL = (
@@ -34,8 +38,11 @@ const CATEGORY_LABELS = {
     sounds: "Sound",
 };
 
+
+/* Page state */
+
 const state = {
-    files: [],
+    media: [],
     counts: {
         pictures: 0,
         videos: 0,
@@ -54,44 +61,62 @@ const state = {
 };
 
 
+/* DOM */
+
+function requireElement(
+    selector
+) {
+    const element = document.querySelector(
+        selector
+    );
+
+    if (element === null) {
+        throw new Error(
+            `Missing required element: ${selector}`
+        );
+    }
+
+    return element;
+}
+
 const elements = {
-    refreshButton: document.querySelector(
+    refreshButton: requireElement(
         "#media-refresh"
     ),
-    retryButton: document.querySelector(
+    retryButton: requireElement(
         "#media-retry"
     ),
 
-    totalCount: document.querySelector(
+    totalCount: requireElement(
         "#media-total-count"
     ),
-    pictureCount: document.querySelector(
+    pictureCount: requireElement(
         "#media-picture-count"
     ),
-    videoCount: document.querySelector(
+    videoCount: requireElement(
         "#media-video-count"
     ),
-    soundCount: document.querySelector(
+    soundCount: requireElement(
         "#media-sound-count"
     ),
-    totalSize: document.querySelector(
+    totalSize: requireElement(
         "#media-total-size"
     ),
 
-    filterAllCount: document.querySelector(
+    filterAllCount: requireElement(
         "#media-filter-all-count"
     ),
-    filterPictureCount: document.querySelector(
+    filterPictureCount: requireElement(
         "#media-filter-picture-count"
     ),
-    filterVideoCount: document.querySelector(
+    filterVideoCount: requireElement(
         "#media-filter-video-count"
     ),
-    filterSoundCount: document.querySelector(
+    filterSoundCount: requireElement(
         "#media-filter-sound-count"
     ),
 
-    resultSummary: document.querySelector(
+    resultSummary: requireElement(
         "#media-result-summary"
     ),
     categoryFilters: Array.from(
@@ -99,160 +124,137 @@ const elements = {
             "[data-media-category]"
         )
     ),
-    searchInput: document.querySelector(
+    searchInput: requireElement(
         "#media-search"
     ),
-    sortSelect: document.querySelector(
+    sortSelect: requireElement(
         "#media-sort"
     ),
 
-    gridViewButton: document.querySelector(
+    gridViewButton: requireElement(
         "#media-grid-view"
     ),
-    listViewButton: document.querySelector(
+    listViewButton: requireElement(
         "#media-list-view"
     ),
 
-    loadingState: document.querySelector(
+    loadingState: requireElement(
         "#media-loading"
     ),
-    errorState: document.querySelector(
+    errorState: requireElement(
         "#media-error"
     ),
-    errorMessage: document.querySelector(
+    errorMessage: requireElement(
         "#media-error-message"
     ),
-    emptyState: document.querySelector(
+    emptyState: requireElement(
         "#media-empty"
     ),
-    emptyTitle: document.querySelector(
+    emptyTitle: requireElement(
         "#media-empty-title"
     ),
-    emptyMessage: document.querySelector(
+    emptyMessage: requireElement(
         "#media-empty-message"
     ),
-    items: document.querySelector(
+    items: requireElement(
         "#media-items"
     ),
-    cardTemplate: document.querySelector(
+    cardTemplate: requireElement(
         "#media-card-template"
     ),
-    announcement: document.querySelector(
+    announcement: requireElement(
         "#media-announcement"
     ),
 
-    previewDialog: document.querySelector(
+    previewDialog: requireElement(
         "#media-preview-dialog"
     ),
-    previewCloseButton: document.querySelector(
+    previewCloseButton: requireElement(
         "#media-preview-close"
     ),
-    previewCategory: document.querySelector(
+    previewCategory: requireElement(
         "#media-preview-category"
     ),
-    previewTitle: document.querySelector(
+    previewTitle: requireElement(
         "#media-preview-title"
     ),
-    previewImage: document.querySelector(
+    previewImage: requireElement(
         "#media-preview-image"
     ),
-    previewVideo: document.querySelector(
+    previewVideo: requireElement(
         "#media-preview-video"
     ),
-    previewAudio: document.querySelector(
+    previewAudio: requireElement(
         "#media-preview-audio"
     ),
-    previewDate: document.querySelector(
+    previewDate: requireElement(
         "#media-preview-date"
     ),
-    previewSize: document.querySelector(
+    previewSize: requireElement(
         "#media-preview-size"
     ),
-    previewDownload: document.querySelector(
+    previewDownload: requireElement(
         "#media-preview-download"
     ),
 
-    deleteDialog: document.querySelector(
+    deleteDialog: requireElement(
         "#media-delete-dialog"
     ),
-    deleteName: document.querySelector(
+    deleteName: requireElement(
         "#media-delete-name"
     ),
-    deleteError: document.querySelector(
+    deleteError: requireElement(
         "#media-delete-error"
     ),
-    deleteConfirmButton: document.querySelector(
+    deleteConfirmButton: requireElement(
         "#media-delete-confirm"
     ),
-    uploadOpenButton: document.querySelector(
+    uploadOpenButton: requireElement(
         "#media-upload-open"
     ),
-    uploadDialog: document.querySelector(
+    uploadDialog: requireElement(
         "#media-upload-dialog"
     ),
-    uploadForm: document.querySelector(
+    uploadForm: requireElement(
         "#media-upload-form"
     ),
-    uploadCloseButton: document.querySelector(
+    uploadCloseButton: requireElement(
         "#media-upload-close"
     ),
-    uploadCancelButton: document.querySelector(
+    uploadCancelButton: requireElement(
         "#media-upload-cancel"
     ),
-    uploadConfirmButton: document.querySelector(
+    uploadConfirmButton: requireElement(
         "#media-upload-confirm"
     ),
-    uploadInput: document.querySelector(
+    uploadInput: requireElement(
         "#media-upload-input"
     ),
-    uploadDropzone: document.querySelector(
+    uploadDropzone: requireElement(
         "#media-upload-dropzone"
     ),
-    uploadSelection: document.querySelector(
+    uploadSelection: requireElement(
         "#media-upload-selection"
     ),
-    uploadSelectionCount: document.querySelector(
+    uploadSelectionCount: requireElement(
         "#media-upload-selection-count"
     ),
-    uploadFileList: document.querySelector(
+    uploadFileList: requireElement(
         "#media-upload-file-list"
     ),
-    uploadClearButton: document.querySelector(
+    uploadClearButton: requireElement(
         "#media-upload-clear"
     ),
-    uploadResult: document.querySelector(
+    uploadResult: requireElement(
         "#media-upload-result"
     ),
-    uploadError: document.querySelector(
+    uploadError: requireElement(
         "#media-upload-error"
     ),
 };
 
 
-function assertRequiredElements() {
-    const requiredElements = {
-        items: elements.items,
-        cardTemplate: elements.cardTemplate,
-        loadingState: elements.loadingState,
-        errorState: elements.errorState,
-        emptyState: elements.emptyState,
-        previewDialog: elements.previewDialog,
-        deleteDialog: elements.deleteDialog,
-        uploadDialog: elements.uploadDialog,
-    };
-
-    for (
-        const [name, element]
-        of Object.entries(requiredElements)
-    ) {
-        if (!element) {
-            throw new Error(
-                `Media page element is missing: ${name}`
-            );
-        }
-    }
-}
-
+/* UI helpers */
 
 function announce(message) {
     if (!elements.announcement) {
@@ -266,7 +268,6 @@ function announce(message) {
     });
 }
 
-
 function setHidden(element, hidden) {
     if (!element) {
         return;
@@ -274,7 +275,6 @@ function setHidden(element, hidden) {
 
     element.hidden = hidden;
 }
-
 
 function setLoading(loading) {
     state.loading = loading;
@@ -284,20 +284,16 @@ function setLoading(loading) {
         !loading
     );
 
-    if (elements.refreshButton) {
-        elements.refreshButton.disabled = loading;
-        elements.refreshButton.textContent = (
-            loading
-                ? "Refreshing…"
-                : "Refresh"
-        );
-    }
+    elements.refreshButton.disabled = loading;
+    elements.refreshButton.textContent = (
+        loading
+            ? "Refreshing…"
+            : "Refresh"
+    );
 
-    if (elements.retryButton) {
-        elements.retryButton.disabled = loading;
-    }
+    elements.retryButton.disabled = loading;
+
 }
-
 
 function showError(message) {
     setLoading(false);
@@ -317,17 +313,13 @@ function showError(message) {
         true
     );
 
-    if (elements.errorMessage) {
-        elements.errorMessage.textContent = message;
-    }
 
-    if (elements.resultSummary) {
-        elements.resultSummary.textContent = (
-            "Media unavailable"
-        );
-    }
+    elements.errorMessage.textContent = message;
+
+    elements.resultSummary.textContent = (
+        "Media unavailable"
+    );
 }
-
 
 function hideError() {
     setHidden(
@@ -336,6 +328,8 @@ function hideError() {
     );
 }
 
+
+/* Formatting */
 
 function formatBytes(value) {
     const bytes = Number(value);
@@ -386,7 +380,6 @@ function formatBytes(value) {
     );
 }
 
-
 function parseDate(value) {
     const date = new Date(value);
 
@@ -400,7 +393,6 @@ function parseDate(value) {
 
     return date;
 }
-
 
 function formatDate(value) {
     const date = parseDate(value);
@@ -418,6 +410,30 @@ function formatDate(value) {
     ).format(date);
 }
 
+function dateTimestamp(value) {
+    const date = parseDate(value);
+
+    return (
+        date
+            ? date.getTime()
+            : 0
+    );
+}
+
+function pluralize(
+    count,
+    singular,
+    plural
+) {
+    return (
+        count === 1
+            ? singular
+            : plural
+    );
+}
+
+
+/* Classification */
 
 function categoryLabel(category) {
     return (
@@ -425,7 +441,6 @@ function categoryLabel(category) {
         ?? "Media"
     );
 }
-
 
 function normalizedMediaFile(file) {
     if (
@@ -489,6 +504,8 @@ function normalizedMediaFile(file) {
 }
 
 
+/* State helpers */
+
 function updateSummary() {
     const pictureCount = (
         state.counts.pictures ?? 0
@@ -502,63 +519,45 @@ function updateSummary() {
         state.counts.sounds ?? 0
     );
 
-    if (elements.totalCount) {
-        elements.totalCount.textContent = (
-            String(state.totalCount)
-        );
-    }
 
-    if (elements.pictureCount) {
-        elements.pictureCount.textContent = (
-            String(pictureCount)
-        );
-    }
+    elements.totalCount.textContent = (
+        String(state.totalCount)
+    );
 
-    if (elements.videoCount) {
-        elements.videoCount.textContent = (
-            String(videoCount)
-        );
-    }
+    elements.pictureCount.textContent = (
+        String(pictureCount)
+    );
 
-    if (elements.soundCount) {
-        elements.soundCount.textContent = (
-            String(soundCount)
-        );
-    }
+    elements.videoCount.textContent = (
+        String(videoCount)
+    );
 
-    if (elements.totalSize) {
-        elements.totalSize.textContent = (
-            formatBytes(
-                state.totalSizeBytes
-            )
-        );
-    }
+    elements.soundCount.textContent = (
+        String(soundCount)
+    );
 
-    if (elements.filterAllCount) {
-        elements.filterAllCount.textContent = (
-            String(state.totalCount)
-        );
-    }
+    elements.totalSize.textContent = (
+        formatBytes(
+            state.totalSizeBytes
+        )
+    );
 
-    if (elements.filterPictureCount) {
-        elements.filterPictureCount.textContent = (
-            String(pictureCount)
-        );
-    }
+    elements.filterAllCount.textContent = (
+        String(state.totalCount)
+    );
 
-    if (elements.filterVideoCount) {
-        elements.filterVideoCount.textContent = (
-            String(videoCount)
-        );
-    }
+    elements.filterPictureCount.textContent = (
+        String(pictureCount)
+    );
 
-    if (elements.filterSoundCount) {
-        elements.filterSoundCount.textContent = (
-            String(soundCount)
-        );
-    }
+    elements.filterVideoCount.textContent = (
+        String(videoCount)
+    );
+
+    elements.filterSoundCount.textContent = (
+        String(soundCount)
+    );
 }
-
 
 function filteredFiles() {
     const query = (
@@ -567,7 +566,7 @@ function filteredFiles() {
             .toLocaleLowerCase()
     );
 
-    const filtered = state.files.filter(
+    const filtered = state.media.filter(
         (file) => {
             const categoryMatches = (
                 state.category === "all"
@@ -590,7 +589,6 @@ function filteredFiles() {
 
     return sortFiles(filtered);
 }
-
 
 function sortFiles(files) {
     const sorted = [...files];
@@ -657,18 +655,6 @@ function sortFiles(files) {
     return sorted;
 }
 
-
-function dateTimestamp(value) {
-    const date = parseDate(value);
-
-    return (
-        date
-            ? date.getTime()
-            : 0
-    );
-}
-
-
 function updateFilterButtons() {
     for (
         const button
@@ -694,35 +680,30 @@ function updateFilterButtons() {
     }
 }
 
-
 function updateViewButtons() {
     const gridActive = (
         state.view === "grid"
     );
 
-    if (elements.gridViewButton) {
-        elements.gridViewButton.classList.toggle(
-            "is-active",
-            gridActive
-        );
+    elements.gridViewButton.classList.toggle(
+        "is-active",
+        gridActive
+    );
 
-        elements.gridViewButton.setAttribute(
-            "aria-pressed",
-            String(gridActive)
-        );
-    }
+    elements.gridViewButton.setAttribute(
+        "aria-pressed",
+        String(gridActive)
+    );
 
-    if (elements.listViewButton) {
-        elements.listViewButton.classList.toggle(
-            "is-active",
-            !gridActive
-        );
+    elements.listViewButton.classList.toggle(
+        "is-active",
+        !gridActive
+    );
 
-        elements.listViewButton.setAttribute(
-            "aria-pressed",
-            String(!gridActive)
-        );
-    }
+    elements.listViewButton.setAttribute(
+        "aria-pressed",
+        String(!gridActive)
+    );
 
     elements.items.classList.toggle(
         "media-grid",
@@ -734,7 +715,6 @@ function updateViewButtons() {
         !gridActive
     );
 }
-
 
 function updateResultSummary(
     visibleCount
@@ -771,20 +751,6 @@ function updateResultSummary(
         )
     );
 }
-
-
-function pluralize(
-    count,
-    singular,
-    plural
-) {
-    return (
-        count === 1
-            ? singular
-            : plural
-    );
-}
-
 
 function updateEmptyState(
     visibleCount
@@ -832,36 +798,30 @@ function updateEmptyState(
             || hasCategoryFilter
         )
     ) {
-        if (elements.emptyTitle) {
-            elements.emptyTitle.textContent = (
-                "No matching media"
-            );
-        }
+        elements.emptyTitle.textContent = (
+            "No matching media"
+        );
 
-        if (elements.emptyMessage) {
-            elements.emptyMessage.textContent = (
-                "Try another search or choose "
-                + "a different media category."
-            );
-        }
+        elements.emptyMessage.textContent = (
+            "Try another search or choose "
+            + "a different media category."
+        );
 
         return;
     }
 
-    if (elements.emptyTitle) {
-        elements.emptyTitle.textContent = (
-            "No media yet"
-        );
-    }
+    elements.emptyTitle.textContent = (
+        "No media yet"
+    );
 
-    if (elements.emptyMessage) {
-        elements.emptyMessage.textContent = (
-            "Pictures, recordings, and sounds "
-            + "created on this robot will appear here."
-        );
-    }
+    elements.emptyMessage.textContent = (
+        "Pictures, recordings, and sounds "
+        + "created on this robot will appear here."
+    );
 }
 
+
+/* Rendering */
 
 function createMediaCard(file) {
     const fragment = (
@@ -1014,7 +974,6 @@ function createMediaCard(file) {
 
     return fragment;
 }
-
 
 function configureThumbnail(
     file,
@@ -1178,7 +1137,6 @@ function configureThumbnail(
     );
 }
 
-
 function showThumbnailPlaceholder(
     placeholder,
     icon,
@@ -1193,7 +1151,6 @@ function showThumbnailPlaceholder(
         false
     );
 }
-
 
 function renderMedia() {
     hideError();
@@ -1225,282 +1182,7 @@ function renderMedia() {
 }
 
 
-function stopPreviewMedia() {
-    if (elements.previewVideo) {
-        elements.previewVideo.pause();
-        elements.previewVideo.removeAttribute(
-            "src"
-        );
-        elements.previewVideo.load();
-    }
-
-    if (elements.previewAudio) {
-        elements.previewAudio.pause();
-        elements.previewAudio.removeAttribute(
-            "src"
-        );
-        elements.previewAudio.load();
-    }
-
-    if (elements.previewImage) {
-        elements.previewImage.removeAttribute(
-            "src"
-        );
-        elements.previewImage.alt = "";
-    }
-
-    setHidden(
-        elements.previewImage,
-        true
-    );
-
-    setHidden(
-        elements.previewVideo,
-        true
-    );
-
-    setHidden(
-        elements.previewAudio,
-        true
-    );
-}
-
-
-function openPreview(file) {
-    stopPreviewMedia();
-
-    state.previewFile = file;
-
-    if (elements.previewCategory) {
-        elements.previewCategory.textContent = (
-            categoryLabel(file.category)
-        );
-    }
-
-    if (elements.previewTitle) {
-        elements.previewTitle.textContent = (
-            file.name
-        );
-    }
-
-    if (elements.previewDate) {
-        elements.previewDate.textContent = (
-            formatDate(
-                file.modifiedAt
-            )
-        );
-    }
-
-    if (elements.previewSize) {
-        elements.previewSize.textContent = (
-            formatBytes(
-                file.sizeBytes
-            )
-        );
-    }
-
-    if (elements.previewDownload) {
-        elements.previewDownload.href = (
-            file.downloadUrl
-        );
-
-        elements.previewDownload.setAttribute(
-            "aria-label",
-            `Download ${file.name}`
-        );
-    }
-
-    switch (file.category) {
-        case "pictures":
-            if (elements.previewImage) {
-                elements.previewImage.src = (
-                    file.url
-                );
-
-                elements.previewImage.alt = (
-                    file.name
-                );
-
-                setHidden(
-                    elements.previewImage,
-                    false
-                );
-            }
-            break;
-
-        case "videos":
-            if (elements.previewVideo) {
-                elements.previewVideo.src = (
-                    file.url
-                );
-
-                setHidden(
-                    elements.previewVideo,
-                    false
-                );
-            }
-            break;
-
-        case "sounds":
-            if (elements.previewAudio) {
-                elements.previewAudio.src = (
-                    file.url
-                );
-
-                setHidden(
-                    elements.previewAudio,
-                    false
-                );
-            }
-            break;
-
-        default:
-            return;
-    }
-
-    if (
-        typeof elements.previewDialog
-            .showModal
-        === "function"
-    ) {
-        elements.previewDialog.showModal();
-    }
-}
-
-
-function closePreview() {
-    if (elements.previewDialog.open) {
-        elements.previewDialog.close();
-    }
-
-    stopPreviewMedia();
-    state.previewFile = null;
-}
-
-
-function openDeleteDialog(file) {
-    state.deleteFile = file;
-
-    if (elements.deleteName) {
-        elements.deleteName.textContent = (
-            file.name
-        );
-    }
-
-    if (elements.deleteError) {
-        elements.deleteError.textContent = "";
-        elements.deleteError.hidden = true;
-    }
-
-    if (elements.deleteConfirmButton) {
-        elements.deleteConfirmButton.disabled = (
-            false
-        );
-
-        elements.deleteConfirmButton.textContent = (
-            "Delete File"
-        );
-    }
-
-    if (
-        typeof elements.deleteDialog
-            .showModal
-        === "function"
-    ) {
-        elements.deleteDialog.showModal();
-    }
-}
-
-
-function closeDeleteDialog() {
-    if (elements.deleteDialog.open) {
-        elements.deleteDialog.close();
-    }
-
-    state.deleteFile = null;
-
-    if (elements.deleteError) {
-        elements.deleteError.textContent = "";
-        elements.deleteError.hidden = true;
-    }
-}
-
-
-async function deleteSelectedFile() {
-    const file = state.deleteFile;
-
-    if (!file) {
-        return;
-    }
-
-    if (elements.deleteConfirmButton) {
-        elements.deleteConfirmButton.disabled = (
-            true
-        );
-
-        elements.deleteConfirmButton.textContent = (
-            "Deleting…"
-        );
-    }
-
-    if (elements.deleteError) {
-        elements.deleteError.hidden = true;
-        elements.deleteError.textContent = "";
-    }
-
-    try {
-        const response = await fetch(
-            file.url,
-            {
-                method: "DELETE",
-                headers: {
-                    Accept: "application/json",
-                },
-            }
-        );
-
-        if (!response.ok) {
-            throw new Error(
-                await responseErrorMessage(
-                    response,
-                    "The media file could not be deleted."
-                )
-            );
-        }
-
-        closeDeleteDialog();
-
-        announce(
-            `${file.name} was deleted.`
-        );
-
-        await loadMedia({
-            announceResult: false,
-        });
-    } catch (error) {
-        if (elements.deleteError) {
-            elements.deleteError.textContent = (
-                errorMessage(
-                    error,
-                    "The media file could not be deleted."
-                )
-            );
-
-            elements.deleteError.hidden = false;
-        }
-    } finally {
-        if (elements.deleteConfirmButton) {
-            elements.deleteConfirmButton.disabled = (
-                false
-            );
-
-            elements.deleteConfirmButton.textContent = (
-                "Delete File"
-            );
-        }
-    }
-}
-
+/* Data helpers */
 
 async function responseErrorMessage(
     response,
@@ -1554,7 +1236,6 @@ async function responseErrorMessage(
     return fallback;
 }
 
-
 function errorMessage(
     error,
     fallback
@@ -1568,7 +1249,6 @@ function errorMessage(
 
     return fallback;
 }
-
 
 function normalizeCounts(value) {
     if (
@@ -1594,7 +1274,6 @@ function normalizeCounts(value) {
         ),
     };
 }
-
 
 function safeCount(value) {
     const number = Number(value);
@@ -1625,7 +1304,6 @@ function filenameExtension(
         .slice(index)
         .toLocaleLowerCase();
 }
-
 
 function validateUploadFile(
     file
@@ -1663,12 +1341,210 @@ function validateUploadFile(
 }
 
 
-function selectedUploadFiles() {
-    return Array.from(
-        elements.uploadInput?.files ?? []
+/* Dialogs */
+
+function stopPreviewMedia() {
+    elements.previewVideo.pause();
+    elements.previewVideo.removeAttribute(
+        "src"
+    );
+    elements.previewVideo.load();
+
+    elements.previewAudio.pause();
+    elements.previewAudio.removeAttribute(
+        "src"
+    );
+    elements.previewAudio.load();
+
+
+    elements.previewImage.removeAttribute(
+        "src"
+    );
+    elements.previewImage.alt = "";
+
+    setHidden(
+        elements.previewImage,
+        true
+    );
+
+    setHidden(
+        elements.previewVideo,
+        true
+    );
+
+    setHidden(
+        elements.previewAudio,
+        true
     );
 }
 
+function openPreview(file) {
+    stopPreviewMedia();
+
+    state.previewFile = file;
+
+    elements.previewCategory.textContent = (
+        categoryLabel(file.category)
+    );
+
+    elements.previewTitle.textContent = (
+        file.name
+    );
+
+    elements.previewDate.textContent = (
+        formatDate(
+            file.modifiedAt
+        )
+    );
+
+    elements.previewSize.textContent = (
+        formatBytes(
+            file.sizeBytes
+        )
+    );
+
+    elements.previewDownload.href = (
+        file.downloadUrl
+    );
+
+    elements.previewDownload.setAttribute(
+        "aria-label",
+        `Download ${file.name}`
+    );
+
+    switch (file.category) {
+        case "pictures":
+            elements.previewImage.src = (
+                file.url
+            );
+
+            elements.previewImage.alt = (
+                file.name
+            );
+
+            setHidden(
+                elements.previewImage,
+                false
+            );
+            break;
+
+        case "videos":
+            elements.previewVideo.src = (
+                file.url
+            );
+
+            setHidden(
+                elements.previewVideo,
+                false
+            );
+            break;
+
+        case "sounds":
+            elements.previewAudio.src = (
+                file.url
+            );
+
+            setHidden(
+                elements.previewAudio,
+                false
+            );
+            break;
+
+        default:
+            return;
+    }
+
+    if (
+        typeof elements.previewDialog
+            .showModal
+        === "function"
+    ) {
+        elements.previewDialog.showModal();
+    }
+}
+
+function closePreview() {
+    if (elements.previewDialog.open) {
+        elements.previewDialog.close();
+    }
+
+    stopPreviewMedia();
+    state.previewFile = null;
+}
+
+function openDeleteDialog(file) {
+    state.deleteFile = file;
+
+    elements.deleteName.textContent = (
+        file.name
+    );
+
+    elements.deleteError.textContent = "";
+    elements.deleteError.hidden = true;
+
+    elements.deleteConfirmButton.disabled = (
+        false
+    );
+
+    elements.deleteConfirmButton.textContent = (
+        "Delete File"
+    );
+
+    if (
+        typeof elements.deleteDialog
+            .showModal
+        === "function"
+    ) {
+        elements.deleteDialog.showModal();
+    }
+}
+
+function closeDeleteDialog() {
+    if (elements.deleteDialog.open) {
+        elements.deleteDialog.close();
+    }
+
+    state.deleteFile = null;
+
+    elements.deleteError.textContent = "";
+    elements.deleteError.hidden = true;
+}
+
+function openUploadDialog() {
+    resetUploadDialog();
+
+    if (
+        typeof elements.uploadDialog
+            .showModal
+        === "function"
+    ) {
+        elements.uploadDialog.showModal();
+    }
+}
+
+function closeUploadDialog() {
+    if (
+        state.uploading
+        || !elements.uploadDialog
+    ) {
+        return;
+    }
+
+    if (elements.uploadDialog.open) {
+        elements.uploadDialog.close();
+    }
+
+    resetUploadDialog();
+}
+
+
+/* Upload */
+
+function selectedUploadFiles() {
+    return Array.from(
+        elements.uploadInput.files
+    );
+}
 
 function setUploadError(
     message
@@ -1684,16 +1560,12 @@ function setUploadError(
     elements.uploadError.hidden = !message;
 }
 
-
 function clearUploadResult() {
-    if (elements.uploadResult) {
-        elements.uploadResult.textContent = "";
-        elements.uploadResult.hidden = true;
-    }
+    elements.uploadResult.textContent = "";
+    elements.uploadResult.hidden = true;
 
     setUploadError("");
 }
-
 
 function updateUploadSelection() {
     const files = selectedUploadFiles();
@@ -1712,25 +1584,21 @@ function updateUploadSelection() {
     if (files.length === 0) {
         elements.uploadSelection.hidden = true;
 
-        if (elements.uploadConfirmButton) {
-            elements.uploadConfirmButton.disabled = true;
-        }
+        elements.uploadConfirmButton.disabled = true;
 
         return;
     }
 
     elements.uploadSelection.hidden = false;
 
-    if (elements.uploadSelectionCount) {
-        elements.uploadSelectionCount.textContent = (
-            `${files.length} `
-            + pluralize(
-                files.length,
-                "file selected",
-                "files selected"
-            )
-        );
-    }
+    elements.uploadSelectionCount.textContent = (
+        `${files.length} `
+        + pluralize(
+            files.length,
+            "file selected",
+            "files selected"
+        )
+    );
 
     let hasInvalidFile = (
         files.length > MAX_UPLOAD_FILES
@@ -1804,75 +1672,31 @@ function updateUploadSelection() {
         );
     }
 
-    if (elements.uploadConfirmButton) {
-        elements.uploadConfirmButton.disabled = (
-            hasInvalidFile
-            || state.uploading
-        );
-    }
+    elements.uploadConfirmButton.disabled = (
+        hasInvalidFile
+        || state.uploading
+    );
 }
-
 
 function resetUploadDialog() {
     state.uploading = false;
 
-    if (elements.uploadForm) {
-        elements.uploadForm.reset();
-    }
+    elements.uploadForm.reset();
 
-    if (elements.uploadConfirmButton) {
-        elements.uploadConfirmButton.disabled = true;
-        elements.uploadConfirmButton.textContent = (
-            "Upload Files"
-        );
-    }
+    elements.uploadConfirmButton.disabled = true;
+    elements.uploadConfirmButton.textContent = (
+        "Upload Files"
+    );
 
-    if (elements.uploadCancelButton) {
-        elements.uploadCancelButton.disabled = false;
-    }
+    elements.uploadCancelButton.disabled = false;
 
-    if (elements.uploadCloseButton) {
-        elements.uploadCloseButton.disabled = false;
-    }
+    elements.uploadCloseButton.disabled = false;
 
-    if (elements.uploadSelection) {
-        elements.uploadSelection.hidden = true;
-    }
+    elements.uploadSelection.hidden = true;
 
-    if (elements.uploadFileList) {
-        elements.uploadFileList.replaceChildren();
-    }
+    elements.uploadFileList.replaceChildren();
 
     clearUploadResult();
-}
-
-
-function openUploadDialog() {
-    resetUploadDialog();
-
-    if (
-        typeof elements.uploadDialog
-            .showModal
-        === "function"
-    ) {
-        elements.uploadDialog.showModal();
-    }
-}
-
-
-function closeUploadDialog() {
-    if (
-        state.uploading
-        || !elements.uploadDialog
-    ) {
-        return;
-    }
-
-    if (elements.uploadDialog.open) {
-        elements.uploadDialog.close();
-    }
-
-    resetUploadDialog();
 }
 
 async function uploadMedia(
@@ -1927,20 +1751,14 @@ async function uploadMedia(
     state.uploading = true;
     setUploadError("");
 
-    if (elements.uploadConfirmButton) {
-        elements.uploadConfirmButton.disabled = true;
-        elements.uploadConfirmButton.textContent = (
-            "Uploading…"
-        );
-    }
+    elements.uploadConfirmButton.disabled = true;
+    elements.uploadConfirmButton.textContent = (
+        "Uploading…"
+    );
 
-    if (elements.uploadCancelButton) {
-        elements.uploadCancelButton.disabled = true;
-    }
+    elements.uploadCancelButton.disabled = true;
 
-    if (elements.uploadCloseButton) {
-        elements.uploadCloseButton.disabled = true;
-    }
+    elements.uploadCloseButton.disabled = true;
 
     try {
         const response = await fetch(
@@ -1994,39 +1812,37 @@ async function uploadMedia(
             );
         }
 
-        if (elements.uploadResult) {
-            const resultParts = [];
+        const resultParts = [];
 
-            if (uploaded.length > 0) {
-                resultParts.push(
-                    `Uploaded ${uploaded.length} `
-                    + pluralize(
-                        uploaded.length,
-                        "file",
-                        "files"
-                    )
-                    + "."
-                );
-            }
-
-            if (failed.length > 0) {
-                resultParts.push(
-                    `${failed.length} `
-                    + pluralize(
-                        failed.length,
-                        "file failed",
-                        "files failed"
-                    )
-                    + "."
-                );
-            }
-
-            elements.uploadResult.textContent = (
-                resultParts.join(" ")
+        if (uploaded.length > 0) {
+            resultParts.push(
+                `Uploaded ${uploaded.length} `
+                + pluralize(
+                    uploaded.length,
+                    "file",
+                    "files"
+                )
+                + "."
             );
-
-            elements.uploadResult.hidden = false;
         }
+
+        if (failed.length > 0) {
+            resultParts.push(
+                `${failed.length} `
+                + pluralize(
+                    failed.length,
+                    "file failed",
+                    "files failed"
+                )
+                + "."
+            );
+        }
+
+        elements.uploadResult.textContent = (
+            resultParts.join(" ")
+        );
+
+        elements.uploadResult.hidden = false;
 
         announce(
             `Uploaded ${uploaded.length} `
@@ -2069,25 +1885,91 @@ async function uploadMedia(
     } finally {
         state.uploading = false;
 
-        if (elements.uploadConfirmButton) {
-            elements.uploadConfirmButton.textContent = (
-                "Upload Files"
-            );
+        elements.uploadConfirmButton.textContent =
+            "Upload Files";
 
-            elements.uploadConfirmButton.disabled = (
-                selectedUploadFiles().length === 0
-            );
-        }
+        elements.uploadConfirmButton.disabled =
+            selectedUploadFiles().length === 0;
 
-        if (elements.uploadCancelButton) {
-            elements.uploadCancelButton.disabled = false;
-        }
+        elements.uploadCancelButton.disabled = false;
 
-        if (elements.uploadCloseButton) {
-            elements.uploadCloseButton.disabled = false;
-        }
+
+        elements.uploadCloseButton.disabled = false;
     }
 }
+
+
+/* Delete */
+
+async function deleteSelectedFile() {
+    const file = state.deleteFile;
+
+    if (!file) {
+        return;
+    }
+
+    elements.deleteConfirmButton.disabled = (
+        true
+    );
+
+    elements.deleteConfirmButton.textContent = (
+        "Deleting…"
+    );
+
+    elements.deleteError.hidden = true;
+    elements.deleteError.textContent = "";
+
+    try {
+        const response = await fetch(
+            file.url,
+            {
+                method: "DELETE",
+                headers: {
+                    Accept: "application/json",
+                },
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error(
+                await responseErrorMessage(
+                    response,
+                    "The media file could not be deleted."
+                )
+            );
+        }
+
+        closeDeleteDialog();
+
+        announce(
+            `${file.name} was deleted.`
+        );
+
+        await loadMedia({
+            announceResult: false,
+        });
+    } catch (error) {
+        elements.deleteError.textContent = (
+            errorMessage(
+                error,
+                "The media file could not be deleted."
+            )
+        );
+
+        elements.deleteError.hidden = false;
+    } finally {
+        elements.deleteConfirmButton.disabled = (
+            false
+        );
+
+        elements.deleteConfirmButton.textContent = (
+            "Delete File"
+        );
+    }
+}
+
+
+/* API */
 
 async function loadMedia({
     announceResult = true,
@@ -2108,11 +1990,9 @@ async function loadMedia({
 
     setLoading(true);
 
-    if (elements.resultSummary) {
-        elements.resultSummary.textContent = (
+    elements.resultSummary.textContent = (
             "Loading media…"
-        );
-    }
+    );
 
     try {
         const response = await fetch(
@@ -2146,7 +2026,7 @@ async function loadMedia({
                 : []
         );
 
-        state.files = files;
+        state.media = files;
         state.counts = normalizeCounts(
             payload.counts
         );
@@ -2170,10 +2050,10 @@ async function loadMedia({
          */
         if (
             state.totalCount
-            !== state.files.length
+            !== state.media.length
         ) {
             state.totalCount = (
-                state.files.length
+                state.media.length
             );
         }
 
@@ -2185,7 +2065,7 @@ async function loadMedia({
 
         let calculatedSize = 0;
 
-        for (const file of state.files) {
+        for (const file of state.media) {
             calculatedCounts[
                 file.category
             ] += 1;
@@ -2227,6 +2107,8 @@ async function loadMedia({
 }
 
 
+/* UI */
+
 function setCategory(category) {
     if (
         category !== "all"
@@ -2247,7 +2129,6 @@ function setCategory(category) {
             : `Showing ${category}.`
     );
 }
-
 
 function setView(view) {
     if (
@@ -2276,7 +2157,6 @@ function setView(view) {
     );
 }
 
-
 function restoreViewPreference() {
     try {
         const storedView = (
@@ -2297,18 +2177,31 @@ function restoreViewPreference() {
 }
 
 
-function bindEvents() {
-    elements.refreshButton?.addEventListener(
+/* Initialization */
+
+function initializeMediaPage() {
+    restoreViewPreference();
+    setupEventListeners();
+    updateViewButtons();
+
+    void loadMedia();
+}
+
+
+/* Event listeners */
+
+function setupEventListeners() {
+    elements.refreshButton.addEventListener(
         "click",
         () => {
-            loadMedia();
+            void loadMedia();
         }
     );
 
-    elements.retryButton?.addEventListener(
+    elements.retryButton.addEventListener(
         "click",
         () => {
-            loadMedia();
+            void loadMedia();
         }
     );
 
@@ -2327,7 +2220,7 @@ function bindEvents() {
         );
     }
 
-    elements.searchInput?.addEventListener(
+    elements.searchInput.addEventListener(
         "input",
         (event) => {
             state.search = (
@@ -2338,7 +2231,7 @@ function bindEvents() {
         }
     );
 
-    elements.sortSelect?.addEventListener(
+    elements.sortSelect.addEventListener(
         "change",
         (event) => {
             state.sort = (
@@ -2349,21 +2242,21 @@ function bindEvents() {
         }
     );
 
-    elements.gridViewButton?.addEventListener(
+    elements.gridViewButton.addEventListener(
         "click",
         () => {
             setView("grid");
         }
     );
 
-    elements.listViewButton?.addEventListener(
+    elements.listViewButton.addEventListener(
         "click",
         () => {
             setView("list");
         }
     );
 
-    elements.previewCloseButton?.addEventListener(
+    elements.previewCloseButton.addEventListener(
         "click",
         closePreview
     );
@@ -2393,10 +2286,8 @@ function bindEvents() {
         () => {
             state.deleteFile = null;
 
-            if (elements.deleteError) {
-                elements.deleteError.textContent = "";
-                elements.deleteError.hidden = true;
-            }
+            elements.deleteError.textContent = "";
+            elements.deleteError.hidden = true;
         }
     );
 
@@ -2412,45 +2303,45 @@ function bindEvents() {
         }
     );
 
-    elements.deleteConfirmButton?.addEventListener(
+    elements.deleteConfirmButton.addEventListener(
         "click",
         deleteSelectedFile
     );
 
-    elements.uploadOpenButton?.addEventListener(
+    elements.uploadOpenButton.addEventListener(
         "click",
         openUploadDialog
     );
 
-    elements.uploadCloseButton?.addEventListener(
+    elements.uploadCloseButton.addEventListener(
         "click",
         closeUploadDialog
     );
 
-    elements.uploadCancelButton?.addEventListener(
+    elements.uploadCancelButton.addEventListener(
         "click",
         closeUploadDialog
     );
 
-    elements.uploadInput?.addEventListener(
+    elements.uploadInput.addEventListener(
         "change",
         updateUploadSelection
     );
 
-    elements.uploadClearButton?.addEventListener(
+    elements.uploadClearButton.addEventListener(
         "click",
         () => {
-            if (elements.uploadInput) {
-                elements.uploadInput.value = "";
-            }
+            elements.uploadInput.value = "";
 
             updateUploadSelection();
         }
     );
 
-    elements.uploadForm?.addEventListener(
+    elements.uploadForm.addEventListener(
         "submit",
-        uploadMedia
+        (event) => {
+            void uploadMedia(event);
+        }
     );
 
     elements.uploadDialog.addEventListener(
@@ -2483,15 +2374,4 @@ function bindEvents() {
     );
 }
 
-
-function initialize() {
-    assertRequiredElements();
-    restoreViewPreference();
-    bindEvents();
-    updateViewButtons();
-
-    loadMedia();
-}
-
-
-initialize();
+initializeMediaPage();

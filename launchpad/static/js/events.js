@@ -1,6 +1,19 @@
 "use strict";
 
+
+/* Constants */
+
 const EVENTS_API_URL = "/api/events";
+const REFRESH_INTERVAL_MS = 30000;
+
+
+/* Page state */
+
+let requestInProgress = false;
+let refreshTimer = null;
+
+
+/* DOM helpers */
 
 const elements = {
     connection: document.getElementById(
@@ -85,6 +98,135 @@ const elements = {
 };
 
 
+/* Formatting */
+
+function formatUpdatedTime(
+    date
+) {
+    return new Intl.DateTimeFormat(
+        undefined,
+        {
+            hour: "numeric",
+            minute: "2-digit",
+            second: "2-digit",
+        }
+    ).format(date);
+}
+
+function parseTimestamp(
+    value
+) {
+    if (
+        typeof value !== "string"
+        || value === ""
+        || value === "unknown time"
+    ) {
+        return null;
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+        return null;
+    }
+
+    return date;
+}
+
+function formatEventDate(
+    value
+) {
+    const date = parseTimestamp(value);
+
+    if (date === null) {
+        return "Unknown date";
+    }
+
+    return new Intl.DateTimeFormat(
+        undefined,
+        {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+        }
+    ).format(date);
+}
+
+function formatEventTime(
+    value
+) {
+    const date = parseTimestamp(value);
+
+    if (date === null) {
+        return "Unknown time";
+    }
+
+    return new Intl.DateTimeFormat(
+        undefined,
+        {
+            hour: "numeric",
+            minute: "2-digit",
+            second: "2-digit",
+        }
+    ).format(date);
+}
+
+
+/* Classification */
+
+function severityLabel(
+    severity
+) {
+    const labels = {
+        info: "Information",
+        warning: "Warning",
+        error: "Error",
+        critical: "Critical",
+    };
+
+    return labels[severity] || "Information";
+}
+
+function severityClass(
+    severity
+) {
+    if (severity === "warning") {
+        return "event-warning";
+    }
+
+    if (severity === "error") {
+        return "event-error";
+    }
+
+    if (severity === "critical") {
+        return "event-critical";
+    }
+
+    return "event-info";
+}
+
+function overviewStatusClass(
+    summary
+) {
+    if (
+        Number(summary.critical ?? 0) > 0
+        || Number(summary.error ?? 0) > 0
+    ) {
+        return "status-error";
+    }
+
+    if (
+        Number(summary.warning ?? 0) > 0
+    ) {
+        return "status-warning";
+    }
+
+    return "status-info";
+}
+
+
+/* UI helpers */
+
 function setConnectionState(
     state,
     label
@@ -112,7 +254,6 @@ function setConnectionState(
     elements.connection.textContent = label;
 }
 
-
 function setLoadingState(
     loading
 ) {
@@ -133,7 +274,6 @@ function setLoadingState(
     }
 }
 
-
 function showError(
     message
 ) {
@@ -146,139 +286,23 @@ function showError(
     );
 }
 
-
 function hideError() {
     elements.errorPanel.hidden = true;
 }
 
+function updateTimestamp() {
+    elements.updated.textContent = (
+        `Updated ${formatUpdatedTime(new Date())}`
+    );
+}
 
-function formatUpdatedTime(
-    date
-) {
-    return new Intl.DateTimeFormat(
-        undefined,
-        {
-            hour: "numeric",
-            minute: "2-digit",
-            second: "2-digit",
-        }
-    ).format(date);
+function clearTimestamp() {
+    elements.updated.textContent =
+        "Events unavailable";
 }
 
 
-function parseTimestamp(
-    value
-) {
-    if (
-        typeof value !== "string"
-        || value === ""
-        || value === "unknown time"
-    ) {
-        return null;
-    }
-
-    const date = new Date(value);
-
-    if (Number.isNaN(date.getTime())) {
-        return null;
-    }
-
-    return date;
-}
-
-
-function formatEventDate(
-    value
-) {
-    const date = parseTimestamp(value);
-
-    if (date === null) {
-        return "Unknown date";
-    }
-
-    return new Intl.DateTimeFormat(
-        undefined,
-        {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-        }
-    ).format(date);
-}
-
-
-function formatEventTime(
-    value
-) {
-    const date = parseTimestamp(value);
-
-    if (date === null) {
-        return "Unknown time";
-    }
-
-    return new Intl.DateTimeFormat(
-        undefined,
-        {
-            hour: "numeric",
-            minute: "2-digit",
-            second: "2-digit",
-        }
-    ).format(date);
-}
-
-
-function severityLabel(
-    severity
-) {
-    const labels = {
-        info: "Information",
-        warning: "Warning",
-        error: "Error",
-        critical: "Critical",
-    };
-
-    return labels[severity] || "Information";
-}
-
-
-function severityClass(
-    severity
-) {
-    if (severity === "warning") {
-        return "event-warning";
-    }
-
-    if (severity === "error") {
-        return "event-error";
-    }
-
-    if (severity === "critical") {
-        return "event-critical";
-    }
-
-    return "event-info";
-}
-
-
-function overviewStatusClass(
-    summary
-) {
-    if (
-        Number(summary.critical ?? 0) > 0
-        || Number(summary.error ?? 0) > 0
-    ) {
-        return "status-error";
-    }
-
-    if (
-        Number(summary.warning ?? 0) > 0
-    ) {
-        return "status-warning";
-    }
-
-    return "status-info";
-}
-
+/* Rendering */
 
 function renderOverview(
     summary
@@ -319,6 +343,28 @@ function renderOverview(
     );
 }
 
+function renderLoadingState() {
+    elements.updated.textContent =
+        "Loading platform events…";
+
+    elements.listSummary.textContent =
+        "Loading…";
+
+    elements.eventsList.replaceChildren();
+
+    const loading = document.createElement(
+        "div"
+    );
+
+    loading.className = "empty-state";
+
+    loading.textContent =
+        "Loading platform events…";
+
+    elements.eventsList.append(
+        loading
+    );
+}
 
 function renderComponentOptions(
     components
@@ -364,7 +410,6 @@ function renderComponentOptions(
     }
 }
 
-
 function createDetailValue(
     value
 ) {
@@ -385,7 +430,6 @@ function createDetailValue(
 
     return String(value);
 }
-
 
 function createEventDetails(
     event
@@ -486,7 +530,6 @@ function createEventDetails(
 
     return details;
 }
-
 
 function createEventCard(
     event
@@ -618,7 +661,6 @@ function createEventCard(
     return article;
 }
 
-
 function renderEvents(
     events,
     summary
@@ -633,7 +675,7 @@ function renderEvents(
             "div"
         );
 
-        empty.className = "events-empty";
+        empty.className = "empty-state events-empty";
 
         empty.innerHTML = `
             <strong>No matching events</strong>
@@ -680,6 +722,39 @@ function renderEvents(
 }
 
 
+/* Validation */
+
+function validatePayload(
+    payload
+) {
+    if (
+        !payload
+        || typeof payload !== "object"
+    ) {
+        throw new Error(
+            "The Events API returned an invalid response."
+        );
+    }
+
+    if (
+        !payload.summary
+        || typeof payload.summary !== "object"
+    ) {
+        throw new Error(
+            "The event response does not include a summary."
+        );
+    }
+
+    if (!Array.isArray(payload.events)) {
+        throw new Error(
+            "The event response does not include events."
+        );
+    }
+}
+
+
+/* API */
+
 function buildApiUrl() {
     const params = new URLSearchParams();
 
@@ -717,63 +792,17 @@ function buildApiUrl() {
     return `${EVENTS_API_URL}?${params}`;
 }
 
-
-function validatePayload(
-    payload
-) {
-    if (
-        !payload
-        || typeof payload !== "object"
-    ) {
-        throw new Error(
-            "The Events API returned an invalid response."
-        );
-    }
-
-    if (
-        !payload.summary
-        || typeof payload.summary !== "object"
-    ) {
-        throw new Error(
-            "The event response does not include a summary."
-        );
-    }
-
-    if (!Array.isArray(payload.events)) {
-        throw new Error(
-            "The event response does not include events."
-        );
-    }
-}
-
-
 async function loadEvents() {
+    if (requestInProgress) {
+        return;
+    }
+
+    requestInProgress = true;
+
     setLoadingState(true);
     hideError();
 
-    elements.updated.textContent = (
-        "Loading platform events…"
-    );
-
-    elements.listSummary.textContent = (
-        "Loading…"
-    );
-
-    elements.eventsList.replaceChildren();
-
-    const loading = document.createElement(
-        "div"
-    );
-
-    loading.className = "events-empty";
-
-    loading.textContent = (
-        "Loading platform events…"
-    );
-
-    elements.eventsList.append(
-        loading
-    );
+    renderLoadingState();
 
     try {
         const response = await fetch(
@@ -825,15 +854,11 @@ async function loadEvents() {
             payload.summary
         );
 
-        elements.updated.textContent = (
-            `Updated ${
-                formatUpdatedTime(new Date())
-            }`
-        );
+        updateTimestamp();
 
         setConnectionState(
             "connected",
-            "Connected"
+            "Live"
         );
     } catch (error) {
         console.error(
@@ -849,23 +874,23 @@ async function loadEvents() {
 
         showError(message);
 
-        elements.updated.textContent = (
-            "Events unavailable"
-        );
+        clearTimestamp();
     } finally {
+        requestInProgress = false;
         setLoadingState(false);
     }
 }
 
 
-async function clearFilters() {
+/* UI */
+
+function clearFilters() {
     elements.severityFilter.value = "";
     elements.componentFilter.value = "";
     elements.limitFilter.value = "50";
 
-    await loadEvents();
+    void loadEvents();
 }
-
 
 function setupEventListeners() {
     elements.refreshButton.addEventListener(
@@ -900,11 +925,44 @@ function setupEventListeners() {
 }
 
 
+/* Refresh lifecycle */
+
+function startAutomaticRefresh() {
+    stopAutomaticRefresh();
+
+    refreshTimer = window.setInterval(
+        () => {
+            void loadEvents();
+        },
+        REFRESH_INTERVAL_MS
+    );
+}
+
+function stopAutomaticRefresh() {
+    if (refreshTimer === null) {
+        return;
+    }
+
+    window.clearInterval(
+        refreshTimer
+    );
+
+    refreshTimer = null;
+}
+
+
+/* Initialization */
+
 function initializeEventsPage() {
     setupEventListeners();
+
+    startAutomaticRefresh();
+
     void loadEvents();
 }
 
+
+/* Event listeners */
 
 if (
     document.readyState === "loading"
@@ -916,3 +974,21 @@ if (
 } else {
     initializeEventsPage();
 }
+
+document.addEventListener(
+    "visibilitychange",
+    () => {
+        if (document.hidden) {
+            stopAutomaticRefresh();
+            return;
+        }
+
+        startAutomaticRefresh();
+        void loadEvents();
+    }
+);
+
+window.addEventListener(
+    "beforeunload",
+    stopAutomaticRefresh
+);

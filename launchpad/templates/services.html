@@ -31,7 +31,7 @@
 
 {% block page_content %}
     <section
-        class="services-section services-overview"
+        class="page-section"
         aria-labelledby="overview-heading"
     >
         <div class="section-heading">
@@ -53,10 +53,11 @@
             </p>
         </div>
 
-        <div class="services-overview-grid">
+        <div class="overview-grid">
             <article
                 class="
-                    services-overview-card
+                    overview-card
+                    overview-card-primary
                     services-overview-card-primary
                 "
             >
@@ -70,62 +71,80 @@
                 ></span>
 
                 <div>
-                    <span class="services-overview-label">
+                    <span class="overview-label">
                         Overall Health
                     </span>
 
-                    <strong id="overall-status">
+                    <strong
+                        class="overview-value"
+                        id="overall-status"
+                    >
                         Checking…
                     </strong>
                 </div>
             </article>
 
-            <article class="services-overview-card">
-                <span class="services-overview-label">
+            <article class="overview-card">
+                <span class="overview-label">
                     Healthy
                 </span>
 
-                <strong id="healthy-count">
+                <strong
+                    class="overview-value"
+                    id="healthy-count"
+                >
                     --
                 </strong>
             </article>
 
-            <article class="services-overview-card">
-                <span class="services-overview-label">
+            <article class="overview-card">
+                <span class="overview-label">
                     Warnings
                 </span>
 
-                <strong id="warning-count">
+                <strong
+                    class="overview-value"
+                    id="warning-count"
+                >
                     --
                 </strong>
             </article>
 
-            <article class="services-overview-card">
-                <span class="services-overview-label">
+            <article class="overview-card">
+                <span class="overview-label">
                     Errors
                 </span>
 
-                <strong id="error-count">
+                <strong
+                    class="overview-value"
+                    id="error-count"
+                >
                     --
                 </strong>
             </article>
 
-            <article class="services-overview-card">
-                <span class="services-overview-label">
+            <article class="overview-card">
+                <span class="overview-label">
                     Unknown
                 </span>
 
-                <strong id="unknown-count">
+                <strong
+                    class="overview-value"
+                    id="unknown-count"
+                >
                     --
                 </strong>
             </article>
 
-            <article class="services-overview-card">
-                <span class="services-overview-label">
+            <article class="overview-card">
+                <span class="overview-label">
                     Total Services
                 </span>
 
-                <strong id="total-count">
+                <strong
+                    class="overview-value"
+                    id="total-count"
+                >
                     --
                 </strong>
             </article>
@@ -135,7 +154,7 @@
     <section
         id="attention-section"
         class="
-            services-section
+            page-section
             services-attention-section
         "
         aria-labelledby="attention-heading"
@@ -160,7 +179,7 @@
     </section>
 
     <section
-        class="services-section"
+        class="page-section"
         aria-labelledby="services-heading"
     >
         <div class="section-heading">

@@ -1,10 +1,37 @@
 "use strict";
 
+
+/* Constants */
+
 const DIAGNOSTICS_API_URL = "/api/diagnostics";
 
+
+/* Page state */
+
+let requestInProgress = false;
+
+
+/* DOM helpers */
+
+function requireElement(
+    selector
+) {
+    const element = document.querySelector(
+        selector
+    );
+
+    if (element === null) {
+        throw new Error(
+            `Missing required element: ${selector}`
+        );
+    }
+
+    return element;
+}
+
 const elements = {
-    connection: document.getElementById(
-        "diagnostics-connection"
+    connection: requireElement(
+        "#diagnostics-connection"
     ),
 
     runButton: document.getElementById(
@@ -73,74 +100,7 @@ const elements = {
 };
 
 
-function setConnectionState(
-    state,
-    label
-) {
-    const connection = elements.connection;
-
-    connection.classList.remove(
-        "status-connecting",
-        "status-connected",
-        "status-error"
-    );
-
-    if (state === "connected") {
-        connection.classList.add(
-            "status-connected"
-        );
-    } else if (state === "error") {
-        connection.classList.add(
-            "status-error"
-        );
-    } else {
-        connection.classList.add(
-            "status-connecting"
-        );
-    }
-
-    connection.textContent = label;
-}
-
-
-function setRunningState(
-    running
-) {
-    elements.runButton.disabled = running;
-    elements.retryButton.disabled = running;
-
-    elements.runButton.textContent = (
-        running
-            ? "Running…"
-            : "Run Diagnostics"
-    );
-
-    if (running) {
-        setConnectionState(
-            "connecting",
-            "Checking…"
-        );
-    }
-}
-
-
-function showError(
-    message
-) {
-    elements.errorMessage.textContent = message;
-    elements.errorPanel.hidden = false;
-
-    setConnectionState(
-        "error",
-        "Unavailable"
-    );
-}
-
-
-function hideError() {
-    elements.errorPanel.hidden = true;
-}
-
+/* Formatting */
 
 function formatTimestamp(
     date
@@ -155,6 +115,8 @@ function formatTimestamp(
     ).format(date);
 }
 
+
+/* Classification */
 
 function severityLabel(
     severity,
@@ -173,7 +135,6 @@ function severityLabel(
 
     return labels[severity] || "Unknown";
 }
-
 
 function statusClass(
     severity,
@@ -197,7 +158,6 @@ function statusClass(
     return "status-unknown";
 }
 
-
 function cardClass(
     severity,
     ok
@@ -220,7 +180,6 @@ function cardClass(
 
     return "diagnosis-card-unknown";
 }
-
 
 function overallPresentation(
     summary
@@ -252,6 +211,114 @@ function overallPresentation(
     };
 }
 
+
+/* UI helpers */
+
+function setConnectionState(
+    state,
+    label
+) {
+    const connection = elements.connection;
+
+    connection.classList.remove(
+        "status-connecting",
+        "status-connected",
+        "status-error"
+    );
+
+    if (state === "connected") {
+        connection.classList.add(
+            "status-connected"
+        );
+    } else if (state === "error") {
+        connection.classList.add(
+            "status-error"
+        );
+    } else {
+        connection.classList.add(
+            "status-connecting"
+        );
+    }
+
+    connection.textContent = label;
+}
+
+function setRunningState(
+    running
+) {
+    elements.runButton.disabled = running;
+    elements.retryButton.disabled = running;
+
+    elements.runButton.textContent = (
+        running
+            ? "Running…"
+            : "Run"
+    );
+
+    if (running) {
+        setConnectionState(
+            "connecting",
+            "Running…"
+        );
+    }
+}
+
+function showError(
+    message
+) {
+    elements.errorMessage.textContent = message;
+    elements.errorPanel.hidden = false;
+
+    setConnectionState(
+        "error",
+        "Unavailable"
+    );
+}
+
+function hideError() {
+    elements.errorPanel.hidden = true;
+}
+
+function updateTimestamp() {
+    elements.updated.textContent = (
+        `Completed ${formatTimestamp(new Date())}`
+    );
+}
+
+function clearTimestamp() {
+    elements.updated.textContent = (
+        "Diagnostics unavailable"
+    );
+}
+
+
+/* Rendering */
+
+function renderLoadingState() {
+    elements.updated.textContent = (
+        "Running platform diagnostics…"
+    );
+
+    elements.issuesSection.hidden = true;
+    elements.issuesList.replaceChildren();
+    elements.issuesSummary.textContent = "";
+
+    elements.diagnosticsList.replaceChildren();
+
+    const loading = document.createElement(
+        "div"
+    );
+
+    loading.className = "empty-state";
+
+    loading.textContent = (
+        "Running platform diagnostics…"
+    );
+
+    elements.diagnosticsList.append(
+        loading
+    );
+}
 
 function renderOverview(
     summary
@@ -295,7 +362,6 @@ function renderOverview(
         summary.total ?? 0
     );
 }
-
 
 function createListSection(
     title,
@@ -341,7 +407,6 @@ function createListSection(
 
     return section;
 }
-
 
 function createDiagnosisCard(
     diagnosis,
@@ -413,11 +478,10 @@ function createDiagnosisCard(
 
     badge.className = [
         "diagnosis-badge",
-        `diagnosis-badge-${
+        badgeClass(
+            diagnosis.severity,
             diagnosis.ok
-                ? "healthy"
-                : diagnosis.severity
-        }`,
+        ),
     ].join(" ");
 
     badge.textContent = severityLabel(
@@ -511,7 +575,6 @@ function createDiagnosisCard(
     return article;
 }
 
-
 function renderIssues(
     summary,
     diagnoses
@@ -549,7 +612,6 @@ function renderIssues(
     elements.issuesSection.hidden = false;
 }
 
-
 function renderDiagnoses(
     diagnoses
 ) {
@@ -563,7 +625,7 @@ function renderDiagnoses(
             "div"
         );
 
-        empty.className = "diagnostics-empty";
+        empty.className = "empty-state diagnostics-empty";
 
         empty.textContent = (
             "No diagnostic results were returned."
@@ -583,6 +645,23 @@ function renderDiagnoses(
     }
 }
 
+function renderDiagnostics(
+    payload
+) {
+    renderOverview(payload.summary);
+
+    renderIssues(
+        payload.summary,
+        payload.diagnoses
+    );
+
+    renderDiagnoses(
+        payload.diagnoses
+    );
+}
+
+
+/* Validation */
 
 function validatePayload(
     payload
@@ -590,6 +669,7 @@ function validatePayload(
     if (
         !payload
         || typeof payload !== "object"
+        || Array.isArray(payload)
     ) {
         throw new Error(
             "The diagnostics API returned an invalid response."
@@ -599,6 +679,7 @@ function validatePayload(
     if (
         !payload.summary
         || typeof payload.summary !== "object"
+        || Array.isArray(payload.summary)
     ) {
         throw new Error(
             "The diagnostics response does not include a summary."
@@ -610,36 +691,54 @@ function validatePayload(
             "The diagnostics response does not include results."
         );
     }
+
+    for (const diagnosis of payload.diagnoses) {
+        if (
+            !diagnosis
+            || typeof diagnosis !== "object"
+            || typeof diagnosis.ok !== "boolean"
+        ) {
+            throw new Error(
+                "The diagnostics response contains an invalid result."
+            );
+        }
+    }
+}
+
+function badgeClass(
+    severity,
+    ok
+) {
+    if (ok) {
+        return "diagnosis-badge-healthy";
+    }
+
+    if (
+        severity === "warning"
+        || severity === "error"
+        || severity === "critical"
+        || severity === "info"
+    ) {
+        return `diagnosis-badge-${severity}`;
+    }
+
+    return "diagnosis-badge-info";
 }
 
 
+/* API */
+
 async function runDiagnostics() {
+    if (requestInProgress) {
+        return;
+    }
+
+    requestInProgress = true;
+
     setRunningState(true);
     hideError();
 
-    elements.updated.textContent = (
-        "Running platform diagnostics…"
-    );
-
-    elements.issuesSection.hidden = true;
-    elements.issuesList.replaceChildren();
-    elements.issuesSummary.textContent = "";
-
-    elements.diagnosticsList.replaceChildren();
-
-    const loading = document.createElement(
-        "div"
-    );
-
-    loading.className = "diagnostics-empty";
-
-    loading.textContent = (
-        "Running platform diagnostics…"
-    );
-
-    elements.diagnosticsList.append(
-        loading
-    );
+    renderLoadingState();
 
     try {
         const response = await fetch(
@@ -678,20 +777,9 @@ async function runDiagnostics() {
 
         validatePayload(payload);
 
-        renderOverview(payload.summary);
+        renderDiagnostics(payload);
 
-        renderIssues(
-            payload.summary,
-            payload.diagnoses
-        );
-
-        renderDiagnoses(
-            payload.diagnoses
-        );
-
-        elements.updated.textContent = (
-            `Completed ${formatTimestamp(new Date())}`
-        );
+        updateTimestamp();
 
         setConnectionState(
             "connected",
@@ -711,36 +799,45 @@ async function runDiagnostics() {
 
         showError(message);
 
-        elements.updated.textContent = (
-            "Diagnostics unavailable"
-        );
+        clearTimestamp();
     } finally {
+        requestInProgress = false;
         setRunningState(false);
     }
 }
 
 
+/* UI */
+
 function setupEventListeners() {
     elements.runButton.addEventListener(
         "click",
-        runDiagnostics
+        () => {
+            void runDiagnostics();
+        }
     );
 
     elements.retryButton.addEventListener(
         "click",
-        runDiagnostics
+        () => {
+            void runDiagnostics();
+        }
     );
 }
 
+
+/* Initialization */
 
 function initializeDiagnosticsPage() {
     setupEventListeners();
 
     // Run once when the page opens so users immediately
     // receive the current platform health report.
-    runDiagnostics();
+    void runDiagnostics();
 }
 
+
+/* Event listeners */
 
 if (
     document.readyState === "loading"

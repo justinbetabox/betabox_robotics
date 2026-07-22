@@ -1,5 +1,4 @@
 .calibration-layout {
-    display: grid;
     gap: 1.5rem;
 }
 
@@ -14,9 +13,12 @@
     margin: 0;
 }
 
-.calibration-intro .page-description {
+.calibration-description {
     max-width: 48rem;
-    margin-bottom: 0;
+    margin: 0.75rem 0 0;
+    color: var(--color-text-muted);
+    line-height: var(--line-height-body);
+
 }
 
 .calibration-intro-status {
@@ -52,7 +54,7 @@
     min-height: 1.5rem;
 }
 
-.calibration-grayscale-section{
+.calibration-grayscale-section {
     grid-column: 1 / -1;
 }
 

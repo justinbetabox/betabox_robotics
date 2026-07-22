@@ -1,31 +1,11 @@
 .information-layout {
-    display: grid;
-    gap: 1.5rem;
-
-    width: min(100%, 1180px);
-
-    margin: 0 auto;
-    padding: 1.5rem;
-}
-
-.information-intro {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
     gap: 1.5rem;
 }
 
-.information-intro h2 {
-    margin: 0.15rem 0 0.5rem;
-
-    color: var(--color-text);
-}
-
-.information-intro p {
+.information-description {
     max-width: 44rem;
 
-    margin-top: 0;
-    margin-bottom: 0;
+    margin: 0.75rem 0 0;
 
     color: var(--color-text-muted);
 

@@ -24,7 +24,7 @@ async def information_page(
             "page": {
                 "title": "Information",
                 "eyebrow": "Robot Details",
-                "main_class": "information-layout",
+                "main_class": "page-layout information-layout",
             },
         },
     )

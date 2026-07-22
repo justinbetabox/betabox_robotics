@@ -32,8 +32,7 @@
 {% block page_content %}
     <section
         class="
-            status-section
-            status-overview
+            page-section
         "
         aria-labelledby="overview-heading"
     >
@@ -56,10 +55,11 @@
             </p>
         </div>
 
-        <div class="status-overview-grid">
+        <div class="overview-grid">
             <article
                 class="
-                    status-overview-card
+                    overview-card
+                    overview-card-primary
                     status-overview-card-primary
                 "
             >
@@ -74,73 +74,94 @@
 
                 <div>
                     <span
-                        class="status-overview-label"
+                        class="overview-label"
                     >
                         Overall Health
                     </span>
 
-                    <strong id="overall-status">
+                    <strong
+                        class="overview-value"
+                        id="overall-status"
+                    >
                         Checking…
                     </strong>
                 </div>
             </article>
 
-            <article class="status-overview-card">
-                <span class="status-overview-label">
+            <article class="overview-card">
+                <span class="overview-label">
                     Battery
                 </span>
 
-                <strong id="battery-status">
+                <strong
+                    class="overview-value"
+                    id="battery-status"
+                >
                     --
                 </strong>
             </article>
 
-            <article class="status-overview-card">
-                <span class="status-overview-label">
+            <article class="overview-card">
+                <span class="overview-label">
                     CPU Temperature
                 </span>
 
-                <strong id="temperature-status">
+                <strong
+                    class="overview-value"
+                    id="temperature-status"
+                >
                     --
                 </strong>
             </article>
 
-            <article class="status-overview-card">
-                <span class="status-overview-label">
+            <article class="overview-card">
+                <span class="overview-label">
                     Robot Control
                 </span>
 
-                <strong id="robot-status">
+                <strong
+                    class="overview-value"
+                    id="robot-status"
+                >
                     --
                 </strong>
             </article>
 
-            <article class="status-overview-card">
-                <span class="status-overview-label">
+            <article class="overview-card">
+                <span class="overview-label">
                     Vision
                 </span>
 
-                <strong id="vision-status">
+                <strong
+                    class="overview-value"
+                    id="vision-status"
+                >
                     --
                 </strong>
             </article>
 
-            <article class="status-overview-card">
-                <span class="status-overview-label">
+            <article class="overview-card">
+                <span class="overview-label">
                     JupyterHub
                 </span>
 
-                <strong id="jupyter-status">
+                <strong
+                    class="overview-value"
+                    id="jupyter-status"
+                >
                     --
                 </strong>
             </article>
 
-            <article class="status-overview-card">
-                <span class="status-overview-label">
+            <article class="overview-card">
+                <span class="overview-label">
                     Services
                 </span>
 
-                <strong id="services-status">
+                <strong
+                    class="overview-value"
+                    id="services-status"
+                >
                     --
                 </strong>
             </article>
@@ -150,7 +171,7 @@
     <section
         id="attention-section"
         class="
-            status-section
+            page-section
             status-attention-section
         "
         aria-labelledby="attention-heading"
@@ -175,7 +196,7 @@
     </section>
 
     <section
-        class="status-section"
+        class="page-section"
         aria-labelledby="hardware-heading"
     >
         <div class="section-heading">
@@ -201,7 +222,7 @@
     </section>
 
     <section
-        class="status-section"
+        class="page-section"
         aria-labelledby="system-heading"
     >
         <div class="section-heading">
@@ -227,7 +248,7 @@
     </section>
 
     <section
-        class="status-section"
+        class="page-section"
         aria-labelledby="network-heading"
     >
         <div class="section-heading">

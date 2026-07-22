@@ -349,7 +349,7 @@ function setLoadingState(
     if (loading) {
         setConnectionState(
             "connecting",
-            "Connecting…"
+            "Loading…"
         );
     }
 }
@@ -427,14 +427,14 @@ function createMetaItem(
         "div"
     );
 
-    item.className = "service-meta-item";
+    item.className = "detail-card";
 
     const itemLabel = document.createElement(
         "span"
     );
 
     itemLabel.className = (
-        "service-meta-label"
+        "detail-label"
     );
 
     itemLabel.textContent = label;
@@ -444,7 +444,7 @@ function createMetaItem(
     );
 
     itemValue.className = (
-        "service-meta-value"
+        "detail-value"
     );
 
     itemValue.textContent = value;

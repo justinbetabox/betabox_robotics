@@ -32,8 +32,7 @@
 {% block page_content %}
     <section
         class="
-            events-section
-            events-overview
+            page-section
         "
         aria-labelledby="overview-heading"
     >
@@ -50,16 +49,17 @@
 
             <p
                 id="events-updated"
-                class="updated-time"
+                class="timestamp"
             >
                 Loading platform events…
             </p>
         </div>
 
-        <div class="events-overview-grid">
+        <div class="overview-grid">
             <article
                 class="
-                    events-overview-card
+                    overview-card
+                    overview-card-primary
                     events-overview-card-primary
                 "
             >
@@ -74,63 +74,81 @@
 
                 <div>
                     <span
-                        class="events-overview-label"
+                        class="overview-label"
                     >
                         Events Shown
                     </span>
 
-                    <strong id="total-count">
+                    <strong
+                        class="overview-value"
+                        id="total-count"
+                    >
                         --
                     </strong>
                 </div>
             </article>
 
-            <article class="events-overview-card">
-                <span class="events-overview-label">
+            <article class="overview-card">
+                <span class="overview-label">
                     Information
                 </span>
 
-                <strong id="info-count">
+                <strong
+                    class="overview-value"
+                    id="info-count"
+                >
                     --
                 </strong>
             </article>
 
-            <article class="events-overview-card">
-                <span class="events-overview-label">
+            <article class="overview-card">
+                <span class="overview-label">
                     Warnings
                 </span>
 
-                <strong id="warning-count">
+                <strong
+                    class="overview-value"
+                    id="warning-count"
+                >
                     --
                 </strong>
             </article>
 
-            <article class="events-overview-card">
-                <span class="events-overview-label">
+            <article class="overview-card">
+                <span class="overview-label">
                     Errors
                 </span>
 
-                <strong id="error-count">
+                <strong
+                    class="overview-value"
+                    id="error-count"
+                >
                     --
                 </strong>
             </article>
 
-            <article class="events-overview-card">
-                <span class="events-overview-label">
+            <article class="overview-card">
+                <span class="overview-label">
                     Critical
                 </span>
 
-                <strong id="critical-count">
+                <strong
+                    class="overview-value"
+                    id="critical-count"
+                >
                     --
                 </strong>
             </article>
 
-            <article class="events-overview-card">
-                <span class="events-overview-label">
+            <article class="overview-card">
+                <span class="overview-label">
                     Matching Events
                 </span>
 
-                <strong id="available-count">
+                <strong
+                    class="overview-value"
+                    id="available-count"
+                >
                     --
                 </strong>
             </article>
@@ -138,7 +156,7 @@
     </section>
 
     <section
-        class="events-section"
+        class="page-section"
         aria-labelledby="filters-heading"
     >
         <div class="section-heading">
@@ -244,7 +262,7 @@
     </section>
 
     <section
-        class="events-section"
+        class="page-section"
         aria-labelledby="events-heading"
     >
         <div class="section-heading">
@@ -260,7 +278,7 @@
 
             <p
                 id="event-list-summary"
-                class="updated-time"
+                class="timestamp"
             >
                 Loading…
             </p>

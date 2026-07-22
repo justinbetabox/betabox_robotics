@@ -30,7 +30,7 @@ async def status_page(
             "page": {
                 "title": "Robot Status",
                 "eyebrow": "Platform Diagnostics",
-                "main_class": "status-layout",
+                "main_class": "page-layout",
             },
         },
     )

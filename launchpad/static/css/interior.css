@@ -19,9 +19,9 @@
 .interior-header {
     display: grid;
     grid-template-columns:
-        1fr
         auto
-        1fr;
+        minmax(0, 1fr)
+        auto;
 
     align-items: center;
     gap: 1.5rem;
@@ -41,8 +41,9 @@
 }
 
 .interior-header-title {
+    justify-self: center;
+    width: 100%;
     min-width: 0;
-
     text-align: center;
 }
 
@@ -72,39 +73,61 @@
     justify-self: start;
 }
 
+.interior-header-actions {
+    justify-self: end;
+}
+
+/* Responsive behavior */
 
 /* Responsive behavior */
 
 @media (max-width: 760px) {
     .interior-header {
-        grid-template-columns:
-            1fr
-            auto;
-
         gap: 0.75rem;
     }
 
-    .interior-header-title {
-        display: none;
+    .interior-header-title h1 {
+        font-size:
+            clamp(1.25rem, 4vw, 1.75rem);
+    }
+
+    .interior-header-title .eyebrow {
+        font-size:
+            clamp(0.62rem, 1.8vw, 0.75rem);
+    }
+
+    .interior-header-actions {
+        gap: 0.5rem;
     }
 }
 
 @media (max-width: 560px) {
     .interior-header {
+        gap: 0.5rem;
+
         padding:
-            0.75rem
+            0.7rem
             var(--page-padding);
     }
 
-    .interior-header-actions {
-        gap: 0.45rem;
+    .interior-header-title h1 {
+        font-size:
+            clamp(1.05rem, 5vw, 1.4rem);
     }
 
-    .interior-header .button {
-        min-height: 38px;
-        width: auto;
-        padding: 0.5rem 0.7rem;
+    .interior-header-title .eyebrow {
+        margin-bottom: 0.15rem;
 
+        font-size:
+            clamp(0.55rem, 2.4vw, 0.68rem);
+    }
+
+    .interior-header .back-link {
         font-size: 0.78rem;
+    }
+
+    .interior-header-actions {
+        flex-wrap: nowrap;
+        gap: 0.35rem;
     }
 }

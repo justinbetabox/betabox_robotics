@@ -341,7 +341,7 @@ function createDetailItem(label, value) {
         "article",
     );
 
-    item.className = "detail-item";
+    item.className = "detail-card";
 
     const labelElement = document.createElement(
         "span",
@@ -1114,7 +1114,7 @@ async function loadStatus() {
 
     setConnectionState(
         "connecting",
-        "Refreshing…",
+        "Loading…",
     );
 
     try {
@@ -1177,7 +1177,7 @@ async function loadStatus() {
 
         setConnectionState(
             "error",
-            "Disconnected",
+            "Unavailable",
         );
     } finally {
         requestInProgress = false;

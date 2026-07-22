@@ -8,7 +8,7 @@ import {
 
 const VIDEO_STATE_LABELS = {
     connecting: "Connecting…",
-    connected: "Connected",
+    connected: "Live",
     disconnected: "Reconnecting…",
     error: "Unavailable",
     closed: "Disconnected",

@@ -25,7 +25,7 @@ async def services_page(
             "page": {
                 "title": "Services",
                 "eyebrow": "Platform Services",
-                "main_class": "services-layout",
+                "main_class": "page-layout",
             },
         },
     )

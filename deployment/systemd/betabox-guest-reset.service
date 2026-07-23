@@ -1,0 +1,21 @@
+[Unit]
+Description=Reset Betabox Guest Workspace
+Before=betabox-launchpad.service
+
+[Service]
+Type=oneshot
+
+User=root
+Group=root
+
+WorkingDirectory=/opt/libs/betabox_robotics
+
+Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONPATH=/opt/libs/betabox_robotics
+
+ExecStart=/opt/betabox/venv/bin/python -m deployment.provision.reset guest
+
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

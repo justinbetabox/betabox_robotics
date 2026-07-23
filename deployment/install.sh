@@ -110,14 +110,13 @@ python -m ipykernel install \
 echo "Removing default Python 3 Jupyter kernel..."
 "$JUPYTERHUB_VENV_DIR/bin/jupyter" kernelspec remove -f python3 || true
 "$JUPYTERHUB_VENV_DIR/bin/python" -m pip uninstall -y ipykernel || true
-echo "[7/10] Creating media directories..."
-mkdir -p \
-    "$HOME/media/pictures" \
-    "$HOME/media/videos" \
-    "$HOME/media/sounds"
+echo "[7/10] Provisioning platform..."
 
-echo "Installing starter sound assets..."
-cp -n "$SDK_DIR/deployment/assets/sounds/"* "$HOME/media/sounds/" 2>/dev/null || true
+cd "$SDK_DIR"
+
+sudo "$VENV_DIR/bin/python" \
+    -m deployment.provision \
+    --service-user "$USER"
 
 echo "[8/10] Checking boot configuration..."
 CONFIG_FILE="/boot/firmware/config.txt"
@@ -174,6 +173,7 @@ SERVICES=(
     set-hostname-from-serial.service
     wifi-fallback.service
     betabox-video.service
+    betabox-guest-reset.service
     betabox-launchpad.service
 )
 

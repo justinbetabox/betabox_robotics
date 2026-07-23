@@ -7,11 +7,11 @@ import aiohttp_jinja2
 
 from aiohttp import web
 
-from betabox_robotics.config import (
-    PlatformConfig,
-)
 from betabox_robotics.services.http_health import (
     check_http_available,
+)
+from betabox_robotics.launchpad.auth import (
+    LaunchpadContext,
 )
 
 
@@ -41,11 +41,13 @@ def service_state(
 async def jupyter_status(
     request: web.Request,
 ) -> web.Response:
-    config: PlatformConfig = request.app[
-        "platform_config"
+    context: LaunchpadContext = request[
+        "launchpad_context"
     ]
 
-    unit = config.services.jupyterhub.unit
+    platform = context.platform
+
+    unit = platform.services.jupyterhub.unit
 
     state = await asyncio.to_thread(
         service_state,
@@ -61,7 +63,7 @@ async def jupyter_status(
         responding, health_message = (
             await asyncio.to_thread(
                 check_http_available,
-                config.network.jupyterhub_health_url,
+                platform.network.jupyterhub_health_url,
             )
         )
 
@@ -74,7 +76,7 @@ async def jupyter_status(
             "state": state,
             "health_message": health_message,
             "port": (
-                config.network.jupyterhub_port
+                platform.network.jupyterhub_port
             ),
         }
     )

@@ -10,10 +10,6 @@ import aiohttp_jinja2
 
 from aiohttp import WSMsgType, web
 
-from betabox_robotics.config import (
-    PlatformConfig,
-)
-
 from betabox_robotics.exceptions import (
     RobotBusyError,
 )
@@ -22,6 +18,9 @@ from betabox_robotics.launchpad.drive_controller import (
     ControlState,
     DriveControlError,
     ManualDriveController,
+)
+from betabox_robotics.launchpad.auth import (
+    LaunchpadContext,
 )
 
 
@@ -56,9 +55,13 @@ async def drive_page(
 async def drive_websocket(
     request: web.Request,
 ) -> web.WebSocketResponse:
-    controller: ManualDriveController = request.app[
-        "drive_controller"
+    context: LaunchpadContext = request[
+            "launchpad_context"
     ]
+
+    controller = (
+            context.services.require_drive_controller()
+    )
 
     websocket = web.WebSocketResponse(
         heartbeat=10.0,
@@ -295,9 +298,11 @@ async def handle_drive_message(
 async def vision_offer_proxy(
     request: web.Request,
 ) -> web.Response:
-    config: PlatformConfig = request.app[
-        "platform_config"
+    context: LaunchpadContext = request[
+            "launchpad_context"
     ]
+
+    platform = context.platform
 
     try:
         offer = await request.json()
@@ -321,7 +326,7 @@ async def vision_offer_proxy(
             )
 
         vision_url = (
-            f"{config.network.vision_url}"
+            f"{platform.network.vision_url}"
             "/offer"
         )
 

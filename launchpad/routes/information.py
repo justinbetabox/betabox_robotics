@@ -6,13 +6,12 @@ import aiohttp_jinja2
 
 from aiohttp import web
 
-from betabox_robotics.config import (
-    PlatformConfig,
-)
 from betabox_robotics.services.platform_information import (
     collect_platform_information,
 )
-
+from betabox_robotics.launchpad.auth import (
+    LaunchpadContext,
+)
 
 async def information_page(
     request: web.Request,
@@ -34,20 +33,20 @@ async def information_api(
     request: web.Request,
 ) -> web.Response:
     """
-    Return safe, student-facing platform information.
+    Return safe, user-facing platform information.
 
     The endpoint is read-only and deliberately does not expose the
     complete PlatformConfig or administrative configuration values.
     """
 
-    config: PlatformConfig = request.app[
-        "platform_config"
+    context: LaunchpadContext = request[
+        "launchpad_context"
     ]
 
     try:
         report = await asyncio.to_thread(
             collect_platform_information,
-            config,
+            context.platform,
         )
     except Exception as exc:
         return web.json_response(

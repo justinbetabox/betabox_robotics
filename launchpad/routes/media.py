@@ -12,7 +12,10 @@ import aiohttp_jinja2
 
 from aiohttp import web
 
-from betabox_robotics.config import PlatformConfig
+from betabox_robotics.launchpad.auth import (
+    LaunchpadContext,
+    Workspace
+)
 
 
 MEDIA_EXTENSIONS: dict[str, frozenset[str]] = {
@@ -106,21 +109,21 @@ class MediaUploadFailure:
         }
 
 def category_directories(
-    config: PlatformConfig,
+    workspace: Workspace,
 ) -> dict[str, Path]:
     return {
-        "pictures": config.paths.pictures_dir,
-        "videos": config.paths.videos_dir,
-        "sounds": config.paths.sounds_dir,
+        "pictures": workspace.media.pictures,
+        "videos": workspace.media.videos,
+        "sounds": workspace.media.sounds,
     }
 
 
 def require_category(
-    config: PlatformConfig,
+    workspace: Workspace,
     category: str,
 ) -> Path:
     directory = category_directories(
-        config
+        workspace
     ).get(category)
 
     if directory is None:
@@ -535,21 +538,23 @@ async def media_page(
 async def media_api(
     request: web.Request,
 ) -> web.Response:
-    config: PlatformConfig = request.app[
-        "platform_config"
+    context: LaunchpadContext = request[
+        "launchpad_context"
     ]
+
+    workspace = context.workspace
 
     requested_category = request.query.get(
         "category"
     )
 
     directories = category_directories(
-        config
+        workspace
     )
 
     if requested_category is not None:
         directory = require_category(
-            config,
+            workspace,
             requested_category,
         )
 
@@ -604,9 +609,11 @@ async def media_api(
 async def upload_media(
     request: web.Request,
 ) -> web.Response:
-    config: PlatformConfig = request.app[
-        "platform_config"
+    context: LaunchpadContext = request[
+        "launchpad_context"
     ]
+
+    workspace = context.workspace
 
     if not request.content_type.startswith(
         "multipart/"
@@ -724,7 +731,7 @@ async def upload_media(
             continue
 
         directory = require_category(
-            config,
+            workspace,
             category,
         )
 
@@ -819,9 +826,11 @@ async def upload_media(
 async def media_file(
     request: web.Request,
 ) -> web.StreamResponse:
-    config: PlatformConfig = request.app[
-        "platform_config"
+    context: LaunchpadContext = request[
+        "launchpad_context"
     ]
+
+    workspace = context.workspace
 
     category = request.match_info[
         "category"
@@ -832,7 +841,7 @@ async def media_file(
     ]
 
     directory = require_category(
-        config,
+        workspace,
         category,
     )
 
@@ -877,9 +886,11 @@ async def media_file(
 async def delete_media_file(
     request: web.Request,
 ) -> web.Response:
-    config: PlatformConfig = request.app[
-        "platform_config"
+    context: LaunchpadContext = request[
+        "launchpad_context"
     ]
+
+    workspace = context.workspace
 
     category = request.match_info[
         "category"
@@ -890,7 +901,7 @@ async def delete_media_file(
     ]
 
     directory = require_category(
-        config,
+        workspace,
         category,
     )
 

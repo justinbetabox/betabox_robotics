@@ -6,9 +6,6 @@ import aiohttp_jinja2
 
 from aiohttp import web
 
-from betabox_robotics.config import (
-    PlatformConfig,
-)
 from betabox_robotics.services.http_health import (
     check_http_available,
 )
@@ -17,6 +14,9 @@ from betabox_robotics.services.platform_summary import (
 )
 from betabox_robotics.services.status import (
     collect_status,
+)
+from betabox_robotics.launchpad.auth import (
+    LaunchpadContext,
 )
 
 
@@ -39,23 +39,22 @@ async def status_page(
 async def status_api(
     request: web.Request,
 ) -> web.Response:
-    config: PlatformConfig = request.app[
-        "platform_config"
+    context: LaunchpadContext = request[
+        "launchpad_context"
     ]
 
-    cache = request.app[
-        "status_cache"
-    ]
+    platform = context.platform
+    services = context.services
 
     def collect_payload() -> dict[str, object]:
         summary = collect_platform_summary(
-            config
+            platform
         )
 
         payload = summary.to_dict()
 
         jupyter_state = summary.services.get(
-            config.services.jupyterhub.unit,
+            platform.services.jupyterhub.unit,
             "unknown",
         )
 
@@ -69,7 +68,7 @@ async def status_api(
                 jupyter_responding,
                 jupyter_message,
             ) = check_http_available(
-                config.network.jupyterhub_health_url,
+                platform.network.jupyterhub_health_url,
             )
 
         payload["jupyterhub"] = {
@@ -84,7 +83,7 @@ async def status_api(
         return payload
 
     try:
-        payload = await cache.get(
+        payload = await services.status_cache.get(
             collect_payload
         )
     except Exception as exc:
@@ -105,14 +104,16 @@ async def status_api(
 async def status_report_api(
     request: web.Request,
 ) -> web.Response:
-    config: PlatformConfig = request.app[
-        "platform_config"
+    context: LaunchpadContext = request[
+        "launchpad_context"
     ]
+
+    platform = context.platform
 
     try:
         report = await asyncio.to_thread(
             collect_status,
-            config,
+            platform,
         )
     except Exception as exc:
         return web.json_response(

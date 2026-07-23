@@ -6,11 +6,11 @@ import aiohttp_jinja2
 
 from aiohttp import web
 
-from betabox_robotics.config import (
-    PlatformConfig,
-)
 from betabox_robotics.services.doctor import (
     collect_doctor_report,
+)
+from betabox_robotics.launchpad.auth import (
+    LaunchpadContext,
 )
 
 
@@ -41,14 +41,14 @@ async def diagnostics_api(
     the aiohttp event loop.
     """
 
-    config: PlatformConfig = request.app[
-        "platform_config"
+    context: LaunchpadContext = request[
+        "launchpad_context"
     ]
 
     try:
         report = await asyncio.to_thread(
             collect_doctor_report,
-            config,
+            context.platform,
         )
     except Exception:
         return web.json_response(

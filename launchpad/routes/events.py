@@ -6,11 +6,11 @@ import aiohttp_jinja2
 
 from aiohttp import web
 
-from betabox_robotics.config import (
-    PlatformConfig,
-)
 from betabox_robotics.services.events import (
     collect_event_report,
+)
+from betabox_robotics.launchpad.auth import (
+    LaunchpadContext,
 )
 
 
@@ -93,13 +93,15 @@ async def events_api(
     - ``component``
     """
 
-    config: PlatformConfig = request.app[
-        "platform_config"
+    context: LaunchpadContext = request[
+        "launchpad_context"
     ]
+
+    platform = context.platform
 
     last = parse_last(
         request,
-        config.monitoring.default_event_count,
+        platform.monitoring.default_event_count,
     )
 
     severity = parse_optional_filter(
@@ -137,7 +139,7 @@ async def events_api(
             last=last,
             severity=severity,
             component=component,
-            config=config,
+            config=platform,
         )
     except ValueError as exc:
         return web.json_response(

@@ -29,6 +29,13 @@ from betabox_robotics.calibration import (
 from betabox_robotics.services.calibration import (
     CalibrationService,
 )
+from betabox_robotics.launchpad.auth import (
+    LaunchpadContextProvider,
+    launchpad_context_middleware
+)
+from betabox_robotics.launchpad.services import (
+    LaunchpadServices,
+)
 
 
 PACKAGE_DIR = Path(__file__).parent
@@ -39,21 +46,26 @@ TEMPLATES_DIR = PACKAGE_DIR / "templates"
 async def drive_controller_context(
     app: web.Application,
 ) -> AsyncIterator[None]:
-    calibration_manager: CalibrationManager = (
-        app["calibration_manager"]
+    services: LaunchpadServices = (
+        app["launchpad_services"]
     )
 
     controller = ManualDriveController(
-        calibration_manager
+        services.calibration_manager
     )
 
     await controller.start()
 
+    services.drive_controller = controller
+
+    # Keep this temporarily for existing handlers.
     app["drive_controller"] = controller
 
     try:
         yield
     finally:
+        services.drive_controller = None
+        await controller.close()
         await controller.close()
 
 
@@ -71,7 +83,11 @@ async def health(
 def create_app(
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> web.Application:
-    app = web.Application()
+    app = web.Application(
+        middlewares=[
+            launchpad_context_middleware,
+        ]
+    )
 
     aiohttp_jinja2.setup(
         app,
@@ -91,12 +107,30 @@ def create_app(
 
     app["platform_config"] = config
 
+    app["context_provider"] = (
+        LaunchpadContextProvider(config)
+    )
+
     calibration_manager = CalibrationManager(
         config.paths.calibration_file
     )
 
     calibration_service = CalibrationService(
         calibration_manager
+    )
+
+    status_cache = StatusCache(
+        ttl_seconds=3.0
+    )
+
+    launchpad_services = LaunchpadServices(
+        calibration_manager=calibration_manager,
+        calibration_service=calibration_service,
+        status_cache=status_cache,
+    )
+
+    app["launchpad_services"] = (
+        launchpad_services
     )
 
     app["calibration_manager"] = (

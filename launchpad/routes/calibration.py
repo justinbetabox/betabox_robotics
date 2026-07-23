@@ -14,9 +14,6 @@ import aiohttp_jinja2
 
 from aiohttp import web
 
-from betabox_robotics.services.calibration import (
-    CalibrationService,
-)
 
 from betabox_robotics.robots.betabox_car import (
     BETABOX_CAR,
@@ -31,6 +28,21 @@ from betabox_robotics.exceptions import (
 from betabox_robotics.camera import (
     CameraMount,
 )
+from betabox_robotics.launchpad.auth import (
+    LaunchpadContext,
+)
+from betabox_robotics.services.calibration import (
+    CalibrationService,
+)
+
+def calibration_service(
+    request: web.Request,
+) -> CalibrationService:
+    context: LaunchpadContext = request[
+        "launchpad_context"
+    ]
+
+    return context.services.calibration_service
 
 def error_response(
     *,
@@ -274,9 +286,7 @@ async def calibration_page(
 async def calibration_api(
     request: web.Request,
 ) -> web.Response:
-    service: CalibrationService = request.app[
-        "calibration_service"
-    ]
+    service = calibration_service(request)
 
     try:
         return calibration_response(
@@ -319,9 +329,7 @@ async def sample_grayscale_api(
 async def update_motors_api(
     request: web.Request,
 ) -> web.Response:
-    service: CalibrationService = request.app[
-        "calibration_service"
-    ]
+    service = calibration_service(request)
 
     try:
         body = await request.json()
@@ -374,9 +382,7 @@ async def update_motors_api(
 async def update_steering_api(
     request: web.Request,
 ) -> web.Response:
-    service: CalibrationService = request.app[
-        "calibration_service"
-    ]
+    service = calibration_service(request)
 
     try:
         body = await request.json()
@@ -499,9 +505,7 @@ async def preview_camera_mount_api(
 async def preview_motor_trim_api(
     request: web.Request,
 ) -> web.Response:
-    service = request.app[
-        "calibration_service"
-    ]
+    service = calibration_service(request)
 
     try:
         body = await request.json()
@@ -554,9 +558,7 @@ async def preview_motor_trim_api(
 async def update_camera_mount_api(
     request: web.Request,
 ) -> web.Response:
-    service: CalibrationService = request.app[
-        "calibration_service"
-    ]
+    service = calibration_service(request)
 
     try:
         body = await request.json()
@@ -609,9 +611,7 @@ async def update_camera_mount_api(
 async def update_grayscale_api(
     request: web.Request,
 ) -> web.Response:
-    service: CalibrationService = request.app[
-        "calibration_service"
-    ]
+    service = calibration_service(request)
 
     try:
         body = await request.json()
@@ -665,9 +665,7 @@ async def update_grayscale_api(
 async def clear_grayscale_api(
     request: web.Request,
 ) -> web.Response:
-    service: CalibrationService = request.app[
-        "calibration_service"
-    ]
+    service = calibration_service(request)
 
     try:
         service.clear_grayscale()

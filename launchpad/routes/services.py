@@ -6,12 +6,12 @@ import aiohttp_jinja2
 
 from aiohttp import web
 
-from betabox_robotics.config import (
-    PlatformConfig,
-)
 from betabox_robotics.services.services import (
     collect_services,
     service_summary,
+)
+from betabox_robotics.launchpad.auth import (
+    LaunchpadContext,
 )
 
 
@@ -38,14 +38,14 @@ async def services_api(
     Return read-only status information for managed platform services.
     """
 
-    config: PlatformConfig = request.app[
-        "platform_config"
+    context: LaunchpadContext = request[
+        "launchpad_context"
     ]
 
     try:
         statuses = await asyncio.to_thread(
             collect_services,
-            config,
+            context.platform,
         )
     except Exception as exc:
         return web.json_response(

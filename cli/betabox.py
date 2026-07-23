@@ -21,6 +21,9 @@ from betabox_robotics.services.events import main as events_main
 from betabox_robotics.launchpad.app import (
     main as launchpad_main,
 )
+from betabox_robotics.services.guest import (
+    main as guest_main,
+)
 
 
 def main() -> int:
@@ -78,6 +81,10 @@ def main() -> int:
     subparsers.add_parser(
         "reset",
         help="Reset generated Betabox media and recreate expected folders",
+    )
+    subparsers.add_parser(
+        "guest",
+        help="Manage the Betabox Guest workspace",
     )
     subparsers.add_parser(
         "set-hostname",
@@ -139,6 +146,9 @@ def main() -> int:
 
     if args.command == "set-hostname":
         return hostname_main(extra)
+
+    if args.command == "guest":
+        return guest_main(extra)
 
     if args.command == "wifi-fallback":
         return wifi_fallback_main(extra)

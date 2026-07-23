@@ -2,10 +2,22 @@ from __future__ import annotations
 
 import grp
 import pwd
+import subprocess
 
-from .models import BETABOX_ACCOUNTS, ProvisionedAccount
-from .utils import run_command
+from betabox_robotics.services.workspace import (
+    BETABOX_ACCOUNTS,
+    ProvisionedAccount,
+)
 
+def run_command(
+    *command: str,
+) -> None:
+    """Run a system command."""
+
+    subprocess.run(
+        command,
+        check=True,
+    )
 
 def account_exists(username: str) -> bool:
     """Return whether a Linux account exists."""

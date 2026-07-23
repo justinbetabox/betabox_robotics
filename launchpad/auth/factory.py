@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import pwd
-
 from pathlib import Path
 
 from betabox_robotics.config import PlatformConfig
@@ -9,30 +7,12 @@ from betabox_robotics.config import PlatformConfig
 from betabox_robotics.launchpad.services import (
     LaunchpadServices,
 )
+from betabox_robotics.services.workspace import account_by_username
 
 from .context import LaunchpadContext
 from .identity import Identity, Role
 from .permissions import Permissions
 from .workspace import MediaWorkspace, Workspace
-
-
-def account_home(
-    username: str,
-) -> Path:
-    """Return the configured home directory for a Linux account."""
-
-    try:
-        account = pwd.getpwnam(
-            username
-        )
-    except KeyError as exc:
-        raise RuntimeError(
-            f"Linux account does not exist: {username}"
-        ) from exc
-
-    return Path(
-        account.pw_dir
-    ).expanduser().resolve()
 
 
 def build_workspace(
@@ -42,9 +22,7 @@ def build_workspace(
 ) -> Workspace:
     """Build a Launchpad workspace rooted at the given directory."""
 
-    root = Path(
-        root
-    ).expanduser().resolve()
+    root = root.expanduser().resolve()
 
     return Workspace(
         root=root,
@@ -59,35 +37,24 @@ def build_workspace(
     )
 
 
-def build_account_workspace(
-    username: str,
-    *,
-    persistent: bool,
-) -> Workspace:
-    """Build a workspace from a Linux account."""
-
-    return build_workspace(
-        account_home(username),
-        persistent=persistent,
-    )
-
-
 def build_guest_context(
     platform: PlatformConfig,
     services: LaunchpadServices,
 ) -> LaunchpadContext:
     """Build the default guest Launchpad context."""
 
+    guest = account_by_username("guest")
+
     identity = Identity(
-        username="guest",
-        display_name="Guest",
+        username=guest.username,
+        display_name=guest.display_name,
         role=Role.GUEST,
         authenticated=False,
     )
 
-    workspace = build_account_workspace(
-        "guest",
-        persistent=False,
+    workspace = build_workspace(
+        guest.home,
+        persistent=guest.persistent,
     )
 
     workspace.ensure_exists()

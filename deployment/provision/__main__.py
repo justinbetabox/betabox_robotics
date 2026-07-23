@@ -6,8 +6,11 @@ import os
 from pathlib import Path
 
 from .accounts import provision_accounts
-from .media import provision_media
-from .workspaces import provision_workspaces
+from betabox_robotics.services.workspace import (
+    BETABOX_ACCOUNTS,
+    provision_media,
+    provision_workspace,
+)
 
 REPOSITORY_ROOT = (
     Path(__file__)
@@ -60,9 +63,14 @@ def main() -> None:
     )
 
     print("Provisioning Betabox workspaces...")
-    provision_workspaces()
+
+    for account in BETABOX_ACCOUNTS:
+        provision_workspace(
+            account
+        )
 
     print("Provisioning Betabox media...")
+
     provision_media(
         REPOSITORY_ROOT,
     )

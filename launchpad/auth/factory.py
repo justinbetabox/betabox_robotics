@@ -40,6 +40,8 @@ def build_workspace(
 def build_guest_context(
     platform: PlatformConfig,
     services: LaunchpadServices,
+    *,
+    workspace_root: Path | None = None,
 ) -> LaunchpadContext:
     """Build the default guest Launchpad context."""
 
@@ -52,15 +54,20 @@ def build_guest_context(
         authenticated=False,
     )
 
-    workspace = build_workspace(
-        guest.home,
-        persistent=guest.persistent,
+    root = (
+        guest.home
+        if workspace_root is None
+        else workspace_root
     )
 
+    workspace = build_workspace(
+        root,
+        persistent=guest.persistent,
+    )
     workspace.ensure_exists()
 
-    permissions = Permissions(
-        administration=False,
+    permissions = Permissions.for_role(
+        identity.role
     )
 
     return LaunchpadContext(

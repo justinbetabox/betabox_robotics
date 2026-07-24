@@ -12,11 +12,13 @@ from pathlib import Path
 
 from betabox_robotics.config import PlatformConfig
 from betabox_robotics.launchpad.auth import (
+    LaunchpadContext,
+    LaunchpadContextProvider,
+    Permission,
+    Permissions,
     Role,
     build_guest_context,
     build_workspace,
-    LaunchpadContext,
-    LaunchpadContextProvider,
     launchpad_context_middleware,
 )
 
@@ -94,49 +96,68 @@ class GuestContextTests(unittest.TestCase):
     ) -> None:
         platform = PlatformConfig.default()
 
-        context = build_guest_context(
-            platform,
-            create_test_services(),
-            workspace_root=Path(
-                "/tmp/betabox-test-guest"
-            ),
-        )
+        with tempfile.TemporaryDirectory() as temporary:
+            context = build_guest_context(
+                platform,
+                create_test_services(),
+                workspace_root=Path(temporary),
+            )
 
-        self.assertEqual(
-            context.identity.username,
-            "guest",
-        )
-        self.assertEqual(
-            context.identity.display_name,
-            "Guest",
-        )
-        self.assertIs(
-            context.identity.role,
-            Role.GUEST,
-        )
-        self.assertFalse(
-            context.identity.authenticated
-        )
+            self.assertEqual(
+                context.identity.username,
+                "guest",
+            )
+            self.assertEqual(
+                context.identity.display_name,
+                "Guest",
+            )
+            self.assertIs(
+                context.identity.role,
+                Role.GUEST,
+            )
+            self.assertFalse(
+                context.identity.authenticated
+            )
 
     def test_guest_workspace_is_temporary(
         self,
     ) -> None:
         platform = PlatformConfig.default()
 
-        context = build_guest_context(
-            platform,
-            create_test_services(),
-            workspace_root=Path(
-                "/tmp/betabox-test-guest"
-            ),
-        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
 
-        self.assertFalse(
-            context.workspace.persistent
-        )
-        self.assertFalse(
-            context.permissions.administration
-        )
+            context = build_guest_context(
+                platform,
+                create_test_services(),
+                workspace_root=root,
+            )
+
+            self.assertEqual(
+                context.workspace.root,
+                root.resolve(),
+            )
+            self.assertFalse(
+                context.workspace.persistent
+            )
+            self.assertFalse(
+                context.permissions.administration
+            )
+            self.assertIn(
+                Permission.ROBOT_STATUS,
+                context.permissions,
+            )
+            self.assertIn(
+                Permission.VISION_VIEW,
+                context.permissions,
+            )
+            self.assertNotIn(
+                Permission.ROBOT_DRIVE,
+                context.permissions,
+            )
+
+            for directory in context.workspace.directories():
+                self.assertTrue(directory.is_dir())
 
 
 class ContextMiddlewareTests(
@@ -191,6 +212,127 @@ class ContextMiddlewareTests(
         self.assertEqual(
             payload["role"],
             Role.GUEST.value,
+        )
+
+class PermissionTests(unittest.TestCase):
+    def test_guest_has_read_only_permissions(
+        self,
+    ) -> None:
+        permissions = Permissions.for_role(
+            Role.GUEST
+        )
+
+        self.assertIn(
+            Permission.ROBOT_STATUS,
+            permissions,
+        )
+        self.assertIn(
+            Permission.VISION_VIEW,
+            permissions,
+        )
+        self.assertIn(
+            Permission.MEDIA_READ,
+            permissions,
+        )
+        self.assertNotIn(
+            Permission.ROBOT_DRIVE,
+            permissions,
+        )
+        self.assertFalse(
+            permissions.administration
+        )
+
+    def test_student_can_drive_robot(
+        self,
+    ) -> None:
+        permissions = Permissions.for_role(
+            Role.STUDENT
+        )
+
+        self.assertIn(
+            Permission.ROBOT_DRIVE,
+            permissions,
+        )
+        self.assertIn(
+            Permission.CALIBRATION_BASIC,
+            permissions,
+        )
+        self.assertNotIn(
+            Permission.SERVICES_MANAGE,
+            permissions,
+        )
+        self.assertFalse(
+            permissions.administration
+        )
+
+    def test_teacher_has_administrative_permissions(
+        self,
+    ) -> None:
+        permissions = Permissions.for_role(
+            Role.TEACHER
+        )
+
+        self.assertIn(
+            Permission.DIAGNOSTICS_READ,
+            permissions,
+        )
+        self.assertIn(
+            Permission.SERVICES_MANAGE,
+            permissions,
+        )
+        self.assertIn(
+            Permission.PLATFORM_CONFIGURE,
+            permissions,
+        )
+        self.assertIn(
+            Permission.SYSTEM_REBOOT,
+            permissions,
+        )
+        self.assertTrue(
+            permissions.administration
+        )
+
+    def test_requires_accepts_granted_permission(
+        self,
+    ) -> None:
+        permissions = Permissions.for_role(
+            Role.GUEST
+        )
+
+        permissions.requires(
+            Permission.ROBOT_STATUS
+        )
+
+    def test_requires_rejects_missing_permission(
+        self,
+    ) -> None:
+        permissions = Permissions.for_role(
+            Role.GUEST
+        )
+
+        with self.assertRaises(PermissionError):
+            permissions.requires(
+                Permission.SYSTEM_REBOOT
+            )
+
+    def test_unknown_explicit_permissions_can_be_built(
+        self,
+    ) -> None:
+        permissions = Permissions.from_iterable(
+            {
+                Permission.ROBOT_STATUS,
+                Permission.ROBOT_DRIVE,
+            }
+        )
+
+        self.assertEqual(
+            permissions.granted,
+            frozenset(
+                {
+                    Permission.ROBOT_STATUS,
+                    Permission.ROBOT_DRIVE,
+                }
+            ),
         )
 
 if __name__ == "__main__":

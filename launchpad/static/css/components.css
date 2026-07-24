@@ -1107,46 +1107,231 @@ Detail cards
 .identity-badge {
     display: inline-flex;
     align-items: center;
-    gap: 0.65rem;
+    gap: 0.85rem;
+
     min-width: 0;
-    padding: 0.45rem 0.7rem;
+    padding: 0.55rem 0.65rem 0.55rem 0.85rem;
+
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-pill);
-    background: var(--color-surface);
+    border-radius: var(--radius-large);
+
+    background: var(--color-surface-raised);
     color: var(--color-text);
 }
 
-.identity-badge-avatar {
+.identity-badge__details {
     display: grid;
-    flex: 0 0 auto;
-    place-items: center;
-    width: 2rem;
-    height: 2rem;
-    border-radius: 50%;
-    background: var(--brand-blue);
-    color: var(--brand-white);
-    font-size: 0.85rem;
-    font-weight: 900;
-}
+    gap: 0.12rem;
 
-.identity-badge-details {
-    display: grid;
     min-width: 0;
-    line-height: 1.15;
 }
 
-.identity-badge-name {
+.identity-badge__name {
     overflow: hidden;
-    font-size: 0.82rem;
+
+    color: var(--color-text);
+
+    font-size: 0.9rem;
+    font-weight: 850;
+    line-height: 1.2;
+
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
-.identity-badge-role {
-    margin-top: 0.15rem;
+.identity-badge__workspace {
     color: var(--color-text-muted);
-    font-size: 0.68rem;
-    font-weight: 750;
+
+    font-size: var(--font-size-small);
+    font-weight: 650;
+    line-height: 1.25;
+}
+
+.identity-badge__form {
+    display: contents;
+}
+
+.identity-badge__action {
+    min-width: 8.5rem;
+    min-height: 40px;
+    margin-left: auto;
+    padding: 0.55rem 0.8rem;
+
+    border-radius: var(--radius-small);
+
+    font-size: 0.82rem;
+    white-space: nowrap;
+}
+
+/* Student login modal */
+
+.login-modal {
+    width: min(92vw, 440px);
+    max-width: 440px;
+    padding: 0;
+
+    border: 1px solid var(--color-border-strong);
+    border-radius: var(--radius-large);
+
+    background: transparent;
+    color: var(--color-text);
+
+    box-shadow: var(--shadow-card);
+}
+
+.login-modal::backdrop {
+    background: rgb(15 22 28 / 68%);
+    backdrop-filter: blur(4px);
+}
+
+.login-modal__content {
+    overflow: hidden;
+
+    border-radius: inherit;
+
+    background: var(--color-surface);
+}
+
+.login-modal__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+
+    padding: 1.35rem 1.35rem 1rem;
+
+    border-bottom: 1px solid var(--color-border);
+}
+
+.login-modal__eyebrow {
+    margin: 0 0 0.3rem;
+
+    color: var(--color-primary);
+
+    font-size: var(--font-size-small);
+    font-weight: 850;
+    letter-spacing: 0.08em;
+    line-height: 1.2;
+    text-transform: uppercase;
+}
+
+.login-modal__header h2 {
+    margin: 0;
+
+    color: var(--color-text);
+
+    font-size: clamp(1.45rem, 4vw, 1.8rem);
+    line-height: var(--line-height-heading);
+}
+
+.login-modal__close {
+    width: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    padding: 0;
+
+    border-radius: var(--radius-small);
+
+    font-size: 1.35rem;
+    line-height: 1;
+}
+
+.login-modal__error {
+    margin: 1rem 1.35rem 0;
+    padding: 0.85rem 1rem;
+
+    border: 1px solid var(--color-critical);
+    border-left-width: 5px;
+    border-radius: var(--radius-medium);
+
+    background: var(--brand-pink-light);
+    color: var(--color-text);
+
+    font-size: 0.9rem;
+    font-weight: 700;
+    line-height: 1.45;
+}
+
+.login-modal__form {
+    display: grid;
+    gap: 1rem;
+
+    padding: 1.35rem;
+}
+
+.login-modal__field {
+    display: grid;
+    gap: 0.45rem;
+
+    color: var(--color-text);
+
+    font-size: 0.88rem;
+    font-weight: 800;
+}
+
+.login-modal__field input {
+    width: 100%;
+    min-height: 48px;
+    padding: 0.75rem 0.85rem;
+
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-small);
+
+    background: var(--color-surface-inset);
+    color: var(--color-text);
+
+    font: inherit;
+    font-size: var(--font-size-body);
+
+    transition:
+        border-color var(--transition-fast),
+        background var(--transition-fast),
+        box-shadow var(--transition-fast);
+}
+
+.login-modal__field input:hover {
+    border-color: var(--color-border-strong);
+}
+
+.login-modal__field input:focus {
+    border-color: var(--color-primary);
+    background: var(--color-surface);
+
+    outline: none;
+    box-shadow: 0 0 0 3px var(--color-focus-ring);
+}
+
+.login-modal__submit {
+    width: 100%;
+    min-height: 48px;
+    margin-top: 0.25rem;
+
+    border-radius: var(--radius-small);
+}
+
+/* Responsive authentication components */
+
+@media (max-width: 560px) {
+    .overview-grid,
+    .detail-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .login-modal {
+        width: calc(100vw - 1.5rem);
+        max-height: calc(100dvh - 1.5rem);
+    }
+
+    .login-modal__header,
+    .login-modal__form {
+        padding-right: 1rem;
+        padding-left: 1rem;
+    }
+
+    .login-modal__error {
+        margin-right: 1rem;
+        margin-left: 1rem;
+    }
 }
 
 /* ========================================
@@ -1323,13 +1508,6 @@ html[data-compact-layout="true"] .overview-card {
 @media (max-width: 760px) {
     .page-layout {
         padding: 1rem;
-    }
-}
-
-@media (max-width: 560px) {
-    .overview-grid,
-    .detail-grid {
-        grid-template-columns: 1fr;
     }
 }
 

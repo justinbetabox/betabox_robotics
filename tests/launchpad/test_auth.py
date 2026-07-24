@@ -332,15 +332,25 @@ class TemplateContextTests(unittest.IsolatedAsyncioTestCase):
             workspace_root=root,
         )
 
+    def build_request(
+        self,
+        context: LaunchpadContext,
+        *,
+        query: dict[str, str] | None = None,
+    ) -> Mock:
+        request = Mock()
+        request.__getitem__ = Mock(return_value=context)
+        request.query = query or {}
+
+        return request
+
     async def test_template_context_exposes_identity(
         self,
     ) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             context = self.build_context(Path(temporary))
 
-            request = {
-                LAUNCHPAD_CONTEXT_KEY: context,
-            }
+            request = self.build_request(context)
 
             template_context = await launchpad_template_context(
                 request  # type: ignore[arg-type]
@@ -358,6 +368,24 @@ class TemplateContextTests(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(template_context["is_student"])
             self.assertFalse(template_context["is_teacher"])
             self.assertFalse(template_context["is_authenticated"])
+            self.assertFalse(template_context["login_failed"])
+
+    async def test_template_context_exposes_failed_login(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            context = self.build_context(Path(temporary))
+
+            request = self.build_request(
+                context,
+                query={
+                    "login": "failed",
+                },
+            )
+
+            template_context = await launchpad_template_context(request)
+
+            self.assertTrue(template_context["login_failed"])
 
     async def test_template_can_checks_permission(
         self,
@@ -365,9 +393,7 @@ class TemplateContextTests(unittest.IsolatedAsyncioTestCase):
         with tempfile.TemporaryDirectory() as temporary:
             context = self.build_context(Path(temporary))
 
-            request = {
-                LAUNCHPAD_CONTEXT_KEY: context,
-            }
+            request = self.build_request(context)
 
             template_context = await launchpad_template_context(
                 request  # type: ignore[arg-type]
@@ -426,11 +452,54 @@ class IdentityBadgeTemplateTests(unittest.TestCase):
             rendered,
         )
         self.assertIn(
-            "Guest session",
+            "Temporary Workspace",
+            rendered,
+        )
+        self.assertIn(
+            "Login",
             rendered,
         )
         self.assertIn(
             'aria-label="Current Launchpad user"',
+            rendered,
+        )
+
+    def test_student_identity_badge_renders(
+        self,
+    ) -> None:
+        template_root = Path(__file__).parents[2] / "launchpad" / "templates"
+
+        environment = jinja2.Environment(
+            loader=jinja2.FileSystemLoader(template_root),
+            autoescape=True,
+        )
+
+        template = environment.get_template("_identity_badge.html")
+
+        rendered = template.render(
+            identity=type(
+                "Identity",
+                (),
+                {
+                    "display_name": "Student 1",
+                    "role": Role.STUDENT,
+                },
+            )(),
+            is_guest=False,
+            is_student=True,
+            is_teacher=False,
+        )
+
+        self.assertIn(
+            "Student 1",
+            rendered,
+        )
+        self.assertIn(
+            "Persistent Workspace",
+            rendered,
+        )
+        self.assertIn(
+            "Log Out",
             rendered,
         )
 
@@ -562,6 +631,28 @@ class SessionManagerTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             manager.create("guest")
+
+    def test_student_session_can_be_removed(
+        self,
+    ) -> None:
+        manager = SessionManager()
+        created = manager.create("student1")
+
+        assert created.id is not None
+
+        manager.remove(created.id)
+
+        request = Mock()
+        request.cookies = {
+            SESSION_COOKIE_NAME: created.id,
+        }
+
+        resolved = manager.resolve(request)
+
+        self.assertEqual(
+            resolved.username,
+            "guest",
+        )
 
 
 class AuthenticationServiceTests(unittest.IsolatedAsyncioTestCase):

@@ -883,17 +883,28 @@ html[data-compact-layout="true"] .camera-control-section {
         flex-direction: column-reverse;
     }
 
-    .drive-header .identity-badge-details {
+    .drive-header .identity-badge {
+        gap: 0.45rem;
+        padding: 0.35rem 0.4rem 0.35rem 0.55rem;
+    }
+
+    .drive-header .identity-badge__workspace {
         display: none;
     }
 
-    .drive-header .identity-badge {
-        padding: 0.35rem;
+    .drive-header .identity-badge__name {
+        max-width: 5.5rem;
+
+        font-size: 0.76rem;
     }
 
-    .drive-header .identity-badge-avatar {
-        width: 1.8rem;
-        height: 1.8rem;
+    .drive-header .identity-badge__action {
+        width: auto;
+        min-width: 0;
+        min-height: 36px;
+        padding: 0.4rem 0.55rem;
+
+        font-size: 0.7rem;
     }
 }
 

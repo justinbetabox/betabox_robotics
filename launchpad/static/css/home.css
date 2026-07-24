@@ -243,18 +243,33 @@
 
 .launchpad-header .identity-badge {
     border-color: rgb(255 255 255 / 28%);
+
     background: rgb(255 255 255 / 12%);
     color: var(--brand-white);
+
     backdrop-filter: blur(12px);
 }
 
-.launchpad-header .identity-badge-avatar {
-    background: var(--brand-white);
-    color: var(--brand-blue);
+.launchpad-header .identity-badge__name {
+    color: var(--brand-white);
 }
 
-.launchpad-header .identity-badge-role {
-    color: rgb(255 255 255 / 70%);
+.launchpad-header .identity-badge__workspace {
+    color: rgb(255 255 255 / 72%);
+}
+
+.launchpad-header .identity-badge__action {
+    border-color: rgb(255 255 255 / 30%);
+
+    background: rgb(255 255 255 / 14%);
+    color: var(--brand-white);
+}
+
+.launchpad-header .identity-badge__action:hover {
+    border-color: rgb(255 255 255 / 48%);
+
+    background: rgb(255 255 255 / 23%);
+    color: var(--brand-white);
 }
 
 @media (max-width: 820px) {
@@ -283,6 +298,19 @@
 }
 
 @media (max-width: 560px) {
+    .launchpad-header .identity-badge {
+        width: 100%;
+        align-items: stretch;
+        flex-direction: column;
+        gap: 0.65rem;
+    }
+
+    .launchpad-header .identity-badge__action {
+        width: 100%;
+        min-width: 0;
+        margin-left: 0;
+    }
+
     .hud {
         display: grid;
         grid-template-columns:

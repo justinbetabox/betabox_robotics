@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import os
 import shutil
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -12,6 +13,9 @@ from betabox_robotics.services.workspace import (
     account_ids,
     populate_media,
     create_workspace,
+)
+from betabox_robotics.services.privileges import (
+    require_root_or_elevate,
 )
 
 
@@ -171,28 +175,72 @@ def main(
         help="Show Guest workspace status",
     )
 
+    subparsers.add_parser(
+        "provision",
+        help="Create the Guest workspace",
+    )
+
+    subparsers.add_parser(
+        "reset",
+        help="Reset the Guest workspace",
+    )
+
     args = parser.parse_args(argv)
 
-    if args.command == "status":
-        status = guest_status()
+    try:
+        if args.command == "status":
+            status = guest_status()
 
-        print(
-            f"Account:      {'OK' if status.account_exists else 'Missing'}"
-        )
-        print(
-            f"Home:         {'OK' if status.home_exists else 'Missing'}"
-        )
-        print(
-            f"Curriculum:   {'OK' if status.curriculum_exists else 'Missing'}"
-        )
-        print(
-            f"Media:        {'OK' if status.media_exists else 'Missing'}"
-        )
-        print(
-            f"Preferences:  {'OK' if status.preferences_exist else 'Missing'}"
-        )
+            print(
+                f"Account:      {'OK' if status.account_exists else 'Missing'}"
+            )
+            print(
+                f"Home:         {'OK' if status.home_exists else 'Missing'}"
+            )
+            print(
+                f"Curriculum:   {'OK' if status.curriculum_exists else 'Missing'}"
+            )
+            print(
+                f"Media:        {'OK' if status.media_exists else 'Missing'}"
+            )
+            print(
+                f"Preferences:  {'OK' if status.preferences_exist else 'Missing'}"
+            )
 
-        return 0 if status.ok else 1
+            return 0 if status.ok else 1
+
+        if args.command == "provision":
+            require_root_or_elevate(
+                ["guest", "provision"],
+            )
+
+            provision_guest()
+
+            print(
+                "Guest workspace provisioned."
+            )
+
+            return 0
+
+        if args.command == "reset":
+            require_root_or_elevate(
+                ["guest", "reset"],
+            )
+
+            reset_guest()
+
+            print(
+                "Guest workspace reset."
+            )
+
+            return 0
+
+    except Exception as exc:
+        print(
+            f"Guest workspace operation failed: {exc}",
+            file=sys.stderr,
+        )
+        return 1
 
     parser.print_help()
     return 1

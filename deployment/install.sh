@@ -10,6 +10,9 @@ VENV_DIR="$BETABOX_DIR/venv"
 JUPYTERHUB_DIR="/opt/jupyterhub"
 JUPYTERHUB_VENV_DIR="$JUPYTERHUB_DIR/venv"
 
+SUDOERS_SOURCE="$SDK_DIR/deployment/sudoers/betabox-guest"
+SUDOERS_TARGET="/etc/sudoers.d/betabox-guest"
+
 echo "======================================"
 echo " Betabox Robotics SDK Installer"
 echo "======================================"
@@ -19,7 +22,7 @@ if [[ "$EUID" -eq 0 ]]; then
     exit 1
 fi
 
-echo "[1/10] Installing system packages..."
+echo "[1/11] Installing system packages..."
 sudo apt update
 sudo apt install -y \
     git \
@@ -40,18 +43,18 @@ sudo apt install -y \
     npm \
     jq
 
-echo "[2/10] Creating directories..."
+echo "[2/11] Creating directories..."
 sudo mkdir -p "$LIB_DIR" "$BETABOX_DIR"
 sudo chown -R "$USER:$USER" "$LIB_DIR" "$BETABOX_DIR"
 
-echo "[3/10] Creating Python virtual environment..."
+echo "[3/11] Creating Python virtual environment..."
 if [[ ! -d "$VENV_DIR" ]]; then
     python3 -m venv --system-site-packages "$VENV_DIR"
 fi
 
 source "$VENV_DIR/bin/activate"
 
-echo "[4/10] Installing Python dependencies..."
+echo "[4/11] Installing Python dependencies..."
 python -m pip install --upgrade pip setuptools wheel
 
 # Important:
@@ -69,10 +72,10 @@ python -m pip install \
     smbus2 \
     gpiozero
 
-echo "[5/10] Installing Betabox Robotics SDK..."
+echo "[5/11] Installing Betabox Robotics SDK..."
 python -m pip install -e "$SDK_DIR" --no-deps
 
-echo "[6/10] Installing JupyterHub..."
+echo "[6/11] Installing JupyterHub..."
 sudo mkdir -p "$JUPYTERHUB_DIR"
 sudo chown -R "$USER:$USER" "$JUPYTERHUB_DIR"
 
@@ -110,7 +113,7 @@ python -m ipykernel install \
 echo "Removing default Python 3 Jupyter kernel..."
 "$JUPYTERHUB_VENV_DIR/bin/jupyter" kernelspec remove -f python3 || true
 "$JUPYTERHUB_VENV_DIR/bin/python" -m pip uninstall -y ipykernel || true
-echo "[7/10] Provisioning platform..."
+echo "[7/11] Provisioning platform..."
 
 cd "$SDK_DIR"
 
@@ -118,7 +121,7 @@ sudo "$VENV_DIR/bin/python" \
     -m deployment.provision \
     --service-user "$USER"
 
-echo "[8/10] Checking boot configuration..."
+echo "[8/11] Checking boot configuration..."
 CONFIG_FILE="/boot/firmware/config.txt"
 
 if [[ -f "$CONFIG_FILE" ]]; then
@@ -161,7 +164,39 @@ if ! nmcli connection show PiAP >/dev/null 2>&1; then
         ipv6.method ignore
 fi
 
-echo "[9/10] Installing systemd services..."
+echo "[9/11] Installing Betabox privilege policy..."
+
+if [[ ! -f "$SUDOERS_SOURCE" ]]; then
+    echo "ERROR: Missing sudoers policy:"
+    echo "  $SUDOERS_SOURCE"
+    exit 1
+fi
+
+if ! sudo visudo \
+    --check \
+    --file="$SUDOERS_SOURCE"
+then
+    echo "ERROR: Invalid Betabox sudoers policy."
+    exit 1
+fi
+
+sudo install \
+    -o root \
+    -g root \
+    -m 0440 \
+    "$SUDOERS_SOURCE" \
+    "$SUDOERS_TARGET"
+
+if ! sudo visudo \
+    --check \
+    --file="$SUDOERS_TARGET"
+then
+    echo "ERROR: Installed sudoers policy is invalid."
+    sudo rm -f "$SUDOERS_TARGET"
+    exit 1
+fi
+
+echo "[10/11] Installing systemd services..."
 
 SYSTEMD_SOURCE="$SDK_DIR/deployment/systemd"
 SYSTEMD_TARGET="/etc/systemd/system"
@@ -197,7 +232,7 @@ for service in "${SERVICES[@]}"; do
     sudo systemctl enable "$service"
 done
 
-echo "[10/10] Running install check..."
+echo "[11/11] Running install check..."
 python -m betabox_robotics.services.install_check
 
 echo

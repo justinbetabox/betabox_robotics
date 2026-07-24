@@ -56,6 +56,11 @@ def managed_services(
             title=services.wifi_fallback.display_name,
             unit=services.wifi_fallback.unit,
         ),
+        "guest-reset": ManagedService(
+            name="guest-reset",
+            title=services.guest_reset.display_name,
+            unit=services.guest_reset.unit,
+        ),
         "launchpad": ManagedService(
             name="launchpad",
             title=services.launchpad.display_name,

@@ -390,6 +390,17 @@ class PlatformServicesConfig:
         startup=ServiceStartup.CONDITIONAL,
     )
 
+    guest_reset: ServiceDefinition = ServiceDefinition(
+        unit="betabox-guest-reset.service",
+        display_name="Guest Workspace Reset",
+        description=(
+            "Resets and provisions the temporary "
+            "Guest workspace during system startup."
+        ),
+        category=ServiceCategory.BOOT,
+        startup=ServiceStartup.ONESHOT,
+    )
+
     launchpad: ServiceDefinition = ServiceDefinition(
         unit="betabox-launchpad.service",
         display_name="Launchpad",
@@ -420,6 +431,7 @@ class PlatformServicesConfig:
             self.jupyterhub,
             self.video,
             self.wifi_fallback,
+            self.guest_reset,
             self.launchpad,
         )
 

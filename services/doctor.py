@@ -23,6 +23,10 @@ from betabox_robotics.config import (
     PlatformConfig,
 )
 
+from betabox_robotics.services.guest import (
+    GuestWorkspaceStatus,
+)
+
 
 Severity = Literal["info", "warning", "error", "critical"]
 
@@ -230,6 +234,81 @@ def diagnose_media(results: dict[str, CheckResult]) -> Diagnosis:
             "Run the deployment installer again.",
             "Create ~/media/pictures, ~/media/videos, and ~/media/sounds.",
             "Run: betabox status",
+        ],
+    )
+
+
+def diagnose_guest_workspace(
+    guest: GuestWorkspaceStatus,
+) -> Diagnosis:
+    if guest.ok:
+        return healthy(
+            "Guest Workspace",
+            "Guest workspace is ready for classroom use.",
+        )
+
+    affected: list[str] = []
+
+    if not guest.account_exists:
+        affected.append("Guest account")
+
+    if not guest.home_exists:
+        affected.append("Guest home")
+
+    if not guest.curriculum_exists:
+        affected.append("Curriculum")
+
+    if not guest.media_exists:
+        affected.append("Media")
+
+    if not guest.preferences_exist:
+        affected.append("Preferences")
+
+    causes: list[str] = []
+
+    if not guest.account_exists:
+        causes.append(
+            "The Guest account is missing."
+        )
+
+    if not guest.home_exists:
+        causes.append(
+            "The Guest home directory is missing."
+        )
+
+    if (
+        guest.home_exists
+        and not guest.curriculum_exists
+    ):
+        causes.append(
+            "The Guest workspace was not fully provisioned."
+        )
+
+    if (
+        guest.home_exists
+        and (
+            not guest.media_exists
+            or not guest.preferences_exist
+        )
+    ):
+        causes.append(
+            "Workspace files may have been removed or corrupted."
+        )
+
+    return Diagnosis(
+        title="Guest Workspace",
+        ok=False,
+        severity="error",
+        summary="Guest workspace is incomplete.",
+        causes=causes,
+        affected=affected,
+        actions=[
+            "Run: betabox guest provision",
+            (
+                "Restart: sudo systemctl restart "
+                "betabox-guest-reset.service"
+            ),
+            "Run: betabox doctor",
         ],
     )
 
@@ -853,6 +932,7 @@ def collect_diagnoses(
         diagnose_power(system),
 
         robot_hardware,
+        diagnose_guest_workspace(status.guest),
         diagnose_audio_hardware(hardware),
         vision,
         diagnose_jupyterhub(results, status, config),

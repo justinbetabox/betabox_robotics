@@ -13,7 +13,7 @@ WorkingDirectory=/opt/libs/betabox_robotics
 Environment=PYTHONUNBUFFERED=1
 Environment=PYTHONPATH=/opt/libs/betabox_robotics
 
-ExecStart=/opt/betabox/venv/bin/python -m deployment.provision.reset guest
+ExecStart=/opt/betabox/venv/bin/betabox guest reset
 
 RemainAfterExit=yes
 

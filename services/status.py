@@ -28,6 +28,10 @@ from betabox_robotics.hardware.ownership import (
 
 from betabox_robotics.services.managed import managed_services
 from betabox_robotics.version import __version__
+from betabox_robotics.services.guest import (
+    GuestWorkspaceStatus,
+    guest_status,
+)
 
 
 @dataclass(frozen=True)
@@ -41,6 +45,7 @@ class StatusReport:
     control: RobotOwnershipStatus
     hardware: RobotHardwareStatus
     system_health: SystemHealthStatus
+    guest: GuestWorkspaceStatus
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -130,6 +135,7 @@ def collect_status(
         control=probe_robot_ownership(),
         hardware=hardware,
         system_health=system_health,
+        guest=guest_status(),
     )
 
 
@@ -305,6 +311,30 @@ def print_human(
         print(f"{name.title():8} {path} {'OK' if exists else 'MISSING'}")
 
     print()
+
+    print("Guest Workspace")
+    print("----------------")
+
+    guest = report.guest
+
+    print(
+        f"Account:      {'OK' if guest.account_exists else 'Missing'}"
+    )
+    print(
+        f"Home:         {'OK' if guest.home_exists else 'Missing'}"
+    )
+    print(
+        f"Curriculum:   {'OK' if guest.curriculum_exists else 'Missing'}"
+    )
+    print(
+        f"Media:        {'OK' if guest.media_exists else 'Missing'}"
+    )
+    print(
+        f"Preferences:  {'OK' if guest.preferences_exist else 'Missing'}"
+    )
+
+    print()
+
     print("Services")
     print("--------")
     managed = managed_services(config)

@@ -36,6 +36,11 @@ from betabox_robotics.launchpad.auth import (
 from betabox_robotics.launchpad.services import (
     LaunchpadServices,
 )
+from betabox_robotics.launchpad.auth import (
+    LaunchpadContextProvider,
+    launchpad_context_middleware,
+    launchpad_template_context,
+)
 
 
 PACKAGE_DIR = Path(__file__).parent
@@ -93,6 +98,9 @@ def create_app(
         app,
         loader=jinja2.FileSystemLoader(
             TEMPLATES_DIR
+        ),
+        context_processors=(
+            launchpad_template_context,
         ),
         autoescape=jinja2.select_autoescape(
             enabled_extensions=(

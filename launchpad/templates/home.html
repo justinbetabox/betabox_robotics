@@ -67,79 +67,82 @@
             </div>
 
             <div class="launchpad-header-actions">
-                {% include "_identity_badge.html" %}
+                <div class="launchpad-user-controls">
+                    {% include "_identity_badge.html" %}
 
-                <button
-                    id="theme-toggle"
-                    class="theme-toggle"
-                    type="button"
-                >
-                    Dark Mode
-                </button>
-
-                <button
-                    id="hud-toggle"
-                    class="hud"
-                    type="button"
-                    aria-expanded="false"
-                    aria-controls="hud-details"
-                >
-                    <span
-                        id="hud-health-dot"
-                        class="
-                            hud-health-dot
-                            status-unknown
-                        "
-                    ></span>
-
-                    <span class="hud-item hud-overall">
-                        <span class="hud-label">
-                            Robot
-                        </span>
-
-                        <strong id="hud-health">
-                            Checking…
-                        </strong>
-                    </span>
-
-                    <span class="hud-item">
-                        <span class="hud-label">
-                            Battery
-                        </span>
-
-                        <strong id="hud-battery">
-                            --
-                        </strong>
-                    </span>
-
-                    <span class="hud-item">
-                        <span class="hud-label">
-                            Control
-                        </span>
-
-                        <strong id="hud-control">
-                            --
-                        </strong>
-                    </span>
-
-                    <span class="hud-item hud-wide">
-                        <span class="hud-label">
-                            Vision
-                        </span>
-
-                        <strong id="hud-vision">
-                            --
-                        </strong>
-                    </span>
-
-                    <span
-                        class="hud-expand-icon"
-                        aria-hidden="true"
+                    <button
+                        id="theme-toggle"
+                        class="theme-toggle"
+                        type="button"
+                        data-theme-toggle
                     >
-                        ▾
-                    </span>
-                </button>
+                        Dark Mode
+                    </button>
+                </div>
             </div>
+
+            <button
+                id="hud-toggle"
+                class="hud"
+                type="button"
+                aria-expanded="false"
+                aria-controls="hud-details"
+            >
+                <span
+                    id="hud-health-dot"
+                    class="
+                        hud-health-dot
+                        status-unknown
+                    "
+                ></span>
+
+                <span class="hud-item hud-overall">
+                    <span class="hud-label">
+                        Robot
+                    </span>
+
+                    <strong id="hud-health">
+                        Checking…
+                    </strong>
+                </span>
+
+                <span class="hud-item">
+                    <span class="hud-label">
+                        Battery
+                    </span>
+
+                    <strong id="hud-battery">
+                        --
+                    </strong>
+                </span>
+
+                <span class="hud-item">
+                    <span class="hud-label">
+                        Control
+                    </span>
+
+                    <strong id="hud-control">
+                        --
+                    </strong>
+                </span>
+
+                <span class="hud-item hud-wide">
+                    <span class="hud-label">
+                        Vision
+                    </span>
+
+                    <strong id="hud-vision">
+                        --
+                    </strong>
+                </span>
+
+                <span
+                    class="hud-expand-icon"
+                    aria-hidden="true"
+                >
+                    ▾
+                </span>
+            </button>
         </div>
 
         <section

@@ -56,13 +56,8 @@
 
     /* Typography */
     --font-family:
-        Inter,
-        ui-sans-serif,
-        system-ui,
-        -apple-system,
-        BlinkMacSystemFont,
-        "Segoe UI",
-        sans-serif;
+        Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", sans-serif;
 
     --font-size-small: 0.78rem;
     --font-size-body: 1rem;
@@ -79,23 +74,19 @@
 
     /* Layout */
     --content-width: 1200px;
+    --content-width-wide: 1400px;
     --content-width-narrow: 860px;
 
-    --page-padding:
-        clamp(1rem, 3vw, 2.5rem);
+    --page-padding: clamp(1rem, 3vw, 2.5rem);
 
-    --section-gap:
-        clamp(2rem, 5vw, 4.5rem);
+    --section-gap: clamp(2rem, 5vw, 4.5rem);
 
     /* Shadows */
-    --shadow-small:
-        0 5px 16px rgb(35 43 51 / 7%);
+    --shadow-small: 0 5px 16px rgb(35 43 51 / 7%);
 
-    --shadow-card:
-        0 14px 34px rgb(35 43 51 / 10%);
+    --shadow-card: 0 14px 34px rgb(35 43 51 / 10%);
 
-    --shadow-header:
-        0 4px 18px rgb(35 43 51 / 8%);
+    --shadow-header: 0 4px 18px rgb(35 43 51 / 8%);
 
     /* Motion */
     --transition-fast: 140ms ease;
@@ -141,14 +132,11 @@
     --color-focus-ring: rgb(22 143 212 / 42%);
 
     /* Shadows */
-    --shadow-small:
-        0 6px 20px rgb(0 0 0 / 22%);
+    --shadow-small: 0 6px 20px rgb(0 0 0 / 22%);
 
-    --shadow-card:
-        0 16px 38px rgb(0 0 0 / 30%);
+    --shadow-card: 0 16px 38px rgb(0 0 0 / 30%);
 
-    --shadow-header:
-        0 5px 20px rgb(0 0 0 / 28%);
+    --shadow-header: 0 5px 20px rgb(0 0 0 / 28%);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -182,13 +170,10 @@
         --color-neutral: #8998a3;
         --color-focus-ring: rgb(22 143 212 / 42%);
 
-        --shadow-small:
-            0 6px 20px rgb(0 0 0 / 22%);
+        --shadow-small: 0 6px 20px rgb(0 0 0 / 22%);
 
-        --shadow-card:
-            0 16px 38px rgb(0 0 0 / 30%);
+        --shadow-card: 0 16px 38px rgb(0 0 0 / 30%);
 
-        --shadow-header:
-            0 5px 20px rgb(0 0 0 / 28%);
+        --shadow-header: 0 5px 20px rgb(0 0 0 / 28%);
     }
 }

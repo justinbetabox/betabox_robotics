@@ -2,24 +2,17 @@
 
 /* Constants */
 
-const THEME_STORAGE_KEY =
-    "betabox-launchpad-theme";
+const THEME_STORAGE_KEY = "betabox-launchpad-theme";
 
-const REDUCED_MOTION_STORAGE_KEY =
-    "betabox-launchpad-reduced-motion";
+const REDUCED_MOTION_STORAGE_KEY = "betabox-launchpad-reduced-motion";
 
-const LARGER_TEXT_STORAGE_KEY =
-    "betabox-launchpad-larger-text";
+const LARGER_TEXT_STORAGE_KEY = "betabox-launchpad-larger-text";
 
-const COMPACT_LAYOUT_STORAGE_KEY =
-    "betabox-launchpad-compact-layout";
-
+const COMPACT_LAYOUT_STORAGE_KEY = "betabox-launchpad-compact-layout";
 
 /* DOM elements */
 
-const root =
-    document.documentElement;
-
+const root = document.documentElement;
 
 /* Storage helpers */
 
@@ -31,15 +24,9 @@ function readStoredValue(key) {
     }
 }
 
-function writeStoredValue(
-    key,
-    value,
-) {
+function writeStoredValue(key, value) {
     try {
-        window.localStorage.setItem(
-            key,
-            value,
-        );
+        window.localStorage.setItem(key, value);
     } catch {
         // Ignore storage failures.
     }
@@ -47,26 +34,18 @@ function writeStoredValue(
 
 function removeStoredValue(key) {
     try {
-        window.localStorage.removeItem(
-            key,
-        );
+        window.localStorage.removeItem(key);
     } catch {
         // Ignore storage failures.
     }
 }
 
-
 /* Theme helpers */
 
 function storedTheme() {
-    const value = readStoredValue(
-        THEME_STORAGE_KEY,
-    );
+    const value = readStoredValue(THEME_STORAGE_KEY);
 
-    if (
-        value === "light"
-        || value === "dark"
-    ) {
+    if (value === "light" || value === "dark") {
         return value;
     }
 
@@ -74,40 +53,28 @@ function storedTheme() {
 }
 
 function systemTheme() {
-    return window.matchMedia(
-        "(prefers-color-scheme: dark)"
-    ).matches
+    return window.matchMedia("(prefers-color-scheme: dark)").matches
         ? "dark"
         : "light";
 }
 
 function activeTheme() {
-    return (
-        root.dataset.theme
-        || storedTheme()
-        || systemTheme()
-    );
+    return root.dataset.theme || storedTheme() || systemTheme();
 }
 
 function useSystemTheme() {
-    removeStoredValue(
-        THEME_STORAGE_KEY
-    );
+    removeStoredValue(THEME_STORAGE_KEY);
 
     delete root.dataset.theme;
 
     document.dispatchEvent(
-        new CustomEvent(
-            "betabox:theme-changed",
-            {
-                detail: {
-                    theme: systemTheme(),
-                },
-            }
-        )
+        new CustomEvent("betabox:theme-changed", {
+            detail: {
+                theme: systemTheme(),
+            },
+        }),
     );
 }
-
 
 /* Preference helpers */
 
@@ -116,129 +83,89 @@ function storedBooleanPreference(key) {
 }
 
 function applyLaunchpadPreferences() {
-    root.dataset.reducedMotion = (
-        storedBooleanPreference(
-            REDUCED_MOTION_STORAGE_KEY
-        )
-            ? "true"
-            : "false"
-    );
+    root.dataset.reducedMotion = storedBooleanPreference(
+        REDUCED_MOTION_STORAGE_KEY,
+    )
+        ? "true"
+        : "false";
 
-    root.dataset.largerText = (
-        storedBooleanPreference(
-            LARGER_TEXT_STORAGE_KEY
-        )
-            ? "true"
-            : "false"
-    );
+    root.dataset.largerText = storedBooleanPreference(LARGER_TEXT_STORAGE_KEY)
+        ? "true"
+        : "false";
 
-    root.dataset.compactLayout = (
-        storedBooleanPreference(
-            COMPACT_LAYOUT_STORAGE_KEY
-        )
-            ? "true"
-            : "false"
-    );
+    root.dataset.compactLayout = storedBooleanPreference(
+        COMPACT_LAYOUT_STORAGE_KEY,
+    )
+        ? "true"
+        : "false";
 }
-
 
 /* Theme actions */
 
-function applyTheme(
-    theme,
-    {
-        persist = false,
-    } = {}
-) {
-    if (
-        theme !== "light"
-        && theme !== "dark"
-    ) {
+function applyTheme(theme, { persist = false } = {}) {
+    if (theme !== "light" && theme !== "dark") {
         return;
     }
 
     root.dataset.theme = theme;
 
     if (persist) {
-        writeStoredValue(
-            THEME_STORAGE_KEY,
-            theme
-        );
+        writeStoredValue(THEME_STORAGE_KEY, theme);
     }
 
     document.dispatchEvent(
-        new CustomEvent(
-            "betabox:theme-changed",
-            {
-                detail: {
-                    theme,
-                },
-            }
-        )
+        new CustomEvent("betabox:theme-changed", {
+            detail: {
+                theme,
+            },
+        }),
     );
 }
 
 function toggleTheme() {
-    applyTheme(
-        activeTheme() === "dark"
-            ? "light"
-            : "dark",
-        {
-            persist: true,
-        }
-    );
+    applyTheme(activeTheme() === "dark" ? "light" : "dark", {
+        persist: true,
+    });
 }
-
 
 /* UI */
 
 function configureThemeToggle() {
-    const toggle =
-        document.getElementById(
-            "theme-toggle"
-        );
+    const toggle = document.getElementById("theme-toggle");
 
-    if (toggle === null) {
+    if (!(toggle instanceof HTMLButtonElement)) {
         return;
     }
 
     const updateLabel = () => {
-        const theme =
-            activeTheme();
+        const theme = activeTheme();
+        const dark = theme === "dark";
 
-        toggle.textContent =
-            theme === "dark"
-                ? "Switch to Light Mode"
-                : "Switch to Dark Mode";
+        toggle.textContent = dark ? "Dark Mode" : "Light Mode";
 
-        toggle.setAttribute(
-            "aria-label",
-            theme === "dark"
-                ? "Switch to light mode"
-                : "Switch to dark mode"
-        );
+        const actionLabel = dark
+            ? "Switch to light mode"
+            : "Switch to dark mode";
+
+        toggle.setAttribute("aria-label", actionLabel);
+        toggle.setAttribute("title", actionLabel);
     };
 
-    toggle.addEventListener(
-        "click",
-        () => {
-            toggleTheme();
-            updateLabel();
-        }
-    );
+    toggle.addEventListener("click", () => {
+        toggleTheme();
+    });
+
+    document.addEventListener("betabox:theme-changed", updateLabel);
 
     updateLabel();
 }
-
 
 /* Public API */
 
 window.applyTheme = applyTheme;
 window.useSystemTheme = useSystemTheme;
 
-window.applyLaunchpadPreferences = (
-    applyLaunchpadPreferences
-);
+window.applyLaunchpadPreferences = applyLaunchpadPreferences;
 
 window.betaboxPreferences = {
     applyTheme,
@@ -247,7 +174,6 @@ window.betaboxPreferences = {
     systemTheme,
     useSystemTheme,
 };
-
 
 /* Startup */
 
@@ -261,35 +187,20 @@ if (initialTheme !== null) {
 
 applyLaunchpadPreferences();
 
-const systemThemeQuery = window.matchMedia(
-    "(prefers-color-scheme: dark)"
-);
-
+const systemThemeQuery = window.matchMedia("(prefers-color-scheme: dark)");
 
 /* Event listeners */
 
-systemThemeQuery.addEventListener(
-    "change",
-    () => {
-        if (
-            storedTheme() === null
-            && !root.dataset.theme
-        ) {
-            document.dispatchEvent(
-                new CustomEvent(
-                    "betabox:theme-changed",
-                    {
-                        detail: {
-                            theme: systemTheme(),
-                        },
-                    }
-                )
-            );
-        }
+systemThemeQuery.addEventListener("change", () => {
+    if (storedTheme() === null && !root.dataset.theme) {
+        document.dispatchEvent(
+            new CustomEvent("betabox:theme-changed", {
+                detail: {
+                    theme: systemTheme(),
+                },
+            }),
+        );
     }
-);
+});
 
-document.addEventListener(
-    "DOMContentLoaded",
-    configureThemeToggle
-);
+document.addEventListener("DOMContentLoaded", configureThemeToggle);

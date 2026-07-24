@@ -1152,7 +1152,7 @@ Detail cards
 }
 
 .identity-badge__action {
-    min-width: 8.5rem;
+    min-width: 0;
     min-height: 40px;
     margin-left: auto;
     padding: 0.55rem 0.8rem;
@@ -1401,7 +1401,7 @@ html[data-compact-layout="true"] .panel {
     padding: 0.85rem;
 }
 
-/* Responsive behavior */
+/* Compact layout: component adjustments */
 
 html[data-compact-layout="true"] .form-section {
     gap: 0.8rem;

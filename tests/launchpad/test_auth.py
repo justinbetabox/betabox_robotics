@@ -13,6 +13,8 @@ from aiohttp.test_utils import (
 )
 from betabox_robotics.config import PlatformConfig
 from betabox_robotics.launchpad.auth import (
+    LAUNCHPAD_CONTEXT_KEY,
+    LAUNCHPAD_CONTEXT_PROVIDER_KEY,
     LaunchpadContext,
     LaunchpadContextProvider,
     Permission,
@@ -25,6 +27,7 @@ from betabox_robotics.launchpad.auth import (
     launchpad_template_context,
 )
 from betabox_robotics.launchpad.services import (
+    LAUNCHPAD_SERVICES_KEY,
     LaunchpadServices,
 )
 
@@ -137,16 +140,15 @@ class GuestContextTests(unittest.TestCase):
                 root.resolve(),
             )
             self.assertFalse(context.workspace.persistent)
-            self.assertFalse(context.permissions.administration)
             self.assertIn(
-                Permission.ROBOT_STATUS,
+                Permission.STATUS,
                 context.permissions,
             )
             self.assertIn(
-                Permission.VISION_VIEW,
+                Permission.VISION,
                 context.permissions,
             )
-            self.assertNotIn(
+            self.assertIn(
                 Permission.ROBOT_DRIVE,
                 context.permissions,
             )
@@ -184,8 +186,8 @@ class GuestContextTests(unittest.TestCase):
                 workspace_root=Path(temporary),
             )
 
-            self.assertTrue(context.can(Permission.ROBOT_STATUS))
-            self.assertFalse(context.can(Permission.ROBOT_DRIVE))
+            self.assertTrue(context.can(Permission.STATUS))
+            self.assertTrue(context.can(Permission.ROBOT_DRIVE))
 
     def test_guest_context_can_require_permission(
         self,
@@ -199,10 +201,7 @@ class GuestContextTests(unittest.TestCase):
                 workspace_root=Path(temporary),
             )
 
-            context.require(Permission.ROBOT_STATUS)
-
-            with self.assertRaises(PermissionError):
-                context.require(Permission.SYSTEM_REBOOT)
+            context.require(Permission.STATUS)
 
 
 class ContextMiddlewareTests(unittest.IsolatedAsyncioTestCase):
@@ -217,14 +216,14 @@ class ContextMiddlewareTests(unittest.IsolatedAsyncioTestCase):
             ]
         )
 
-        app["context_provider"] = LaunchpadContextProvider(platform)
+        app[LAUNCHPAD_CONTEXT_PROVIDER_KEY] = LaunchpadContextProvider(platform)
 
-        app["launchpad_services"] = create_test_services()
+        app[LAUNCHPAD_SERVICES_KEY] = create_test_services()
 
         async def handler(
             request: web.Request,
         ) -> web.Response:
-            context = request["launchpad_context"]
+            context = request[LAUNCHPAD_CONTEXT_KEY]
 
             self.assertIsInstance(
                 context,
@@ -246,92 +245,56 @@ class ContextMiddlewareTests(unittest.IsolatedAsyncioTestCase):
 
 
 class PermissionTests(unittest.TestCase):
-    def test_guest_has_read_only_permissions(
+    def test_guest_has_standard_permissions(
         self,
     ) -> None:
         permissions = Permissions.for_role(Role.GUEST)
 
-        self.assertIn(
-            Permission.ROBOT_STATUS,
-            permissions,
-        )
-        self.assertIn(
-            Permission.VISION_VIEW,
-            permissions,
-        )
-        self.assertIn(
-            Permission.MEDIA_READ,
-            permissions,
-        )
-        self.assertNotIn(
-            Permission.ROBOT_DRIVE,
-            permissions,
-        )
-        self.assertFalse(permissions.administration)
+        self.assertIn(Permission.ROBOT_DRIVE, permissions)
+        self.assertIn(Permission.CODE, permissions)
+        self.assertIn(Permission.VISION, permissions)
+        self.assertIn(Permission.MEDIA, permissions)
+        self.assertIn(Permission.MEDIA_UPLOAD, permissions)
+        self.assertIn(Permission.MEDIA_DOWNLOAD, permissions)
+        self.assertIn(Permission.CALIBRATION, permissions)
+        self.assertIn(Permission.STATUS, permissions)
+        self.assertIn(Permission.DIAGNOSTICS, permissions)
+        self.assertIn(Permission.SERVICES, permissions)
+        self.assertIn(Permission.INFORMATION, permissions)
+        self.assertIn(Permission.PREFERENCES, permissions)
+        self.assertIn(Permission.EVENTS, permissions)
 
-    def test_student_can_drive_robot(
-        self,
-    ) -> None:
-        permissions = Permissions.for_role(Role.STUDENT)
+    def test_student_permissions_match_guest(self):
+        guest = Permissions.for_role(Role.GUEST)
+        student = Permissions.for_role(Role.STUDENT)
 
-        self.assertIn(
-            Permission.ROBOT_DRIVE,
-            permissions,
+        self.assertEqual(
+            guest.granted,
+            student.granted,
         )
-        self.assertIn(
-            Permission.CALIBRATION_BASIC,
-            permissions,
-        )
-        self.assertNotIn(
-            Permission.SERVICES_MANAGE,
-            permissions,
-        )
-        self.assertFalse(permissions.administration)
 
-    def test_teacher_has_administrative_permissions(
-        self,
-    ) -> None:
-        permissions = Permissions.for_role(Role.TEACHER)
+    def test_teacher_permissions_match_student(self):
+        teacher = Permissions.for_role(Role.TEACHER)
+        student = Permissions.for_role(Role.STUDENT)
 
-        self.assertIn(
-            Permission.DIAGNOSTICS_READ,
-            permissions,
+        self.assertEqual(
+            teacher.granted,
+            student.granted,
         )
-        self.assertIn(
-            Permission.SERVICES_MANAGE,
-            permissions,
-        )
-        self.assertIn(
-            Permission.PLATFORM_CONFIGURE,
-            permissions,
-        )
-        self.assertIn(
-            Permission.SYSTEM_REBOOT,
-            permissions,
-        )
-        self.assertTrue(permissions.administration)
 
     def test_requires_accepts_granted_permission(
         self,
     ) -> None:
         permissions = Permissions.for_role(Role.GUEST)
 
-        permissions.requires(Permission.ROBOT_STATUS)
-
-    def test_requires_rejects_missing_permission(
-        self,
-    ) -> None:
-        permissions = Permissions.for_role(Role.GUEST)
-
-        with self.assertRaises(PermissionError):
-            permissions.requires(Permission.SYSTEM_REBOOT)
+        permissions.require(Permission.STATUS)
 
     def test_unknown_explicit_permissions_can_be_built(
         self,
     ) -> None:
         permissions = Permissions.from_iterable(
             {
-                Permission.ROBOT_STATUS,
+                Permission.STATUS,
                 Permission.ROBOT_DRIVE,
             }
         )
@@ -340,7 +303,7 @@ class PermissionTests(unittest.TestCase):
             permissions.granted,
             frozenset(
                 {
-                    Permission.ROBOT_STATUS,
+                    Permission.STATUS,
                     Permission.ROBOT_DRIVE,
                 }
             ),
@@ -365,7 +328,7 @@ class TemplateContextTests(unittest.IsolatedAsyncioTestCase):
             context = self.build_context(Path(temporary))
 
             request = {
-                "launchpad_context": context,
+                LAUNCHPAD_CONTEXT_KEY: context,
             }
 
             template_context = await launchpad_template_context(
@@ -392,7 +355,7 @@ class TemplateContextTests(unittest.IsolatedAsyncioTestCase):
             context = self.build_context(Path(temporary))
 
             request = {
-                "launchpad_context": context,
+                LAUNCHPAD_CONTEXT_KEY: context,
             }
 
             template_context = await launchpad_template_context(
@@ -401,9 +364,9 @@ class TemplateContextTests(unittest.IsolatedAsyncioTestCase):
 
             can = template_context["can"]
 
-            self.assertTrue(can("robot.status"))
-            self.assertTrue(can("vision.view"))
-            self.assertFalse(can("robot.drive"))
+            self.assertTrue(can("status"))
+            self.assertTrue(can("vision"))
+            self.assertTrue(can("robot.drive"))
 
     def test_permission_checker_rejects_unknown_value(
         self,

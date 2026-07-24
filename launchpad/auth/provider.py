@@ -4,7 +4,7 @@ from aiohttp import web
 
 from betabox_robotics.config import PlatformConfig
 from betabox_robotics.launchpad.services import (
-    LaunchpadServices,
+    LAUNCHPAD_SERVICES_KEY,
 )
 
 from .context import LaunchpadContext
@@ -26,14 +26,23 @@ class LaunchpadContextProvider:
     ) -> LaunchpadContext:
         """Return the Launchpad context for this request."""
 
-        services: LaunchpadServices = (
-            request.app["launchpad_services"]
-        )
+        services = request.app[LAUNCHPAD_SERVICES_KEY]
 
         return build_guest_context(
             self._platform,
             services,
         )
+
+
+LAUNCHPAD_CONTEXT_KEY = web.RequestKey(
+    "launchpad_context",
+    LaunchpadContext,
+)
+
+LAUNCHPAD_CONTEXT_PROVIDER_KEY = web.AppKey(
+    "launchpad_context_provider",
+    LaunchpadContextProvider,
+)
 
 
 @web.middleware
@@ -43,12 +52,8 @@ async def launchpad_context_middleware(
 ) -> web.StreamResponse:
     """Attach the current Launchpad context to the request."""
 
-    provider: LaunchpadContextProvider = (
-        request.app["context_provider"]
-    )
+    provider = request.app[LAUNCHPAD_CONTEXT_PROVIDER_KEY]
 
-    request["launchpad_context"] = (
-        provider.context(request)
-    )
+    request[LAUNCHPAD_CONTEXT_KEY] = provider.context(request)
 
     return await handler(request)

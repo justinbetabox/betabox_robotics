@@ -1,26 +1,23 @@
 from __future__ import annotations
 
-import asyncio
 import json
-
 from uuid import uuid4
 
 import aiohttp
 import aiohttp_jinja2
-
 from aiohttp import WSMsgType, web
 
 from betabox_robotics.exceptions import (
     RobotBusyError,
 )
-
+from betabox_robotics.launchpad.auth import (
+    LAUNCHPAD_CONTEXT_KEY,
+    LaunchpadContext,
+)
 from betabox_robotics.launchpad.drive_controller import (
     ControlState,
     DriveControlError,
     ManualDriveController,
-)
-from betabox_robotics.launchpad.auth import (
-    LaunchpadContext,
 )
 
 
@@ -32,9 +29,7 @@ def parse_bool(
     if isinstance(value, bool):
         return value
 
-    raise DriveControlError(
-        f"{name} must be a boolean"
-    )
+    raise DriveControlError(f"{name} must be a boolean")
 
 
 async def drive_page(
@@ -55,13 +50,9 @@ async def drive_page(
 async def drive_websocket(
     request: web.Request,
 ) -> web.WebSocketResponse:
-    context: LaunchpadContext = request[
-            "launchpad_context"
-    ]
+    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
 
-    controller = (
-            context.services.require_drive_controller()
-    )
+    controller = context.services.require_drive_controller()
 
     websocket = web.WebSocketResponse(
         heartbeat=10.0,
@@ -74,9 +65,7 @@ async def drive_websocket(
 
     try:
         try:
-            claimed = await controller.claim(
-                client_id
-            )
+            claimed = await controller.claim(client_id)
 
         except RobotBusyError as exc:
             await send_json_if_open(
@@ -99,10 +88,7 @@ async def drive_websocket(
                 websocket,
                 {
                     "type": "error",
-                    "message": (
-                        "Manual Drive could not start: "
-                        f"{exc}"
-                    ),
+                    "message": (f"Manual Drive could not start: {exc}"),
                 },
             )
 
@@ -118,8 +104,7 @@ async def drive_websocket(
                 {
                     "type": "busy",
                     "message": (
-                        "The robot is already being controlled "
-                        "from another browser."
+                        "The robot is already being controlled from another browser."
                     ),
                 }
             )
@@ -135,22 +120,16 @@ async def drive_websocket(
             {
                 "type": "ready",
                 "client_id": client_id,
-                "heartbeat_timeout": (
-                    controller.heartbeat_timeout
-                ),
+                "heartbeat_timeout": (controller.heartbeat_timeout),
             }
         )
 
         while not websocket.closed:
             try:
-                message = await websocket.receive(
-                    timeout=0.25
-                )
+                message = await websocket.receive(timeout=0.25)
 
-            except asyncio.TimeoutError:
-                still_owns_robot = await controller.owns(
-                    client_id
-                )
+            except TimeoutError:
+                still_owns_robot = await controller.owns(client_id)
 
                 if not still_owns_robot:
                     await websocket.close(
@@ -192,9 +171,7 @@ async def send_json_if_open(
         return False
 
     try:
-        await websocket.send_json(
-            data
-        )
+        await websocket.send_json(data)
         return True
 
     except (
@@ -202,6 +179,7 @@ async def send_json_if_open(
         aiohttp.ClientConnectionError,
     ):
         return False
+
 
 async def handle_drive_message(
     websocket: web.WebSocketResponse,
@@ -213,16 +191,12 @@ async def handle_drive_message(
         data = json.loads(raw_message)
 
         if not isinstance(data, dict):
-            raise DriveControlError(
-                "message must be a JSON object"
-            )
+            raise DriveControlError("message must be a JSON object")
 
         message_type = data.get("type")
 
         if message_type == "heartbeat":
-            await controller.heartbeat(
-                client_id
-            )
+            await controller.heartbeat(client_id)
 
             await send_json_if_open(
                 websocket,
@@ -233,9 +207,7 @@ async def handle_drive_message(
             return
 
         if message_type == "stop":
-            await controller.emergency_stop(
-                client_id
-            )
+            await controller.emergency_stop(client_id)
 
             await send_json_if_open(
                 websocket,
@@ -246,23 +218,13 @@ async def handle_drive_message(
             return
 
         if message_type != "control":
-            raise DriveControlError(
-                "unknown manual-control message type"
-            )
+            raise DriveControlError("unknown manual-control message type")
 
         state = ControlState(
-            throttle=float(
-                data.get("throttle", 0.0)
-            ),
-            steering=float(
-                data.get("steering", 0.0)
-            ),
-            camera_pan=float(
-                data.get("camera_pan", 0.0)
-            ),
-            camera_tilt=float(
-                data.get("camera_tilt", 0.0)
-            ),
+            throttle=float(data.get("throttle", 0.0)),
+            steering=float(data.get("steering", 0.0)),
+            camera_pan=float(data.get("camera_pan", 0.0)),
+            camera_tilt=float(data.get("camera_tilt", 0.0)),
             headlights=parse_bool(
                 data.get("headlights", False),
                 name="headlights",
@@ -298,9 +260,7 @@ async def handle_drive_message(
 async def vision_offer_proxy(
     request: web.Request,
 ) -> web.Response:
-    context: LaunchpadContext = request[
-            "launchpad_context"
-    ]
+    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
 
     platform = context.platform
 
@@ -308,58 +268,43 @@ async def vision_offer_proxy(
         offer = await request.json()
 
         if not isinstance(offer, dict):
-            raise ValueError(
-                "offer must be a JSON object"
-            )
+            raise ValueError("offer must be a JSON object")
 
         sdp = offer.get("sdp")
         offer_type = offer.get("type")
 
         if not isinstance(sdp, str) or not sdp:
-            raise ValueError(
-                "offer sdp must be a non-empty string"
-            )
+            raise ValueError("offer sdp must be a non-empty string")
 
         if not isinstance(offer_type, str) or not offer_type:
-            raise ValueError(
-                "offer type must be a non-empty string"
-            )
+            raise ValueError("offer type must be a non-empty string")
 
-        vision_url = (
-            f"{platform.network.vision_url}"
-            "/offer"
-        )
+        vision_url = f"{platform.network.vision_url}/offer"
 
-        timeout = aiohttp.ClientTimeout(
-            total=10
-        )
+        timeout = aiohttp.ClientTimeout(total=10)
 
-        async with aiohttp.ClientSession(
-            timeout=timeout
-        ) as session:
-            async with session.post(
+        async with (
+            aiohttp.ClientSession(timeout=timeout) as session,
+            session.post(
                 vision_url,
                 json={
                     "sdp": sdp,
                     "type": offer_type,
                 },
-            ) as response:
-                response_data = await response.json()
+            ) as response,
+        ):
+            response_data = await response.json()
 
-                if response.status >= 400:
-                    return web.json_response(
-                        {
-                            "error": (
-                                "Vision signaling request failed"
-                            ),
-                            "details": response_data,
-                        },
-                        status=response.status,
-                    )
+            if response.status >= 400:
+                return web.json_response(
+                    {
+                        "error": ("Vision signaling request failed"),
+                        "details": response_data,
+                    },
+                    status=response.status,
+                )
 
-        return web.json_response(
-            response_data
-        )
+        return web.json_response(response_data)
 
     except (
         ValueError,
@@ -372,10 +317,7 @@ async def vision_offer_proxy(
             status=400,
         )
 
-    except (
-        aiohttp.ClientError,
-        asyncio.TimeoutError,
-    ) as exc:
+    except (TimeoutError, aiohttp.ClientError) as exc:
         return web.json_response(
             {
                 "error": str(exc),

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from aiohttp import web
+
 from betabox_robotics.calibration import (
     CalibrationManager,
 )
@@ -28,8 +30,12 @@ class LaunchpadServices:
         """Return the active drive controller."""
 
         if self.drive_controller is None:
-            raise RuntimeError(
-                "Manual drive controller is not available"
-            )
+            raise RuntimeError("Manual drive controller is not available")
 
         return self.drive_controller
+
+
+LAUNCHPAD_SERVICES_KEY = web.AppKey(
+    "launchpad_services",
+    LaunchpadServices,
+)

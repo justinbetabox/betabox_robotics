@@ -3,15 +3,15 @@ from __future__ import annotations
 import asyncio
 
 import aiohttp_jinja2
-
 from aiohttp import web
 
+from betabox_robotics.launchpad.auth import (
+    LAUNCHPAD_CONTEXT_KEY,
+    LaunchpadContext,
+)
 from betabox_robotics.services.services import (
     collect_services,
     service_summary,
-)
-from betabox_robotics.launchpad.auth import (
-    LaunchpadContext,
 )
 
 
@@ -38,9 +38,7 @@ async def services_api(
     Return read-only status information for managed platform services.
     """
 
-    context: LaunchpadContext = request[
-        "launchpad_context"
-    ]
+    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
 
     try:
         statuses = await asyncio.to_thread(
@@ -51,23 +49,15 @@ async def services_api(
         return web.json_response(
             {
                 "error": "services_unavailable",
-                "message": (
-                    "Unable to collect platform "
-                    "service information."
-                ),
+                "message": ("Unable to collect platform service information."),
                 "detail": str(exc),
             },
             status=500,
         )
 
     payload = {
-        "summary": service_summary(
-            statuses
-        ),
-        "services": [
-            status.to_dict()
-            for status in statuses
-        ],
+        "summary": service_summary(statuses),
+        "services": [status.to_dict() for status in statuses],
     }
 
     return web.json_response(payload)

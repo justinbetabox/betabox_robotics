@@ -7,6 +7,7 @@ from aiohttp import web
 
 from .context import LaunchpadContext
 from .permissions import Permission
+from .provider import LAUNCHPAD_CONTEXT_KEY
 
 
 def build_permission_checker(
@@ -21,8 +22,7 @@ def build_permission_checker(
             permission = Permission(permission_value)
         except ValueError as exc:
             raise ValueError(
-                "Unknown Launchpad permission: "
-                f"{permission_value!r}"
+                f"Unknown Launchpad permission: {permission_value!r}"
             ) from exc
 
         return context.can(permission)
@@ -35,9 +35,7 @@ async def launchpad_template_context(
 ) -> dict[str, Any]:
     """Expose the current Launchpad context to Jinja templates."""
 
-    context: LaunchpadContext = request[
-        "launchpad_context"
-    ]
+    context = request[LAUNCHPAD_CONTEXT_KEY]
 
     return {
         "launchpad": context,

@@ -4,14 +4,14 @@ import asyncio
 import subprocess
 
 import aiohttp_jinja2
-
 from aiohttp import web
 
+from betabox_robotics.launchpad.auth import (
+    LAUNCHPAD_CONTEXT_KEY,
+    LaunchpadContext,
+)
 from betabox_robotics.services.http_health import (
     check_http_available,
-)
-from betabox_robotics.launchpad.auth import (
-    LaunchpadContext,
 )
 
 
@@ -32,18 +32,13 @@ def service_state(
     except Exception:
         return "unknown"
 
-    return (
-        result.stdout.strip()
-        or "unknown"
-    )
+    return result.stdout.strip() or "unknown"
 
 
 async def jupyter_status(
     request: web.Request,
 ) -> web.Response:
-    context: LaunchpadContext = request[
-        "launchpad_context"
-    ]
+    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
 
     platform = context.platform
 
@@ -55,16 +50,12 @@ async def jupyter_status(
     )
 
     responding = False
-    health_message = (
-        "Service is not active."
-    )
+    health_message = "Service is not active."
 
     if state == "active":
-        responding, health_message = (
-            await asyncio.to_thread(
-                check_http_available,
-                platform.network.jupyterhub_health_url,
-            )
+        responding, health_message = await asyncio.to_thread(
+            check_http_available,
+            platform.network.jupyterhub_health_url,
         )
 
     return web.json_response(
@@ -75,9 +66,7 @@ async def jupyter_status(
             "responding": responding,
             "state": state,
             "health_message": health_message,
-            "port": (
-                platform.network.jupyterhub_port
-            ),
+            "port": (platform.network.jupyterhub_port),
         }
     )
 

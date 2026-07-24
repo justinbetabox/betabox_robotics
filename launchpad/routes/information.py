@@ -3,15 +3,16 @@ from __future__ import annotations
 import asyncio
 
 import aiohttp_jinja2
-
 from aiohttp import web
 
+from betabox_robotics.launchpad.auth import (
+    LAUNCHPAD_CONTEXT_KEY,
+    LaunchpadContext,
+)
 from betabox_robotics.services.platform_information import (
     collect_platform_information,
 )
-from betabox_robotics.launchpad.auth import (
-    LaunchpadContext,
-)
+
 
 async def information_page(
     request: web.Request,
@@ -39,9 +40,7 @@ async def information_api(
     complete PlatformConfig or administrative configuration values.
     """
 
-    context: LaunchpadContext = request[
-        "launchpad_context"
-    ]
+    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
 
     try:
         report = await asyncio.to_thread(
@@ -52,18 +51,13 @@ async def information_api(
         return web.json_response(
             {
                 "error": "information_unavailable",
-                "message": (
-                    "Unable to collect platform "
-                    "information."
-                ),
+                "message": ("Unable to collect platform information."),
                 "detail": str(exc),
             },
             status=500,
         )
 
-    return web.json_response(
-        report.to_dict()
-    )
+    return web.json_response(report.to_dict())
 
 
 def setup_information_routes(

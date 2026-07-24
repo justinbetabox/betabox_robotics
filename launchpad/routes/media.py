@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import mimetypes
-
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -9,14 +8,13 @@ from typing import Any
 from urllib.parse import quote
 
 import aiohttp_jinja2
-
 from aiohttp import web
 
 from betabox_robotics.launchpad.auth import (
+    LAUNCHPAD_CONTEXT_KEY,
     LaunchpadContext,
-    Workspace
+    Workspace,
 )
-
 
 MEDIA_EXTENSIONS: dict[str, frozenset[str]] = {
     "pictures": frozenset(
@@ -58,16 +56,9 @@ UPLOAD_CATEGORIES = frozenset(
 
 MAX_UPLOAD_FILES = 10
 
-MAX_UPLOAD_FILE_SIZE = (
-    25
-    * 1024
-    * 1024
-)
+MAX_UPLOAD_FILE_SIZE = 25 * 1024 * 1024
 
-UPLOAD_CHUNK_SIZE = (
-    64
-    * 1024
-)
+UPLOAD_CHUNK_SIZE = 64 * 1024
 
 
 @dataclass(frozen=True)
@@ -95,6 +86,7 @@ class MediaItem:
             "download_url": self.download_url,
         }
 
+
 @dataclass(frozen=True)
 class MediaUploadFailure:
     name: str
@@ -107,6 +99,7 @@ class MediaUploadFailure:
             "name": self.name,
             "reason": self.reason,
         }
+
 
 def category_directories(
     workspace: Workspace,
@@ -122,14 +115,10 @@ def require_category(
     workspace: Workspace,
     category: str,
 ) -> Path:
-    directory = category_directories(
-        workspace
-    ).get(category)
+    directory = category_directories(workspace).get(category)
 
     if directory is None:
-        raise web.HTTPNotFound(
-            reason="media category not found"
-        )
+        raise web.HTTPNotFound(reason="media category not found")
 
     return directory
 
@@ -138,65 +127,39 @@ def validate_filename(
     filename: str,
 ) -> None:
     if not filename:
-        raise web.HTTPBadRequest(
-            reason="media filename cannot be empty"
-        )
+        raise web.HTTPBadRequest(reason="media filename cannot be empty")
 
     if filename.startswith("."):
-        raise web.HTTPBadRequest(
-            reason=(
-                "hidden media files are not available"
-            )
-        )
+        raise web.HTTPBadRequest(reason=("hidden media files are not available"))
 
-    if (
-        Path(filename).name != filename
-        or "/" in filename
-        or "\\" in filename
-    ):
-        raise web.HTTPBadRequest(
-            reason="invalid media filename"
-        )
+    if Path(filename).name != filename or "/" in filename or "\\" in filename:
+        raise web.HTTPBadRequest(reason="invalid media filename")
 
 
 def resolve_media_file(
     directory: Path,
     filename: str,
 ) -> Path:
-    validate_filename(
-        filename
-    )
+    validate_filename(filename)
 
     root = directory.resolve()
     candidate = root / filename
 
     if candidate.is_symlink():
-        raise web.HTTPNotFound(
-            reason="media file not found"
-        )
+        raise web.HTTPNotFound(reason="media file not found")
 
     try:
-        resolved = candidate.resolve(
-            strict=True
-        )
+        resolved = candidate.resolve(strict=True)
     except FileNotFoundError as exc:
-        raise web.HTTPNotFound(
-            reason="media file not found"
-        ) from exc
+        raise web.HTTPNotFound(reason="media file not found") from exc
     except OSError as exc:
-        raise web.HTTPNotFound(
-            reason="media file not found"
-        ) from exc
+        raise web.HTTPNotFound(reason="media file not found") from exc
 
     if resolved.parent != root:
-        raise web.HTTPBadRequest(
-            reason="invalid media filename"
-        )
+        raise web.HTTPBadRequest(reason="invalid media filename")
 
     if not resolved.is_file():
-        raise web.HTTPNotFound(
-            reason="media file not found"
-        )
+        raise web.HTTPNotFound(reason="media file not found")
 
     return resolved
 
@@ -205,17 +168,13 @@ def media_extension_allowed(
     category: str,
     path: Path,
 ) -> bool:
-    allowed_extensions = MEDIA_EXTENSIONS.get(
-        category
-    )
+    allowed_extensions = MEDIA_EXTENSIONS.get(category)
 
     if allowed_extensions is None:
         return False
 
-    return (
-        path.suffix.lower()
-        in allowed_extensions
-    )
+    return path.suffix.lower() in allowed_extensions
+
 
 def upload_category(
     filename: str,
@@ -223,35 +182,25 @@ def upload_category(
     suffix = Path(filename).suffix.lower()
 
     for category in UPLOAD_CATEGORIES:
-        if (
-            suffix
-            in MEDIA_EXTENSIONS[category]
-        ):
+        if suffix in MEDIA_EXTENSIONS[category]:
             return category
 
     return None
+
 
 def upload_rejection_reason(
     filename: str,
 ) -> str:
     suffix = Path(filename).suffix.lower()
 
-    if (
-        suffix
-        in MEDIA_EXTENSIONS["videos"]
-    ):
+    if suffix in MEDIA_EXTENSIONS["videos"]:
         return "Videos cannot be uploaded."
 
     if not suffix:
-        return (
-            "The file does not have a supported "
-            "extension."
-        )
+        return "The file does not have a supported extension."
 
-    return (
-        "Only JPG, JPEG, PNG, WebP, MP3, WAV, "
-        "OGG, and M4A files can be uploaded."
-    )
+    return "Only JPG, JPEG, PNG, WebP, MP3, WAV, OGG, and M4A files can be uploaded."
+
 
 def upload_content_type_allowed(
     category: str,
@@ -261,8 +210,7 @@ def upload_content_type_allowed(
         return True
 
     normalized = (
-        content_type
-        .split(
+        content_type.split(
             ";",
             maxsplit=1,
         )[0]
@@ -270,44 +218,29 @@ def upload_content_type_allowed(
         .lower()
     )
 
-    if (
-        normalized
-        in {
-            "",
-            "application/octet-stream",
-        }
-    ):
+    if normalized in {
+        "",
+        "application/octet-stream",
+    }:
         return True
 
     if category == "pictures":
-        return normalized.startswith(
-            "image/"
-        )
+        return normalized.startswith("image/")
 
     if category == "sounds":
-        return (
-            normalized.startswith(
-                "audio/"
-            )
-            or normalized
-            in {
-                "application/ogg",
-            }
-        )
+        return normalized.startswith("audio/") or normalized in {
+            "application/ogg",
+        }
 
     return False
+
 
 def media_mime_type(
     path: Path,
 ) -> str:
-    mime_type, _ = mimetypes.guess_type(
-        path.name
-    )
+    mime_type, _ = mimetypes.guess_type(path.name)
 
-    return (
-        mime_type
-        or "application/octet-stream"
-    )
+    return mime_type or "application/octet-stream"
 
 
 def media_url(
@@ -326,11 +259,7 @@ def media_url(
         safe="",
     )
 
-    url = (
-        f"/api/media/"
-        f"{encoded_category}/"
-        f"{encoded_filename}"
-    )
+    url = f"/api/media/{encoded_category}/{encoded_filename}"
 
     if download:
         return f"{url}?download=1"
@@ -344,9 +273,7 @@ def build_media_item(
 ) -> MediaItem:
     stat = path.stat()
 
-    modified_at = datetime.fromtimestamp(
-        stat.st_mtime
-    ).astimezone().isoformat()
+    modified_at = datetime.fromtimestamp(stat.st_mtime).astimezone().isoformat()
 
     return MediaItem(
         category=category,
@@ -366,6 +293,7 @@ def build_media_item(
         ),
     )
 
+
 def unique_media_path(
     directory: Path,
     filename: str,
@@ -380,10 +308,7 @@ def unique_media_path(
     stem = original.stem
     suffix = original.suffix.lower()
 
-    candidate = (
-        directory
-        / f"{stem}{suffix}"
-    )
+    candidate = directory / f"{stem}{suffix}"
 
     if not candidate.exists():
         return candidate
@@ -391,15 +316,13 @@ def unique_media_path(
     sequence = 2
 
     while True:
-        candidate = (
-            directory
-            / f"{stem}-{sequence}{suffix}"
-        )
+        candidate = directory / f"{stem}-{sequence}{suffix}"
 
         if not candidate.exists():
             return candidate
 
         sequence += 1
+
 
 async def save_uploaded_file(
     field: Any,
@@ -407,52 +330,37 @@ async def save_uploaded_file(
 ) -> int:
     bytes_written = 0
 
-    temporary_path = destination.with_name(
-        f".{destination.name}.uploading"
-    )
+    temporary_path = destination.with_name(f".{destination.name}.uploading")
 
     try:
         with temporary_path.open("xb") as output:
             while True:
-                chunk = await field.read_chunk(
-                    size=UPLOAD_CHUNK_SIZE
-                )
+                chunk = await field.read_chunk(size=UPLOAD_CHUNK_SIZE)
 
                 if not chunk:
                     break
 
                 bytes_written += len(chunk)
 
-                if (
-                    bytes_written
-                    > MAX_UPLOAD_FILE_SIZE
-                ):
-                    raise ValueError(
-                        "The file exceeds the "
-                        "25 MB upload limit."
-                    )
+                if bytes_written > MAX_UPLOAD_FILE_SIZE:
+                    raise ValueError("The file exceeds the 25 MB upload limit.")
 
                 output.write(chunk)
 
         if bytes_written == 0:
-            raise ValueError(
-                "The uploaded file is empty."
-            )
+            raise ValueError("The uploaded file is empty.")
 
-        temporary_path.replace(
-            destination
-        )
+        temporary_path.replace(destination)
 
         return bytes_written
     except BaseException:
         try:
-            temporary_path.unlink(
-                missing_ok=True
-            )
+            temporary_path.unlink(missing_ok=True)
         except OSError:
             pass
 
         raise
+
 
 def upload_failure(
     failures: list[MediaUploadFailure],
@@ -461,13 +369,11 @@ def upload_failure(
 ) -> None:
     failures.append(
         MediaUploadFailure(
-            name=(
-                filename
-                or "Unnamed file"
-            ),
+            name=(filename or "Unnamed file"),
             reason=reason,
         )
     )
+
 
 def list_category_media(
     category: str,
@@ -481,9 +387,7 @@ def list_category_media(
     items: list[MediaItem] = []
 
     try:
-        paths = tuple(
-            directory.iterdir()
-        )
+        paths = tuple(directory.iterdir())
     except OSError:
         return items
 
@@ -507,9 +411,7 @@ def list_category_media(
         except OSError:
             continue
 
-        items.append(
-            item
-        )
+        items.append(item)
 
     items.sort(
         key=lambda item: item.modified_at,
@@ -529,7 +431,7 @@ async def media_page(
             "page": {
                 "title": "Media",
                 "eyebrow": "Robot Files",
-                "main_class": "page-layout media-page"
+                "main_class": "page-layout media-page",
             },
         },
     )
@@ -538,19 +440,13 @@ async def media_page(
 async def media_api(
     request: web.Request,
 ) -> web.Response:
-    context: LaunchpadContext = request[
-        "launchpad_context"
-    ]
+    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
 
     workspace = context.workspace
 
-    requested_category = request.query.get(
-        "category"
-    )
+    requested_category = request.query.get("category")
 
-    directories = category_directories(
-        workspace
-    )
+    directories = category_directories(workspace)
 
     if requested_category is not None:
         directory = require_category(
@@ -566,9 +462,7 @@ async def media_api(
 
     items: list[MediaItem] = []
 
-    for category, directory in (
-        selected_directories.items()
-    ):
+    for category, directory in selected_directories.items():
         items.extend(
             list_category_media(
                 category,
@@ -581,10 +475,7 @@ async def media_api(
         reverse=True,
     )
 
-    counts = {
-        category: 0
-        for category in MEDIA_EXTENSIONS
-    }
+    counts = {category: 0 for category in MEDIA_EXTENSIONS}
 
     total_size_bytes = 0
 
@@ -594,52 +485,34 @@ async def media_api(
 
     return web.json_response(
         {
-            "files": [
-                item.to_dict()
-                for item in items
-            ],
+            "files": [item.to_dict() for item in items],
             "counts": counts,
             "total_count": len(items),
-            "total_size_bytes": (
-                total_size_bytes
-            ),
+            "total_size_bytes": (total_size_bytes),
         }
     )
+
 
 async def upload_media(
     request: web.Request,
 ) -> web.Response:
-    context: LaunchpadContext = request[
-        "launchpad_context"
-    ]
+    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
 
     workspace = context.workspace
 
-    if not request.content_type.startswith(
-        "multipart/"
-    ):
-        raise web.HTTPBadRequest(
-            reason=(
-                "media uploads must use "
-                "multipart form data"
-            )
-        )
+    if not request.content_type.startswith("multipart/"):
+        raise web.HTTPBadRequest(reason=("media uploads must use multipart form data"))
 
     try:
         reader = await request.multipart()
     except (ValueError, OSError) as exc:
         raise web.HTTPBadRequest(
-            reason=(
-                "the upload request could not "
-                "be read"
-            )
+            reason=("the upload request could not be read")
         ) from exc
 
     uploaded: list[MediaItem] = []
 
-    failures: list[
-        MediaUploadFailure
-    ] = []
+    failures: list[MediaUploadFailure] = []
 
     submitted_files = 0
 
@@ -648,84 +521,58 @@ async def upload_media(
             field = await reader.next()
         except (ValueError, OSError) as exc:
             raise web.HTTPBadRequest(
-                reason=(
-                    "the upload request could not "
-                    "be read"
-                )
+                reason=("the upload request could not be read")
             ) from exc
 
         if field is None:
             break
 
-        if (
-            field.name != "files"
-            or not field.filename
-        ):
+        if field.name != "files" or not field.filename:
             continue
 
         submitted_files += 1
 
-        original_filename = Path(
-            field.filename
-        ).name
+        original_filename = Path(field.filename).name
 
-        if (
-            submitted_files
-            > MAX_UPLOAD_FILES
-        ):
+        if submitted_files > MAX_UPLOAD_FILES:
             upload_failure(
                 failures,
                 original_filename,
-                (
-                    "Only 10 files can be "
-                    "uploaded at once."
-                ),
+                ("Only 10 files can be uploaded at once."),
             )
 
             continue
 
         try:
-            validate_filename(
-                original_filename
-            )
+            validate_filename(original_filename)
         except web.HTTPException as exc:
             upload_failure(
                 failures,
                 original_filename,
-                exc.reason
-                or "Invalid media filename.",
+                exc.reason or "Invalid media filename.",
             )
 
             continue
 
-        category = upload_category(
-            original_filename
-        )
+        category = upload_category(original_filename)
 
         if category is None:
             upload_failure(
                 failures,
                 original_filename,
-                upload_rejection_reason(
-                    original_filename
-                ),
+                upload_rejection_reason(original_filename),
             )
 
             continue
 
         if not upload_content_type_allowed(
             category,
-            field.headers.get(
-                "Content-Type"
-            ),
+            field.headers.get("Content-Type"),
         ):
             upload_failure(
                 failures,
                 original_filename,
-                (
-                    "The file type does not match "
-                    "its extension."
-                ),
+                ("The file type does not match its extension."),
             )
 
             continue
@@ -774,71 +621,41 @@ async def upload_media(
             upload_failure(
                 failures,
                 original_filename,
-                (
-                    "A temporary upload with this "
-                    "name already exists."
-                ),
+                ("A temporary upload with this name already exists."),
             )
         except OSError:
             upload_failure(
                 failures,
                 original_filename,
-                (
-                    "The file could not be saved "
-                    "on the robot."
-                ),
+                ("The file could not be saved on the robot."),
             )
 
     if submitted_files == 0:
-        raise web.HTTPBadRequest(
-            reason=(
-                "the upload does not contain "
-                "any files"
-            )
-        )
+        raise web.HTTPBadRequest(reason=("the upload does not contain any files"))
 
-    status = (
-        201
-        if uploaded
-        else 400
-    )
+    status = 201 if uploaded else 400
 
     return web.json_response(
         {
-            "uploaded": [
-                item.to_dict()
-                for item in uploaded
-            ],
-            "failed": [
-                failure.to_dict()
-                for failure in failures
-            ],
-            "uploaded_count": len(
-                uploaded
-            ),
-            "failed_count": len(
-                failures
-            ),
+            "uploaded": [item.to_dict() for item in uploaded],
+            "failed": [failure.to_dict() for failure in failures],
+            "uploaded_count": len(uploaded),
+            "failed_count": len(failures),
         },
         status=status,
     )
 
+
 async def media_file(
     request: web.Request,
 ) -> web.StreamResponse:
-    context: LaunchpadContext = request[
-        "launchpad_context"
-    ]
+    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
 
     workspace = context.workspace
 
-    category = request.match_info[
-        "category"
-    ]
+    category = request.match_info["category"]
 
-    filename = request.match_info[
-        "filename"
-    ]
+    filename = request.match_info["filename"]
 
     directory = require_category(
         workspace,
@@ -854,17 +671,11 @@ async def media_file(
         category,
         path,
     ):
-        raise web.HTTPNotFound(
-            reason="media file not found"
-        )
+        raise web.HTTPNotFound(reason="media file not found")
 
-    response = web.FileResponse(
-        path
-    )
+    response = web.FileResponse(path)
 
-    response.content_type = media_mime_type(
-        path
-    )
+    response.content_type = media_mime_type(path)
 
     if request.query.get("download") == "1":
         encoded_filename = quote(
@@ -872,12 +683,8 @@ async def media_file(
             safe="",
         )
 
-        response.headers[
-            "Content-Disposition"
-        ] = (
-            "attachment; "
-            f"filename*=UTF-8''"
-            f"{encoded_filename}"
+        response.headers["Content-Disposition"] = (
+            f"attachment; filename*=UTF-8''{encoded_filename}"
         )
 
     return response
@@ -886,19 +693,13 @@ async def media_file(
 async def delete_media_file(
     request: web.Request,
 ) -> web.Response:
-    context: LaunchpadContext = request[
-        "launchpad_context"
-    ]
+    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
 
     workspace = context.workspace
 
-    category = request.match_info[
-        "category"
-    ]
+    category = request.match_info["category"]
 
-    filename = request.match_info[
-        "filename"
-    ]
+    filename = request.match_info["filename"]
 
     directory = require_category(
         workspace,
@@ -914,21 +715,15 @@ async def delete_media_file(
         category,
         path,
     ):
-        raise web.HTTPNotFound(
-            reason="media file not found"
-        )
+        raise web.HTTPNotFound(reason="media file not found")
 
     try:
         path.unlink()
     except FileNotFoundError as exc:
-        raise web.HTTPNotFound(
-            reason="media file not found"
-        ) from exc
+        raise web.HTTPNotFound(reason="media file not found") from exc
     except OSError as exc:
         raise web.HTTPInternalServerError(
-            reason=(
-                "media file could not be deleted"
-            )
+            reason=("media file could not be deleted")
         ) from exc
 
     return web.json_response(

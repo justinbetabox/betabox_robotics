@@ -36,7 +36,7 @@ class LaunchpadContext:
     ) -> None:
         """Require a permission for the current operation."""
 
-        self.permissions.requires(permission)
+        self.permissions.require(permission)
 
     @property
     def guest(self) -> bool:

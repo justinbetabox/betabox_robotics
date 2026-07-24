@@ -3,14 +3,14 @@ from __future__ import annotations
 import asyncio
 
 import aiohttp_jinja2
-
 from aiohttp import web
 
+from betabox_robotics.launchpad.auth import (
+    LAUNCHPAD_CONTEXT_KEY,
+    LaunchpadContext,
+)
 from betabox_robotics.services.events import (
     collect_event_report,
-)
-from betabox_robotics.launchpad.auth import (
-    LaunchpadContext,
 )
 
 
@@ -22,9 +22,7 @@ def parse_last(
     Parse the optional event limit from the query string.
     """
 
-    raw_value = request.query.get(
-        "last"
-    )
+    raw_value = request.query.get("last")
 
     if raw_value is None:
         return default
@@ -32,14 +30,10 @@ def parse_last(
     try:
         value = int(raw_value)
     except ValueError as exc:
-        raise web.HTTPBadRequest(
-            text="last must be an integer"
-        ) from exc
+        raise web.HTTPBadRequest(text="last must be an integer") from exc
 
     if value < 0:
-        raise web.HTTPBadRequest(
-            text="last cannot be negative"
-        )
+        raise web.HTTPBadRequest(text="last cannot be negative")
 
     return value
 
@@ -52,9 +46,7 @@ def parse_optional_filter(
     Return a trimmed optional query-string filter.
     """
 
-    value = request.query.get(
-        name
-    )
+    value = request.query.get(name)
 
     if value is None:
         return None
@@ -93,9 +85,7 @@ async def events_api(
     - ``component``
     """
 
-    context: LaunchpadContext = request[
-        "launchpad_context"
-    ]
+    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
 
     platform = context.platform
 
@@ -121,16 +111,9 @@ async def events_api(
         "critical",
     }
 
-    if (
-        severity is not None
-        and severity.lower()
-        not in allowed_severities
-    ):
+    if severity is not None and severity.lower() not in allowed_severities:
         raise web.HTTPBadRequest(
-            text=(
-                "severity must be one of: "
-                "info, warning, error, critical"
-            )
+            text=("severity must be one of: info, warning, error, critical")
         )
 
     try:
@@ -153,17 +136,13 @@ async def events_api(
         return web.json_response(
             {
                 "error": "events_unavailable",
-                "message": (
-                    "Unable to load platform events."
-                ),
+                "message": ("Unable to load platform events."),
                 "detail": str(exc),
             },
             status=500,
         )
 
-    return web.json_response(
-        report.to_dict()
-    )
+    return web.json_response(report.to_dict())
 
 
 def setup_events_routes(

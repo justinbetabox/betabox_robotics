@@ -3,14 +3,14 @@ from __future__ import annotations
 import asyncio
 
 import aiohttp_jinja2
-
 from aiohttp import web
 
+from betabox_robotics.launchpad.auth import (
+    LAUNCHPAD_CONTEXT_KEY,
+    LaunchpadContext,
+)
 from betabox_robotics.services.doctor import (
     collect_doctor_report,
-)
-from betabox_robotics.launchpad.auth import (
-    LaunchpadContext,
 )
 
 
@@ -41,9 +41,7 @@ async def diagnostics_api(
     the aiohttp event loop.
     """
 
-    context: LaunchpadContext = request[
-        "launchpad_context"
-    ]
+    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
 
     try:
         report = await asyncio.to_thread(
@@ -54,16 +52,12 @@ async def diagnostics_api(
         return web.json_response(
             {
                 "error": "diagnostics_unavailable",
-                "message": (
-                    "Unable to run platform diagnostics."
-                ),
+                "message": ("Unable to run platform diagnostics."),
             },
             status=500,
         )
 
-    return web.json_response(
-        report.to_dict()
-    )
+    return web.json_response(report.to_dict())
 
 
 def setup_diagnostics_routes(

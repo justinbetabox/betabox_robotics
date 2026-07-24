@@ -8,7 +8,8 @@ from betabox_robotics.launchpad.services import (
 )
 
 from .context import LaunchpadContext
-from .factory import build_guest_context
+from .factory import build_account_context
+from .session_manager import SESSION_MANAGER_KEY
 
 
 class LaunchpadContextProvider:
@@ -28,9 +29,14 @@ class LaunchpadContextProvider:
 
         services = request.app[LAUNCHPAD_SERVICES_KEY]
 
-        return build_guest_context(
+        session_manager = request.app[SESSION_MANAGER_KEY]
+
+        session = session_manager.resolve(request)
+
+        return build_account_context(
             self._platform,
             services,
+            session.username,
         )
 
 

@@ -5,3 +5,4 @@
 
 pi ALL=(root) NOPASSWD: /opt/betabox/venv/bin/betabox guest provision
 pi ALL=(root) NOPASSWD: /opt/betabox/venv/bin/betabox guest reset
+pi ALL=(root) NOPASSWD: /opt/betabox/venv/bin/betabox-auth-check

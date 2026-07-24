@@ -3,7 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import Mock
+from unittest.mock import AsyncMock, Mock
 
 import jinja2
 from aiohttp import web
@@ -15,11 +15,16 @@ from betabox_robotics.config import PlatformConfig
 from betabox_robotics.launchpad.auth import (
     LAUNCHPAD_CONTEXT_KEY,
     LAUNCHPAD_CONTEXT_PROVIDER_KEY,
+    SESSION_COOKIE_NAME,
+    SESSION_MANAGER_KEY,
+    AuthenticationError,
+    AuthenticationService,
     LaunchpadContext,
     LaunchpadContextProvider,
     Permission,
     Permissions,
     Role,
+    SessionManager,
     build_account_context,
     build_guest_context,
     build_permission_checker,
@@ -141,6 +146,9 @@ class GuestContextTests(unittest.TestCase):
                 root.resolve(),
             )
             self.assertFalse(context.workspace.persistent)
+            self.assertFalse(
+                context.persistent_workspace,
+            )
             self.assertIn(
                 Permission.STATUS,
                 context.permissions,
@@ -220,6 +228,8 @@ class ContextMiddlewareTests(unittest.IsolatedAsyncioTestCase):
         app[LAUNCHPAD_CONTEXT_PROVIDER_KEY] = LaunchpadContextProvider(platform)
 
         app[LAUNCHPAD_SERVICES_KEY] = create_test_services()
+
+        app[SESSION_MANAGER_KEY] = SessionManager()
 
         async def handler(
             request: web.Request,
@@ -445,6 +455,10 @@ class AccountContextTests(unittest.TestCase):
                 context.identity.display_name,
                 "Student 1",
             )
+            self.assertEqual(
+                context.workspace.root,
+                Path(temporary).resolve(),
+            )
             self.assertIs(
                 context.identity.role,
                 Role.STUDENT,
@@ -487,6 +501,205 @@ class AccountContextTests(unittest.TestCase):
                 create_test_services(),
                 "unknown",
             )
+
+
+class SessionManagerTests(unittest.TestCase):
+    def test_missing_cookie_resolves_to_guest(
+        self,
+    ) -> None:
+        manager = SessionManager()
+
+        request = Mock()
+        request.cookies = {}
+
+        session = manager.resolve(request)
+
+        self.assertEqual(
+            session.username,
+            "guest",
+        )
+        self.assertIsNone(session.id)
+
+    def test_unknown_cookie_resolves_to_guest(
+        self,
+    ) -> None:
+        manager = SessionManager()
+
+        request = Mock()
+        request.cookies = {
+            SESSION_COOKIE_NAME: "unknown",
+        }
+
+        session = manager.resolve(request)
+
+        self.assertEqual(
+            session.username,
+            "guest",
+        )
+
+    def test_student_session_can_be_resolved(
+        self,
+    ) -> None:
+        manager = SessionManager()
+        created = manager.create("student1")
+
+        request = Mock()
+        request.cookies = {
+            SESSION_COOKIE_NAME: created.id,
+        }
+
+        resolved = manager.resolve(request)
+
+        self.assertIs(
+            resolved,
+            created,
+        )
+
+    def test_guest_cannot_be_stored(
+        self,
+    ) -> None:
+        manager = SessionManager()
+
+        with self.assertRaises(ValueError):
+            manager.create("guest")
+
+
+class AuthenticationServiceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_student_credentials_are_authenticated(
+        self,
+    ) -> None:
+        authenticate = AsyncMock(return_value=True)
+
+        service = AuthenticationService(
+            authenticate=authenticate,
+        )
+
+        await service.authenticate(
+            "student1",
+            "learnbydoing",
+        )
+
+        authenticate.assert_awaited_once_with(
+            "student1",
+            "learnbydoing",
+        )
+
+    async def test_invalid_password_is_rejected(
+        self,
+    ) -> None:
+        authenticate = AsyncMock(return_value=False)
+
+        service = AuthenticationService(
+            authenticate=authenticate,
+        )
+
+        with self.assertRaisesRegex(
+            AuthenticationError,
+            "Invalid username or password",
+        ):
+            await service.authenticate(
+                "student1",
+                "incorrect",
+            )
+
+    async def test_username_is_trimmed(
+        self,
+    ) -> None:
+        authenticate = AsyncMock(return_value=True)
+
+        service = AuthenticationService(
+            authenticate=authenticate,
+        )
+
+        await service.authenticate(
+            "  student1  ",
+            "learnbydoing",
+        )
+
+        authenticate.assert_awaited_once_with(
+            "student1",
+            "learnbydoing",
+        )
+
+    async def test_unknown_account_is_rejected(
+        self,
+    ) -> None:
+        authenticate = AsyncMock()
+
+        service = AuthenticationService(
+            authenticate=authenticate,
+        )
+
+        with self.assertRaisesRegex(
+            AuthenticationError,
+            "Invalid username or password",
+        ):
+            await service.authenticate(
+                "unknown",
+                "learnbydoing",
+            )
+
+        authenticate.assert_not_awaited()
+
+    async def test_guest_login_is_rejected(
+        self,
+    ) -> None:
+        authenticate = AsyncMock()
+
+        service = AuthenticationService(
+            authenticate=authenticate,
+        )
+
+        with self.assertRaisesRegex(
+            AuthenticationError,
+            "Invalid username or password",
+        ):
+            await service.authenticate(
+                "guest",
+                "learnbydoing",
+            )
+
+        authenticate.assert_not_awaited()
+
+    async def test_missing_username_is_rejected(
+        self,
+    ) -> None:
+        authenticate = AsyncMock()
+
+        service = AuthenticationService(
+            authenticate=authenticate,
+        )
+
+        with self.assertRaisesRegex(
+            AuthenticationError,
+            "Username and password are required",
+        ):
+            await service.authenticate(
+                "",
+                "learnbydoing",
+            )
+
+        authenticate.assert_not_awaited()
+
+    async def test_missing_password_is_rejected(
+        self,
+    ) -> None:
+        authenticate = AsyncMock()
+
+        service = AuthenticationService(
+            authenticate=authenticate,
+        )
+
+        with self.assertRaisesRegex(
+            AuthenticationError,
+            "Username and password are required",
+        ):
+            await service.authenticate(
+                "student1",
+                "",
+            )
+
+        authenticate.assert_not_awaited()
 
 
 if __name__ == "__main__":

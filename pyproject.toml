@@ -32,6 +32,7 @@ classifiers = [
 dependencies = [
 "aiohttp",
 "aiortc",
+"pamela",
 "gpiozero",
 "smbus2",
 "aiohttp-jinja2",
@@ -39,6 +40,7 @@ dependencies = [
 
 [project.scripts]
 betabox = "betabox_robotics.cli.betabox:main"
+betabox-auth-check = "betabox_robotics.launchpad.auth.pam_helper:main"
 
 [project.urls]
 Homepage = "https://github.com/justinbetabox/betabox_robotics"

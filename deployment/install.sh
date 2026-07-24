@@ -129,6 +129,7 @@ python -m pip install \
     aiohttp \
     aiohttp-jinja2 \
     aiortc \
+    pamela \
     smbus2 \
     gpiozero
 

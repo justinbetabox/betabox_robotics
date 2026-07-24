@@ -16,8 +16,12 @@ from betabox_robotics.config import (
     PlatformConfig,
 )
 from betabox_robotics.launchpad.auth import (
+    AUTHENTICATION_SERVICE_KEY,
     LAUNCHPAD_CONTEXT_PROVIDER_KEY,
+    SESSION_MANAGER_KEY,
+    AuthenticationService,
     LaunchpadContextProvider,
+    SessionManager,
     launchpad_context_middleware,
     launchpad_template_context,
 )
@@ -94,6 +98,10 @@ def create_app(
             default=True,
         ),
     )
+
+    app[AUTHENTICATION_SERVICE_KEY] = AuthenticationService()
+
+    app[SESSION_MANAGER_KEY] = SessionManager()
 
     app[LAUNCHPAD_CONTEXT_PROVIDER_KEY] = LaunchpadContextProvider(config)
 

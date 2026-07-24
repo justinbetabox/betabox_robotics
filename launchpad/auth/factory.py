@@ -3,37 +3,63 @@ from __future__ import annotations
 from pathlib import Path
 
 from betabox_robotics.config import PlatformConfig
-
 from betabox_robotics.launchpad.services import (
     LaunchpadServices,
 )
-from betabox_robotics.services.workspace import account_by_username
+from betabox_robotics.services.workspace import (
+    account_by_username,
+)
 
 from .context import LaunchpadContext
 from .identity import Identity, Role
 from .permissions import Permissions
-from .workspace import MediaWorkspace, Workspace
+from .workspace import build_workspace
 
 
-def build_workspace(
-    root: Path,
+def role_for_username(
+    username: str,
+) -> Role:
+    """Return the Launchpad role for a managed username."""
+
+    if username == "guest":
+        return Role.GUEST
+
+    return Role.STUDENT
+
+
+def build_account_context(
+    platform: PlatformConfig,
+    services: LaunchpadServices,
+    username: str,
     *,
-    persistent: bool,
-) -> Workspace:
-    """Build a Launchpad workspace rooted at the given directory."""
+    workspace_root: Path | None = None,
+) -> LaunchpadContext:
+    """Build a Launchpad context for a managed account."""
 
-    root = root.expanduser().resolve()
+    account = account_by_username(username)
+    role = role_for_username(account.username)
 
-    return Workspace(
-        root=root,
-        curriculum=root / "curriculum",
-        media=MediaWorkspace(
-            pictures=root / "media" / "pictures",
-            videos=root / "media" / "videos",
-            sounds=root / "media" / "sounds",
-        ),
-        preferences=root / "preferences",
-        persistent=persistent,
+    identity = Identity(
+        username=account.username,
+        display_name=account.display_name,
+        role=role,
+        authenticated=role is not Role.GUEST,
+    )
+
+    root = account.home if workspace_root is None else workspace_root
+
+    workspace = build_workspace(
+        root,
+        persistent=account.persistent,
+    )
+    workspace.ensure_exists()
+
+    return LaunchpadContext(
+        platform=platform,
+        services=services,
+        identity=identity,
+        workspace=workspace,
+        permissions=Permissions.for_role(role),
     )
 
 
@@ -45,35 +71,9 @@ def build_guest_context(
 ) -> LaunchpadContext:
     """Build the default guest Launchpad context."""
 
-    guest = account_by_username("guest")
-
-    identity = Identity(
-        username=guest.username,
-        display_name=guest.display_name,
-        role=Role.GUEST,
-        authenticated=False,
-    )
-
-    root = (
-        guest.home
-        if workspace_root is None
-        else workspace_root
-    )
-
-    workspace = build_workspace(
-        root,
-        persistent=guest.persistent,
-    )
-    workspace.ensure_exists()
-
-    permissions = Permissions.for_role(
-        identity.role
-    )
-
-    return LaunchpadContext(
-        platform=platform,
-        services=services,
-        identity=identity,
-        workspace=workspace,
-        permissions=permissions,
+    return build_account_context(
+        platform,
+        services,
+        "guest",
+        workspace_root=workspace_root,
     )

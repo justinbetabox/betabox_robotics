@@ -1,7 +1,8 @@
 from .context import LaunchpadContext
 from .factory import (
+    build_account_context,
     build_guest_context,
-    build_workspace,
+    role_for_username,
 )
 from .identity import Identity, Role
 from .permissions import (
@@ -20,7 +21,7 @@ from .provider import (
 )
 from .session import Session
 from .templates import build_permission_checker, launchpad_template_context
-from .workspace import MediaWorkspace, Workspace
+from .workspace import MediaWorkspace, Workspace, build_workspace
 
 __all__ = [
     "GUEST_PERMISSIONS",
@@ -38,9 +39,11 @@ __all__ = [
     "Role",
     "Session",
     "Workspace",
+    "build_account_context",
     "build_guest_context",
     "build_permission_checker",
     "build_workspace",
     "launchpad_context_middleware",
     "launchpad_template_context",
+    "role_for_username",
 ]

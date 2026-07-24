@@ -20,6 +20,7 @@ from betabox_robotics.launchpad.auth import (
     Permission,
     Permissions,
     Role,
+    build_account_context,
     build_guest_context,
     build_permission_checker,
     build_workspace,
@@ -422,6 +423,70 @@ class IdentityBadgeTemplateTests(unittest.TestCase):
             'aria-label="Current Launchpad user"',
             rendered,
         )
+
+
+class AccountContextTests(unittest.TestCase):
+    def test_student_context_is_persistent(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            context = build_account_context(
+                PlatformConfig.default(),
+                create_test_services(),
+                "student1",
+                workspace_root=Path(temporary),
+            )
+
+            self.assertEqual(
+                context.identity.username,
+                "student1",
+            )
+            self.assertEqual(
+                context.identity.display_name,
+                "Student 1",
+            )
+            self.assertIs(
+                context.identity.role,
+                Role.STUDENT,
+            )
+            self.assertTrue(context.identity.authenticated)
+            self.assertTrue(context.workspace.persistent)
+
+    def test_guest_and_student_permissions_match(
+        self,
+    ) -> None:
+        with (
+            tempfile.TemporaryDirectory() as guest_directory,
+            tempfile.TemporaryDirectory() as student_directory,
+        ):
+            guest = build_account_context(
+                PlatformConfig.default(),
+                create_test_services(),
+                "guest",
+                workspace_root=Path(guest_directory),
+            )
+
+            student = build_account_context(
+                PlatformConfig.default(),
+                create_test_services(),
+                "student1",
+                workspace_root=Path(student_directory),
+            )
+
+            self.assertEqual(
+                guest.permissions.granted,
+                student.permissions.granted,
+            )
+
+    def test_unknown_account_is_rejected(
+        self,
+    ) -> None:
+        with self.assertRaises(LookupError):
+            build_account_context(
+                PlatformConfig.default(),
+                create_test_services(),
+                "unknown",
+            )
 
 
 if __name__ == "__main__":

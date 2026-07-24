@@ -46,3 +46,23 @@ class Workspace:
                 parents=True,
                 exist_ok=True,
             )
+
+
+def build_workspace(
+    root: Path,
+    *,
+    persistent: bool,
+) -> Workspace:
+    """Build a Launchpad workspace rooted at the given directory."""
+
+    return Workspace(
+        root=root,
+        curriculum=root / "curriculum",
+        media=MediaWorkspace(
+            pictures=root / "media" / "pictures",
+            videos=root / "media" / "videos",
+            sounds=root / "media" / "sounds",
+        ),
+        preferences=root / "preferences",
+        persistent=persistent,
+    )

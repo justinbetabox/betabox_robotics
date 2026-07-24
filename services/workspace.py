@@ -3,10 +3,9 @@ from __future__ import annotations
 import os
 import pwd
 import shutil
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
-
 
 WORKSPACE_MODE = 0o2770
 
@@ -24,16 +23,41 @@ class ProvisionedAccount:
     install_media: bool = True
 
 
-BETABOX_ACCOUNTS: tuple[
-    ProvisionedAccount,
-    ...
-] = (
+BETABOX_ACCOUNTS: tuple[ProvisionedAccount, ...] = (
     ProvisionedAccount(
         username="guest",
         display_name="Guest",
         group="guest",
         home=Path("/home/guest"),
         persistent=False,
+    ),
+    ProvisionedAccount(
+        username="student",
+        display_name="Student",
+        group="student",
+        home=Path("/home/student"),
+        persistent=True,
+    ),
+    ProvisionedAccount(
+        username="student1",
+        display_name="Student 1",
+        group="student1",
+        home=Path("/home/student1"),
+        persistent=True,
+    ),
+    ProvisionedAccount(
+        username="student2",
+        display_name="Student 2",
+        group="student2",
+        home=Path("/home/student2"),
+        persistent=True,
+    ),
+    ProvisionedAccount(
+        username="student3",
+        display_name="Student 3",
+        group="student3",
+        home=Path("/home/student3"),
+        persistent=True,
     ),
 )
 
@@ -47,9 +71,7 @@ def account_by_username(
         if account.username == username:
             return account
 
-    raise LookupError(
-        f"Unknown Betabox account: {username}"
-    )
+    raise LookupError(f"Unknown Betabox account: {username}")
 
 
 def account_ids(
@@ -60,9 +82,7 @@ def account_ids(
     try:
         account = pwd.getpwnam(username)
     except KeyError as exc:
-        raise RuntimeError(
-            f"Linux account does not exist: {username}"
-        ) from exc
+        raise RuntimeError(f"Linux account does not exist: {username}") from exc
 
     return account.pw_uid, account.pw_gid
 
@@ -104,9 +124,7 @@ def ensure_directory(
         gid,
     )
 
-    directory.chmod(
-        WORKSPACE_MODE
-    )
+    directory.chmod(WORKSPACE_MODE)
 
 
 def create_workspace(
@@ -114,13 +132,9 @@ def create_workspace(
 ) -> None:
     """Create the workspace for a managed account."""
 
-    uid, gid = account_ids(
-        account.username
-    )
+    uid, gid = account_ids(account.username)
 
-    for directory in workspace_directories(
-        account
-    ):
+    for directory in workspace_directories(account):
         ensure_directory(
             directory,
             uid=uid,
@@ -163,9 +177,7 @@ def install_directory(
     """Copy assets without overwriting existing files."""
 
     if not source.exists():
-        raise FileNotFoundError(
-            f"Asset source does not exist: {source}"
-        )
+        raise FileNotFoundError(f"Asset source does not exist: {source}")
 
     destination.mkdir(
         parents=True,
@@ -210,32 +222,21 @@ def install_directory(
 def populate_media(
     repository_root: Path,
     *,
-    accounts: Iterable[
-        ProvisionedAccount
-    ] = BETABOX_ACCOUNTS,
+    accounts: Iterable[ProvisionedAccount] = BETABOX_ACCOUNTS,
 ) -> None:
     """Install starter media for managed accounts."""
 
-    assets = (
-        repository_root
-        / "deployment"
-        / "assets"
-        / "sounds"
-    )
+    assets = repository_root / "deployment" / "assets" / "sounds"
 
     for account in accounts:
         if not account.install_media:
             continue
 
-        uid, gid = account_ids(
-            account.username
-        )
+        uid, gid = account_ids(account.username)
 
         install_directory(
             assets,
-            account.home
-            / "media"
-            / "sounds",
+            account.home / "media" / "sounds",
             uid=uid,
             gid=gid,
         )

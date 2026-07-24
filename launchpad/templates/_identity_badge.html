@@ -1,0 +1,29 @@
+<div
+  class="identity-badge"
+  aria-label="Current Launchpad user"
+>
+  <span
+    class="identity-badge-avatar"
+    aria-hidden="true"
+  >
+    {{ identity.display_name[:1] | upper }}
+  </span>
+
+  <span class="identity-badge-details">
+    <strong class="identity-badge-name">
+      {{ identity.display_name }}
+    </strong>
+
+    <span class="identity-badge-role">
+      {% if is_guest %}
+        Guest session
+      {% elif is_teacher %}
+        Teacher
+      {% elif is_student %}
+        Student
+      {% else %}
+        {{ identity.role.value | title }}
+      {% endif %}
+    </span>
+  </span>
+</div>

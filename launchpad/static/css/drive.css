@@ -59,16 +59,21 @@
     gap: 1.5rem;
     width: 100%;
 
-    padding:
-        1rem
-        clamp(1rem, 3vw, 2.5rem);
+    padding: 1rem clamp(1rem, 3vw, 2.5rem);
 
     background: var(--drive-header);
 
-    border-bottom:
-        1px solid var(--drive-border);
+    border-bottom: 1px solid var(--drive-border);
 
     box-shadow: var(--shadow-header);
+}
+
+.drive-header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.75rem;
+    min-width: 0;
 }
 
 .drive-header h1 {
@@ -76,8 +81,7 @@
 
     color: var(--drive-text);
 
-    font-size:
-        clamp(1.6rem, 4vw, 2.5rem);
+    font-size: clamp(1.6rem, 4vw, 2.5rem);
 
     line-height: 1.1;
 }
@@ -87,8 +91,7 @@
 
     color: var(--brand-blue);
 
-    font-size:
-        clamp(0.65rem, 1.8vw, 0.78rem);
+    font-size: clamp(0.65rem, 1.8vw, 0.78rem);
 
     text-align: center;
 }
@@ -108,7 +111,6 @@
     grid-column: 3;
     justify-self: end;
 }
-
 
 /* Main layout */
 
@@ -139,8 +141,7 @@
 
     overflow: hidden;
 
-    border:
-        1px solid var(--drive-border);
+    border: 1px solid var(--drive-border);
 
     border-radius: var(--radius-large);
 
@@ -175,8 +176,7 @@
 
     padding: 0.75rem 1rem;
 
-    border:
-        1px solid var(--drive-border);
+    border: 1px solid var(--drive-border);
 
     border-radius: var(--radius-medium);
 
@@ -194,8 +194,7 @@
 
     padding: 0.5rem 0.75rem;
 
-    border:
-        1px solid var(--drive-border);
+    border: 1px solid var(--drive-border);
 
     border-radius: var(--radius-pill);
 
@@ -207,15 +206,13 @@
 
     backdrop-filter: blur(10px);
 
-    transition:
-        opacity var(--transition-fast);
+    transition: opacity var(--transition-fast);
 }
 
 .video-panel[data-video-state="connected"] .video-status {
     opacity: 0;
     pointer-events: none;
 }
-
 
 /* Drive HUD */
 
@@ -238,8 +235,7 @@
 
     overflow-x: auto;
 
-    border:
-        1px solid var(--drive-border);
+    border: 1px solid var(--drive-border);
 
     border-radius: var(--radius-medium);
 
@@ -267,29 +263,25 @@
 .drive-hud-dot.hud-unknown {
     background: var(--color-neutral);
 
-    box-shadow:
-        0 0 0 4px rgb(125 139 148 / 18%);
+    box-shadow: 0 0 0 4px rgb(125 139 148 / 18%);
 }
 
 .drive-hud-dot.hud-healthy {
     background: var(--drive-healthy);
 
-    box-shadow:
-        0 0 0 4px rgb(37 182 122 / 18%);
+    box-shadow: 0 0 0 4px rgb(37 182 122 / 18%);
 }
 
 .drive-hud-dot.hud-warning {
     background: var(--drive-warning);
 
-    box-shadow:
-        0 0 0 4px rgb(241 118 59 / 18%);
+    box-shadow: 0 0 0 4px rgb(241 118 59 / 18%);
 }
 
 .drive-hud-dot.hud-critical {
     background: var(--drive-critical);
 
-    box-shadow:
-        0 0 0 4px rgb(221 31 120 / 18%);
+    box-shadow: 0 0 0 4px rgb(221 31 120 / 18%);
 }
 
 .drive-hud-value {
@@ -339,8 +331,7 @@
 
 .control-panel {
     display: grid;
-    grid-template-columns:
-        repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
 
     grid-template-areas:
         "speed speed"
@@ -366,8 +357,7 @@
     padding: 1rem;
     overflow: hidden;
 
-    border:
-        1px solid var(--drive-border);
+    border: 1px solid var(--drive-border);
 
     border-radius: var(--radius-large);
 
@@ -375,7 +365,6 @@
 
     box-shadow: var(--shadow-small);
 }
-
 
 /* Speed control */
 
@@ -395,7 +384,6 @@
 .speed-control input[type="range"] {
     accent-color: var(--brand-blue);
 }
-
 
 /* Joystick sections */
 
@@ -445,34 +433,27 @@
     line-height: 1.3;
 }
 
-
 /* Joystick geometry and theme */
 
 .joystick {
     position: relative;
 
-    width:
-        min(
-            100%,
-            clamp(160px, 28vh, 250px)
-        );
+    width: min(100%, clamp(160px, 28vh, 250px));
 
     aspect-ratio: 1;
 
     overflow: hidden;
 
-    border:
-        1px solid var(--drive-border-strong);
+    border: 1px solid var(--drive-border-strong);
 
     border-radius: 50%;
 
-    background:
-        radial-gradient(
-            circle at center,
-            var(--color-surface-raised) 0 18%,
-            var(--color-surface-subtle) 18% 48%,
-            var(--color-surface-inset) 48% 100%
-        );
+    background: radial-gradient(
+        circle at center,
+        var(--color-surface-raised) 0 18%,
+        var(--color-surface-subtle) 18% 48%,
+        var(--color-surface-inset) 48% 100%
+    );
 
     box-shadow:
         inset 0 0 32px rgb(0 0 0 / 12%),
@@ -484,8 +465,7 @@
 }
 
 .joystick:focus-visible {
-    outline:
-        3px solid rgb(0 125 198 / 48%);
+    outline: 3px solid rgb(0 125 198 / 48%);
 
     outline-offset: 4px;
 }
@@ -534,17 +514,15 @@
     width: 31%;
     aspect-ratio: 1;
 
-    border:
-        2px solid #58b8ed;
+    border: 2px solid #58b8ed;
 
     border-radius: 50%;
 
-    background:
-        radial-gradient(
-            circle at 35% 30%,
-            #58b8ed,
-            var(--brand-blue) 72%
-        );
+    background: radial-gradient(
+        circle at 35% 30%,
+        #58b8ed,
+        var(--brand-blue) 72%
+    );
 
     /*
      * Keep centering separate from the transform property.
@@ -553,8 +531,7 @@
      */
     translate: -50% -50%;
 
-    box-shadow:
-        0 7px 18px rgb(0 0 0 / 34%);
+    box-shadow: 0 7px 18px rgb(0 0 0 / 34%);
 
     pointer-events: none;
     will-change: transform;
@@ -592,18 +569,14 @@
     top: 50%;
     left: 5%;
 
-    transform:
-        translateY(-50%)
-        rotate(-90deg);
+    transform: translateY(-50%) rotate(-90deg);
 }
 
 .joystick-right {
     top: 50%;
     right: 4%;
 
-    transform:
-        translateY(-50%)
-        rotate(90deg);
+    transform: translateY(-50%) rotate(90deg);
 }
 
 .joystick-readout {
@@ -630,7 +603,6 @@
     color: var(--drive-text);
 }
 
-
 /* Camera control */
 
 .camera-control-heading {
@@ -639,19 +611,14 @@
 }
 
 .camera-joystick {
-    width:
-        min(
-            100%,
-            clamp(145px, 24vh, 220px)
-        );
+    width: min(100%, clamp(145px, 24vh, 220px));
 
-    background:
-        radial-gradient(
-            circle at center,
-            var(--color-surface-raised) 0 18%,
-            var(--color-surface-subtle) 18% 48%,
-            var(--color-surface-inset) 48% 100%
-        );
+    background: radial-gradient(
+        circle at center,
+        var(--color-surface-raised) 0 18%,
+        var(--color-surface-subtle) 18% 48%,
+        var(--color-surface-inset) 48% 100%
+    );
 }
 
 .camera-stick {
@@ -659,12 +626,11 @@
 
     border-color: #f6a47b;
 
-    background:
-        radial-gradient(
-            circle at 35% 30%,
-            #f6a47b,
-            var(--brand-orange) 72%
-        );
+    background: radial-gradient(
+        circle at 35% 30%,
+        #f6a47b,
+        var(--brand-orange) 72%
+    );
 }
 
 .camera-center-button {
@@ -672,8 +638,7 @@
 
     padding: 0.45rem 0.65rem;
 
-    border:
-        1px solid var(--drive-border-strong);
+    border: 1px solid var(--drive-border-strong);
 
     border-radius: var(--radius-small);
 
@@ -697,12 +662,10 @@
 }
 
 .camera-center-button:focus-visible {
-    outline:
-        3px solid rgb(0 125 198 / 48%);
+    outline: 3px solid rgb(0 125 198 / 48%);
 
     outline-offset: 3px;
 }
-
 
 /* Emergency stop */
 
@@ -717,8 +680,7 @@
     width: 100%;
     min-height: 52px;
 
-    border:
-        1px solid var(--brand-pink);
+    border: 1px solid var(--brand-pink);
 
     border-radius: var(--radius-medium);
 
@@ -731,8 +693,7 @@
 
     cursor: pointer;
 
-    box-shadow:
-        0 8px 20px rgb(221 31 120 / 20%);
+    box-shadow: 0 8px 20px rgb(221 31 120 / 20%);
 
     transition:
         background var(--transition-fast),
@@ -750,8 +711,7 @@
 }
 
 .emergency-stop:focus-visible {
-    outline:
-        3px solid rgb(221 31 120 / 44%);
+    outline: 3px solid rgb(221 31 120 / 44%);
 
     outline-offset: 3px;
 }
@@ -759,7 +719,6 @@
 .stop-icon {
     font-size: 1.35rem;
 }
-
 
 /* Keyboard and safety information */
 
@@ -772,8 +731,7 @@
 
     padding: 0.65rem 0.8rem;
 
-    border:
-        1px solid var(--drive-border);
+    border: 1px solid var(--drive-border);
 
     border-radius: var(--radius-small);
 
@@ -800,32 +758,27 @@
     line-height: 1.35;
 }
 
-html[data-compact-layout="true"]
-    .drive-header {
+html[data-compact-layout="true"] .drive-header {
     padding-top: 0.55rem;
     padding-bottom: 0.55rem;
 }
 
-html[data-compact-layout="true"]
-    .drive-layout {
+html[data-compact-layout="true"] .drive-layout {
     gap: 0.5rem;
     padding: 0.5rem;
 }
 
-html[data-compact-layout="true"]
-    .control-panel {
+html[data-compact-layout="true"] .control-panel {
     gap: 0.4rem;
     padding: 0.6rem;
 }
 
-html[data-compact-layout="true"]
-    .drive-hud {
+html[data-compact-layout="true"] .drive-hud {
     gap: 0.55rem;
     padding: 0.4rem 0.55rem;
 }
 
-html[data-compact-layout="true"]
-    .video-overlay {
+html[data-compact-layout="true"] .video-overlay {
     right: 0.5rem;
     bottom: 0.5rem;
     left: 0.5rem;
@@ -833,15 +786,12 @@ html[data-compact-layout="true"]
     padding: 0.45rem 0.6rem;
 }
 
-html[data-compact-layout="true"]
-    .keyboard-help {
+html[data-compact-layout="true"] .keyboard-help {
     padding: 0.4rem 0.55rem;
 }
 
-html[data-compact-layout="true"]
-    .joystick-section,
-html[data-compact-layout="true"]
-    .camera-control-section {
+html[data-compact-layout="true"] .joystick-section,
+html[data-compact-layout="true"] .camera-control-section {
     gap: 0.35rem;
 }
 
@@ -872,19 +822,11 @@ html[data-compact-layout="true"]
     }
 
     .joystick {
-        width:
-            min(
-                100%,
-                clamp(130px, 23vh, 190px)
-            );
+        width: min(100%, clamp(130px, 23vh, 190px));
     }
 
     .camera-joystick {
-        width:
-            min(
-                100%,
-                clamp(120px, 20vh, 170px)
-            );
+        width: min(100%, clamp(120px, 20vh, 170px));
     }
 
     .joystick-help,
@@ -897,7 +839,6 @@ html[data-compact-layout="true"]
         min-height: 44px;
     }
 }
-
 
 /* Tablet and narrow layouts */
 
@@ -922,8 +863,7 @@ html[data-compact-layout="true"]
 
     .video-panel,
     .drive-video {
-        min-height:
-            min(52dvh, 420px);
+        min-height: min(52dvh, 420px);
     }
 
     .control-panel {
@@ -937,6 +877,25 @@ html[data-compact-layout="true"]
     }
 }
 
+@media (max-width: 720px) {
+    .drive-header-actions {
+        align-items: flex-end;
+        flex-direction: column-reverse;
+    }
+
+    .drive-header .identity-badge-details {
+        display: none;
+    }
+
+    .drive-header .identity-badge {
+        padding: 0.35rem;
+    }
+
+    .drive-header .identity-badge-avatar {
+        width: 1.8rem;
+        height: 1.8rem;
+    }
+}
 
 /* Phones */
 
@@ -953,15 +912,13 @@ html[data-compact-layout="true"]
     }
 
     .drive-header h1 {
-        font-size:
-            clamp(1.1rem, 5vw, 1.45rem);
+        font-size: clamp(1.1rem, 5vw, 1.45rem);
     }
 
     .drive-header .eyebrow {
         margin-bottom: 0.15rem;
 
-        font-size:
-            clamp(0.55rem, 2.5vw, 0.68rem);
+        font-size: clamp(0.55rem, 2.5vw, 0.68rem);
     }
 
     .drive-header .back-link {
@@ -980,8 +937,7 @@ html[data-compact-layout="true"]
         right: 0.6rem;
         left: 0.6rem;
 
-        max-width:
-            calc(100% - 1.2rem);
+        max-width: calc(100% - 1.2rem);
 
         padding: 0.5rem 0.65rem;
         gap: 0.75rem;
@@ -1021,13 +977,11 @@ html[data-compact-layout="true"]
     }
 
     .joystick {
-        width:
-            min(82vw, 300px);
+        width: min(82vw, 300px);
     }
 
     .camera-joystick {
-        width:
-            min(68vw, 230px);
+        width: min(68vw, 230px);
     }
 
     .joystick-readout {

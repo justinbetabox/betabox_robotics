@@ -47,16 +47,20 @@
             </h1>
         </div>
 
-        <div
-            id="drive-connection"
-            class="
+        <div class="drive-header-actions">
+            <div
+                id="drive-connection"
+                class="
                 connection-status
                 status-connecting
-            "
-            role="status"
-            aria-live="polite"
-        >
-            Connecting…
+                "
+                role="status"
+                aria-live="polite"
+            >
+                Connecting…
+            </div>
+
+            {% include "_identity_badge.html" %}
         </div>
     </header>
 

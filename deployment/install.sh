@@ -13,66 +13,6 @@ JUPYTERHUB_VENV_DIR="$JUPYTERHUB_DIR/venv"
 SUDOERS_SOURCE="$SDK_DIR/deployment/sudoers/betabox-guest"
 SUDOERS_TARGET="/etc/sudoers.d/betabox-guest"
 
-STUDENT_ACCOUNTS=(
-    student
-    student1
-    student2
-    student3
-)
-
-STUDENT_PASSWORD="learnbydoing"
-
-provision_student_accounts() {
-    echo "Provisioning student accounts..."
-
-    local username
-    local home
-    local group
-
-    for username in "${STUDENT_ACCOUNTS[@]}"; do
-        home="/home/$username"
-
-        if id "$username" >/dev/null 2>&1; then
-            echo "Student account already exists: $username"
-        else
-            echo "Creating student account: $username"
-
-            sudo useradd \
-                --create-home \
-                --shell /bin/bash \
-                --user-group \
-                "$username"
-        fi
-
-        echo "${username}:${STUDENT_PASSWORD}" \
-            | sudo chpasswd
-
-        # Disable password expiration for classroom accounts.
-        sudo chage \
-            --maxdays -1 \
-            "$username"
-
-        group="$(id -gn "$username")"
-
-        sudo usermod \
-            -aG "$group" \
-            "$USER"
-
-        sudo install \
-            -d \
-            -o "$username" \
-            -g "$group" \
-            -m 2770 \
-            "$home" \
-            "$home/curriculum" \
-            "$home/media" \
-            "$home/media/pictures" \
-            "$home/media/videos" \
-            "$home/media/sounds" \
-            "$home/preferences"
-    done
-}
-
 echo "======================================"
 echo " Betabox Robotics SDK Installer"
 echo "======================================"
@@ -175,8 +115,6 @@ echo "Removing default Python 3 Jupyter kernel..."
 "$JUPYTERHUB_VENV_DIR/bin/jupyter" kernelspec remove -f python3 || true
 "$JUPYTERHUB_VENV_DIR/bin/python" -m pip uninstall -y ipykernel || true
 echo "[7/11] Provisioning platform..."
-
-provision_student_accounts
 
 cd "$SDK_DIR"
 

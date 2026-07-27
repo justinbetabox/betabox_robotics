@@ -7,23 +7,20 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-from betabox_robotics.services.workspace import (
-    ProvisionedAccount,
+from betabox_robotics.services.accounts import (
     account_by_username,
-    account_ids,
-    populate_media,
-    create_workspace,
 )
 from betabox_robotics.services.privileges import (
     require_root_or_elevate,
 )
-
-
-DEFAULT_REPOSITORY_ROOT = (
-    Path(__file__)
-    .resolve()
-    .parent.parent
+from betabox_robotics.services.workspace import (
+    ProvisionedAccount,
+    account_ids,
+    create_workspace,
+    populate_media,
 )
+
+DEFAULT_REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 
 
 @dataclass(frozen=True)
@@ -52,18 +49,14 @@ class GuestWorkspaceStatus:
 def guest_account() -> ProvisionedAccount:
     """Return the managed Guest account."""
 
-    return account_by_username(
-        "guest"
-    )
+    return account_by_username("guest")
 
 
 def require_root() -> None:
     """Require root privileges for Guest modification."""
 
     if os.geteuid() != 0:
-        raise PermissionError(
-            "Guest workspace management requires root."
-        )
+        raise PermissionError("Guest workspace management requires root.")
 
 
 def provision_guest(
@@ -76,9 +69,7 @@ def provision_guest(
 
     account = guest_account()
 
-    create_workspace(
-        account
-    )
+    create_workspace(account)
 
     if account.install_media:
         populate_media(
@@ -98,25 +89,15 @@ def reset_guest(
     account = guest_account()
 
     if account.persistent:
-        raise RuntimeError(
-            "Refusing to reset a persistent account."
-        )
+        raise RuntimeError("Refusing to reset a persistent account.")
 
-    expected_home = (
-        Path("/home")
-        / account.username
-    )
+    expected_home = Path("/home") / account.username
 
     if account.home != expected_home:
-        raise RuntimeError(
-            f"Refusing to reset unexpected path: "
-            f"{account.home}"
-        )
+        raise RuntimeError(f"Refusing to reset unexpected path: {account.home}")
 
     if not account.home.is_dir():
-        raise RuntimeError(
-            f"Guest home directory does not exist: {account.home}"
-        )
+        raise RuntimeError(f"Guest home directory does not exist: {account.home}")
 
     for child in account.home.iterdir():
         if child.is_dir() and not child.is_symlink():
@@ -148,16 +129,11 @@ def guest_status() -> GuestWorkspaceStatus:
     return GuestWorkspaceStatus(
         account_exists=account_exists,
         home_exists=account.home.is_dir(),
-        curriculum_exists=(
-            account.home / "curriculum"
-        ).is_dir(),
-        media_exists=(
-            account.home / "media"
-        ).is_dir(),
-        preferences_exist=(
-            account.home / "preferences"
-        ).is_dir(),
+        curriculum_exists=(account.home / "curriculum").is_dir(),
+        media_exists=(account.home / "media").is_dir(),
+        preferences_exist=(account.home / "preferences").is_dir(),
     )
+
 
 def main(
     argv: list[str] | None = None,
@@ -191,21 +167,11 @@ def main(
         if args.command == "status":
             status = guest_status()
 
-            print(
-                f"Account:      {'OK' if status.account_exists else 'Missing'}"
-            )
-            print(
-                f"Home:         {'OK' if status.home_exists else 'Missing'}"
-            )
-            print(
-                f"Curriculum:   {'OK' if status.curriculum_exists else 'Missing'}"
-            )
-            print(
-                f"Media:        {'OK' if status.media_exists else 'Missing'}"
-            )
-            print(
-                f"Preferences:  {'OK' if status.preferences_exist else 'Missing'}"
-            )
+            print(f"Account:      {'OK' if status.account_exists else 'Missing'}")
+            print(f"Home:         {'OK' if status.home_exists else 'Missing'}")
+            print(f"Curriculum:   {'OK' if status.curriculum_exists else 'Missing'}")
+            print(f"Media:        {'OK' if status.media_exists else 'Missing'}")
+            print(f"Preferences:  {'OK' if status.preferences_exist else 'Missing'}")
 
             return 0 if status.ok else 1
 
@@ -216,9 +182,7 @@ def main(
 
             provision_guest()
 
-            print(
-                "Guest workspace provisioned."
-            )
+            print("Guest workspace provisioned.")
 
             return 0
 
@@ -229,9 +193,7 @@ def main(
 
             reset_guest()
 
-            print(
-                "Guest workspace reset."
-            )
+            print("Guest workspace reset.")
 
             return 0
 

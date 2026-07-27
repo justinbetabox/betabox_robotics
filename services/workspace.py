@@ -4,74 +4,14 @@ import os
 import pwd
 import shutil
 from collections.abc import Iterable
-from dataclasses import dataclass
 from pathlib import Path
 
-WORKSPACE_MODE = 0o2770
-
-
-@dataclass(frozen=True, slots=True)
-class ProvisionedAccount:
-    """Description of a Betabox-managed Linux account."""
-
-    username: str
-    display_name: str
-    group: str
-    home: Path
-    shell: Path = Path("/usr/sbin/nologin")
-    persistent: bool = True
-    install_media: bool = True
-
-
-BETABOX_ACCOUNTS: tuple[ProvisionedAccount, ...] = (
-    ProvisionedAccount(
-        username="guest",
-        display_name="Guest",
-        group="guest",
-        home=Path("/home/guest"),
-        persistent=False,
-    ),
-    ProvisionedAccount(
-        username="student",
-        display_name="Student",
-        group="student",
-        home=Path("/home/student"),
-        persistent=True,
-    ),
-    ProvisionedAccount(
-        username="student1",
-        display_name="Student 1",
-        group="student1",
-        home=Path("/home/student1"),
-        persistent=True,
-    ),
-    ProvisionedAccount(
-        username="student2",
-        display_name="Student 2",
-        group="student2",
-        home=Path("/home/student2"),
-        persistent=True,
-    ),
-    ProvisionedAccount(
-        username="student3",
-        display_name="Student 3",
-        group="student3",
-        home=Path("/home/student3"),
-        persistent=True,
-    ),
+from betabox_robotics.services.accounts import (
+    BETABOX_ACCOUNTS,
+    ProvisionedAccount,
 )
 
-
-def account_by_username(
-    username: str,
-) -> ProvisionedAccount:
-    """Return a managed Betabox account."""
-
-    for account in BETABOX_ACCOUNTS:
-        if account.username == username:
-            return account
-
-    raise LookupError(f"Unknown Betabox account: {username}")
+WORKSPACE_MODE = 0o2770
 
 
 def account_ids(
@@ -95,7 +35,6 @@ def workspace_directories(
     media = account.home / "media"
 
     return (
-        account.home,
         account.home / "curriculum",
         media,
         media / "pictures",
@@ -131,6 +70,9 @@ def create_workspace(
     account: ProvisionedAccount,
 ) -> None:
     """Create the workspace for a managed account."""
+
+    if not account.home.is_dir():
+        raise RuntimeError(f"Account home directory does not exist: {account.home}")
 
     uid, gid = account_ids(account.username)
 

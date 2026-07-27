@@ -6,7 +6,7 @@ from collections.abc import Awaitable, Callable
 
 from aiohttp import web
 
-from betabox_robotics.services.workspace import (
+from betabox_robotics.services.accounts import (
     account_by_username,
 )
 

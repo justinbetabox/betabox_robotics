@@ -4,8 +4,10 @@ import argparse
 import os
 from pathlib import Path
 
-from betabox_robotics.services.workspace import (
+from betabox_robotics.services.accounts import (
     BETABOX_ACCOUNTS,
+)
+from betabox_robotics.services.workspace import (
     create_workspace,
     populate_media,
 )
@@ -25,7 +27,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--service-user",
         required=True,
-        help=("Linux user that runs Betabox services, normally pi."),
+        help=(
+            "Linux service account that runs Betabox "
+            "services and requires access to persistent "
+            "student workspaces."
+        ),
     )
 
     return parser.parse_args()
@@ -46,6 +52,7 @@ def main() -> None:
     require_root()
 
     print("Provisioning Betabox accounts...")
+
     provision_accounts(
         service_user=args.service_user,
     )
@@ -59,6 +66,7 @@ def main() -> None:
 
     populate_media(
         REPOSITORY_ROOT,
+        accounts=BETABOX_ACCOUNTS,
     )
 
     print("Betabox provisioning complete.")

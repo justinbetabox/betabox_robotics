@@ -6,7 +6,7 @@ from betabox_robotics.config import PlatformConfig
 from betabox_robotics.launchpad.services import (
     LaunchpadServices,
 )
-from betabox_robotics.services.workspace import (
+from betabox_robotics.services.accounts import (
     account_by_username,
 )
 

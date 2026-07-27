@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -232,6 +233,8 @@ def check_account_workspace(
 def collect_checks(
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> list[CheckResult]:
+    betabox_command = str(Path(sys.executable).parent / "betabox")
+
     checks: list[CheckResult] = []
     verification = config.verification
 
@@ -240,21 +243,21 @@ def collect_checks(
 
     checks.append(
         check_command(
-            ["betabox", "--help"],
+            [betabox_command, "--help"],
             "cli:betabox",
-            timeout=(verification.command_timeout_seconds),
+            timeout=verification.command_timeout_seconds,
         )
     )
 
     checks.append(
         check_command(
             [
-                "betabox",
+                betabox_command,
                 "launchpad",
                 "--help",
             ],
             "cli:betabox-launchpad",
-            timeout=(verification.command_timeout_seconds),
+            timeout=verification.command_timeout_seconds,
         )
     )
 

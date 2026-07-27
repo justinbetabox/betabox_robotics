@@ -234,7 +234,9 @@ for service in "${SERVICES[@]}"; do
 done
 
 echo "[11/11] Running install check..."
-sudo "$VENV_DIR/bin/betabox" install-check
+sudo "$VENV_DIR/bin/betabox" \
+    install-check \
+    --service-user "$USER"
 
 echo
 echo "======================================"

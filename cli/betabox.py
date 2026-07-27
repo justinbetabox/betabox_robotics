@@ -2,9 +2,16 @@ from __future__ import annotations
 
 import argparse
 
+from betabox_robotics.launchpad.app import (
+    main as launchpad_main,
+)
 from betabox_robotics.services.backup import main as backup_main
 from betabox_robotics.services.boot_announce import main as boot_announce_main
 from betabox_robotics.services.doctor import main as doctor_main
+from betabox_robotics.services.events import main as events_main
+from betabox_robotics.services.guest import (
+    main as guest_main,
+)
 from betabox_robotics.services.hostname import main as hostname_main
 from betabox_robotics.services.install_check import main as install_check_main
 from betabox_robotics.services.logs import main as logs_main
@@ -17,13 +24,6 @@ from betabox_robotics.services.status import main as status_main
 from betabox_robotics.services.verify import main as verify_main
 from betabox_robotics.services.video import main as video_main
 from betabox_robotics.services.wifi_fallback import main as wifi_fallback_main
-from betabox_robotics.services.events import main as events_main
-from betabox_robotics.launchpad.app import (
-    main as launchpad_main,
-)
-from betabox_robotics.services.guest import (
-    main as guest_main,
-)
 
 
 def main() -> int:
@@ -106,7 +106,7 @@ def main() -> int:
     args, extra = parser.parse_known_args()
 
     if args.command == "install-check":
-        return install_check_main()
+        return install_check_main(extra)
 
     if args.command == "verify":
         return verify_main()

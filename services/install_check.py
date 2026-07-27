@@ -368,7 +368,9 @@ def print_results(checks: list[CheckResult]) -> bool:
     return all_ok
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(
+    argv: list[str] | None = None,
+) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description="Verify the Betabox software installation.",
     )
@@ -381,11 +383,13 @@ def parse_args() -> argparse.Namespace:
         ),
     )
 
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
-def main() -> int:
-    args = parse_args()
+def main(
+    argv: list[str] | None = None,
+) -> int:
+    args = parse_args(argv)
     config = DEFAULT_PLATFORM_CONFIG
 
     service_user = resolve_service_user(args.service_user)

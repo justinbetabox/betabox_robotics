@@ -7,28 +7,6 @@
     >
 {% endblock %}
 
-{% block header_actions %}
-    <div
-        id="services-connection"
-        class="
-            connection-status
-            status-connecting
-        "
-        role="status"
-        aria-live="polite"
-    >
-        Connecting…
-    </div>
-
-    <button
-        id="refresh-services"
-        class="button button-secondary"
-        type="button"
-    >
-        Refresh
-    </button>
-{% endblock %}
-
 {% block page_content %}
     <section
         class="page-section"
@@ -45,12 +23,36 @@
                 </h2>
             </div>
 
-            <p
-                id="services-updated"
-                class="timestamp"
-            >
-                Waiting for service status…
-            </p>
+            <div class="section-actions">
+                <div class="section-status">
+                    <div
+                        id="services-connection"
+                        class="
+                            connection-status
+                            status-connecting
+                        "
+                        role="status"
+                        aria-live="polite"
+                    >
+                        Connecting…
+                    </div>
+
+                    <p
+                        id="services-updated"
+                        class="timestamp"
+                    >
+                        Waiting for service status…
+                    </p>
+                </div>
+
+                <button
+                    id="refresh-services"
+                    class="button button-secondary"
+                    type="button"
+                >
+                    Refresh
+                </button>
+            </div>
         </div>
 
         <div class="overview-grid">

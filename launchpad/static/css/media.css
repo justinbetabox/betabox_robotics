@@ -7,6 +7,33 @@ Media page
     padding-bottom: 3rem;
 }
 
+.section-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 2rem;
+}
+
+.section-actions {
+    display: grid;
+    justify-items: end;
+    gap: 0.75rem;
+}
+
+.section-actions .timestamp {
+    max-width: 28rem;
+    margin: 0;
+
+    text-align: right;
+}
+
+.section-buttons {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.65rem;
+}
+
 /* =========================================================
 Browser panel
 ========================================================= */
@@ -141,8 +168,7 @@ Filters and query controls
     line-height: 1;
 }
 
-.media-filter.is-active
-.media-filter-count {
+.media-filter.is-active .media-filter-count {
     color: var(--color-text-on-primary);
     background: rgb(255 255 255 / 20%);
 }
@@ -206,11 +232,7 @@ Filters and query controls
     width: 10.5rem;
     min-width: 9.5rem;
     min-height: 2.6rem;
-    padding:
-        0.55rem
-        2.25rem
-        0.55rem
-        0.75rem;
+    padding: 0.55rem 2.25rem 0.55rem 0.75rem;
     color: var(--color-text);
     background-color: var(--color-surface-raised);
     border: 1px solid var(--color-border);
@@ -263,11 +285,7 @@ Loading, empty, and error states
     border: 3px solid var(--color-border);
     border-top-color: var(--color-primary);
     border-radius: 50%;
-    animation:
-        media-spinner
-        800ms
-        linear
-        infinite;
+    animation: media-spinner 800ms linear infinite;
 }
 
 .media-empty-icon {
@@ -299,11 +317,7 @@ Media grid
 
 .media-grid {
     display: grid;
-    grid-template-columns:
-        repeat(
-            auto-fill,
-            minmax(14rem, 1fr)
-        );
+    grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));
     gap: 0.9rem;
 }
 
@@ -373,12 +387,11 @@ Media grid
     display: grid;
     place-items: center;
     color: var(--color-text-muted);
-    background:
-        linear-gradient(
-            135deg,
-            var(--color-surface-subtle),
-            var(--color-surface-inset)
-        );
+    background: linear-gradient(
+        135deg,
+        var(--color-surface-subtle),
+        var(--color-surface-inset)
+    );
 }
 
 .media-placeholder-icon {
@@ -404,11 +417,7 @@ Media grid
 
 .media-play-indicator {
     position: absolute;
-    inset:
-        50%
-        auto
-        auto
-        50%;
+    inset: 50% auto auto 50%;
     width: 3rem;
     height: 3rem;
     display: grid;
@@ -417,11 +426,7 @@ Media grid
     background: rgb(0 0 0 / 62%);
     border: 1px solid rgb(255 255 255 / 14%);
     border-radius: 50%;
-    transform:
-        translate(
-            -50%,
-            -50%
-        );
+    transform: translate(-50%, -50%);
     font-size: 1rem;
     backdrop-filter: blur(6px);
 }
@@ -540,11 +545,7 @@ Dialogs
 /* Upload dialog */
 
 .media-upload-dialog {
-    width:
-        min(
-            36rem,
-            calc(100% - 2rem)
-        );
+    width: min(36rem, calc(100% - 2rem));
 }
 
 .media-upload-content {
@@ -724,8 +725,7 @@ Dialogs
     font-weight: 800;
 }
 
-.media-upload-file.is-valid
-    .media-upload-file-status {
+.media-upload-file.is-valid .media-upload-file-status {
     color: var(--color-healthy);
 }
 
@@ -733,8 +733,7 @@ Dialogs
     border-color: var(--color-critical);
 }
 
-.media-upload-file.is-invalid
-    .media-upload-file-status {
+.media-upload-file.is-invalid .media-upload-file-status {
     color: var(--color-critical);
 }
 
@@ -751,21 +750,15 @@ Dialogs
 }
 
 .media-dialog {
-    width:
-        min(
-            44rem,
-            calc(100% - 2rem)
-        );
-    max-height:
-        calc(100vh - 2rem);
+    width: min(44rem, calc(100% - 2rem));
+    max-height: calc(100vh - 2rem);
     padding: 0;
     overflow: auto;
     color: var(--color-text);
     background: var(--color-surface-raised);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-large);
-    box-shadow:
-        0 24px 60px rgb(0 0 0 / 28%);
+    box-shadow: 0 24px 60px rgb(0 0 0 / 28%);
 }
 
 .media-dialog::backdrop {
@@ -779,8 +772,7 @@ Dialogs
     align-items: flex-start;
     justify-content: space-between;
     gap: 1rem;
-    border-bottom:
-        1px solid var(--color-border);
+    border-bottom: 1px solid var(--color-border);
 }
 
 .media-dialog-header h2 {
@@ -831,21 +823,13 @@ Dialogs
 .media-preview-video {
     display: block;
     max-width: 100%;
-    max-height:
-        min(
-            65vh,
-            38rem
-        );
+    max-height: min(65vh, 38rem);
     background: var(--color-surface-dark);
     border-radius: var(--radius-small);
 }
 
 .media-preview-audio {
-    width:
-        min(
-            100%,
-            32rem
-        );
+    width: min(100%, 32rem);
 }
 
 .media-preview-footer {
@@ -865,11 +849,7 @@ Dialogs
 }
 
 .media-delete-dialog {
-    width:
-        min(
-            30rem,
-            calc(100% - 2rem)
-        );
+    width: min(30rem, calc(100% - 2rem));
 }
 
 .media-delete-content {
@@ -903,8 +883,7 @@ Dialogs
     align-items: center;
     justify-content: flex-end;
     gap: 0.75rem;
-    border-top:
-        1px solid var(--color-border);
+    border-top: 1px solid var(--color-border);
 }
 
 /* =========================================================
@@ -919,29 +898,24 @@ Hidden state
 Compact layout
 ========================================================= */
 
-html[data-compact-layout="true"]
-.media-page {
+html[data-compact-layout="true"] .media-page {
     gap: 1rem;
 }
 
-html[data-compact-layout="true"]
-.media-summary {
+html[data-compact-layout="true"] .media-summary {
     gap: 0.6rem;
 }
 
-html[data-compact-layout="true"]
-.media-summary-card {
+html[data-compact-layout="true"] .media-summary-card {
     padding: 0.75rem;
 }
 
-html[data-compact-layout="true"]
-.media-browser {
+html[data-compact-layout="true"] .media-browser {
     gap: 0.85rem;
     padding: 0.85rem;
 }
 
-html[data-compact-layout="true"]
-.media-grid {
+html[data-compact-layout="true"] .media-grid {
     gap: 0.6rem;
 }
 
@@ -951,22 +925,13 @@ Responsive layout
 
 @media (max-width: 1000px) {
     .media-summary {
-        grid-template-columns:
-            repeat(
-                3,
-                minmax(0, 1fr)
-            );
+        grid-template-columns: repeat(3, minmax(0, 1fr));
     }
 }
 
 @media (max-width: 760px) {
-
     .media-summary {
-        grid-template-columns:
-            repeat(
-                2,
-                minmax(0, 1fr)
-            );
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .media-controls {
@@ -993,14 +958,30 @@ Responsive layout
     }
 
     .media-grid {
-        grid-template-columns:
-            repeat(
-                auto-fill,
-                minmax(12rem, 1fr)
-            );
+        grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
     }
 }
 
+@media (max-width: 720px) {
+    .section-heading {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 1rem;
+    }
+
+    .section-actions {
+        justify-items: start;
+    }
+
+    .section-actions .timestamp {
+        text-align: left;
+        max-width: none;
+    }
+
+    .section-buttons {
+        justify-content: flex-start;
+    }
+}
 
 @media (max-width: 520px) {
     .media-browser {
@@ -1009,11 +990,7 @@ Responsive layout
 
     .media-category-filters {
         display: grid;
-        grid-template-columns:
-            repeat(
-                2,
-                minmax(0, 1fr)
-            );
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
     .media-query-controls {
@@ -1036,8 +1013,7 @@ Responsive layout
     }
 
     .media-grid {
-        grid-template-columns:
-            minmax(0, 1fr);
+        grid-template-columns: minmax(0, 1fr);
     }
 
     .media-list .media-card {
@@ -1072,9 +1048,20 @@ Responsive layout
     }
 }
 
-@media (
-prefers-reduced-motion: reduce
-) {
+@media (max-width: 460px) {
+    .section-buttons {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+
+        width: 100%;
+    }
+
+    .section-buttons .button {
+        width: 100%;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
     .media-card,
     .media-filter,
     .media-view-button,

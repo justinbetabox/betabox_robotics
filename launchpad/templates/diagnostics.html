@@ -7,28 +7,6 @@
     >
 {% endblock %}
 
-{% block header_actions %}
-    <div
-        id="diagnostics-connection"
-        class="
-            connection-status
-            status-connecting
-        "
-        role="status"
-        aria-live="polite"
-    >
-        Checking...
-    </div>
-
-    <button
-        id="run-diagnostics"
-        class="button"
-        type="button"
-    >
-        Run
-    </button>
-{% endblock %}
-
 {% block page_content %}
     <section
         class="
@@ -47,12 +25,36 @@
                 </h2>
             </div>
 
-            <p
-                id="diagnostics-updated"
-                class="timestamp"
-            >
-                Diagnostics have not run yet.
-            </p>
+            <div class="section-actions">
+                <div class="section-status">
+                    <div
+                        id="diagnostics-connection"
+                        class="
+                            connection-status
+                            status-connecting
+                        "
+                        role="status"
+                        aria-live="polite"
+                    >
+                        Checking…
+                    </div>
+
+                    <p
+                        id="diagnostics-updated"
+                        class="timestamp"
+                    >
+                        Diagnostics have not run yet.
+                    </p>
+                </div>
+
+                <button
+                    id="run-diagnostics"
+                    class="button button-secondary"
+                    type="button"
+                >
+                    Run
+                </button>
+            </div>
         </div>
 
         <div class="overview-grid">

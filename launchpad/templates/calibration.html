@@ -7,31 +7,6 @@
     >
 {% endblock %}
 
-{% block header_actions %}
-    <div
-        id="calibration-connection"
-        class="
-            connection-status
-            status-connecting
-        "
-        role="status"
-        aria-live="polite"
-    >
-        Loading…
-    </div>
-
-    <button
-        id="refresh-calibration"
-        class="
-            button
-            button-secondary
-        "
-        type="button"
-    >
-        Refresh
-    </button>
-{% endblock %}
-
 {% block page_content %}
     <section
         class="page-section calibration-intro"
@@ -53,14 +28,29 @@
         </div>
 
         <div class="calibration-intro-status">
-            <span
-                id="calibration-source"
-                class="
-                    status-badge
-                "
-            >
-                Checking
-            </span>
+            <div class="calibration-status-row">
+                <div
+                    id="calibration-connection"
+                    class="connection-status status-connecting"
+                >
+                    Loading…
+                </div>
+
+                <span
+                    id="calibration-source"
+                    class="status-badge"
+                >
+                    Checking
+                </span>
+
+                <button
+                    id="refresh-calibration"
+                    class="button button-secondary"
+                    type="button"
+                >
+                    Refresh
+                </button>
+            </div>
 
             <p
                 id="calibration-updated"

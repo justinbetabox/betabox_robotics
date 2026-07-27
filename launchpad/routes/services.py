@@ -49,7 +49,7 @@ async def services_api(
         return web.json_response(
             {
                 "error": "services_unavailable",
-                "message": ("Unable to collect platform service information."),
+                "message": "Unable to collect platform service information.",
                 "detail": str(exc),
             },
             status=500,

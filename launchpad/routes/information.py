@@ -51,7 +51,7 @@ async def information_api(
         return web.json_response(
             {
                 "error": "information_unavailable",
-                "message": ("Unable to collect platform information."),
+                "message": "Unable to collect platform information.",
                 "detail": str(exc),
             },
             status=500,

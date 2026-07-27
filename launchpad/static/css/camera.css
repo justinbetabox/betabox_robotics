@@ -11,7 +11,6 @@
     overflow: hidden;
 }
 
-
 /* Vision viewport */
 
 .camera-main {
@@ -55,13 +54,25 @@
     object-fit: contain;
 }
 
+.camera-status {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    z-index: 2;
+
+    pointer-events: none;
+
+    box-shadow: var(--shadow-small);
+
+    backdrop-filter: blur(10px);
+}
+
 .camera-message {
     position: absolute;
     top: 1rem;
     left: 1rem;
 
-    max-width:
-        calc(100% - 2rem);
+    max-width: calc(100% - 2rem);
 
     padding: 0.55rem 0.8rem;
 
@@ -78,16 +89,13 @@
 
     backdrop-filter: blur(10px);
 
-    transition:
-        opacity var(--transition-fast);
+    transition: opacity var(--transition-fast);
 }
 
-.camera-view[data-video-state="connected"]
-    .camera-message {
+.camera-view[data-video-state="connected"] .camera-message {
     opacity: 0;
     pointer-events: none;
 }
-
 
 /* Vision connection states */
 
@@ -98,42 +106,30 @@
     background: var(--brand-orange-light);
 }
 
-
 /* Compact layout */
 
-html[data-compact-layout="true"]
-    .camera-page
-    .interior-header {
+html[data-compact-layout="true"] .camera-page .interior-header {
     padding-top: 0.55rem;
     padding-bottom: 0.55rem;
 }
 
-html[data-compact-layout="true"]
-    .camera-main {
+html[data-compact-layout="true"] .camera-main {
     padding: 0.45rem;
 }
 
-
 /* Short browser windows */
 
-@media (
-    max-height: 700px
-) and (
-    min-width: 641px
-) {
+@media (max-height: 700px) and (min-width: 641px) {
     .camera-page .interior-header {
         padding-top: 0.6rem;
         padding-bottom: 0.6rem;
     }
 
-    .camera-page
-        .interior-header-title h1 {
+    .camera-page .interior-header-title h1 {
         font-size: 1.6rem;
     }
 
-    .camera-page
-        .interior-header-title
-        .eyebrow {
+    .camera-page .interior-header-title .eyebrow {
         display: none;
     }
 
@@ -142,7 +138,6 @@ html[data-compact-layout="true"]
     }
 }
 
-
 /* Phones */
 
 @media (max-width: 640px) {
@@ -150,12 +145,16 @@ html[data-compact-layout="true"]
         padding: 0.75rem;
     }
 
+    .camera-status {
+        top: 0.75rem;
+        right: 0.75rem;
+    }
+
     .camera-message {
         top: 0.75rem;
         left: 0.75rem;
 
-        max-width:
-            calc(100% - 1.5rem);
+        max-width: calc(100% - 1.5rem);
 
         font-size: 0.72rem;
     }

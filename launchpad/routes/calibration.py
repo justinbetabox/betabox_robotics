@@ -261,7 +261,7 @@ async def calibration_api(
     except Exception as exc:
         return error_response(
             error="calibration_unavailable",
-            message=("Unable to load robot calibration."),
+            message="Unable to load robot calibration.",
             detail=str(exc),
             status=500,
         )
@@ -282,7 +282,7 @@ async def sample_grayscale_api(
     except Exception as exc:
         return error_response(
             error="sample_failed",
-            message=("Unable to read the line sensor."),
+            message="Unable to read the line sensor.",
             detail=str(exc),
             status=500,
         )
@@ -317,14 +317,14 @@ async def update_motors_api(
     ):
         return error_response(
             error="invalid_request",
-            message=("Valid left and right motor trim values are required."),
+            message="Valid left and right motor trim values are required.",
             status=400,
         )
 
     except Exception as exc:
         return error_response(
             error="update_failed",
-            message=("Unable to save motor trim calibration."),
+            message="Unable to save motor trim calibration.",
             detail=str(exc),
             status=500,
         )
@@ -356,14 +356,14 @@ async def update_steering_api(
     ):
         return error_response(
             error="invalid_request",
-            message=("A valid steering offset is required."),
+            message="A valid steering offset is required.",
             status=400,
         )
 
     except Exception as exc:
         return error_response(
             error="update_failed",
-            message=("Unable to save steering calibration."),
+            message="Unable to save steering calibration.",
             detail=str(exc),
             status=500,
         )
@@ -387,13 +387,13 @@ async def preview_steering_api(
     ):
         return error_response(
             error="invalid_request",
-            message=("A valid steering offset is required."),
+            message="A valid steering offset is required.",
             status=400,
         )
 
     return await run_preview(
         preview_steering,
-        failure_message=("Unable to move the steering servo."),
+        failure_message="Unable to move the steering servo.",
         offset=offset,
     )
 
@@ -418,13 +418,13 @@ async def preview_camera_mount_api(
     ):
         return error_response(
             error="invalid_request",
-            message=("Valid camera pan and tilt offsets are required."),
+            message="Valid camera pan and tilt offsets are required.",
             status=400,
         )
 
     return await run_preview(
         preview_camera_mount,
-        failure_message=("Unable to move the camera mount."),
+        failure_message="Unable to move the camera mount.",
         pan_offset=pan_offset,
         tilt_offset=tilt_offset,
     )
@@ -450,19 +450,16 @@ async def preview_motor_trim_api(
 
         calibration = service.load()
 
-    except (
-        KeyError,
-        TypeError,
-    ):
+    except (KeyError, TypeError, ValueError):
         return error_response(
             error="invalid_request",
-            message=("Valid left and right motor trim values are required."),
+            message="Valid left and right motor trim values are required.",
             status=400,
         )
 
     return await run_preview(
         preview_motor_trim,
-        failure_message=("Unable to preview motor trim."),
+        failure_message="Unable to preview motor trim.",
         left_trim=left_trim,
         right_trim=right_trim,
         steering_offset=(calibration.steering.offset),
@@ -498,14 +495,14 @@ async def update_camera_mount_api(
     ):
         return error_response(
             error="invalid_request",
-            message=("Valid camera pan and tilt offsets are required."),
+            message="Valid camera pan and tilt offsets are required.",
             status=400,
         )
 
     except Exception as exc:
         return error_response(
             error="update_failed",
-            message=("Unable to save camera mount calibration."),
+            message="Unable to save camera mount calibration.",
             detail=str(exc),
             status=500,
         )
@@ -542,14 +539,14 @@ async def update_grayscale_api(
     ):
         return error_response(
             error="invalid_request",
-            message=("Valid floor and line sensor readings are required."),
+            message="Valid floor and line sensor readings are required.",
             status=400,
         )
 
     except Exception as exc:
         return error_response(
             error="update_failed",
-            message=("Unable to save line sensor calibration."),
+            message="Unable to save line sensor calibration.",
             detail=str(exc),
             status=500,
         )
@@ -568,7 +565,7 @@ async def clear_grayscale_api(
     except Exception as exc:
         return error_response(
             error="clear_failed",
-            message=("Unable to clear line sensor calibration."),
+            message="Unable to clear line sensor calibration.",
             detail=str(exc),
             status=500,
         )

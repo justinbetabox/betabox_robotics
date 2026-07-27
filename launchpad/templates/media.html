@@ -8,29 +8,6 @@
     >
 {% endblock %}
 
-{% block header_actions %}
-    <button
-        id="media-upload-open"
-        class="
-            button
-        "
-        type="button"
-    >
-        Upload
-    </button>
-
-    <button
-        id="media-refresh"
-        class="
-            button
-            button-secondary
-        "
-        type="button"
-    >
-        Refresh
-    </button>
-{% endblock %}
-
 {% block page_content %}
     <section
         class="
@@ -49,10 +26,30 @@
                 </h2>
             </div>
 
-            <p class="timestamp">
-                Pictures, recordings, and sounds
-                stored on this robot.
-            </p>
+            <div class="section-actions">
+                <p class="timestamp">
+                    Pictures, recordings, and sounds
+                    stored on this robot.
+                </p>
+
+                <div class="section-buttons">
+                    <button
+                        id="media-upload-open"
+                        class="button"
+                        type="button"
+                    >
+                        Upload
+                    </button>
+
+                    <button
+                        id="media-refresh"
+                        class="button button-secondary"
+                        type="button"
+                    >
+                        Refresh
+                    </button>
+                </div>
+            </div>
         </div>
 
         <div
@@ -155,254 +152,254 @@
         <div class="media-browser panel">
 
 
-        <div class="media-controls">
-            <div
-                class="media-category-filters"
-                aria-label="Media categories"
-            >
-                <button
-                    class="
-                        media-filter
-                        is-active
-                    "
-                    type="button"
-                    data-media-category="all"
-                    aria-pressed="true"
-                >
-                    All
-
-                    <span
-                        id="media-filter-all-count"
-                        class="media-filter-count"
-                    >
-                        0
-                    </span>
-                </button>
-
-                <button
-                    class="media-filter"
-                    type="button"
-                    data-media-category="pictures"
-                    aria-pressed="false"
-                >
-                    Pictures
-
-                    <span
-                        id="media-filter-picture-count"
-                        class="media-filter-count"
-                    >
-                        0
-                    </span>
-                </button>
-
-                <button
-                    class="media-filter"
-                    type="button"
-                    data-media-category="videos"
-                    aria-pressed="false"
-                >
-                    Videos
-
-                    <span
-                        id="media-filter-video-count"
-                        class="media-filter-count"
-                    >
-                        0
-                    </span>
-                </button>
-
-                <button
-                    class="media-filter"
-                    type="button"
-                    data-media-category="sounds"
-                    aria-pressed="false"
-                >
-                    Sounds
-
-                    <span
-                        id="media-filter-sound-count"
-                        class="media-filter-count"
-                    >
-                        0
-                    </span>
-                </button>
-            </div>
-
-
-            <div class="media-query-controls">
-                <label class="media-search">
-                    <span class="media-search-icon" aria-hidden="true">
-                        ⌕
-                    </span>
-
-                    <span class="sr-only">
-                        Search media
-                    </span>
-
-                    <input
-                        id="media-search"
-                        type="search"
-                        placeholder="Search media"
-                        autocomplete="off"
-                    >
-                </label>
-
-                <label class="media-sort">
-                    <span class="sr-only">
-                        Sort media
-                    </span>
-
-                    <select id="media-sort">
-                        <option value="newest">
-                            Newest first
-                        </option>
-
-                        <option value="oldest">
-                            Oldest first
-                        </option>
-
-                        <option value="name-ascending">
-                            Name A–Z
-                        </option>
-
-                        <option value="name-descending">
-                            Name Z–A
-                        </option>
-
-                        <option value="size-descending">
-                            Largest first
-                        </option>
-
-                        <option value="size-ascending">
-                            Smallest first
-                        </option>
-                    </select>
-                </label>
+            <div class="media-controls">
                 <div
-                    class="media-view-controls"
-                    role="group"
-                    aria-label="Media view"
+                    class="media-category-filters"
+                    aria-label="Media categories"
                 >
                     <button
-                        id="media-grid-view"
                         class="
-                            media-view-button
+                            media-filter
                             is-active
                         "
                         type="button"
-                        data-media-view="grid"
+                        data-media-category="all"
                         aria-pressed="true"
-                        title="Grid view"
                     >
-                        ⊞
+                        All
+
+                        <span
+                            id="media-filter-all-count"
+                            class="media-filter-count"
+                        >
+                            0
+                        </span>
                     </button>
 
                     <button
-                        id="media-list-view"
-                        class="media-view-button"
+                        class="media-filter"
                         type="button"
-                        data-media-view="list"
+                        data-media-category="pictures"
                         aria-pressed="false"
-                        title="List view"
                     >
-                        ☰
+                        Pictures
+
+                        <span
+                            id="media-filter-picture-count"
+                            class="media-filter-count"
+                        >
+                            0
+                        </span>
+                    </button>
+
+                    <button
+                        class="media-filter"
+                        type="button"
+                        data-media-category="videos"
+                        aria-pressed="false"
+                    >
+                        Videos
+
+                        <span
+                            id="media-filter-video-count"
+                            class="media-filter-count"
+                        >
+                            0
+                        </span>
+                    </button>
+
+                    <button
+                        class="media-filter"
+                        type="button"
+                        data-media-category="sounds"
+                        aria-pressed="false"
+                    >
+                        Sounds
+
+                        <span
+                            id="media-filter-sound-count"
+                            class="media-filter-count"
+                        >
+                            0
+                        </span>
                     </button>
                 </div>
+
+
+                <div class="media-query-controls">
+                    <label class="media-search">
+                        <span class="media-search-icon" aria-hidden="true">
+                            ⌕
+                        </span>
+
+                        <span class="sr-only">
+                            Search media
+                        </span>
+
+                        <input
+                            id="media-search"
+                            type="search"
+                            placeholder="Search media"
+                            autocomplete="off"
+                        >
+                    </label>
+
+                    <label class="media-sort">
+                        <span class="sr-only">
+                            Sort media
+                        </span>
+
+                        <select id="media-sort">
+                            <option value="newest">
+                                Newest first
+                            </option>
+
+                            <option value="oldest">
+                                Oldest first
+                            </option>
+
+                            <option value="name-ascending">
+                                Name A–Z
+                            </option>
+
+                            <option value="name-descending">
+                                Name Z–A
+                            </option>
+
+                            <option value="size-descending">
+                                Largest first
+                            </option>
+
+                            <option value="size-ascending">
+                                Smallest first
+                            </option>
+                        </select>
+                    </label>
+                    <div
+                        class="media-view-controls"
+                        role="group"
+                        aria-label="Media view"
+                    >
+                        <button
+                            id="media-grid-view"
+                            class="
+                                media-view-button
+                                is-active
+                            "
+                            type="button"
+                            data-media-view="grid"
+                            aria-pressed="true"
+                            title="Grid view"
+                        >
+                            ⊞
+                        </button>
+
+                        <button
+                            id="media-list-view"
+                            class="media-view-button"
+                            type="button"
+                            data-media-view="list"
+                            aria-pressed="false"
+                            title="List view"
+                        >
+                            ☰
+                        </button>
+                    </div>
+                </div>
             </div>
-        </div>
 
 
-        <div
-            id="media-loading"
-            class="media-state"
-            role="status"
-        >
             <div
-                class="media-loading-spinner"
-                aria-hidden="true"
+                id="media-loading"
+                class="media-state"
+                role="status"
+            >
+                <div
+                    class="media-loading-spinner"
+                    aria-hidden="true"
+                ></div>
+
+                <div>
+                    <h3>
+                        Loading media
+                    </h3>
+
+                    <p>
+                        Checking the robot for pictures,
+                        videos, and sounds.
+                    </p>
+                </div>
+            </div>
+
+
+            <div
+                id="media-error"
+                class="error-panel"
+                role="alert"
+                hidden
+            >
+                <div>
+                    <p class="eyebrow">
+                        Media Unavailable
+                    </p>
+
+                    <h2>
+                        Media could not be loaded
+                    </h2>
+
+                    <p id="media-error-message">
+                        Launchpad could not read the
+                        robot's media files.
+                    </p>
+                </div>
+
+                <button
+                    id="media-retry"
+                    class="button"
+                    type="button"
+                >
+                    Try Again
+                </button>
+            </div>
+
+
+            <div
+                id="media-empty"
+                class="media-state"
+                hidden
+            >
+                <div
+                    class="media-empty-icon"
+                    aria-hidden="true"
+                >
+                    ◫
+                </div>
+
+                <div>
+                    <h3 id="media-empty-title">
+                        No media yet
+                    </h3>
+
+                    <p id="media-empty-message">
+                        Pictures, recordings, and sounds
+                        created on this robot will appear
+                        here.
+                    </p>
+                </div>
+            </div>
+
+
+            <div
+                id="media-items"
+                class="
+                    media-items
+                    media-grid
+                "
+                aria-live="polite"
+                hidden
             ></div>
-
-            <div>
-                <h3>
-                    Loading media
-                </h3>
-
-                <p>
-                    Checking the robot for pictures,
-                    videos, and sounds.
-                </p>
-            </div>
         </div>
-
-
-        <div
-            id="media-error"
-            class="error-panel"
-            role="alert"
-            hidden
-        >
-            <div>
-                <p class="eyebrow">
-                    Media Unavailable
-                </p>
-
-                <h2>
-                    Media could not be loaded
-                </h2>
-
-                <p id="media-error-message">
-                    Launchpad could not read the
-                    robot's media files.
-                </p>
-            </div>
-
-            <button
-                id="media-retry"
-                class="button"
-                type="button"
-            >
-                Try Again
-            </button>
-        </div>
-
-
-        <div
-            id="media-empty"
-            class="media-state"
-            hidden
-        >
-            <div
-                class="media-empty-icon"
-                aria-hidden="true"
-            >
-                ◫
-            </div>
-
-            <div>
-                <h3 id="media-empty-title">
-                    No media yet
-                </h3>
-
-                <p id="media-empty-message">
-                    Pictures, recordings, and sounds
-                    created on this robot will appear
-                    here.
-                </p>
-            </div>
-        </div>
-
-
-        <div
-            id="media-items"
-            class="
-                media-items
-                media-grid
-            "
-            aria-live="polite"
-            hidden
-        ></div>
-    </div>
-</section>
+    </section>
 
 
     <p

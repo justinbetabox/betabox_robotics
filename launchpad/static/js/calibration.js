@@ -1,196 +1,104 @@
-const connectionStatus = document.getElementById(
-    "calibration-connection"
-);
+const connectionStatus = document.getElementById("calibration-connection");
 
-const refreshButton = document.getElementById(
-    "refresh-calibration"
-);
+const refreshButton = document.getElementById("refresh-calibration");
 
-const retryButton = document.getElementById(
-    "retry-calibration"
-);
+const retryButton = document.getElementById("retry-calibration");
 
-const loadingPanel = document.getElementById(
-    "calibration-loading"
-);
+const loadingPanel = document.getElementById("calibration-loading");
 
-const contentPanel = document.getElementById(
-    "calibration-content"
-);
+const contentPanel = document.getElementById("calibration-content");
 
-const errorPanel = document.getElementById(
-    "calibration-error"
-);
+const errorPanel = document.getElementById("calibration-error");
 
-const errorMessage = document.getElementById(
-    "calibration-error-message"
-);
+const errorMessage = document.getElementById("calibration-error-message");
 
-const sourceBadge = document.getElementById(
-    "calibration-source"
-);
+const sourceBadge = document.getElementById("calibration-source");
 
-const updatedTime = document.getElementById(
-    "calibration-updated"
-);
+const updatedTime = document.getElementById("calibration-updated");
 
-const announcement = document.getElementById(
-    "calibration-announcement"
-);
+const announcement = document.getElementById("calibration-announcement");
 
-const steeringOffset = document.getElementById(
-    "steering-offset"
-);
+const steeringOffset = document.getElementById("steering-offset");
 
-const cameraPanOffset = document.getElementById(
-    "camera-pan-offset"
-);
+const cameraPanOffset = document.getElementById("camera-pan-offset");
 
-const cameraTiltOffset = document.getElementById(
-    "camera-tilt-offset"
-);
+const cameraTiltOffset = document.getElementById("camera-tilt-offset");
 
-const cameraStatus = document.getElementById(
-    "camera-status"
-);
+const cameraStatus = document.getElementById("camera-status");
 
-const leftMotorTrim = document.getElementById(
-    "left-motor-trim"
-);
+const leftMotorTrim = document.getElementById("left-motor-trim");
 
-const rightMotorTrim = document.getElementById(
-    "right-motor-trim"
-);
+const rightMotorTrim = document.getElementById("right-motor-trim");
 
-const steeringStatus = document.getElementById(
-    "steering-status"
-);
+const steeringStatus = document.getElementById("steering-status");
 
-const motorsStatus = document.getElementById(
-    "motors-status"
-);
+const motorsStatus = document.getElementById("motors-status");
 
-const grayscaleStatus = document.getElementById(
-    "grayscale-status"
-);
+const grayscaleStatus = document.getElementById("grayscale-status");
 
-const grayscaleFloor = document.getElementById(
-    "grayscale-floor"
-);
+const grayscaleFloor = document.getElementById("grayscale-floor");
 
-const grayscaleLine = document.getElementById(
-    "grayscale-line"
-);
+const grayscaleLine = document.getElementById("grayscale-line");
 
-const steeringIncreaseButton = document.getElementById(
-    "steering-increase"
-);
+const steeringIncreaseButton = document.getElementById("steering-increase");
 
-const steeringDecreaseButton = document.getElementById(
-    "steering-decrease"
-);
+const steeringDecreaseButton = document.getElementById("steering-decrease");
 
-const steeringSaveButton = document.getElementById(
-    "steering-save"
-);
+const steeringSaveButton = document.getElementById("steering-save");
 
-const steeringResetButton = document.getElementById(
-    "steering-reset"
-);
+const steeringResetButton = document.getElementById("steering-reset");
 
-const steeringMessage = document.getElementById(
-    "steering-message"
-);
+const steeringMessage = document.getElementById("steering-message");
 
-const cameraPanIncreaseButton = document.getElementById(
-    "camera-pan-increase"
-);
+const cameraPanIncreaseButton = document.getElementById("camera-pan-increase");
 
-const cameraPanDecreaseButton = document.getElementById(
-    "camera-pan-decrease"
-);
+const cameraPanDecreaseButton = document.getElementById("camera-pan-decrease");
 
 const cameraTiltIncreaseButton = document.getElementById(
-    "camera-tilt-increase"
+    "camera-tilt-increase",
 );
 
 const cameraTiltDecreaseButton = document.getElementById(
-    "camera-tilt-decrease"
+    "camera-tilt-decrease",
 );
 
-const cameraSaveButton = document.getElementById(
-    "camera-save"
+const cameraSaveButton = document.getElementById("camera-save");
+
+const cameraResetButton = document.getElementById("camera-reset");
+
+const cameraMessage = document.getElementById("camera-message");
+
+const leftTrimIncreaseButton = document.getElementById("left-trim-increase");
+
+const leftTrimDecreaseButton = document.getElementById("left-trim-decrease");
+
+const rightTrimIncreaseButton = document.getElementById("right-trim-increase");
+
+const rightTrimDecreaseButton = document.getElementById("right-trim-decrease");
+
+const motorsSaveButton = document.getElementById("motors-save");
+
+const motorsResetButton = document.getElementById("motors-reset");
+
+const motorsPreviewButton = document.getElementById("motors-preview");
+
+const motorsMessage = document.getElementById("motors-message");
+
+const grayscaleCaptureFloorButton = document.getElementById(
+    "grayscale-capture-floor",
 );
 
-const cameraResetButton = document.getElementById(
-    "camera-reset"
+const grayscaleCaptureLineButton = document.getElementById(
+    "grayscale-capture-line",
 );
 
-const cameraMessage = document.getElementById(
-    "camera-message"
-);
+const grayscaleSaveButton = document.getElementById("grayscale-save");
 
-const leftTrimIncreaseButton = document.getElementById(
-    "left-trim-increase"
-);
+const grayscaleResetButton = document.getElementById("grayscale-reset");
 
-const leftTrimDecreaseButton = document.getElementById(
-    "left-trim-decrease"
-);
+const grayscaleClearButton = document.getElementById("grayscale-clear");
 
-const rightTrimIncreaseButton = document.getElementById(
-    "right-trim-increase"
-);
-
-const rightTrimDecreaseButton = document.getElementById(
-    "right-trim-decrease"
-);
-
-const motorsSaveButton = document.getElementById(
-    "motors-save"
-);
-
-const motorsResetButton = document.getElementById(
-    "motors-reset"
-);
-
-const motorsPreviewButton = document.getElementById(
-    "motors-preview"
-);
-
-const motorsMessage = document.getElementById(
-    "motors-message"
-);
-
-const grayscaleCaptureFloorButton =
-    document.getElementById(
-        "grayscale-capture-floor"
-    );
-
-const grayscaleCaptureLineButton =
-    document.getElementById(
-        "grayscale-capture-line"
-    );
-
-const grayscaleSaveButton =
-    document.getElementById(
-        "grayscale-save"
-    );
-
-const grayscaleResetButton =
-    document.getElementById(
-        "grayscale-reset"
-    );
-
-const grayscaleClearButton =
-    document.getElementById(
-        "grayscale-clear"
-    );
-
-const grayscaleMessage =
-    document.getElementById(
-        "grayscale-message"
-    );
+const grayscaleMessage = document.getElementById("grayscale-message");
 
 const STEERING_STEP = 1;
 const STEERING_MIN = -30;
@@ -230,42 +138,25 @@ let grayscaleCalibratedValue = false;
 let steeringPreviewTimer = null;
 let cameraPreviewTimer = null;
 
+let hasLoadedOnce = false;
 
-function clamp(
-    value,
-    minimum,
-    maximum,
-) {
-    return Math.min(
-        maximum,
-        Math.max(
-            minimum,
-            value,
-        ),
-    );
+function clamp(value, minimum, maximum) {
+    return Math.min(maximum, Math.max(minimum, value));
 }
 
-
-function formatOffset(
-    value,
-) {
+function formatOffset(value) {
     const number = Number(value);
 
     if (!Number.isFinite(number)) {
         return "—";
     }
 
-    const prefix = number > 0
-        ? "+"
-        : "";
+    const prefix = number > 0 ? "+" : "";
 
     return `${prefix}${number.toFixed(1)}°`;
 }
 
-
-function formatTrim(
-    value,
-) {
+function formatTrim(value) {
     const number = Number(value);
 
     if (!Number.isFinite(number)) {
@@ -275,264 +166,174 @@ function formatTrim(
     return number.toFixed(2);
 }
 
-
-function setConnectionState(
-    state,
-    message,
-) {
-    connectionStatus.className = (
-        `connection-status status-${state}`
-    );
+function setConnectionState(state, message) {
+    connectionStatus.className = `connection-status status-${state}`;
 
     connectionStatus.textContent = message;
 }
 
-
-function setBadge(
-    element,
-    text,
-    tone,
-) {
-    element.className = (
-        tone === "neutral"
-            ? "status-badge"
-            : `status-badge status-${tone}`
-    );
+function setBadge(element, text, tone) {
+    element.className =
+        tone === "neutral" ? "status-badge" : `status-badge status-${tone}`;
 
     element.textContent = text;
 }
 
-
 function showLoading() {
-    loadingPanel.hidden = false;
-    contentPanel.hidden = true;
+    loadingPanel.hidden = hasLoadedOnce;
+    contentPanel.hidden = !hasLoadedOnce;
     errorPanel.hidden = true;
 
     refreshButton.disabled = true;
+    refreshButton.textContent = "Refreshing…";
 
-    setSteeringControlsDisabled(
-        true
-    );
-    setCameraControlsDisabled(
-        true
-    );
-    setMotorControlsDisabled(
-        true
-    );
-    setGrayscaleControlsDisabled(
-        true
-    );
+    setSteeringControlsDisabled(true);
+    setCameraControlsDisabled(true);
+    setMotorControlsDisabled(true);
+    setGrayscaleControlsDisabled(true);
 
-    setConnectionState(
-        "connecting",
-        "Loading…",
-    );
+    setConnectionState("connecting", "Updating…");
+
+    updatedTime.textContent = hasLoadedOnce
+        ? "Refreshing calibration…"
+        : "Loading calibration…";
 }
 
-function showTemporaryMessage(
-    element,
-    message,
-    stillCurrent,
-) {
+function showTemporaryMessage(element, message, stillCurrent) {
     element.textContent = message;
 
-    window.setTimeout(
-        () => {
-            if (stillCurrent()) {
-                element.textContent = "";
-            }
-        },
-        3000,
-    );
+    window.setTimeout(() => {
+        if (stillCurrent()) {
+            element.textContent = "";
+        }
+    }, 3000);
 }
 
-function showError(
-    message,
-) {
+function showError(message) {
     loadingPanel.hidden = true;
     contentPanel.hidden = true;
     errorPanel.hidden = false;
 
     refreshButton.disabled = false;
 
+    refreshButton.textContent = "Refresh";
+
     errorMessage.textContent = message;
 
-    setConnectionState(
-        "error",
-        "Unavailable",
-    );
+    setConnectionState("error", "Unavailable");
 
-    announcement.textContent = (
-        "Calibration could not be loaded."
-    );
+    announcement.textContent = "Calibration could not be loaded.";
 }
-
 
 function restorePreviewState() {
     restoreSavedSteering();
     restoreSavedCameraMount();
 }
 
-
 /* Steering */
 
-function renderSteering(
-    steering,
-) {
-    const offset = Number(
-        steering.offset
-    );
+function renderSteering(steering) {
+    const offset = Number(steering.offset);
 
-    const validOffset = Number.isFinite(
-        offset
-    )
-        ? offset
-        : 0;
+    const validOffset = Number.isFinite(offset) ? offset : 0;
 
     savedSteeringOffset = validOffset;
     steeringOffsetValue = validOffset;
 
     renderSteeringEditor();
 
-    const adjusted = (
-        validOffset !== 0
-    );
+    const adjusted = validOffset !== 0;
 
     setBadge(
         steeringStatus,
-        adjusted
-            ? "Adjusted"
-            : "Default",
-        adjusted
-            ? "healthy"
-            : "neutral",
+        adjusted ? "Adjusted" : "Default",
+        adjusted ? "healthy" : "neutral",
     );
 }
 
-
 function renderSteeringEditor() {
-    steeringOffset.textContent = formatOffset(
-        steeringOffsetValue
-    );
+    steeringOffset.textContent = formatOffset(steeringOffsetValue);
 
-    const changed = (
-        steeringOffsetValue
-        !== savedSteeringOffset
-    );
+    const changed = steeringOffsetValue !== savedSteeringOffset;
 
     steeringSaveButton.disabled = !changed;
     steeringResetButton.disabled = !changed;
 
-    steeringMessage.textContent = (
-        changed
-            ? "Unsaved steering changes."
-            : ""
-    );
+    steeringMessage.textContent = changed ? "Unsaved steering changes." : "";
 }
 
-
 async function previewSteering() {
-    const response = await fetch(
-        "/api/calibration/steering/preview",
-        {
-            method: "POST",
+    const response = await fetch("/api/calibration/steering/preview", {
+        method: "POST",
 
-            headers: {
-                "Content-Type":
-                    "application/json",
-                Accept:
-                    "application/json",
-            },
-
-            body: JSON.stringify({
-                offset:
-                    steeringOffsetValue,
-            }),
+        headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
         },
-    );
+
+        body: JSON.stringify({
+            offset: steeringOffsetValue,
+        }),
+    });
 
     let payload;
 
     try {
         payload = await response.json();
     } catch {
-        throw new Error(
-            "Steering API returned an "
-            + "invalid response."
-        );
+        throw new Error("Steering API returned an " + "invalid response.");
     }
 
     if (!response.ok) {
-        throw new Error(
-            payload.message
-            ?? "Unable to move steering."
-        );
+        throw new Error(payload.message ?? "Unable to move steering.");
     }
 }
 
 function scheduleSteeringPreview() {
     if (steeringPreviewTimer !== null) {
-        window.clearTimeout(
-            steeringPreviewTimer
-        );
+        window.clearTimeout(steeringPreviewTimer);
     }
 
-    steeringPreviewTimer = window.setTimeout(
-        async () => {
-            steeringPreviewTimer = null;
+    steeringPreviewTimer = window.setTimeout(async () => {
+        steeringPreviewTimer = null;
 
-            setSteeringControlsDisabled(
-                true
-            );
+        setSteeringControlsDisabled(true);
 
-            try {
-                await previewSteering();
-            } catch (error) {
-                steeringMessage.textContent = (
-                    error instanceof Error
-                        ? error.message
-                        : "Unable to move steering."
-                );
-            } finally {
-                setSteeringControlsDisabled(
-                    false
-                );
+        try {
+            await previewSteering();
+        } catch (error) {
+            steeringMessage.textContent =
+                error instanceof Error
+                    ? error.message
+                    : "Unable to move steering.";
+        } finally {
+            setSteeringControlsDisabled(false);
 
-                renderSteeringEditor();
-            }
-        },
-        75,
-    );
+            renderSteeringEditor();
+        }
+    }, 75);
 }
-
 
 async function saveSteering() {
     steeringSaveButton.disabled = true;
     steeringResetButton.disabled = true;
     refreshButton.disabled = true;
 
-    steeringMessage.textContent =
-        "Saving…";
+    steeringMessage.textContent = "Saving…";
 
     try {
-        const response = await fetch(
-            "/api/calibration/steering",
-            {
-                method: "PUT",
+        const response = await fetch("/api/calibration/steering", {
+            method: "PUT",
 
-                headers: {
-                    "Content-Type":
-                        "application/json",
-                    Accept:
-                        "application/json",
-                },
-
-                body: JSON.stringify({
-                    offset:
-                        steeringOffsetValue,
-                }),
+            headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
             },
-        );
+
+            body: JSON.stringify({
+                offset: steeringOffsetValue,
+            }),
+        });
 
         let payload;
 
@@ -540,100 +341,67 @@ async function saveSteering() {
             payload = await response.json();
         } catch {
             throw new Error(
-                "Calibration API returned an "
-                + "invalid response."
+                "Calibration API returned an " + "invalid response.",
             );
         }
 
         if (!response.ok) {
             throw new Error(
-                payload.message
-                ?? (
-                    "Unable to save steering "
-                    + "calibration."
-                )
+                payload.message ?? "Unable to save steering " + "calibration.",
             );
         }
 
-        renderCalibration(
-            payload
-        );
+        renderCalibration(payload);
 
         showTemporaryMessage(
             steeringMessage,
             "Steering calibration saved.",
-            () => (
-                steeringOffsetValue
-                === savedSteeringOffset
-            ),
+            () => steeringOffsetValue === savedSteeringOffset,
         );
 
-        announcement.textContent = (
-            "Steering calibration saved."
-        );
+        announcement.textContent = "Steering calibration saved.";
     } catch (error) {
         renderSteeringEditor();
 
-        steeringMessage.textContent = (
+        steeringMessage.textContent =
             error instanceof Error
                 ? error.message
-                : (
-                    "Unable to save steering "
-                    + "calibration."
-                )
-        );
+                : "Unable to save steering " + "calibration.";
     } finally {
         refreshButton.disabled = false;
     }
 }
 
-
 function restoreSavedSteering() {
     if (steeringPreviewTimer !== null) {
-        window.clearTimeout(
-            steeringPreviewTimer
-        );
+        window.clearTimeout(steeringPreviewTimer);
 
         steeringPreviewTimer = null;
     }
 
-    if (
-        steeringOffsetValue
-        === savedSteeringOffset
-    ) {
+    if (steeringOffsetValue === savedSteeringOffset) {
         return;
     }
 
-    fetch(
-        "/api/calibration/steering/preview",
-        {
-            method: "POST",
-            keepalive: true,
+    fetch("/api/calibration/steering/preview", {
+        method: "POST",
+        keepalive: true,
 
-            headers: {
-                "Content-Type":
-                    "application/json",
-                Accept:
-                    "application/json",
-            },
+        headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+        },
 
-            body: JSON.stringify({
-                offset:
-                    savedSteeringOffset,
-            }),
-        },
-    ).catch(
-        () => {
-            // The page is leaving, so there is
-            // nowhere useful to display an error.
-        },
-    );
+        body: JSON.stringify({
+            offset: savedSteeringOffset,
+        }),
+    }).catch(() => {
+        // The page is leaving, so there is
+        // nowhere useful to display an error.
+    });
 }
 
-
-function setSteeringControlsDisabled(
-    disabled,
-) {
+function setSteeringControlsDisabled(disabled) {
     steeringIncreaseButton.disabled = disabled;
     steeringDecreaseButton.disabled = disabled;
 
@@ -643,31 +411,16 @@ function setSteeringControlsDisabled(
     }
 }
 
-
 /* Motors */
 
-function renderMotors(
-    motors,
-) {
-    const left = Number(
-        motors.left_trim
-    );
+function renderMotors(motors) {
+    const left = Number(motors.left_trim);
 
-    const right = Number(
-        motors.right_trim
-    );
+    const right = Number(motors.right_trim);
 
-    const validLeft = Number.isFinite(
-        left
-    )
-        ? left
-        : 1;
+    const validLeft = Number.isFinite(left) ? left : 1;
 
-    const validRight = Number.isFinite(
-        right
-    )
-        ? right
-        : 1;
+    const validRight = Number.isFinite(right) ? right : 1;
 
     savedLeftTrim = validLeft;
     savedRightTrim = validRight;
@@ -677,112 +430,73 @@ function renderMotors(
 
     renderMotorEditor();
 
-    const adjusted = (
-        validLeft !== 1
-        || validRight !== 1
-    );
+    const adjusted = validLeft !== 1 || validRight !== 1;
 
     setBadge(
         motorsStatus,
-        adjusted
-            ? "Adjusted"
-            : "Default",
-        adjusted
-            ? "healthy"
-            : "neutral",
+        adjusted ? "Adjusted" : "Default",
+        adjusted ? "healthy" : "neutral",
     );
 }
 
-
 function renderMotorEditor() {
-    leftMotorTrim.textContent = formatTrim(
-        leftTrimValue
-    );
+    leftMotorTrim.textContent = formatTrim(leftTrimValue);
 
-    rightMotorTrim.textContent = formatTrim(
-        rightTrimValue
-    );
+    rightMotorTrim.textContent = formatTrim(rightTrimValue);
 
-    const changed = (
-        leftTrimValue !== savedLeftTrim
-        || rightTrimValue !== savedRightTrim
-    );
+    const changed =
+        leftTrimValue !== savedLeftTrim || rightTrimValue !== savedRightTrim;
 
     motorsSaveButton.disabled = !changed;
     motorsResetButton.disabled = !changed;
 
-    motorsMessage.textContent = (
-        changed
-            ? "Unsaved motor trim changes."
-            : ""
-    );
+    motorsMessage.textContent = changed ? "Unsaved motor trim changes." : "";
 }
 
-
 async function previewMotorTrim() {
-    const response = await fetch(
-        "/api/calibration/motors/preview",
-        {
-            method: "POST",
+    const response = await fetch("/api/calibration/motors/preview", {
+        method: "POST",
 
-            headers: {
-                "Content-Type":
-                    "application/json",
-                Accept:
-                    "application/json",
-            },
-
-            body: JSON.stringify({
-                left_trim:
-                    leftTrimValue,
-                right_trim:
-                    rightTrimValue,
-            }),
+        headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
         },
-    );
+
+        body: JSON.stringify({
+            left_trim: leftTrimValue,
+            right_trim: rightTrimValue,
+        }),
+    });
 
     let payload;
 
     try {
         payload = await response.json();
     } catch {
-        throw new Error(
-            "Motor trim API returned an "
-            + "invalid response."
-        );
+        throw new Error("Motor trim API returned an " + "invalid response.");
     }
 
     if (!response.ok) {
-        throw new Error(
-            payload.message
-            ?? "Unable to preview motor trim."
-        );
+        throw new Error(payload.message ?? "Unable to preview motor trim.");
     }
 }
 
-
 async function runMotorPreview() {
-    setMotorControlsDisabled(
-        true
-    );
+    setMotorControlsDisabled(true);
 
     refreshButton.disabled = true;
 
-    motorsMessage.textContent =
-        "Previewing motor trim…";
+    motorsMessage.textContent = "Previewing motor trim…";
 
     try {
         await previewMotorTrim();
     } catch (error) {
-        motorsMessage.textContent = (
+        motorsMessage.textContent =
             error instanceof Error
                 ? error.message
-                : "Unable to preview motor trim."
-        );
+                : "Unable to preview motor trim.";
     } finally {
-        setMotorControlsDisabled(
-            false
-        );
+        setMotorControlsDisabled(false);
 
         refreshButton.disabled = false;
 
@@ -790,36 +504,27 @@ async function runMotorPreview() {
     }
 }
 
-
 async function saveMotors() {
     motorsSaveButton.disabled = true;
     motorsResetButton.disabled = true;
     refreshButton.disabled = true;
 
-    motorsMessage.textContent =
-        "Saving…";
+    motorsMessage.textContent = "Saving…";
 
     try {
-        const response = await fetch(
-            "/api/calibration/motors",
-            {
-                method: "PUT",
+        const response = await fetch("/api/calibration/motors", {
+            method: "PUT",
 
-                headers: {
-                    "Content-Type":
-                        "application/json",
-                    Accept:
-                        "application/json",
-                },
-
-                body: JSON.stringify({
-                    left_trim:
-                        leftTrimValue,
-                    right_trim:
-                        rightTrimValue,
-                }),
+            headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
             },
-        );
+
+            body: JSON.stringify({
+                left_trim: leftTrimValue,
+                right_trim: rightTrimValue,
+            }),
+        });
 
         let payload;
 
@@ -827,57 +532,41 @@ async function saveMotors() {
             payload = await response.json();
         } catch {
             throw new Error(
-                "Calibration API returned an "
-                + "invalid response."
+                "Calibration API returned an " + "invalid response.",
             );
         }
 
         if (!response.ok) {
             throw new Error(
-                payload.message
-                ?? (
-                    "Unable to save motor trim "
-                    + "calibration."
-                )
+                payload.message ??
+                    "Unable to save motor trim " + "calibration.",
             );
         }
 
-        renderCalibration(
-            payload
-        );
+        renderCalibration(payload);
 
         showTemporaryMessage(
             motorsMessage,
             "Motor trim calibration saved.",
-            () => (
-                leftTrimValue === savedLeftTrim
-                && rightTrimValue === savedRightTrim
-            ),
+            () =>
+                leftTrimValue === savedLeftTrim &&
+                rightTrimValue === savedRightTrim,
         );
 
-        announcement.textContent = (
-            "Motor trim calibration saved."
-        );
+        announcement.textContent = "Motor trim calibration saved.";
     } catch (error) {
         renderMotorEditor();
 
-        motorsMessage.textContent = (
+        motorsMessage.textContent =
             error instanceof Error
                 ? error.message
-                : (
-                    "Unable to save motor trim "
-                    + "calibration."
-                )
-        );
+                : "Unable to save motor trim " + "calibration.";
     } finally {
         refreshButton.disabled = false;
     }
 }
 
-
-function setMotorControlsDisabled(
-    disabled,
-) {
+function setMotorControlsDisabled(disabled) {
     leftTrimIncreaseButton.disabled = disabled;
     leftTrimDecreaseButton.disabled = disabled;
     rightTrimIncreaseButton.disabled = disabled;
@@ -890,31 +579,16 @@ function setMotorControlsDisabled(
     }
 }
 
-
 /* Camera */
 
-function renderCameraMount(
-    cameraMount,
-) {
-    const panOffset = Number(
-        cameraMount.pan_offset
-    );
+function renderCameraMount(cameraMount) {
+    const panOffset = Number(cameraMount.pan_offset);
 
-    const tiltOffset = Number(
-        cameraMount.tilt_offset
-    );
+    const tiltOffset = Number(cameraMount.tilt_offset);
 
-    const validPanOffset = Number.isFinite(
-        panOffset
-    )
-        ? panOffset
-        : 0;
+    const validPanOffset = Number.isFinite(panOffset) ? panOffset : 0;
 
-    const validTiltOffset = Number.isFinite(
-        tiltOffset
-    )
-        ? tiltOffset
-        : 0;
+    const validTiltOffset = Number.isFinite(tiltOffset) ? tiltOffset : 0;
 
     savedCameraPanOffset = validPanOffset;
     savedCameraTiltOffset = validTiltOffset;
@@ -924,159 +598,106 @@ function renderCameraMount(
 
     renderCameraMountEditor();
 
-    const adjusted = (
-        validPanOffset !== 0
-        || validTiltOffset !== 0
-    );
+    const adjusted = validPanOffset !== 0 || validTiltOffset !== 0;
 
     setBadge(
         cameraStatus,
-        adjusted
-            ? "Adjusted"
-            : "Default",
-        adjusted
-            ? "healthy"
-            : "neutral",
+        adjusted ? "Adjusted" : "Default",
+        adjusted ? "healthy" : "neutral",
     );
 }
 
-
 function renderCameraMountEditor() {
-    cameraPanOffset.textContent = formatOffset(
-        cameraPanOffsetValue
-    );
+    cameraPanOffset.textContent = formatOffset(cameraPanOffsetValue);
 
-    cameraTiltOffset.textContent = formatOffset(
-        cameraTiltOffsetValue
-    );
+    cameraTiltOffset.textContent = formatOffset(cameraTiltOffsetValue);
 
-    const changed = (
-        cameraPanOffsetValue
-            !== savedCameraPanOffset
-        || cameraTiltOffsetValue
-            !== savedCameraTiltOffset
-    );
+    const changed =
+        cameraPanOffsetValue !== savedCameraPanOffset ||
+        cameraTiltOffsetValue !== savedCameraTiltOffset;
 
     cameraSaveButton.disabled = !changed;
     cameraResetButton.disabled = !changed;
 
-    cameraMessage.textContent = (
-        changed
-            ? "Unsaved camera mount changes."
-            : ""
-    );
+    cameraMessage.textContent = changed ? "Unsaved camera mount changes." : "";
 }
 
-
 async function previewCameraMount() {
-    const response = await fetch(
-        "/api/calibration/camera-mount/preview",
-        {
-            method: "POST",
+    const response = await fetch("/api/calibration/camera-mount/preview", {
+        method: "POST",
 
-            headers: {
-                "Content-Type":
-                    "application/json",
-                Accept:
-                    "application/json",
-            },
-
-            body: JSON.stringify({
-                pan_offset:
-                    cameraPanOffsetValue,
-
-                tilt_offset:
-                    cameraTiltOffsetValue,
-            }),
+        headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
         },
-    );
+
+        body: JSON.stringify({
+            pan_offset: cameraPanOffsetValue,
+
+            tilt_offset: cameraTiltOffsetValue,
+        }),
+    });
 
     let payload;
 
     try {
         payload = await response.json();
     } catch {
-        throw new Error(
-            "Camera mount API returned an "
-            + "invalid response."
-        );
+        throw new Error("Camera mount API returned an " + "invalid response.");
     }
 
     if (!response.ok) {
-        throw new Error(
-            payload.message
-            ?? "Unable to move camera."
-        );
+        throw new Error(payload.message ?? "Unable to move camera.");
     }
 }
-
 
 function scheduleCameraPreview() {
     if (cameraPreviewTimer !== null) {
-        window.clearTimeout(
-            cameraPreviewTimer
-        );
+        window.clearTimeout(cameraPreviewTimer);
     }
 
-    cameraPreviewTimer = window.setTimeout(
-        async () => {
-            cameraPreviewTimer = null;
+    cameraPreviewTimer = window.setTimeout(async () => {
+        cameraPreviewTimer = null;
 
-            setCameraControlsDisabled(
-                true
-            );
+        setCameraControlsDisabled(true);
 
-            try {
-                await previewCameraMount();
-            } catch (error) {
-                cameraMessage.textContent = (
-                    error instanceof Error
-                        ? error.message
-                        : "Unable to move camera."
-                );
-            } finally {
-                setCameraControlsDisabled(
-                    false
-                );
+        try {
+            await previewCameraMount();
+        } catch (error) {
+            cameraMessage.textContent =
+                error instanceof Error
+                    ? error.message
+                    : "Unable to move camera.";
+        } finally {
+            setCameraControlsDisabled(false);
 
-                renderCameraMountEditor();
-            }
-        },
-        75,
-    );
+            renderCameraMountEditor();
+        }
+    }, 75);
 }
-
 
 async function saveCameraMount() {
     cameraSaveButton.disabled = true;
     cameraResetButton.disabled = true;
     refreshButton.disabled = true;
 
-    cameraMessage.textContent =
-        "Saving…";
+    cameraMessage.textContent = "Saving…";
 
     try {
-        const response = await fetch(
-            "/api/calibration/camera-mount",
-            {
-                method: "PUT",
+        const response = await fetch("/api/calibration/camera-mount", {
+            method: "PUT",
 
-                headers: {
-                    "Content-Type":
-                        "application/json",
-                    Accept:
-                        "application/json",
-                },
-
-                body: JSON.stringify({
-                    pan_offset:
-                        cameraPanOffsetValue,
-
-                    tilt_offset:
-                        cameraTiltOffsetValue,
-                }),
+            headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
             },
-        );
+
+            body: JSON.stringify({
+                pan_offset: cameraPanOffsetValue,
+
+                tilt_offset: cameraTiltOffsetValue,
+            }),
+        });
 
         let payload;
 
@@ -1084,111 +705,78 @@ async function saveCameraMount() {
             payload = await response.json();
         } catch {
             throw new Error(
-                "Calibration API returned an "
-                + "invalid response."
+                "Calibration API returned an " + "invalid response.",
             );
         }
 
         if (!response.ok) {
             throw new Error(
-                payload.message
-                ?? (
-                    "Unable to save camera mount "
-                    + "calibration."
-                )
+                payload.message ??
+                    "Unable to save camera mount " + "calibration.",
             );
         }
 
-        renderCalibration(
-            payload
-        );
+        renderCalibration(payload);
 
         showTemporaryMessage(
             cameraMessage,
             "Camera mount calibration saved.",
-            () => (
-                cameraPanOffsetValue
-                    === savedCameraPanOffset
-                && cameraTiltOffsetValue
-                    === savedCameraTiltOffset
-            ),
+            () =>
+                cameraPanOffsetValue === savedCameraPanOffset &&
+                cameraTiltOffsetValue === savedCameraTiltOffset,
         );
 
-        announcement.textContent = (
-            "Camera mount calibration saved."
-        );
+        announcement.textContent = "Camera mount calibration saved.";
     } catch (error) {
         renderCameraMountEditor();
 
-        cameraMessage.textContent = (
+        cameraMessage.textContent =
             error instanceof Error
                 ? error.message
-                : (
-                    "Unable to save camera mount "
-                    + "calibration."
-                )
-        );
+                : "Unable to save camera mount " + "calibration.";
     } finally {
         refreshButton.disabled = false;
     }
 }
 
-
 function restoreSavedCameraMount() {
     if (cameraPreviewTimer !== null) {
-        window.clearTimeout(
-            cameraPreviewTimer
-        );
+        window.clearTimeout(cameraPreviewTimer);
 
         cameraPreviewTimer = null;
     }
 
     if (
-        cameraPanOffsetValue
-            === savedCameraPanOffset
-        && cameraTiltOffsetValue
-            === savedCameraTiltOffset
+        cameraPanOffsetValue === savedCameraPanOffset &&
+        cameraTiltOffsetValue === savedCameraTiltOffset
     ) {
         return;
     }
 
-    fetch(
-        "/api/calibration/camera-mount/preview",
-        {
-            method: "POST",
-            keepalive: true,
+    fetch("/api/calibration/camera-mount/preview", {
+        method: "POST",
+        keepalive: true,
 
-            headers: {
-                "Content-Type":
-                    "application/json",
-            },
-
-            body: JSON.stringify({
-                pan_offset:
-                    savedCameraPanOffset,
-
-                tilt_offset:
-                    savedCameraTiltOffset,
-            }),
+        headers: {
+            "Content-Type": "application/json",
         },
-    ).catch(() => {});
+
+        body: JSON.stringify({
+            pan_offset: savedCameraPanOffset,
+
+            tilt_offset: savedCameraTiltOffset,
+        }),
+    }).catch(() => {});
 }
 
+function setCameraControlsDisabled(disabled) {
+    cameraPanIncreaseButton.disabled = disabled;
 
-function setCameraControlsDisabled(
-    disabled,
-) {
-    cameraPanIncreaseButton.disabled =
-        disabled;
+    cameraPanDecreaseButton.disabled = disabled;
 
-    cameraPanDecreaseButton.disabled =
-        disabled;
+    cameraTiltIncreaseButton.disabled = disabled;
 
-    cameraTiltIncreaseButton.disabled =
-        disabled;
-
-    cameraTiltDecreaseButton.disabled =
-        disabled;
+    cameraTiltDecreaseButton.disabled = disabled;
 
     if (disabled) {
         cameraSaveButton.disabled = true;
@@ -1196,319 +784,188 @@ function setCameraControlsDisabled(
     }
 }
 
-
 /* Grayscale */
 
-function renderSensorValues(
-    element,
-    values,
-) {
-    const validValues = copySensorValues(
-        values
-    );
+function renderSensorValues(element, values) {
+    const validValues = copySensorValues(values);
 
     element.replaceChildren();
 
-    const displayedValues = (
-        validValues
-        ?? [null, null, null]
-    );
+    const displayedValues = validValues ?? [null, null, null];
 
     for (const value of displayedValues) {
-        const item = document.createElement(
-            "span"
-        );
+        const item = document.createElement("span");
 
-        item.textContent = (
+        item.textContent =
             value === null
                 ? "—"
-                : (
-                    Number.isInteger(value)
-                        ? String(value)
-                        : value.toFixed(1)
-                )
-        );
+                : Number.isInteger(value)
+                  ? String(value)
+                  : value.toFixed(1);
 
-        element.appendChild(
-            item
-        );
+        element.appendChild(item);
     }
 }
 
-
-function copySensorValues(
-    values,
-) {
-    if (
-        !Array.isArray(values)
-        || values.length !== 3
-    ) {
+function copySensorValues(values) {
+    if (!Array.isArray(values) || values.length !== 3) {
         return null;
     }
 
-    const numbers = values.map(
-        (value) => Number(value)
-    );
+    const numbers = values.map((value) => Number(value));
 
-    return numbers.every(
-        Number.isFinite
-    )
-        ? numbers
-        : null;
+    return numbers.every(Number.isFinite) ? numbers : null;
 }
 
-
-function sensorValuesEqual(
-    first,
-    second,
-) {
-    if (
-        first === null
-        || second === null
-    ) {
+function sensorValuesEqual(first, second) {
+    if (first === null || second === null) {
         return first === second;
     }
 
-    return first.every(
-        (value, index) => (
-            value === second[index]
-        )
-    );
+    return first.every((value, index) => value === second[index]);
 }
 
+function renderGrayscale(grayscale) {
+    grayscaleCalibratedValue = Boolean(grayscale.calibrated);
 
-function renderGrayscale(
-    grayscale,
-) {
-    grayscaleCalibratedValue = Boolean(
-        grayscale.calibrated
-    );
+    savedGrayscaleFloor = grayscaleCalibratedValue
+        ? copySensorValues(grayscale.floor)
+        : null;
 
-    savedGrayscaleFloor = (
-        grayscaleCalibratedValue
-            ? copySensorValues(
-                grayscale.floor
-            )
-            : null
-    );
+    savedGrayscaleLine = grayscaleCalibratedValue
+        ? copySensorValues(grayscale.line)
+        : null;
 
-    savedGrayscaleLine = (
-        grayscaleCalibratedValue
-            ? copySensorValues(
-                grayscale.line
-            )
-            : null
-    );
+    grayscaleFloorValue =
+        savedGrayscaleFloor === null ? null : [...savedGrayscaleFloor];
 
-    grayscaleFloorValue = (
-        savedGrayscaleFloor === null
-            ? null
-            : [...savedGrayscaleFloor]
-    );
-
-    grayscaleLineValue = (
-        savedGrayscaleLine === null
-            ? null
-            : [...savedGrayscaleLine]
-    );
+    grayscaleLineValue =
+        savedGrayscaleLine === null ? null : [...savedGrayscaleLine];
 
     renderGrayscaleEditor();
 
     setBadge(
         grayscaleStatus,
-        grayscaleCalibratedValue
-            ? "Calibrated"
-            : "Not Calibrated",
-        grayscaleCalibratedValue
-            ? "healthy"
-            : "warning",
+        grayscaleCalibratedValue ? "Calibrated" : "Not Calibrated",
+        grayscaleCalibratedValue ? "healthy" : "warning",
     );
 }
 
 function renderGrayscaleEditor() {
-    renderSensorValues(
-        grayscaleFloor,
-        grayscaleFloorValue
-    );
+    renderSensorValues(grayscaleFloor, grayscaleFloorValue);
 
-    renderSensorValues(
-        grayscaleLine,
-        grayscaleLineValue
-    );
+    renderSensorValues(grayscaleLine, grayscaleLineValue);
 
-    const complete = (
-        grayscaleFloorValue !== null
-        && grayscaleLineValue !== null
-    );
+    const complete =
+        grayscaleFloorValue !== null && grayscaleLineValue !== null;
 
-    const changed = (
-        !sensorValuesEqual(
-            grayscaleFloorValue,
-            savedGrayscaleFloor,
-        )
-        || !sensorValuesEqual(
-            grayscaleLineValue,
-            savedGrayscaleLine,
-        )
-    );
+    const changed =
+        !sensorValuesEqual(grayscaleFloorValue, savedGrayscaleFloor) ||
+        !sensorValuesEqual(grayscaleLineValue, savedGrayscaleLine);
 
-    grayscaleSaveButton.disabled = (
-        !complete
-        || !changed
-    );
+    grayscaleSaveButton.disabled = !complete || !changed;
 
     grayscaleResetButton.disabled = !changed;
 
-    grayscaleClearButton.disabled = (
-        !grayscaleCalibratedValue
-    );
+    grayscaleClearButton.disabled = !grayscaleCalibratedValue;
 
-    grayscaleMessage.textContent = (
-        changed
-            ? (
-                complete
-                    ? "Unsaved line sensor calibration."
-                    : "Capture both surfaces before saving."
-            )
-            : ""
-    );
+    grayscaleMessage.textContent = changed
+        ? complete
+            ? "Unsaved line sensor calibration."
+            : "Capture both surfaces before saving."
+        : "";
 }
 
-
 async function sampleGrayscale() {
-    const response = await fetch(
-        "/api/calibration/grayscale/sample",
-        {
-            headers: {
-                Accept: "application/json",
-            },
-            cache: "no-store",
+    const response = await fetch("/api/calibration/grayscale/sample", {
+        headers: {
+            Accept: "application/json",
         },
-    );
+        cache: "no-store",
+    });
 
     let payload;
 
     try {
         payload = await response.json();
     } catch {
-        throw new Error(
-            "Line sensor API returned an "
-            + "invalid response."
-        );
+        throw new Error("Line sensor API returned an " + "invalid response.");
     }
 
     if (!response.ok) {
-        throw new Error(
-            payload.message
-            || "Unable to read the line sensor."
-        );
+        throw new Error(payload.message || "Unable to read the line sensor.");
     }
 
-    const values = copySensorValues(
-        payload.values
-    );
+    const values = copySensorValues(payload.values);
 
     if (values === null) {
-        throw new Error(
-            "Line sensor returned invalid readings."
-        );
+        throw new Error("Line sensor returned invalid readings.");
     }
 
     return values;
 }
 
 async function captureGrayscaleFloor() {
-    setGrayscaleControlsDisabled(
-        true
-    );
+    setGrayscaleControlsDisabled(true);
 
     refreshButton.disabled = true;
 
-    grayscaleMessage.textContent = (
-        "Reading floor surface…"
-    );
+    grayscaleMessage.textContent = "Reading floor surface…";
 
     try {
-        grayscaleFloorValue =
-            await sampleGrayscale();
+        grayscaleFloorValue = await sampleGrayscale();
 
         renderGrayscaleEditor();
 
-        grayscaleMessage.textContent = (
-            "Floor reference captured."
-        );
+        grayscaleMessage.textContent = "Floor reference captured.";
 
-        announcement.textContent = (
-            "Floor reference captured."
-        );
+        announcement.textContent = "Floor reference captured.";
     } catch (error) {
         renderGrayscaleEditor();
 
-        grayscaleMessage.textContent = (
+        grayscaleMessage.textContent =
             error instanceof Error
                 ? error.message
-                : "Unable to capture floor reference."
-        );
+                : "Unable to capture floor reference.";
     } finally {
-        setGrayscaleControlsDisabled(
-            false
-        );
+        setGrayscaleControlsDisabled(false);
 
         refreshButton.disabled = false;
     }
 }
-
 
 async function captureGrayscaleLine() {
-    setGrayscaleControlsDisabled(
-        true
-    );
+    setGrayscaleControlsDisabled(true);
 
     refreshButton.disabled = true;
 
-    grayscaleMessage.textContent = (
-        "Reading line surface…"
-    );
+    grayscaleMessage.textContent = "Reading line surface…";
 
     try {
-        grayscaleLineValue =
-            await sampleGrayscale();
+        grayscaleLineValue = await sampleGrayscale();
 
         renderGrayscaleEditor();
 
-        grayscaleMessage.textContent = (
-            "Line reference captured."
-        );
+        grayscaleMessage.textContent = "Line reference captured.";
 
-        announcement.textContent = (
-            "Line reference captured."
-        );
+        announcement.textContent = "Line reference captured.";
     } catch (error) {
         renderGrayscaleEditor();
 
-        grayscaleMessage.textContent = (
+        grayscaleMessage.textContent =
             error instanceof Error
                 ? error.message
-                : "Unable to capture line reference."
-        );
+                : "Unable to capture line reference.";
     } finally {
-        setGrayscaleControlsDisabled(
-            false
-        );
+        setGrayscaleControlsDisabled(false);
 
         refreshButton.disabled = false;
     }
 }
 
-
 async function saveGrayscale() {
-    if (
-        grayscaleFloorValue === null
-        || grayscaleLineValue === null
-    ) {
-        grayscaleMessage.textContent = (
-            "Capture both surfaces before saving."
-        );
+    if (grayscaleFloorValue === null || grayscaleLineValue === null) {
+        grayscaleMessage.textContent = "Capture both surfaces before saving.";
 
         return;
     }
@@ -1517,29 +974,22 @@ async function saveGrayscale() {
     grayscaleResetButton.disabled = true;
     refreshButton.disabled = true;
 
-    grayscaleMessage.textContent = (
-        "Saving line sensor calibration…"
-    );
+    grayscaleMessage.textContent = "Saving line sensor calibration…";
 
     try {
-        const response = await fetch(
-            "/api/calibration/grayscale",
-            {
-                method: "PUT",
+        const response = await fetch("/api/calibration/grayscale", {
+            method: "PUT",
 
-                headers: {
-                    "Content-Type":
-                        "application/json",
-                    Accept:
-                        "application/json",
-                },
-
-                body: JSON.stringify({
-                    floor: grayscaleFloorValue,
-                    line: grayscaleLineValue,
-                }),
+            headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
             },
-        );
+
+            body: JSON.stringify({
+                floor: grayscaleFloorValue,
+                line: grayscaleLineValue,
+            }),
+        });
 
         let payload;
 
@@ -1547,80 +997,54 @@ async function saveGrayscale() {
             payload = await response.json();
         } catch {
             throw new Error(
-                "Calibration API returned an "
-                + "invalid response."
+                "Calibration API returned an " + "invalid response.",
             );
         }
 
         if (!response.ok) {
             throw new Error(
-                payload.message
-                || (
-                    "Unable to save line "
-                    + "sensor calibration."
-                )
+                payload.message ||
+                    "Unable to save line " + "sensor calibration.",
             );
         }
 
-        renderCalibration(
-            payload
-        );
+        renderCalibration(payload);
 
         showTemporaryMessage(
             grayscaleMessage,
             "Line sensor calibration saved.",
-            () => (
-                sensorValuesEqual(
-                    grayscaleFloorValue,
-                    savedGrayscaleFloor,
-                )
-                && sensorValuesEqual(
-                    grayscaleLineValue,
-                    savedGrayscaleLine,
-                )
-            ),
+            () =>
+                sensorValuesEqual(grayscaleFloorValue, savedGrayscaleFloor) &&
+                sensorValuesEqual(grayscaleLineValue, savedGrayscaleLine),
         );
 
-        announcement.textContent = (
-            "Line sensor calibration saved."
-        );
+        announcement.textContent = "Line sensor calibration saved.";
     } catch (error) {
         renderGrayscaleEditor();
 
-        grayscaleMessage.textContent = (
+        grayscaleMessage.textContent =
             error instanceof Error
                 ? error.message
-                : (
-                    "Unable to save line "
-                    + "sensor calibration."
-                )
-        );
+                : "Unable to save line " + "sensor calibration.";
     } finally {
         refreshButton.disabled = false;
     }
 }
-
 
 async function clearGrayscale() {
     grayscaleClearButton.disabled = true;
     refreshButton.disabled = true;
 
-    grayscaleMessage.textContent = (
-        "Clearing line sensor calibration…"
-    );
+    grayscaleMessage.textContent = "Clearing line sensor calibration…";
 
     try {
-        const response = await fetch(
-            "/api/calibration/grayscale/clear",
-            {
-                method: "POST",
+        const response = await fetch("/api/calibration/grayscale/clear", {
+            method: "POST",
 
-                headers: {
-                    Accept:
-                        "application/json",
-                },
+            headers: {
+                Accept: "application/json",
             },
-        );
+        });
 
         let payload;
 
@@ -1628,61 +1052,42 @@ async function clearGrayscale() {
             payload = await response.json();
         } catch {
             throw new Error(
-                "Calibration API returned an "
-                + "invalid response."
+                "Calibration API returned an " + "invalid response.",
             );
         }
 
         if (!response.ok) {
             throw new Error(
-                payload.message
-                || (
-                    "Unable to clear line "
-                    + "sensor calibration."
-                )
+                payload.message ||
+                    "Unable to clear line " + "sensor calibration.",
             );
         }
 
-        renderCalibration(
-            payload
-        );
+        renderCalibration(payload);
 
         showTemporaryMessage(
             grayscaleMessage,
             "Line sensor calibration cleared.",
-            () => (
-                !grayscaleCalibratedValue
-            ),
+            () => !grayscaleCalibratedValue,
         );
 
-        announcement.textContent = (
-            "Line sensor calibration cleared."
-        );
+        announcement.textContent = "Line sensor calibration cleared.";
     } catch (error) {
         renderGrayscaleEditor();
 
-        grayscaleMessage.textContent = (
+        grayscaleMessage.textContent =
             error instanceof Error
                 ? error.message
-                : (
-                    "Unable to clear line "
-                    + "sensor calibration."
-                )
-        );
+                : "Unable to clear line " + "sensor calibration.";
     } finally {
         refreshButton.disabled = false;
     }
 }
 
+function setGrayscaleControlsDisabled(disabled) {
+    grayscaleCaptureFloorButton.disabled = disabled;
 
-function setGrayscaleControlsDisabled(
-    disabled,
-) {
-    grayscaleCaptureFloorButton.disabled =
-        disabled;
-
-    grayscaleCaptureLineButton.disabled =
-        disabled;
+    grayscaleCaptureLineButton.disabled = disabled;
 
     if (disabled) {
         grayscaleSaveButton.disabled = true;
@@ -1691,72 +1096,41 @@ function setGrayscaleControlsDisabled(
     }
 }
 
-
-function renderMetadata(
-    payload,
-) {
-    const saved = Boolean(
-        payload.saved
-    );
+function renderMetadata(payload) {
+    const saved = Boolean(payload.saved);
 
     setBadge(
         sourceBadge,
-        saved
-            ? "Saved Calibration"
-            : "Factory Defaults",
-        saved
-            ? "healthy"
-            : "neutral",
+        saved ? "Saved Calibration" : "Factory Defaults",
+        saved ? "healthy" : "neutral",
     );
 
     const now = new Date();
 
-    updatedTime.textContent = (
-        `Updated ${now.toLocaleTimeString([], {
-            hour: "numeric",
-            minute: "2-digit",
-        })}`
-    );
+    updatedTime.textContent = `Last updated ${now.toLocaleTimeString([], {
+        hour: "numeric",
+        minute: "2-digit",
+    })}`;
 }
 
-
-function renderCalibration(
-    payload,
-) {
+function renderCalibration(payload) {
     const calibration = payload.calibration;
 
-    if (
-        !calibration
-        || typeof calibration !== "object"
-    ) {
-        throw new Error(
-            "Calibration API returned invalid data."
-        );
+    if (!calibration || typeof calibration !== "object") {
+        throw new Error("Calibration API returned invalid data.");
     }
 
-    renderSteering(
-        calibration.steering
-        ?? {}
-    );
+    renderSteering(calibration.steering ?? {});
 
-    renderCameraMount(
-        calibration.camera_mount
-        ?? {}
-    );
+    renderCameraMount(calibration.camera_mount ?? {});
 
-    renderMotors(
-        calibration.motors
-        ?? {}
-    );
+    renderMotors(calibration.motors ?? {});
 
-    renderGrayscale(
-        calibration.grayscale
-        ?? {}
-    );
+    renderGrayscale(calibration.grayscale ?? {});
 
-    renderMetadata(
-        payload
-    );
+    renderMetadata(payload);
+
+    hasLoadedOnce = true;
 
     loadingPanel.hidden = true;
     errorPanel.hidden = true;
@@ -1764,30 +1138,19 @@ function renderCalibration(
 
     refreshButton.disabled = false;
 
-    setConnectionState(
-        "connected",
-        "Loaded",
-    );
+    refreshButton.textContent = "Refresh";
 
-    announcement.textContent = (
-        "Calibration loaded."
-    );
+    setConnectionState("connected", "Connected");
 
-    setSteeringControlsDisabled(
-        false
-    );
+    announcement.textContent = "Calibration loaded.";
 
-    setCameraControlsDisabled(
-        false
-    );
+    setSteeringControlsDisabled(false);
 
-    setMotorControlsDisabled(
-        false
-    );
+    setCameraControlsDisabled(false);
 
-    setGrayscaleControlsDisabled(
-        false
-    );
+    setMotorControlsDisabled(false);
+
+    setGrayscaleControlsDisabled(false);
 
     renderGrayscaleEditor();
 
@@ -1798,332 +1161,204 @@ function renderCalibration(
     renderSteeringEditor();
 }
 
-
 async function loadCalibration() {
     showLoading();
 
     try {
-        const response = await fetch(
-            "/api/calibration",
-            {
-                headers: {
-                    Accept: "application/json",
-                },
-                cache: "no-store",
+        const response = await fetch("/api/calibration", {
+            headers: {
+                Accept: "application/json",
             },
-        );
+            cache: "no-store",
+        });
 
         let payload;
 
         try {
             payload = await response.json();
         } catch {
-            throw new Error(
-                "Calibration API returned an invalid response."
-            );
+            throw new Error("Calibration API returned an invalid response.");
         }
 
         if (!response.ok) {
-            throw new Error(
-                payload.message
-                || "Unable to load calibration."
-            );
+            throw new Error(payload.message || "Unable to load calibration.");
         }
 
-        renderCalibration(
-            payload
-        );
+        renderCalibration(payload);
     } catch (error) {
         showError(
             error instanceof Error
                 ? error.message
-                : "Unable to load calibration."
+                : "Unable to load calibration.",
         );
     }
 }
 
+refreshButton.addEventListener("click", loadCalibration);
 
-refreshButton.addEventListener(
-    "click",
-    loadCalibration,
-);
+retryButton.addEventListener("click", loadCalibration);
 
-retryButton.addEventListener(
-    "click",
-    loadCalibration,
-);
+steeringIncreaseButton.addEventListener("click", () => {
+    steeringOffsetValue = clamp(
+        steeringOffsetValue + STEERING_STEP,
+        STEERING_MIN,
+        STEERING_MAX,
+    );
 
-steeringIncreaseButton.addEventListener(
-    "click",
-    () => {
-        steeringOffsetValue = clamp(
-            steeringOffsetValue
-                + STEERING_STEP,
-            STEERING_MIN,
-            STEERING_MAX,
-        );
+    renderSteeringEditor();
+    scheduleSteeringPreview();
+});
 
-        renderSteeringEditor();
-        scheduleSteeringPreview();
-    },
-);
+steeringDecreaseButton.addEventListener("click", () => {
+    steeringOffsetValue = clamp(
+        steeringOffsetValue - STEERING_STEP,
+        STEERING_MIN,
+        STEERING_MAX,
+    );
 
-steeringDecreaseButton.addEventListener(
-    "click",
-    () => {
-        steeringOffsetValue = clamp(
-            steeringOffsetValue
-                - STEERING_STEP,
-            STEERING_MIN,
-            STEERING_MAX,
-        );
+    renderSteeringEditor();
+    scheduleSteeringPreview();
+});
 
-        renderSteeringEditor();
-        scheduleSteeringPreview();
-    },
-);
+steeringResetButton.addEventListener("click", () => {
+    steeringOffsetValue = savedSteeringOffset;
 
-steeringResetButton.addEventListener(
-    "click",
-    () => {
-        steeringOffsetValue =
-            savedSteeringOffset;
+    renderSteeringEditor();
+    scheduleSteeringPreview();
+});
 
-        renderSteeringEditor();
-        scheduleSteeringPreview();
+steeringSaveButton.addEventListener("click", saveSteering);
 
-    },
-);
+cameraPanIncreaseButton.addEventListener("click", () => {
+    cameraPanOffsetValue = clamp(
+        cameraPanOffsetValue + CAMERA_OFFSET_STEP,
+        CAMERA_OFFSET_MIN,
+        CAMERA_OFFSET_MAX,
+    );
 
-steeringSaveButton.addEventListener(
-    "click",
-    saveSteering,
-);
+    renderCameraMountEditor();
+    scheduleCameraPreview();
+});
 
-cameraPanIncreaseButton.addEventListener(
-    "click",
-    () => {
-        cameraPanOffsetValue = clamp(
-            cameraPanOffsetValue
-                + CAMERA_OFFSET_STEP,
-            CAMERA_OFFSET_MIN,
-            CAMERA_OFFSET_MAX,
-        );
+cameraPanDecreaseButton.addEventListener("click", () => {
+    cameraPanOffsetValue = clamp(
+        cameraPanOffsetValue - CAMERA_OFFSET_STEP,
+        CAMERA_OFFSET_MIN,
+        CAMERA_OFFSET_MAX,
+    );
 
-        renderCameraMountEditor();
-        scheduleCameraPreview();
-    },
-);
+    renderCameraMountEditor();
+    scheduleCameraPreview();
+});
 
-cameraPanDecreaseButton.addEventListener(
-    "click",
-    () => {
-        cameraPanOffsetValue = clamp(
-            cameraPanOffsetValue
-                - CAMERA_OFFSET_STEP,
-            CAMERA_OFFSET_MIN,
-            CAMERA_OFFSET_MAX,
-        );
+cameraTiltIncreaseButton.addEventListener("click", () => {
+    cameraTiltOffsetValue = clamp(
+        cameraTiltOffsetValue + CAMERA_OFFSET_STEP,
+        CAMERA_OFFSET_MIN,
+        CAMERA_OFFSET_MAX,
+    );
 
-        renderCameraMountEditor();
-        scheduleCameraPreview();
-    },
-);
+    renderCameraMountEditor();
+    scheduleCameraPreview();
+});
 
-cameraTiltIncreaseButton.addEventListener(
-    "click",
-    () => {
-        cameraTiltOffsetValue = clamp(
-            cameraTiltOffsetValue
-                + CAMERA_OFFSET_STEP,
-            CAMERA_OFFSET_MIN,
-            CAMERA_OFFSET_MAX,
-        );
+cameraTiltDecreaseButton.addEventListener("click", () => {
+    cameraTiltOffsetValue = clamp(
+        cameraTiltOffsetValue - CAMERA_OFFSET_STEP,
+        CAMERA_OFFSET_MIN,
+        CAMERA_OFFSET_MAX,
+    );
 
-        renderCameraMountEditor();
-        scheduleCameraPreview();
-    },
-);
+    renderCameraMountEditor();
+    scheduleCameraPreview();
+});
 
-cameraTiltDecreaseButton.addEventListener(
-    "click",
-    () => {
-        cameraTiltOffsetValue = clamp(
-            cameraTiltOffsetValue
-                - CAMERA_OFFSET_STEP,
-            CAMERA_OFFSET_MIN,
-            CAMERA_OFFSET_MAX,
-        );
+cameraResetButton.addEventListener("click", () => {
+    cameraPanOffsetValue = savedCameraPanOffset;
 
-        renderCameraMountEditor();
-        scheduleCameraPreview();
-    },
-);
+    cameraTiltOffsetValue = savedCameraTiltOffset;
 
-cameraResetButton.addEventListener(
-    "click",
-    () => {
-        cameraPanOffsetValue =
-            savedCameraPanOffset;
+    renderCameraMountEditor();
+    scheduleCameraPreview();
+});
 
-        cameraTiltOffsetValue =
-            savedCameraTiltOffset;
+cameraSaveButton.addEventListener("click", saveCameraMount);
 
-        renderCameraMountEditor();
-        scheduleCameraPreview();
+leftTrimIncreaseButton.addEventListener("click", () => {
+    leftTrimValue = clamp(
+        Number((leftTrimValue + MOTOR_TRIM_STEP).toFixed(2)),
+        MOTOR_TRIM_MIN,
+        MOTOR_TRIM_MAX,
+    );
 
-    },
-);
+    renderMotorEditor();
+});
 
-cameraSaveButton.addEventListener(
-    "click",
-    saveCameraMount,
-);
+leftTrimDecreaseButton.addEventListener("click", () => {
+    leftTrimValue = clamp(
+        Number((leftTrimValue - MOTOR_TRIM_STEP).toFixed(2)),
+        MOTOR_TRIM_MIN,
+        MOTOR_TRIM_MAX,
+    );
 
-leftTrimIncreaseButton.addEventListener(
-    "click",
-    () => {
-        leftTrimValue = clamp(
-            Number(
-                (
-                    leftTrimValue
-                    + MOTOR_TRIM_STEP
-                ).toFixed(2)
-            ),
-            MOTOR_TRIM_MIN,
-            MOTOR_TRIM_MAX,
-        );
+    renderMotorEditor();
+});
 
-        renderMotorEditor();
-    },
-);
+rightTrimIncreaseButton.addEventListener("click", () => {
+    rightTrimValue = clamp(
+        Number((rightTrimValue + MOTOR_TRIM_STEP).toFixed(2)),
+        MOTOR_TRIM_MIN,
+        MOTOR_TRIM_MAX,
+    );
 
-leftTrimDecreaseButton.addEventListener(
-    "click",
-    () => {
-        leftTrimValue = clamp(
-            Number(
-                (
-                    leftTrimValue
-                    - MOTOR_TRIM_STEP
-                ).toFixed(2)
-            ),
-            MOTOR_TRIM_MIN,
-            MOTOR_TRIM_MAX,
-        );
+    renderMotorEditor();
+});
 
-        renderMotorEditor();
-    },
-);
+rightTrimDecreaseButton.addEventListener("click", () => {
+    rightTrimValue = clamp(
+        Number((rightTrimValue - MOTOR_TRIM_STEP).toFixed(2)),
+        MOTOR_TRIM_MIN,
+        MOTOR_TRIM_MAX,
+    );
 
-rightTrimIncreaseButton.addEventListener(
-    "click",
-    () => {
-        rightTrimValue = clamp(
-            Number(
-                (
-                    rightTrimValue
-                    + MOTOR_TRIM_STEP
-                ).toFixed(2)
-            ),
-            MOTOR_TRIM_MIN,
-            MOTOR_TRIM_MAX,
-        );
+    renderMotorEditor();
+});
 
-        renderMotorEditor();
-    },
-);
+motorsResetButton.addEventListener("click", () => {
+    leftTrimValue = savedLeftTrim;
+    rightTrimValue = savedRightTrim;
 
-rightTrimDecreaseButton.addEventListener(
-    "click",
-    () => {
-        rightTrimValue = clamp(
-            Number(
-                (
-                    rightTrimValue
-                    - MOTOR_TRIM_STEP
-                ).toFixed(2)
-            ),
-            MOTOR_TRIM_MIN,
-            MOTOR_TRIM_MAX,
-        );
+    renderMotorEditor();
 
-        renderMotorEditor();
-    },
-);
+    motorsMessage.textContent = "Motor trim changes discarded.";
+});
 
-motorsResetButton.addEventListener(
-    "click",
-    () => {
-        leftTrimValue = savedLeftTrim;
-        rightTrimValue = savedRightTrim;
+motorsPreviewButton.addEventListener("click", runMotorPreview);
 
-        renderMotorEditor();
+motorsSaveButton.addEventListener("click", saveMotors);
 
-        motorsMessage.textContent = (
-            "Motor trim changes discarded."
-        );
-    },
-);
+grayscaleResetButton.addEventListener("click", () => {
+    grayscaleFloorValue =
+        savedGrayscaleFloor === null ? null : [...savedGrayscaleFloor];
 
-motorsPreviewButton.addEventListener(
-    "click",
-    runMotorPreview,
-);
+    grayscaleLineValue =
+        savedGrayscaleLine === null ? null : [...savedGrayscaleLine];
 
-motorsSaveButton.addEventListener(
-    "click",
-    saveMotors,
-);
+    renderGrayscaleEditor();
 
-grayscaleResetButton.addEventListener(
-    "click",
-    () => {
-        grayscaleFloorValue = (
-            savedGrayscaleFloor === null
-                ? null
-                : [...savedGrayscaleFloor]
-        );
+    grayscaleMessage.textContent = "Line sensor changes discarded.";
+});
 
-        grayscaleLineValue = (
-            savedGrayscaleLine === null
-                ? null
-                : [...savedGrayscaleLine]
-        );
+grayscaleCaptureFloorButton.addEventListener("click", captureGrayscaleFloor);
 
-        renderGrayscaleEditor();
+grayscaleCaptureLineButton.addEventListener("click", captureGrayscaleLine);
 
-        grayscaleMessage.textContent = (
-            "Line sensor changes discarded."
-        );
-    },
-);
+grayscaleSaveButton.addEventListener("click", saveGrayscale);
 
-grayscaleCaptureFloorButton.addEventListener(
-    "click",
-    captureGrayscaleFloor,
-);
+grayscaleClearButton.addEventListener("click", clearGrayscale);
 
-grayscaleCaptureLineButton.addEventListener(
-    "click",
-    captureGrayscaleLine,
-);
-
-grayscaleSaveButton.addEventListener(
-    "click",
-    saveGrayscale,
-);
-
-grayscaleClearButton.addEventListener(
-    "click",
-    clearGrayscale,
-);
-
-window.addEventListener(
-    "pagehide",
-    () => {
-        restorePreviewState();
-    },
-);
+window.addEventListener("pagehide", () => {
+    restorePreviewState();
+});
 
 loadCalibration();

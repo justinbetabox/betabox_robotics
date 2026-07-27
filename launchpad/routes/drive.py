@@ -42,6 +42,7 @@ async def drive_page(
             "page": {
                 "title": "Manual Drive",
                 "eyebrow": "Robot Control",
+                "main_class": ("drive-layout"),
             },
         },
     )

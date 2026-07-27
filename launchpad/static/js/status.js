@@ -1,34 +1,24 @@
 "use strict";
 
-
 /* Constants */
 
 const STATUS_API_URL = "/api/status";
 const AUTO_REFRESH_INTERVAL_MS = 30_000;
 
 const SERVICE_LABELS = {
-    "set-hostname-from-serial.service":
-        "Robot Hostname",
-    "betabox-boot-announce.service":
-        "Boot Announcer",
-    "betabox-monitor.service":
-        "Health Monitor",
-    "jupyterhub.service":
-        "JupyterHub",
-    "betabox-video.service":
-        "Video Service",
-    "wifi-fallback.service":
-        "Wi-Fi Fallback",
-    "betabox-launchpad.service":
-        "Launchpad",
+    "set-hostname-from-serial.service": "Robot Hostname",
+    "betabox-boot-announce.service": "Boot Announcer",
+    "betabox-monitor.service": "Health Monitor",
+    "jupyterhub.service": "JupyterHub",
+    "betabox-video.service": "Video Service",
+    "wifi-fallback.service": "Wi-Fi Fallback",
+    "betabox-launchpad.service": "Launchpad",
 };
-
 
 /* Page state */
 
 let requestInProgress = false;
 let refreshTimer = null;
-
 
 /* DOM helpers */
 
@@ -43,7 +33,6 @@ function setText(id, value) {
         element.textContent = value;
     }
 }
-
 
 /* Formatting */
 
@@ -60,20 +49,13 @@ function formatBoolean(value) {
 }
 
 function formatState(value) {
-    if (
-        value === null
-        || value === undefined
-        || value === ""
-    ) {
+    if (value === null || value === undefined || value === "") {
         return "Unavailable";
     }
 
     return String(value)
         .replace(/[_-]+/g, " ")
-        .replace(
-            /\b\w/g,
-            (letter) => letter.toUpperCase(),
-        );
+        .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function formatVoltage(value) {
@@ -116,7 +98,6 @@ function formatGigabytes(value) {
     return `${value.toFixed(1)} GB`;
 }
 
-
 /* Classification */
 
 function serviceDisplayName(name) {
@@ -128,17 +109,11 @@ function visionLabel(vision) {
         return "Unavailable";
     }
 
-    if (
-        vision.camera_running
-        && vision.camera_has_frame
-    ) {
+    if (vision.camera_running && vision.camera_has_frame) {
         return "Ready";
     }
 
-    if (
-        vision.running
-        || vision.camera_running
-    ) {
+    if (vision.running || vision.camera_running) {
         return "Starting";
     }
 
@@ -212,12 +187,10 @@ function statusClass(state) {
 }
 
 function determineOverallStatus(data) {
-    const attentionItems = (
-        collectAttentionItems(data)
-    );
+    const attentionItems = collectAttentionItems(data);
 
     const hasCritical = attentionItems.some(
-        item => item.severity === "critical"
+        (item) => item.severity === "critical",
     );
 
     if (hasCritical) {
@@ -240,18 +213,12 @@ function determineOverallStatus(data) {
     };
 }
 
-
 /* UI helpers */
 
 function setOverallStatus(label, state) {
-    setText(
-        "overall-status",
-        label,
-    );
+    setText("overall-status", label);
 
-    const indicator = getElement(
-        "overall-indicator",
-    );
+    const indicator = getElement("overall-indicator");
 
     if (!indicator) {
         return;
@@ -264,32 +231,19 @@ function setOverallStatus(label, state) {
         "status-unknown",
     );
 
-    indicator.classList.add(
-        `status-${statusClass(state)}`,
-    );
+    indicator.classList.add(`status-${statusClass(state)}`);
 }
 
 function markStatusStale() {
-    setText(
-        "status-updated",
-        "Status may be out of date.",
-    );
+    setText("status-updated", "Status may be out of date.");
 }
 
 function updateTimestamp() {
-    setText(
-        "status-updated",
-        `Updated ${new Date().toLocaleString()}`,
-    );
+    setText("status-updated", `Last updated ${new Date().toLocaleString()}`);
 }
 
-function setConnectionState(
-    state,
-    text,
-) {
-    const connection = getElement(
-        "status-connection",
-    );
+function setConnectionState(state, text) {
+    const connection = getElement("status-connection");
 
     if (!connection) {
         return;
@@ -301,22 +255,15 @@ function setConnectionState(
         "status-error",
     );
 
-    connection.classList.add(
-        `status-${state}`,
-    );
+    connection.classList.add(`status-${state}`);
 
     connection.textContent = text;
 }
 
 function showError(message) {
-    const panel = getElement(
-        "status-error-panel",
-    );
+    const panel = getElement("status-error-panel");
 
-    setText(
-        "status-error-message",
-        message,
-    );
+    setText("status-error-message", message);
 
     if (panel) {
         panel.hidden = false;
@@ -324,51 +271,36 @@ function showError(message) {
 }
 
 function hideError() {
-    const panel = getElement(
-        "status-error-panel",
-    );
+    const panel = getElement("status-error-panel");
 
     if (panel) {
         panel.hidden = true;
     }
 }
 
-
 /* Rendering */
 
 function createDetailItem(label, value) {
-    const item = document.createElement(
-        "article",
-    );
+    const item = document.createElement("article");
 
     item.className = "detail-card";
 
-    const labelElement = document.createElement(
-        "span",
-    );
+    const labelElement = document.createElement("span");
 
     labelElement.className = "detail-label";
     labelElement.textContent = label;
 
-    const valueElement = document.createElement(
-        "strong",
-    );
+    const valueElement = document.createElement("strong");
 
     valueElement.className = "detail-value";
     valueElement.textContent = value;
 
-    item.append(
-        labelElement,
-        valueElement,
-    );
+    item.append(labelElement, valueElement);
 
     return item;
 }
 
-function renderDetailItems(
-    containerId,
-    items,
-) {
+function renderDetailItems(containerId, items) {
     const container = getElement(containerId);
 
     if (!container) {
@@ -378,169 +310,91 @@ function renderDetailItems(
     container.replaceChildren();
 
     for (const [label, value] of items) {
-        container.append(
-            createDetailItem(
-                label,
-                value,
-            ),
-        );
+        container.append(createDetailItem(label, value));
     }
 }
 
 function renderServiceSummary(data) {
-    const states = Object.values(
-        data.services ?? {},
-    );
+    const states = Object.values(data.services ?? {});
 
-    const activeCount = states.filter(
-        (state) => state === "active",
-    ).length;
+    const activeCount = states.filter((state) => state === "active").length;
 
-    const failedCount = states.filter(
-        (state) => state === "failed",
-    ).length;
+    const failedCount = states.filter((state) => state === "failed").length;
 
-    const otherCount = (
-        states.length
-        - activeCount
-        - failedCount
-    );
+    const otherCount = states.length - activeCount - failedCount;
 
-    const parts = [
-        `${activeCount} active`,
-    ];
+    const parts = [`${activeCount} active`];
 
     if (failedCount > 0) {
-        parts.push(
-            `${failedCount} failed`,
-        );
+        parts.push(`${failedCount} failed`);
     }
 
     if (otherCount > 0) {
-        parts.push(
-            `${otherCount} other`,
-        );
+        parts.push(`${otherCount} other`);
     }
 
-    setText(
-        "services-status",
-        parts.join(" · "),
-    );
+    setText("services-status", parts.join(" · "));
 }
 
 function renderOverview(data) {
-    const overall = determineOverallStatus(
-        data,
-    );
+    const overall = determineOverallStatus(data);
 
-    setOverallStatus(
-        overall.label,
-        overall.state,
-    );
+    setOverallStatus(overall.label, overall.state);
 
     const control = data.control ?? {};
 
-    const battery = (
-        data.hardware?.battery ?? {}
-    );
+    const battery = data.hardware?.battery ?? {};
 
-    const vision = (
-        data.hardware?.vision ?? {}
-    );
+    const vision = data.hardware?.vision ?? {};
 
-    const temperature = (
-        data.system_health?.temperature ?? {}
-    );
+    const temperature = data.system_health?.temperature ?? {};
 
-    const jupyterhub = (
-        data.jupyterhub ?? {}
-    );
+    const jupyterhub = data.jupyterhub ?? {};
 
-    setText(
-        "battery-status",
-        formatVoltage(battery.voltage),
-    );
+    setText("battery-status", formatVoltage(battery.voltage));
 
-    setText(
-        "temperature-status",
-        formatTemperature(
-            temperature.celsius,
-        ),
-    );
+    setText("temperature-status", formatTemperature(temperature.celsius));
 
-    setText(
-        "robot-status",
-        controlLabel(control),
-    );
+    setText("robot-status", controlLabel(control));
 
-    setText(
-        "vision-status",
-        visionLabel(vision),
-    );
+    setText("vision-status", visionLabel(vision));
 
     setText(
         "jupyter-status",
         jupyterhub.responding
             ? "Online"
             : jupyterhub.active
-                ? "Not Responding"
-                : "Offline",
+              ? "Not Responding"
+              : "Offline",
     );
 
     renderServiceSummary(data);
 }
 
-function createAttentionItem(
-    title,
-    message,
-    severity,
-) {
-    const item = document.createElement(
-        "article",
-    );
+function createAttentionItem(title, message, severity) {
+    const item = document.createElement("article");
 
-    item.className = (
-        `attention-item attention-${severity}`
-    );
+    item.className = `attention-item attention-${severity}`;
 
-    const indicator = document.createElement(
-        "span",
-    );
+    const indicator = document.createElement("span");
 
-    indicator.className = (
-        `status-dot status-${severity}`
-    );
+    indicator.className = `status-dot status-${severity}`;
 
-    indicator.setAttribute(
-        "aria-hidden",
-        "true",
-    );
+    indicator.setAttribute("aria-hidden", "true");
 
-    const text = document.createElement(
-        "div",
-    );
+    const text = document.createElement("div");
 
-    const heading = document.createElement(
-        "h3",
-    );
+    const heading = document.createElement("h3");
 
     heading.textContent = title;
 
-    const description = document.createElement(
-        "p",
-    );
+    const description = document.createElement("p");
 
     description.textContent = message;
 
-    text.append(
-        heading,
-        description,
-    );
+    text.append(heading, description);
 
-    item.append(
-        indicator,
-        text,
-    );
+    item.append(indicator, text);
 
     return item;
 }
@@ -548,57 +402,40 @@ function createAttentionItem(
 function collectAttentionItems(data) {
     const items = [];
 
-    for (
-        const [service, state]
-        of Object.entries(data.services ?? {})
-    ) {
+    for (const [service, state] of Object.entries(data.services ?? {})) {
         if (state === "failed") {
             items.push({
                 title: serviceDisplayName(service),
-                message: (
-                    `${service} has failed.`
-                ),
+                message: `${service} has failed.`,
                 severity: "critical",
             });
 
             continue;
         }
 
-        if (
-            state !== "active"
-            && state !== "inactive"
-        ) {
+        if (state !== "active" && state !== "inactive") {
             items.push({
                 title: serviceDisplayName(service),
-                message: (
-                    `${service} reported `
-                    + `${formatState(state)}.`
-                ),
+                message: `${service} reported ` + `${formatState(state)}.`,
                 severity: "warning",
             });
         }
     }
 
-    const battery = (
-        data.hardware?.battery ?? {}
-    );
+    const battery = data.hardware?.battery ?? {};
 
     if (battery.state === "critical") {
         items.push({
             title: "Battery Critical",
-            message: (
-                `Battery voltage is `
-                + `${formatVoltage(battery.voltage)}.`
-            ),
+            message:
+                `Battery voltage is ` + `${formatVoltage(battery.voltage)}.`,
             severity: "critical",
         });
     } else if (battery.state === "low") {
         items.push({
             title: "Battery Low",
-            message: (
-                `Battery voltage is `
-                + `${formatVoltage(battery.voltage)}.`
-            ),
+            message:
+                `Battery voltage is ` + `${formatVoltage(battery.voltage)}.`,
             severity: "warning",
         });
     }
@@ -611,30 +448,21 @@ function collectAttentionItems(data) {
         });
     }
 
-    const vision = (
-        data.hardware?.vision ?? {}
-    );
+    const vision = data.hardware?.vision ?? {};
 
     if (!vision.service_available) {
         items.push({
             title: "Vision Service Unavailable",
-            message: (
-                "The robot vision service could not "
-                + "be reached."
-            ),
+            message: "The robot vision service could not " + "be reached.",
             severity: "critical",
         });
-    } else if (
-        !vision.camera_running
-        || !vision.camera_has_frame
-    ) {
+    } else if (!vision.camera_running || !vision.camera_has_frame) {
         items.push({
             title: "Vision Not Ready",
-            message: (
-                "The vision service is available, "
-                + "but the camera is not producing "
-                + "a usable frame."
-            ),
+            message:
+                "The vision service is available, " +
+                "but the camera is not producing " +
+                "a usable frame.",
             severity: "warning",
         });
     }
@@ -647,103 +475,74 @@ function collectAttentionItems(data) {
         });
     }
 
-    const temperature = (
-        data.system_health?.temperature ?? {}
-    );
+    const temperature = data.system_health?.temperature ?? {};
 
     if (temperature.state === "critical") {
         items.push({
             title: "CPU Temperature Critical",
-            message: (
-                `Current temperature is `
-                + `${formatTemperature(
-                    temperature.celsius,
-                )}.`
-            ),
+            message:
+                `Current temperature is ` +
+                `${formatTemperature(temperature.celsius)}.`,
             severity: "critical",
         });
-    } else if (
-        temperature.state === "warning"
-    ) {
+    } else if (temperature.state === "warning") {
         items.push({
             title: "CPU Temperature High",
-            message: (
-                `Current temperature is `
-                + `${formatTemperature(
-                    temperature.celsius,
-                )}.`
-            ),
+            message:
+                `Current temperature is ` +
+                `${formatTemperature(temperature.celsius)}.`,
             severity: "warning",
         });
     }
 
-    const memory = (
-        data.system_health?.memory ?? {}
-    );
+    const memory = data.system_health?.memory ?? {};
 
     if (memory.state === "critical") {
         items.push({
             title: "Memory Critical",
-            message: (
-                `${formatPercent(
-                    memory.used_percent,
-                )} of memory is in use.`
-            ),
+            message: `${formatPercent(
+                memory.used_percent,
+            )} of memory is in use.`,
             severity: "critical",
         });
-    } else if (
-        memory.state === "warning"
-    ) {
+    } else if (memory.state === "warning") {
         items.push({
             title: "Memory Usage High",
-            message: (
-                `${formatPercent(
-                    memory.used_percent,
-                )} of memory is in use.`
-            ),
+            message: `${formatPercent(
+                memory.used_percent,
+            )} of memory is in use.`,
             severity: "warning",
         });
     }
 
-    const disk = (
-        data.system_health?.disk ?? {}
-    );
+    const disk = data.system_health?.disk ?? {};
 
     if (disk.state === "critical") {
         items.push({
             title: "Disk Space Critical",
-            message: (
-                `${formatPercent(
-                    disk.used_percent,
-                )} of the disk is in use.`
-            ),
+            message: `${formatPercent(
+                disk.used_percent,
+            )} of the disk is in use.`,
             severity: "critical",
         });
-    } else if (
-        disk.state === "warning"
-    ) {
+    } else if (disk.state === "warning") {
         items.push({
             title: "Disk Usage High",
-            message: (
-                `${formatPercent(
-                    disk.used_percent,
-                )} of the disk is in use.`
-            ),
+            message: `${formatPercent(
+                disk.used_percent,
+            )} of the disk is in use.`,
             severity: "warning",
         });
     }
 
-    const throttling = (
-        data.system_health?.throttling ?? {}
-    );
+    const throttling = data.system_health?.throttling ?? {};
 
     if (throttling.undervoltage_now) {
         items.push({
             title: "Undervoltage Detected",
-            message: (
-                "The Raspberry Pi is currently "
-                + "receiving insufficient power."
-            ),
+            message:
+                "The Raspberry Pi is currently " +
+                "receiving insufficient power.",
             severity: "critical",
         });
     }
@@ -751,53 +550,37 @@ function collectAttentionItems(data) {
     if (throttling.throttled_now) {
         items.push({
             title: "CPU Throttling",
-            message: (
-                "The Raspberry Pi is currently "
-                + "reducing performance."
-            ),
+            message: "The Raspberry Pi is currently " + "reducing performance.",
             severity: "warning",
         });
     }
 
-    if (
-        throttling.undervoltage_occurred
-        && !throttling.undervoltage_now
-    ) {
+    if (throttling.undervoltage_occurred && !throttling.undervoltage_now) {
         items.push({
             title: "Previous Undervoltage",
-            message: (
-                "The Raspberry Pi detected an "
-                + "undervoltage condition since boot."
-            ),
+            message:
+                "The Raspberry Pi detected an " +
+                "undervoltage condition since boot.",
             severity: "warning",
         });
     }
 
-    if (
-        throttling.throttled_occurred
-        && !throttling.throttled_now
-    ) {
+    if (throttling.throttled_occurred && !throttling.throttled_now) {
         items.push({
             title: "Previous CPU Throttling",
-            message: (
-                "The Raspberry Pi was throttled "
-                + "at least once since boot."
-            ),
+            message:
+                "The Raspberry Pi was throttled " + "at least once since boot.",
             severity: "warning",
         });
     }
 
-    if (
-        data.jupyterhub?.active
-        && !data.jupyterhub?.responding
-    ) {
+    if (data.jupyterhub?.active && !data.jupyterhub?.responding) {
         items.push({
             title: "JupyterHub Not Responding",
-            message: (
-                data.jupyterhub?.message
-                ?? "The service is active but its "
-                + "HTTP endpoint is unavailable."
-            ),
+            message:
+                data.jupyterhub?.message ??
+                "The service is active but its " +
+                    "HTTP endpoint is unavailable.",
             severity: "warning",
         });
     }
@@ -806,21 +589,15 @@ function collectAttentionItems(data) {
 }
 
 function renderAttention(data) {
-    const section = getElement(
-        "attention-section",
-    );
+    const section = getElement("attention-section");
 
-    const container = getElement(
-        "attention-list",
-    );
+    const container = getElement("attention-list");
 
     if (!section || !container) {
         return;
     }
 
-    const items = collectAttentionItems(
-        data,
-    );
+    const items = collectAttentionItems(data);
 
     container.replaceChildren();
 
@@ -831,11 +608,7 @@ function renderAttention(data) {
 
     for (const item of items) {
         container.append(
-            createAttentionItem(
-                item.title,
-                item.message,
-                item.severity,
-            ),
+            createAttentionItem(item.title, item.message, item.severity),
         );
     }
 
@@ -843,231 +616,83 @@ function renderAttention(data) {
 }
 
 function renderHardware(data) {
-    const battery = (
-        data.hardware?.battery ?? {}
-    );
+    const battery = data.hardware?.battery ?? {};
 
-    const vision = (
-        data.hardware?.vision ?? {}
-    );
+    const vision = data.hardware?.vision ?? {};
 
     const control = data.control ?? {};
 
-    renderDetailItems(
-        "hardware-status",
+    renderDetailItems("hardware-status", [
+        ["Battery Voltage", formatVoltage(battery.voltage)],
+        ["Battery State", formatState(battery.state)],
+        ["Control Available", formatBoolean(control.available)],
+        ["Control Owner", control.owner ? String(control.owner) : "None"],
         [
-            [
-                "Battery Voltage",
-                formatVoltage(battery.voltage),
-            ],
-            [
-                "Battery State",
-                formatState(battery.state),
-            ],
-            [
-                "Control Available",
-                formatBoolean(control.available),
-            ],
-            [
-                "Control Owner",
-                control.owner
-                    ? String(control.owner)
-                    : "None",
-            ],
-            [
-                "Vision Service",
-                vision.service_available
-                    ? "Available"
-                    : "Unavailable",
-            ],
-            [
-                "Vision Running",
-                formatBoolean(vision.camera_running),
-            ],
-            [
-                "Vision Frame Available",
-                formatBoolean(vision.camera_has_frame),
-            ],
-            [
-                "Vision Clients",
-                String(vision.clients ?? 0),
-            ],
+            "Vision Service",
+            vision.service_available ? "Available" : "Unavailable",
         ],
-    );
+        ["Vision Running", formatBoolean(vision.camera_running)],
+        ["Vision Frame Available", formatBoolean(vision.camera_has_frame)],
+        ["Vision Clients", String(vision.clients ?? 0)],
+    ]);
 }
 
 function renderSystem(data) {
     const health = data.system_health ?? {};
 
-    const temperature = (
-        health.temperature ?? {}
-    );
+    const temperature = health.temperature ?? {};
 
-    const throttling = (
-        health.throttling ?? {}
-    );
+    const throttling = health.throttling ?? {};
 
-    const memory = (
-        health.memory ?? {}
-    );
+    const memory = health.memory ?? {};
 
-    const disk = (
-        health.disk ?? {}
-    );
+    const disk = health.disk ?? {};
 
-    renderDetailItems(
-        "system-status",
+    renderDetailItems("system-status", [
+        ["Platform Version", data.version ?? "Unavailable"],
+        ["Hostname", data.hostname ?? "Unavailable"],
+        ["CPU Temperature", formatTemperature(temperature.celsius)],
+        ["Temperature State", formatState(temperature.state)],
+        ["Memory Used", formatPercent(memory.used_percent)],
+        ["Memory Available", formatMegabytes(memory.available_mb)],
+        ["Memory Total", formatMegabytes(memory.total_mb)],
+        ["Disk Used", formatPercent(disk.used_percent)],
+        ["Disk Free", formatGigabytes(disk.free_gb)],
+        ["Disk Total", formatGigabytes(disk.total_gb)],
+        ["Undervoltage Now", throttling.undervoltage_now ? "Detected" : "No"],
         [
-            [
-                "Platform Version",
-                data.version ?? "Unavailable",
-            ],
-            [
-                "Hostname",
-                data.hostname ?? "Unavailable",
-            ],
-            [
-                "CPU Temperature",
-                formatTemperature(
-                    temperature.celsius,
-                ),
-            ],
-            [
-                "Temperature State",
-                formatState(
-                    temperature.state,
-                ),
-            ],
-            [
-                "Memory Used",
-                formatPercent(
-                    memory.used_percent,
-                ),
-            ],
-            [
-                "Memory Available",
-                formatMegabytes(
-                    memory.available_mb,
-                ),
-            ],
-            [
-                "Memory Total",
-                formatMegabytes(
-                    memory.total_mb,
-                ),
-            ],
-            [
-                "Disk Used",
-                formatPercent(
-                    disk.used_percent,
-                ),
-            ],
-            [
-                "Disk Free",
-                formatGigabytes(
-                    disk.free_gb,
-                ),
-            ],
-            [
-                "Disk Total",
-                formatGigabytes(
-                    disk.total_gb,
-                ),
-            ],
-            [
-                "Undervoltage Now",
-                throttling.undervoltage_now
-                    ? "Detected"
-                    : "No",
-            ],
-            [
-                "Undervoltage Since Boot",
-                throttling.undervoltage_occurred
-                    ? "Detected"
-                    : "No",
-            ],
-            [
-                "Throttled Now",
-                throttling.throttled_now
-                    ? "Yes"
-                    : "No",
-            ],
-            [
-                "Throttled Since Boot",
-                throttling.throttled_occurred
-                    ? "Yes"
-                    : "No",
-            ],
-            [
-                "Throttle Flags",
-                throttling.raw
-                    ?? "Unavailable",
-            ],
+            "Undervoltage Since Boot",
+            throttling.undervoltage_occurred ? "Detected" : "No",
         ],
-    );
+        ["Throttled Now", throttling.throttled_now ? "Yes" : "No"],
+        ["Throttled Since Boot", throttling.throttled_occurred ? "Yes" : "No"],
+        ["Throttle Flags", throttling.raw ?? "Unavailable"],
+    ]);
 }
 
 function renderNetwork(data) {
     const health = data.system_health ?? {};
 
-    const ethernet = (
-        health.ethernet ?? {}
-    );
+    const ethernet = health.ethernet ?? {};
 
-    const wifi = (
-        health.wifi ?? {}
-    );
+    const wifi = health.wifi ?? {};
 
-    renderDetailItems(
-        "network-status",
+    renderDetailItems("network-status", [
         [
-            [
-                "IP Addresses",
-                Array.isArray(data.ip_addresses)
-                    && data.ip_addresses.length > 0
-                    ? data.ip_addresses.join(", ")
-                    : "Unavailable",
-            ],
-            [
-                "Ethernet Interface",
-                ethernet.name
-                    ?? "Unavailable",
-            ],
-            [
-                "Ethernet Connected",
-                formatBoolean(ethernet.connected),
-            ],
-            [
-                "Ethernet State",
-                ethernet.state
-                    ?? "Unavailable",
-            ],
-            [
-                "Ethernet Connection",
-                ethernet.connection
-                    || "None",
-            ],
-            [
-                "Wi-Fi Interface",
-                wifi.name
-                    ?? "Unavailable",
-            ],
-            [
-                "Wi-Fi Connected",
-                formatBoolean(wifi.connected),
-            ],
-            [
-                "Wi-Fi State",
-                wifi.state
-                    ?? "Unavailable",
-            ],
-            [
-                "Wi-Fi Connection",
-                wifi.connection
-                    || "None",
-            ],
+            "IP Addresses",
+            Array.isArray(data.ip_addresses) && data.ip_addresses.length > 0
+                ? data.ip_addresses.join(", ")
+                : "Unavailable",
         ],
-    );
+        ["Ethernet Interface", ethernet.name ?? "Unavailable"],
+        ["Ethernet Connected", formatBoolean(ethernet.connected)],
+        ["Ethernet State", ethernet.state ?? "Unavailable"],
+        ["Ethernet Connection", ethernet.connection || "None"],
+        ["Wi-Fi Interface", wifi.name ?? "Unavailable"],
+        ["Wi-Fi Connected", formatBoolean(wifi.connected)],
+        ["Wi-Fi State", wifi.state ?? "Unavailable"],
+        ["Wi-Fi Connection", wifi.connection || "None"],
+    ]);
 }
 
 function renderStatus(data) {
@@ -1079,21 +704,13 @@ function renderStatus(data) {
     updateTimestamp();
 }
 
-
 /* Validation */
 
 function validatePayload(data) {
-    if (
-        !data
-        || typeof data !== "object"
-        || Array.isArray(data)
-    ) {
-        throw new Error(
-            "Status API returned an invalid response."
-        );
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
+        throw new Error("Status API returned an invalid response.");
     }
 }
-
 
 /* API */
 
@@ -1104,41 +721,28 @@ async function loadStatus() {
 
     requestInProgress = true;
 
-    const refreshButton = getElement(
-        "refresh-status",
-    );
+    const refreshButton = getElement("refresh-status");
 
     if (refreshButton) {
         refreshButton.disabled = true;
     }
 
-    setConnectionState(
-        "connecting",
-        "Loading…",
-    );
+    setConnectionState("connecting", "Updating…");
 
     try {
-        const response = await fetch(
-            STATUS_API_URL,
-            {
-                method: "GET",
-                headers: {
-                    Accept: "application/json",
-                },
-                cache: "no-store",
+        const response = await fetch(STATUS_API_URL, {
+            method: "GET",
+            headers: {
+                Accept: "application/json",
             },
-        );
+            cache: "no-store",
+        });
 
         if (!response.ok) {
-            let message = (
-                `Status API returned HTTP `
-                + `${response.status}.`
-            );
+            let message = `Status API returned HTTP ` + `${response.status}.`;
 
             try {
-                const errorPayload = (
-                    await response.json()
-                );
+                const errorPayload = await response.json();
 
                 if (errorPayload.message) {
                     message = errorPayload.message;
@@ -1157,15 +761,9 @@ async function loadStatus() {
         renderStatus(data);
         hideError();
 
-        setConnectionState(
-            "connected",
-            "Live",
-        );
+        setConnectionState("connected", "Connected");
     } catch (error) {
-        console.error(
-            "Unable to load platform status:",
-            error,
-        );
+        console.error("Unable to load platform status:", error);
 
         markStatusStale();
 
@@ -1175,31 +773,25 @@ async function loadStatus() {
                 : "Unable to load platform status.",
         );
 
-        setConnectionState(
-            "error",
-            "Unavailable",
-        );
+        setConnectionState("error", "Unavailable");
     } finally {
         requestInProgress = false;
 
         if (refreshButton) {
             refreshButton.disabled = false;
+            refreshButton.textContent = "Refresh";
         }
     }
 }
-
 
 /* Refresh lifecycle */
 
 function startAutomaticRefresh() {
     stopAutomaticRefresh();
 
-    refreshTimer = window.setInterval(
-        () => {
-            void loadStatus();
-        },
-        AUTO_REFRESH_INTERVAL_MS
-    );
+    refreshTimer = window.setInterval(() => {
+        void loadStatus();
+    }, AUTO_REFRESH_INTERVAL_MS);
 }
 
 function stopAutomaticRefresh() {
@@ -1207,68 +799,43 @@ function stopAutomaticRefresh() {
         return;
     }
 
-    window.clearInterval(
-        refreshTimer
-    );
+    window.clearInterval(refreshTimer);
 
     refreshTimer = null;
 }
 
-
 /* Initialization */
 
 function initializeStatusPage() {
-    getElement(
-        "refresh-status"
-    )?.addEventListener(
-        "click",
-        () => {
-            void loadStatus();
-        }
-    );
+    getElement("refresh-status")?.addEventListener("click", () => {
+        void loadStatus();
+    });
 
-    getElement(
-        "retry-status"
-    )?.addEventListener(
-        "click",
-        () => {
-            void loadStatus();
-        }
-    );
+    getElement("retry-status")?.addEventListener("click", () => {
+        void loadStatus();
+    });
 
     startAutomaticRefresh();
 
     void loadStatus();
 }
 
-
 /* Event listeners */
 
-if (
-    document.readyState === "loading"
-) {
-    document.addEventListener(
-        "DOMContentLoaded",
-        initializeStatusPage
-    );
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initializeStatusPage);
 } else {
     initializeStatusPage();
 }
 
-document.addEventListener(
-    "visibilitychange",
-    () => {
-        if (document.hidden) {
-            stopAutomaticRefresh();
-            return;
-        }
-
-        startAutomaticRefresh();
-        void loadStatus();
+document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+        stopAutomaticRefresh();
+        return;
     }
-);
 
-window.addEventListener(
-    "beforeunload",
-    stopAutomaticRefresh
-);
+    startAutomaticRefresh();
+    void loadStatus();
+});
+
+window.addEventListener("beforeunload", stopAutomaticRefresh);

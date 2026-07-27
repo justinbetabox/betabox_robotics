@@ -7,28 +7,6 @@
     >
 {% endblock %}
 
-{% block header_actions %}
-    <div
-        id="events-connection"
-        class="
-            connection-status
-            status-connecting
-        "
-        role="status"
-        aria-live="polite"
-    >
-        Loading…
-    </div>
-
-    <button
-        id="refresh-events"
-        class="button"
-        type="button"
-    >
-        Refresh
-    </button>
-{% endblock %}
-
 {% block page_content %}
     <section
         class="
@@ -47,12 +25,36 @@
                 </h2>
             </div>
 
-            <p
-                id="events-updated"
-                class="timestamp"
-            >
-                Loading platform events…
-            </p>
+            <div class="section-actions">
+                <div class="section-status">
+                    <div
+                        id="events-connection"
+                        class="
+                            connection-status
+                            status-connecting
+                        "
+                        role="status"
+                        aria-live="polite"
+                    >
+                        Connecting…
+                    </div>
+
+                    <p
+                        id="events-updated"
+                        class="timestamp"
+                    >
+                        Loading platform events…
+                    </p>
+                </div>
+
+                <button
+                    id="refresh-events"
+                    class="button button-secondary"
+                    type="button"
+                >
+                    Refresh
+                </button>
+            </div>
         </div>
 
         <div class="overview-grid">

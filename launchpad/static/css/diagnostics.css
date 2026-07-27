@@ -2,8 +2,39 @@
     gap: 1.5rem;
 }
 
-/* Overview */
+/* Sections */
 
+.section-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 2rem;
+}
+
+.section-actions {
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-end;
+    gap: 1rem;
+}
+
+.section-status {
+    display: grid;
+    justify-items: end;
+    gap: 0.35rem;
+}
+
+.section-actions .timestamp {
+    margin: 0;
+
+    text-align: right;
+}
+
+.section-actions .button {
+    align-self: flex-start;
+}
+
+/* Overview */
 
 .diagnostics-overview-card-primary {
     display: flex;
@@ -13,21 +44,18 @@
     grid-column: span 2;
 }
 
-.diagnostics-overview-card-primary
-    .status-dot {
+.diagnostics-overview-card-primary .status-dot {
     width: 0.8rem;
     height: 0.8rem;
 }
 
-.diagnostics-overview-card-primary
-    > div {
+.diagnostics-overview-card-primary > div {
     display: grid;
     gap: 0.2rem;
     min-width: 0;
 }
 
-.diagnostics-overview-card-primary
-    .overview-value {
+.diagnostics-overview-card-primary .overview-value {
     font-size: 1.2rem;
 }
 
@@ -59,7 +87,6 @@
     margin: 0 auto;
 }
 
-
 /* Diagnosis cards */
 
 .diagnosis-card {
@@ -69,8 +96,7 @@
     padding: 1.25rem;
 
     border: 1px solid var(--color-border);
-    border-left:
-        0.35rem solid var(--color-neutral);
+    border-left: 0.35rem solid var(--color-neutral);
     border-radius: var(--radius-large);
 
     background: var(--color-surface-raised);
@@ -144,7 +170,6 @@
     line-height: 1.55;
 }
 
-
 /* Diagnosis badges */
 
 .diagnosis-badge {
@@ -190,7 +215,6 @@
     border-color: var(--color-info);
     background: var(--brand-blue-light);
 }
-
 
 /* Diagnosis details */
 
@@ -264,84 +288,84 @@
     border-color: var(--color-border-strong);
 }
 
-
 /* Issues */
 
-.diagnostics-issues-section
-    .diagnosis-card {
+.diagnostics-issues-section .diagnosis-card {
     border-color: var(--color-border);
     border-left-color: var(--color-warning);
 
     background: var(--color-surface-raised);
 }
 
-.diagnostics-issues-section
-    .diagnosis-card-error,
-.diagnostics-issues-section
-    .diagnosis-card-critical {
+.diagnostics-issues-section .diagnosis-card-error,
+.diagnostics-issues-section .diagnosis-card-critical {
     border-left-color: var(--color-critical);
 }
 
-
 /* Compact layout */
 
-html[data-compact-layout="true"]
-    .diagnostics-layout {
+html[data-compact-layout="true"] .diagnostics-layout {
     gap: 0.75rem;
 }
 
-html[data-compact-layout="true"]
-    .diagnostics-list {
+html[data-compact-layout="true"] .diagnostics-list {
     gap: 0.5rem;
 }
 
-html[data-compact-layout="true"]
-    .diagnosis-card {
+html[data-compact-layout="true"] .diagnosis-card {
     gap: 0.5rem;
     padding: 0.65rem;
 }
 
-html[data-compact-layout="true"]
-    .diagnosis-card-compact {
+html[data-compact-layout="true"] .diagnosis-card-compact {
     gap: 0.4rem;
     padding: 0.55rem 0.65rem;
 }
 
-html[data-compact-layout="true"]
-    .diagnosis-header {
+html[data-compact-layout="true"] .diagnosis-header {
     gap: 0.55rem;
 }
 
-html[data-compact-layout="true"]
-    .diagnosis-details summary {
+html[data-compact-layout="true"] .diagnosis-details summary {
     padding-top: 0.45rem;
 }
 
-html[data-compact-layout="true"]
-    .diagnosis-detail-grid {
+html[data-compact-layout="true"] .diagnosis-detail-grid {
     gap: 0.45rem;
     padding-top: 0.5rem;
 }
 
-html[data-compact-layout="true"]
-    .diagnosis-detail {
+html[data-compact-layout="true"] .diagnosis-detail {
     padding: 0.55rem;
 }
-
 
 /* Responsive behavior */
 
 @media (min-width: 800px) {
     .diagnosis-detail-grid {
-        grid-template-columns:
-            repeat(
-                auto-fit,
-                minmax(220px, 1fr)
-            );
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
     }
 }
 
 @media (max-width: 720px) {
+    .section-heading {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 1rem;
+    }
+
+    .section-actions {
+        justify-content: space-between;
+    }
+
+    .section-status {
+        justify-items: start;
+    }
+
+    .section-actions .timestamp {
+        text-align: left;
+    }
+
     .diagnostics-overview-card-primary {
         grid-column: auto;
     }
@@ -353,5 +377,17 @@ html[data-compact-layout="true"]
 
     .diagnosis-badge {
         align-self: flex-start;
+    }
+}
+
+@media (max-width: 460px) {
+    .section-actions {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 0.9rem;
+    }
+
+    .section-actions .button {
+        width: 100%;
     }
 }

@@ -1,224 +1,125 @@
 "use strict";
 
-
 /* Constants */
 
 const INFORMATION_API_URL = "/api/information";
 
 const THEME_KEY = "betabox-launchpad-theme";
-const APPEARANCE_KEY =
-    "betabox-launchpad-appearance";
+const APPEARANCE_KEY = "betabox-launchpad-appearance";
 
-const REDUCED_MOTION_KEY =
-    "betabox-launchpad-reduced-motion";
+const REDUCED_MOTION_KEY = "betabox-launchpad-reduced-motion";
 
-const LARGER_TEXT_KEY =
-    "betabox-launchpad-larger-text";
+const LARGER_TEXT_KEY = "betabox-launchpad-larger-text";
 
-const COMPACT_LAYOUT_KEY =
-    "betabox-launchpad-compact-layout";
+const COMPACT_LAYOUT_KEY = "betabox-launchpad-compact-layout";
 
 const REFRESH_INTERVAL_MS = 30000;
-
 
 /* Page state */
 
 let requestInProgress = false;
 let refreshTimer = null;
 
-
 /* DOM helpers */
 
 const elements = {
-    connection: document.getElementById(
-        "information-connection"
-    ),
+    connection: document.getElementById("information-connection"),
 
-    refreshButton: document.getElementById(
-        "refresh-information"
-    ),
+    refreshButton: document.getElementById("refresh-information"),
 
-    retryButton: document.getElementById(
-        "retry-information"
-    ),
+    retryButton: document.getElementById("retry-information"),
 
-    updated: document.getElementById(
-        "information-updated"
-    ),
+    updated: document.getElementById("information-updated"),
 
-    errorPanel: document.getElementById(
-        "information-error-panel"
-    ),
+    errorPanel: document.getElementById("information-error-panel"),
 
-    errorMessage: document.getElementById(
-        "information-error-message"
-    ),
+    errorMessage: document.getElementById("information-error-message"),
 
-    robotModel: document.getElementById(
-        "robot-model"
-    ),
+    robotModel: document.getElementById("robot-model"),
 
-    robotHostname: document.getElementById(
-        "robot-hostname"
-    ),
+    robotHostname: document.getElementById("robot-hostname"),
 
-    robotIdentifier: document.getElementById(
-        "robot-identifier"
-    ),
+    robotIdentifier: document.getElementById("robot-identifier"),
 
-    robotControl: document.getElementById(
-        "robot-control"
-    ),
+    robotControl: document.getElementById("robot-control"),
 
-    robotControlBadge: document.getElementById(
-        "robot-control-badge"
-    ),
+    robotControlBadge: document.getElementById("robot-control-badge"),
 
-    networkHostname: document.getElementById(
-        "network-hostname"
-    ),
+    networkHostname: document.getElementById("network-hostname"),
 
-    ipAddresses: document.getElementById(
-        "ip-addresses"
-    ),
+    ipAddresses: document.getElementById("ip-addresses"),
 
-    launchpadUrls: document.getElementById(
-        "launchpad-urls"
-    ),
+    launchpadUrls: document.getElementById("launchpad-urls"),
 
-    jupyterhubUrls: document.getElementById(
-        "jupyterhub-urls"
-    ),
+    jupyterhubUrls: document.getElementById("jupyterhub-urls"),
 
-    visionUrls: document.getElementById(
-        "vision-urls"
-    ),
+    visionUrls: document.getElementById("vision-urls"),
 
-    softwareVersion: document.getElementById(
-        "software-version"
-    ),
+    softwareVersion: document.getElementById("software-version"),
 
-    pythonVersion: document.getElementById(
-        "python-version"
-    ),
+    pythonVersion: document.getElementById("python-version"),
 
-    operatingSystem: document.getElementById(
-        "operating-system"
-    ),
+    operatingSystem: document.getElementById("operating-system"),
 
-    architecture: document.getElementById(
-        "architecture"
-    ),
+    architecture: document.getElementById("architecture"),
 
-    storagePercent: document.getElementById(
-        "storage-percent"
-    ),
+    storagePercent: document.getElementById("storage-percent"),
 
-    storageMeterFill: document.getElementById(
-        "storage-meter-fill"
-    ),
+    storageMeterFill: document.getElementById("storage-meter-fill"),
 
-    storageUsed: document.getElementById(
-        "storage-used"
-    ),
+    storageUsed: document.getElementById("storage-used"),
 
-    storageAvailable: document.getElementById(
-        "storage-available"
-    ),
+    storageAvailable: document.getElementById("storage-available"),
 
-    storageTotal: document.getElementById(
-        "storage-total"
-    ),
+    storageTotal: document.getElementById("storage-total"),
 
-    featureRobotControl: document.getElementById(
-        "feature-robot-control"
-    ),
+    featureRobotControl: document.getElementById("feature-robot-control"),
 
-    featureVisionService: document.getElementById(
-        "feature-vision-service"
-    ),
+    featureVisionService: document.getElementById("feature-vision-service"),
 
-    featureCamera: document.getElementById(
-        "feature-camera"
-    ),
+    featureCamera: document.getElementById("feature-camera"),
 
-    featureJupyterhub: document.getElementById(
-        "feature-jupyterhub"
-    ),
+    featureJupyterhub: document.getElementById("feature-jupyterhub"),
 
-    mediaPictures: document.getElementById(
-        "media-pictures"
-    ),
+    mediaPictures: document.getElementById("media-pictures"),
 
-    mediaVideos: document.getElementById(
-        "media-videos"
-    ),
+    mediaVideos: document.getElementById("media-videos"),
 
-    mediaSounds: document.getElementById(
-        "media-sounds"
-    ),
+    mediaSounds: document.getElementById("media-sounds"),
 
-    reducedMotion: document.getElementById(
-        "reduced-motion"
-    ),
+    reducedMotion: document.getElementById("reduced-motion"),
 
-    largerText: document.getElementById(
-        "larger-text"
-    ),
+    largerText: document.getElementById("larger-text"),
 
-    compactLayout: document.getElementById(
-        "compact-layout"
-    ),
+    compactLayout: document.getElementById("compact-layout"),
 
-    resetPreferences: document.getElementById(
-        "reset-preferences"
-    ),
+    resetPreferences: document.getElementById("reset-preferences"),
 
-    preferencesStatus: document.getElementById(
-        "preferences-status"
-    ),
+    preferencesStatus: document.getElementById("preferences-status"),
 };
-
 
 /* Formatting */
 
-function formatUpdatedTime(
-    date
-) {
-    return new Intl.DateTimeFormat(
-        undefined,
-        {
-            hour: "numeric",
-            minute: "2-digit",
-            second: "2-digit",
-        }
-    ).format(date);
+function formatUpdatedTime(date) {
+    return new Intl.DateTimeFormat(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit",
+    }).format(date);
 }
 
-function displayValue(
-    value,
-    fallback = "Not available"
-) {
-    if (
-        value === null
-        || value === undefined
-        || value === ""
-    ) {
+function displayValue(value, fallback = "Not available") {
+    if (value === null || value === undefined || value === "") {
         return fallback;
     }
 
     return String(value);
 }
 
-function formatBytes(
-    value
-) {
+function formatBytes(value) {
     const bytes = Number(value);
 
-    if (
-        !Number.isFinite(bytes)
-        || bytes < 0
-    ) {
+    if (!Number.isFinite(bytes) || bytes < 0) {
         return "Not available";
     }
 
@@ -226,142 +127,89 @@ function formatBytes(
         return "0 B";
     }
 
-    const units = [
-        "B",
-        "KB",
-        "MB",
-        "GB",
-        "TB",
-    ];
+    const units = ["B", "KB", "MB", "GB", "TB"];
 
     const unitIndex = Math.min(
-        Math.floor(
-            Math.log(bytes)
-            / Math.log(1024)
-        ),
-        units.length - 1
+        Math.floor(Math.log(bytes) / Math.log(1024)),
+        units.length - 1,
     );
 
-    const amount = (
-        bytes
-        / Math.pow(
-            1024,
-            unitIndex
-        )
-    );
+    const amount = bytes / Math.pow(1024, unitIndex);
 
     return `${amount.toFixed(
-        amount >= 10 || unitIndex === 0
-            ? 0
-            : 1
+        amount >= 10 || unitIndex === 0 ? 0 : 1,
     )} ${units[unitIndex]}`;
 }
 
-
 /* Classification */
 
-function clearBadgeClasses(
-    badge
-) {
+function clearBadgeClasses(badge) {
     badge.classList.remove(
         "information-badge-healthy",
         "information-badge-warning",
         "information-badge-error",
-        "information-badge-neutral"
+        "information-badge-neutral",
     );
 }
 
 function setAvailabilityBadge(
     badge,
     available,
-    {
-        availableLabel = "Available",
-        unavailableLabel = "Unavailable",
-    } = {}
+    { availableLabel = "Available", unavailableLabel = "Unavailable" } = {},
 ) {
     clearBadgeClasses(badge);
 
     if (available === true) {
-        badge.classList.add(
-            "information-badge-healthy"
-        );
+        badge.classList.add("information-badge-healthy");
 
         badge.textContent = availableLabel;
     } else if (available === false) {
-        badge.classList.add(
-            "information-badge-warning"
-        );
+        badge.classList.add("information-badge-warning");
 
         badge.textContent = unavailableLabel;
     } else {
-        badge.classList.add(
-            "information-badge-neutral"
-        );
+        badge.classList.add("information-badge-neutral");
 
         badge.textContent = "Unknown";
     }
 }
 
-
 /* UI helpers */
 
-function setConnectionState(
-    state,
-    label
-) {
+function setConnectionState(state, label) {
     elements.connection.classList.remove(
         "status-connecting",
         "status-connected",
-        "status-error"
+        "status-error",
     );
 
     if (state === "connected") {
-        elements.connection.classList.add(
-            "status-connected"
-        );
+        elements.connection.classList.add("status-connected");
     } else if (state === "error") {
-        elements.connection.classList.add(
-            "status-error"
-        );
+        elements.connection.classList.add("status-error");
     } else {
-        elements.connection.classList.add(
-            "status-connecting"
-        );
+        elements.connection.classList.add("status-connecting");
     }
 
     elements.connection.textContent = label;
 }
 
-function setLoadingState(
-    loading
-) {
+function setLoadingState(loading) {
     elements.refreshButton.disabled = loading;
     elements.retryButton.disabled = loading;
 
-    elements.refreshButton.textContent = (
-        loading
-            ? "Refreshing…"
-            : "Refresh"
-    );
+    elements.refreshButton.textContent = loading ? "Refreshing…" : "Refresh";
 
     if (loading) {
-        setConnectionState(
-            "connecting",
-            "Loading…"
-        );
+        setConnectionState("connecting", "Updating…");
     }
 }
 
-function showError(
-    message
-) {
+function showError(message) {
     elements.errorMessage.textContent = message;
     elements.errorPanel.hidden = false;
 
-    setConnectionState(
-        "error",
-        "Unavailable"
-    );
+    setConnectionState("error", "Unavailable");
 }
 
 function hideError() {
@@ -369,24 +217,17 @@ function hideError() {
 }
 
 function updateTimestamp() {
-    elements.updated.textContent =
-        `Updated ${formatUpdatedTime(new Date())}`;
+    elements.updated.textContent = `Last updated ${formatUpdatedTime(new Date())}`;
 }
 
 function clearTimestamp() {
-    elements.updated.textContent =
-        "Information unavailable";
+    elements.updated.textContent = "Information unavailable";
 }
-
 
 /* Rendering */
 
-function createValueItem(
-    value
-) {
-    const item = document.createElement(
-        "span"
-    );
+function createValueItem(value) {
+    const item = document.createElement("span");
 
     item.className = "value-chip";
     item.textContent = value;
@@ -394,303 +235,168 @@ function createValueItem(
     return item;
 }
 
-function createUrlItem(
-    value
-) {
-    const item = document.createElement(
-        "div"
-    );
+function createUrlItem(value) {
+    const item = document.createElement("div");
 
     item.className = "url-item";
 
-    const link = document.createElement(
-        "a"
-    );
+    const link = document.createElement("a");
 
     link.href = value;
     link.textContent = value;
     link.target = "_blank";
     link.rel = "noopener noreferrer";
 
-    const copyButton = document.createElement(
-        "button"
-    );
+    const copyButton = document.createElement("button");
 
-    copyButton.className = (
-        "url-copy-button"
-    );
+    copyButton.className = "url-copy-button";
 
     copyButton.type = "button";
     copyButton.textContent = "Copy";
 
-    copyButton.addEventListener(
-        "click",
-        () => {
-            copyText(
-                value,
-                copyButton
-            );
-        }
-    );
+    copyButton.addEventListener("click", () => {
+        copyText(value, copyButton);
+    });
 
-    item.append(
-        link,
-        copyButton
-    );
+    item.append(link, copyButton);
 
     return item;
 }
 
-function renderValueList(
-    container,
-    values
-) {
+function renderValueList(container, values) {
     container.replaceChildren();
 
-    if (
-        !Array.isArray(values)
-        || values.length === 0
-    ) {
+    if (!Array.isArray(values) || values.length === 0) {
         container.textContent = "Not available";
         return;
     }
 
     for (const value of values) {
-        container.append(
-            createValueItem(value)
-        );
+        container.append(createValueItem(value));
     }
 }
 
-function renderUrlList(
-    container,
-    values
-) {
+function renderUrlList(container, values) {
     container.replaceChildren();
 
-    if (
-        !Array.isArray(values)
-        || values.length === 0
-    ) {
+    if (!Array.isArray(values) || values.length === 0) {
         container.textContent = "Not available";
         return;
     }
 
     for (const value of values) {
-        container.append(
-            createUrlItem(value)
-        );
+        container.append(createUrlItem(value));
     }
 }
 
-function renderRobot(
-    robot
-) {
-    elements.robotModel.textContent = (
-        displayValue(robot.model)
-    );
+function renderRobot(robot) {
+    elements.robotModel.textContent = displayValue(robot.model);
 
-    elements.robotHostname.textContent = (
-        displayValue(robot.hostname)
-    );
+    elements.robotHostname.textContent = displayValue(robot.hostname);
 
-    elements.robotIdentifier.textContent = (
-        displayValue(robot.identifier)
-    );
+    elements.robotIdentifier.textContent = displayValue(robot.identifier);
 
-    const available = (
-        robot.control_available
-    );
+    const available = robot.control_available;
 
-    elements.robotControl.textContent = (
-        available
-            ? "Available for student code"
-            : "Currently in use"
-    );
+    elements.robotControl.textContent = available
+        ? "Available for student code"
+        : "Currently in use";
 
-    setAvailabilityBadge(
-        elements.robotControlBadge,
-        available,
-        {
-            availableLabel: "Available",
-            unavailableLabel: "In Use",
-        }
-    );
+    setAvailabilityBadge(elements.robotControlBadge, available, {
+        availableLabel: "Available",
+        unavailableLabel: "In Use",
+    });
 
-    setAvailabilityBadge(
-        elements.featureRobotControl,
-        available,
-        {
-            availableLabel: "Available",
-            unavailableLabel: "In Use",
-        }
-    );
+    setAvailabilityBadge(elements.featureRobotControl, available, {
+        availableLabel: "Available",
+        unavailableLabel: "In Use",
+    });
 }
 
-function renderNetwork(
-    network
-) {
-    elements.networkHostname.textContent = (
-        displayValue(network.hostname)
-    );
+function renderNetwork(network) {
+    elements.networkHostname.textContent = displayValue(network.hostname);
 
-    renderValueList(
-        elements.ipAddresses,
-        network.ip_addresses
-    );
+    renderValueList(elements.ipAddresses, network.ip_addresses);
 
-    renderUrlList(
-        elements.launchpadUrls,
-        network.launchpad_urls
-    );
+    renderUrlList(elements.launchpadUrls, network.launchpad_urls);
 
-    renderUrlList(
-        elements.jupyterhubUrls,
-        network.jupyterhub_urls
-    );
+    renderUrlList(elements.jupyterhubUrls, network.jupyterhub_urls);
 
-    renderUrlList(
-        elements.visionUrls,
-        network.vision_urls
-    );
+    renderUrlList(elements.visionUrls, network.vision_urls);
 }
 
-function renderSoftware(
-    software
-) {
-    elements.softwareVersion.textContent = (
-        displayValue(
-            software.betabox_robotics_version
-        )
+function renderSoftware(software) {
+    elements.softwareVersion.textContent = displayValue(
+        software.betabox_robotics_version,
     );
 
-    elements.pythonVersion.textContent = (
-        displayValue(
-            software.python_version
-        )
+    elements.pythonVersion.textContent = displayValue(software.python_version);
+
+    elements.operatingSystem.textContent = displayValue(
+        software.operating_system,
     );
 
-    elements.operatingSystem.textContent = (
-        displayValue(
-            software.operating_system
-        )
-    );
-
-    elements.architecture.textContent = (
-        displayValue(
-            software.architecture
-        )
-    );
+    elements.architecture.textContent = displayValue(software.architecture);
 }
 
-function renderStorage(
-    storage
-) {
-    const rawUsedPercent = Number(
-        storage.used_percent
-    );
+function renderStorage(storage) {
+    const rawUsedPercent = Number(storage.used_percent);
 
-    const hasUsedPercent = (
-        Number.isFinite(rawUsedPercent)
-    );
+    const hasUsedPercent = Number.isFinite(rawUsedPercent);
 
-    const usedPercent = (
-        hasUsedPercent
-            ? Math.min(
-                100,
-                Math.max(
-                    0,
-                    rawUsedPercent
-                )
-            )
-            : 0
-    );
+    const usedPercent = hasUsedPercent
+        ? Math.min(100, Math.max(0, rawUsedPercent))
+        : 0;
 
-    clearBadgeClasses(
-        elements.storagePercent
-    );
+    clearBadgeClasses(elements.storagePercent);
 
     if (!hasUsedPercent) {
-        elements.storagePercent.textContent = (
-            "Unknown"
-        );
+        elements.storagePercent.textContent = "Unknown";
 
-        elements.storagePercent.classList.add(
-            "information-badge-neutral"
-        );
+        elements.storagePercent.classList.add("information-badge-neutral");
     } else {
-        elements.storagePercent.textContent = (
-            `${usedPercent.toFixed(1)}% used`
-        );
+        elements.storagePercent.textContent = `${usedPercent.toFixed(1)}% used`;
 
         if (usedPercent >= 95) {
-            elements.storagePercent.classList.add(
-                "information-badge-error"
-            );
+            elements.storagePercent.classList.add("information-badge-error");
         } else if (usedPercent >= 85) {
-            elements.storagePercent.classList.add(
-                "information-badge-warning"
-            );
+            elements.storagePercent.classList.add("information-badge-warning");
         } else {
-            elements.storagePercent.classList.add(
-                "information-badge-healthy"
-            );
+            elements.storagePercent.classList.add("information-badge-healthy");
         }
     }
 
-    elements.storageMeterFill.style.width = (
-        `${usedPercent}%`
-    );
+    elements.storageMeterFill.style.width = `${usedPercent}%`;
 
-    const track = (
-        elements.storageMeterFill
-        .parentElement
-    );
+    const track = elements.storageMeterFill.parentElement;
 
     if (track !== null) {
-        track.setAttribute(
-            "aria-valuenow",
-            String(
-                Math.round(usedPercent)
-            )
-        );
+        track.setAttribute("aria-valuenow", String(Math.round(usedPercent)));
     }
 
-    elements.storageUsed.textContent = (
-        formatBytes(storage.used_bytes)
+    elements.storageUsed.textContent = formatBytes(storage.used_bytes);
+
+    elements.storageAvailable.textContent = formatBytes(
+        storage.available_bytes,
     );
 
-    elements.storageAvailable.textContent = (
-        formatBytes(
-            storage.available_bytes
-        )
-    );
-
-    elements.storageTotal.textContent = (
-        formatBytes(storage.total_bytes)
-    );
+    elements.storageTotal.textContent = formatBytes(storage.total_bytes);
 }
 
-function renderFeatures(
-    features
-) {
+function renderFeatures(features) {
     setAvailabilityBadge(
         elements.featureVisionService,
         features.vision_service_available,
         {
             availableLabel: "Running",
             unavailableLabel: "Unavailable",
-        }
+        },
     );
 
-    setAvailabilityBadge(
-        elements.featureCamera,
-        features.camera_ready,
-        {
-            availableLabel: "Ready",
-            unavailableLabel: "Not Ready",
-        }
-    );
+    setAvailabilityBadge(elements.featureCamera, features.camera_ready, {
+        availableLabel: "Ready",
+        unavailableLabel: "Not Ready",
+    });
 
     setAvailabilityBadge(
         elements.featureJupyterhub,
@@ -698,52 +404,34 @@ function renderFeatures(
         {
             availableLabel: "Installed",
             unavailableLabel: "Unavailable",
-        }
+        },
     );
 }
 
-function renderMedia(
-    media
-) {
-    setAvailabilityBadge(
-        elements.mediaPictures,
-        media.pictures_available,
-        {
-            availableLabel: "Ready",
-            unavailableLabel: "Missing",
-        }
-    );
+function renderMedia(media) {
+    setAvailabilityBadge(elements.mediaPictures, media.pictures_available, {
+        availableLabel: "Ready",
+        unavailableLabel: "Missing",
+    });
 
-    setAvailabilityBadge(
-        elements.mediaVideos,
-        media.videos_available,
-        {
-            availableLabel: "Ready",
-            unavailableLabel: "Missing",
-        }
-    );
+    setAvailabilityBadge(elements.mediaVideos, media.videos_available, {
+        availableLabel: "Ready",
+        unavailableLabel: "Missing",
+    });
 
-    setAvailabilityBadge(
-        elements.mediaSounds,
-        media.sounds_available,
-        {
-            availableLabel: "Ready",
-            unavailableLabel: "Missing",
-        }
-    );
+    setAvailabilityBadge(elements.mediaSounds, media.sounds_available, {
+        availableLabel: "Ready",
+        unavailableLabel: "Missing",
+    });
 }
 
 function renderLoadingState() {
-    elements.updated.textContent =
-        "Loading platform information…";
+    elements.updated.textContent = "Updating platform information…";
 }
-
 
 /* Validation */
 
-function validatePayload(
-    payload
-) {
+function validatePayload(payload) {
     const sections = [
         "robot",
         "network",
@@ -753,28 +441,16 @@ function validatePayload(
         "features",
     ];
 
-    if (
-        !payload
-        || typeof payload !== "object"
-    ) {
-        throw new Error(
-            "The Information API returned an invalid response."
-        );
+    if (!payload || typeof payload !== "object") {
+        throw new Error("The Information API returned an invalid response.");
     }
 
     for (const section of sections) {
-        if (
-            !payload[section]
-            || typeof payload[section]
-            !== "object"
-        ) {
-            throw new Error(
-                `The information response is missing ${section}.`
-            );
+        if (!payload[section] || typeof payload[section] !== "object") {
+            throw new Error(`The information response is missing ${section}.`);
         }
     }
 }
-
 
 /* API */
 
@@ -791,27 +467,20 @@ async function loadInformation() {
     renderLoadingState();
 
     try {
-        const response = await fetch(
-            INFORMATION_API_URL,
-            {
-                method: "GET",
-                headers: {
-                    Accept: "application/json",
-                },
-                cache: "no-store",
-            }
-        );
+        const response = await fetch(INFORMATION_API_URL, {
+            method: "GET",
+            headers: {
+                Accept: "application/json",
+            },
+            cache: "no-store",
+        });
 
         if (!response.ok) {
-            let message = (
-                `Information API returned HTTP `
-                + `${response.status}.`
-            );
+            let message =
+                `Information API returned HTTP ` + `${response.status}.`;
 
             try {
-                const errorPayload = (
-                    await response.json()
-                );
+                const errorPayload = await response.json();
 
                 if (errorPayload.message) {
                     message = errorPayload.message;
@@ -836,21 +505,14 @@ async function loadInformation() {
 
         updateTimestamp();
 
-        setConnectionState(
-            "connected",
-            "Live"
-        );
+        setConnectionState("connected", "Connected");
     } catch (error) {
-        console.error(
-            "Unable to load platform information:",
-            error
-        );
+        console.error("Unable to load platform information:", error);
 
-        const message = (
+        const message =
             error instanceof Error
                 ? error.message
-                : "The Information API did not respond."
-        );
+                : "The Information API did not respond.";
 
         showError(message);
 
@@ -861,35 +523,19 @@ async function loadInformation() {
     }
 }
 
-
 /* UI */
 
-async function copyText(
-    value,
-    button
-) {
-    const originalLabel = (
-        button.textContent
-    );
+async function copyText(value, button) {
+    const originalLabel = button.textContent;
 
     try {
-        if (
-            navigator.clipboard
-            && window.isSecureContext
-        ) {
-            await navigator.clipboard.writeText(
-                value
-            );
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(value);
         } else {
-            const textarea = document.createElement(
-                "textarea"
-            );
+            const textarea = document.createElement("textarea");
 
             textarea.value = value;
-            textarea.setAttribute(
-                "readonly",
-                ""
-            );
+            textarea.setAttribute("readonly", "");
 
             textarea.style.position = "fixed";
             textarea.style.opacity = "0";
@@ -898,54 +544,33 @@ async function copyText(
             document.body.append(textarea);
 
             textarea.select();
-            textarea.setSelectionRange(
-                0,
-                textarea.value.length
-            );
+            textarea.setSelectionRange(0, textarea.value.length);
 
-            const copied = document.execCommand(
-                "copy"
-            );
+            const copied = document.execCommand("copy");
 
             textarea.remove();
 
             if (!copied) {
-                throw new Error(
-                    "Browser copy command failed."
-                );
+                throw new Error("Browser copy command failed.");
             }
         }
 
         button.textContent = "Copied";
 
-        window.setTimeout(
-            () => {
-                button.textContent = (
-                    originalLabel
-                );
-            },
-            1500
-        );
+        window.setTimeout(() => {
+            button.textContent = originalLabel;
+        }, 1500);
     } catch (error) {
-        console.error(
-            "Unable to copy URL:",
-            error
-        );
+        console.error("Unable to copy URL:", error);
 
         button.textContent = "Select";
 
-        const link = button
-            .closest(".url-item")
-            ?.querySelector("a");
+        const link = button.closest(".url-item")?.querySelector("a");
 
-        if (link !== null) {
-            const selection = (
-                window.getSelection()
-            );
+        if (link !== null && link !== undefined) {
+            const selection = window.getSelection();
 
-            const range = (
-                document.createRange()
-            );
+            const range = document.createRange();
 
             range.selectNodeContents(link);
 
@@ -953,128 +578,69 @@ async function copyText(
             selection?.addRange(range);
         }
 
-        window.setTimeout(
-            () => {
-                button.textContent = (
-                    originalLabel
-                );
-            },
-            1800
-        );
+        window.setTimeout(() => {
+            button.textContent = originalLabel;
+        }, 1800);
     }
 }
 
-function preferenceBoolean(
-    key
-) {
-    return (
-        window.localStorage.getItem(key)
-        === "true"
-    );
+function preferenceBoolean(key) {
+    return window.localStorage.getItem(key) === "true";
 }
 
-function saveBooleanPreference(
-    key,
-    value
-) {
-    window.localStorage.setItem(
-        key,
-        value ? "true" : "false"
-    );
+function saveBooleanPreference(key, value) {
+    window.localStorage.setItem(key, value ? "true" : "false");
 }
 
-
-function applyAppearance(
-    appearance
-) {
+function applyAppearance(appearance) {
     if (appearance === "system") {
-        window.localStorage.removeItem(
-            THEME_KEY
-        );
+        window.localStorage.removeItem(THEME_KEY);
 
-        if (
-            typeof window.useSystemTheme
-            === "function"
-        ) {
+        if (typeof window.useSystemTheme === "function") {
             window.useSystemTheme();
         } else {
-            delete document.documentElement
-                .dataset.theme;
+            delete document.documentElement.dataset.theme;
         }
 
         return;
     }
 
-    if (
-        appearance !== "light"
-        && appearance !== "dark"
-    ) {
+    if (appearance !== "light" && appearance !== "dark") {
         return;
     }
 
-    if (
-        typeof window.applyTheme
-        === "function"
-    ) {
-        window.applyTheme(
-            appearance,
-            {
-                persist: true,
-            }
-        );
+    if (typeof window.applyTheme === "function") {
+        window.applyTheme(appearance, {
+            persist: true,
+        });
     } else {
-        document.documentElement.dataset.theme = (
-            appearance
-        );
+        document.documentElement.dataset.theme = appearance;
 
-        window.localStorage.setItem(
-            THEME_KEY,
-            appearance
-        );
+        window.localStorage.setItem(THEME_KEY, appearance);
     }
 }
 
+function showPreferenceStatus(message) {
+    elements.preferencesStatus.textContent = message;
 
-function showPreferenceStatus(
-    message
-) {
-    elements.preferencesStatus.textContent = (
-        message
-    );
+    window.clearTimeout(showPreferenceStatus.timeoutId);
 
-    window.clearTimeout(
-        showPreferenceStatus.timeoutId
-    );
-
-    showPreferenceStatus.timeoutId = (
-        window.setTimeout(
-            () => {
-                elements.preferencesStatus
-                    .textContent = "";
-            },
-            1800
-        )
-    );
+    showPreferenceStatus.timeoutId = window.setTimeout(() => {
+        elements.preferencesStatus.textContent = "";
+    }, 1800);
 }
-
 
 showPreferenceStatus.timeoutId = 0;
 
-
 function selectedAppearance() {
-    const selected = document.querySelector(
-        'input[name="appearance"]:checked'
-    );
+    const selected = document.querySelector('input[name="appearance"]:checked');
 
     return selected?.value || "system";
 }
 
-
-function setAppearanceSelection(
-    appearance
-) {
+function setAppearanceSelection(appearance) {
     const input = document.querySelector(
-        `input[name="appearance"][value="${appearance}"]`
+        `input[name="appearance"][value="${appearance}"]`,
     );
 
     if (input !== null) {
@@ -1082,99 +648,50 @@ function setAppearanceSelection(
     }
 }
 
-
 function loadPreferences() {
-    const savedAppearance = (
-        window.localStorage.getItem(
-            APPEARANCE_KEY
-        )
-        || (
-            window.localStorage.getItem(
-                THEME_KEY
-            )
-            || "system"
-        )
-    );
+    const savedAppearance =
+        window.localStorage.getItem(APPEARANCE_KEY) ||
+        window.localStorage.getItem(THEME_KEY) ||
+        "system";
 
-    setAppearanceSelection(
-        savedAppearance
-    );
+    setAppearanceSelection(savedAppearance);
 
-    elements.reducedMotion.checked = (
-        preferenceBoolean(
-            REDUCED_MOTION_KEY
-        )
-    );
+    elements.reducedMotion.checked = preferenceBoolean(REDUCED_MOTION_KEY);
 
-    elements.largerText.checked = (
-        preferenceBoolean(
-            LARGER_TEXT_KEY
-        )
-    );
+    elements.largerText.checked = preferenceBoolean(LARGER_TEXT_KEY);
 
-    elements.compactLayout.checked = (
-        preferenceBoolean(
-            COMPACT_LAYOUT_KEY
-        )
-    );
+    elements.compactLayout.checked = preferenceBoolean(COMPACT_LAYOUT_KEY);
 
-    applyAppearance(
-        savedAppearance
-    );
+    applyAppearance(savedAppearance);
 
-    if (
-        typeof window.applyLaunchpadPreferences
-        === "function"
-    ) {
+    if (typeof window.applyLaunchpadPreferences === "function") {
         window.applyLaunchpadPreferences();
     }
 }
-
 
 function saveAppearancePreference() {
     const appearance = selectedAppearance();
 
-    window.localStorage.setItem(
-        APPEARANCE_KEY,
-        appearance
-    );
+    window.localStorage.setItem(APPEARANCE_KEY, appearance);
 
     applyAppearance(appearance);
 
-    showPreferenceStatus(
-        "Appearance saved"
-    );
+    showPreferenceStatus("Appearance saved");
 }
 
-
 function saveDisplayPreferences() {
-    saveBooleanPreference(
-        REDUCED_MOTION_KEY,
-        elements.reducedMotion.checked
-    );
+    saveBooleanPreference(REDUCED_MOTION_KEY, elements.reducedMotion.checked);
 
-    saveBooleanPreference(
-        LARGER_TEXT_KEY,
-        elements.largerText.checked
-    );
+    saveBooleanPreference(LARGER_TEXT_KEY, elements.largerText.checked);
 
-    saveBooleanPreference(
-        COMPACT_LAYOUT_KEY,
-        elements.compactLayout.checked
-    );
+    saveBooleanPreference(COMPACT_LAYOUT_KEY, elements.compactLayout.checked);
 
-    if (
-        typeof window.applyLaunchpadPreferences
-        === "function"
-    ) {
+    if (typeof window.applyLaunchpadPreferences === "function") {
         window.applyLaunchpadPreferences();
     }
 
-    showPreferenceStatus(
-        "Preferences saved"
-    );
+    showPreferenceStatus("Preferences saved");
 }
-
 
 function resetPreferences() {
     for (const key of [
@@ -1194,73 +711,39 @@ function resetPreferences() {
     elements.compactLayout.checked = false;
 
     applyAppearance("system");
-    if (
-        typeof window.applyLaunchpadPreferences
-        === "function"
-    ) {
+    if (typeof window.applyLaunchpadPreferences === "function") {
         window.applyLaunchpadPreferences();
     }
 
-    showPreferenceStatus(
-        "Preferences reset"
-    );
+    showPreferenceStatus("Preferences reset");
 }
 
 function setupEventListeners() {
-    elements.refreshButton.addEventListener(
-        "click",
-        loadInformation
-    );
+    elements.refreshButton.addEventListener("click", loadInformation);
 
-    elements.retryButton.addEventListener(
-        "click",
-        loadInformation
-    );
+    elements.retryButton.addEventListener("click", loadInformation);
 
-    document.querySelectorAll(
-        'input[name="appearance"]'
-    ).forEach(
-        input => {
-            input.addEventListener(
-                "change",
-                saveAppearancePreference
-            );
-        }
-    );
+    document.querySelectorAll('input[name="appearance"]').forEach((input) => {
+        input.addEventListener("change", saveAppearancePreference);
+    });
 
-    elements.reducedMotion.addEventListener(
-        "change",
-        saveDisplayPreferences
-    );
+    elements.reducedMotion.addEventListener("change", saveDisplayPreferences);
 
-    elements.largerText.addEventListener(
-        "change",
-        saveDisplayPreferences
-    );
+    elements.largerText.addEventListener("change", saveDisplayPreferences);
 
-    elements.compactLayout.addEventListener(
-        "change",
-        saveDisplayPreferences
-    );
+    elements.compactLayout.addEventListener("change", saveDisplayPreferences);
 
-    elements.resetPreferences.addEventListener(
-        "click",
-        resetPreferences
-    );
+    elements.resetPreferences.addEventListener("click", resetPreferences);
 }
-
 
 /* Refresh lifecycle */
 
 function startAutomaticRefresh() {
     stopAutomaticRefresh();
 
-    refreshTimer = window.setInterval(
-        () => {
-            void loadInformation();
-        },
-        REFRESH_INTERVAL_MS
-    );
+    refreshTimer = window.setInterval(() => {
+        void loadInformation();
+    }, REFRESH_INTERVAL_MS);
 }
 
 function stopAutomaticRefresh() {
@@ -1271,7 +754,6 @@ function stopAutomaticRefresh() {
     window.clearInterval(refreshTimer);
     refreshTimer = null;
 }
-
 
 /* Initialization */
 
@@ -1284,31 +766,20 @@ function initializeInformationPage() {
     void loadInformation();
 }
 
-if (
-    document.readyState === "loading"
-) {
-    document.addEventListener(
-        "DOMContentLoaded",
-        initializeInformationPage
-    );
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initializeInformationPage);
 } else {
     initializeInformationPage();
 }
 
-document.addEventListener(
-    "visibilitychange",
-    () => {
-        if (document.hidden) {
-            stopAutomaticRefresh();
-            return;
-        }
-
-        startAutomaticRefresh();
-        void loadInformation();
+document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+        stopAutomaticRefresh();
+        return;
     }
-);
 
-window.addEventListener(
-    "beforeunload",
-    stopAutomaticRefresh
-);
+    startAutomaticRefresh();
+    void loadInformation();
+});
+
+window.addEventListener("beforeunload", stopAutomaticRefresh);

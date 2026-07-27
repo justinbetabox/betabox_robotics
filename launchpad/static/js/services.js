@@ -1,105 +1,62 @@
 "use strict";
 
-
 /* Constants */
 
 const SERVICES_API_URL = "/api/services";
 const REFRESH_INTERVAL_MS = 30000;
-
 
 /* Page state */
 
 let requestInProgress = false;
 let refreshTimer = null;
 
-
 /* DOM helpers */
 
 const elements = {
-    connection: document.getElementById(
-        "services-connection"
-    ),
+    connection: document.getElementById("services-connection"),
 
-    refreshButton: document.getElementById(
-        "refresh-services"
-    ),
+    refreshButton: document.getElementById("refresh-services"),
 
-    retryButton: document.getElementById(
-        "retry-services"
-    ),
+    retryButton: document.getElementById("retry-services"),
 
-    updated: document.getElementById(
-        "services-updated"
-    ),
+    updated: document.getElementById("services-updated"),
 
-    overallIndicator: document.getElementById(
-        "overall-indicator"
-    ),
+    overallIndicator: document.getElementById("overall-indicator"),
 
-    overallStatus: document.getElementById(
-        "overall-status"
-    ),
+    overallStatus: document.getElementById("overall-status"),
 
-    healthyCount: document.getElementById(
-        "healthy-count"
-    ),
+    healthyCount: document.getElementById("healthy-count"),
 
-    warningCount: document.getElementById(
-        "warning-count"
-    ),
+    warningCount: document.getElementById("warning-count"),
 
-    errorCount: document.getElementById(
-        "error-count"
-    ),
+    errorCount: document.getElementById("error-count"),
 
-    unknownCount: document.getElementById(
-        "unknown-count"
-    ),
+    unknownCount: document.getElementById("unknown-count"),
 
-    totalCount: document.getElementById(
-        "total-count"
-    ),
+    totalCount: document.getElementById("total-count"),
 
-    attentionSection: document.getElementById(
-        "attention-section"
-    ),
+    attentionSection: document.getElementById("attention-section"),
 
-    attentionList: document.getElementById(
-        "attention-list"
-    ),
+    attentionList: document.getElementById("attention-list"),
 
-    servicesList: document.getElementById(
-        "services-list"
-    ),
+    servicesList: document.getElementById("services-list"),
 
-    errorPanel: document.getElementById(
-        "services-error-panel"
-    ),
+    errorPanel: document.getElementById("services-error-panel"),
 
-    errorMessage: document.getElementById(
-        "services-error-message"
-    ),
+    errorMessage: document.getElementById("services-error-message"),
 };
-
 
 /* Formatting */
 
-function formatTimestamp(
-    date
-) {
-    return new Intl.DateTimeFormat(
-        undefined,
-        {
-            hour: "numeric",
-            minute: "2-digit",
-            second: "2-digit",
-        }
-    ).format(date);
+function formatTimestamp(date) {
+    return new Intl.DateTimeFormat(undefined, {
+        hour: "numeric",
+        minute: "2-digit",
+        second: "2-digit",
+    }).format(date);
 }
 
-function formatLabel(
-    value
-) {
+function formatLabel(value) {
     if (!value) {
         return "Unknown";
     }
@@ -107,15 +64,10 @@ function formatLabel(
     return String(value)
         .replaceAll("-", " ")
         .replaceAll("_", " ")
-        .replace(
-            /\b\w/g,
-            character => character.toUpperCase()
-        );
+        .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
-function stateLabel(
-    state
-) {
+function stateLabel(state) {
     const labels = {
         running: "Running",
         completed: "Completed",
@@ -132,24 +84,17 @@ function stateLabel(
     return labels[state] || formatLabel(state);
 }
 
-function startupLabel(
-    startup
-) {
+function startupLabel(startup) {
     const labels = {
         continuous: "Continuous",
         oneshot: "One-Time Startup",
         conditional: "Conditional",
     };
 
-    return (
-        labels[startup]
-        || formatLabel(startup)
-    );
+    return labels[startup] || formatLabel(startup);
 }
 
-function categoryLabel(
-    category
-) {
+function categoryLabel(category) {
     const labels = {
         boot: "Boot Service",
         background: "Background Service",
@@ -157,18 +102,12 @@ function categoryLabel(
         network: "Network Service",
     };
 
-    return (
-        labels[category]
-        || formatLabel(category)
-    );
+    return labels[category] || formatLabel(category);
 }
-
 
 /* Classification */
 
-function healthClass(
-    health
-) {
+function healthClass(health) {
     if (health === "healthy") {
         return "status-healthy";
     }
@@ -184,9 +123,7 @@ function healthClass(
     return "status-unknown";
 }
 
-function serviceCardClass(
-    health
-) {
+function serviceCardClass(health) {
     if (health === "healthy") {
         return "service-card-healthy";
     }
@@ -202,20 +139,12 @@ function serviceCardClass(
     return "service-card-unknown";
 }
 
-function overallState(
-    summary
-) {
-    const errorCount = Number(
-        summary.error || 0
-    );
+function overallState(summary) {
+    const errorCount = Number(summary.error || 0);
 
-    const warningCount = Number(
-        summary.warning || 0
-    );
+    const warningCount = Number(summary.warning || 0);
 
-    const unknownCount = Number(
-        summary.unknown || 0
-    );
+    const unknownCount = Number(summary.unknown || 0);
 
     if (errorCount > 0) {
         return {
@@ -224,10 +153,7 @@ function overallState(
         };
     }
 
-    if (
-        warningCount > 0
-        || unknownCount > 0
-    ) {
+    if (warningCount > 0 || unknownCount > 0) {
         return {
             label: "Needs Attention",
             className: "status-warning",
@@ -240,407 +166,238 @@ function overallState(
     };
 }
 
-function serviceNeedsAttention(
-    service
-) {
+function serviceNeedsAttention(service) {
     return (
-        service.health === "error"
-        || service.health === "warning"
-        || service.health === "unknown"
+        service.health === "error" ||
+        service.health === "warning" ||
+        service.health === "unknown"
     );
 }
 
-function attentionMessage(
-    service
-) {
+function attentionMessage(service) {
     if (service.state === "failed") {
-        return (
-            `${service.display_name} encountered `
-            + "an error."
-        );
+        return `${service.display_name} encountered ` + "an error.";
     }
 
     if (service.state === "not-installed") {
-        return (
-            `${service.display_name} is not `
-            + "installed."
-        );
+        return `${service.display_name} is not ` + "installed.";
     }
 
     if (service.state === "inactive") {
-        return (
-            `${service.display_name} is not `
-            + "running."
-        );
+        return `${service.display_name} is not ` + "running.";
     }
 
     if (
-        service.state === "starting"
-        || service.state === "stopping"
-        || service.state === "reloading"
+        service.state === "starting" ||
+        service.state === "stopping" ||
+        service.state === "reloading"
     ) {
         return (
-            `${service.display_name} is currently `
-            + `${stateLabel(service.state).toLowerCase()}.`
+            `${service.display_name} is currently ` +
+            `${stateLabel(service.state).toLowerCase()}.`
         );
     }
 
-    return (
-        `${service.display_name} has an `
-        + "unknown service state."
-    );
+    return `${service.display_name} has an ` + "unknown service state.";
 }
-
 
 /* UI helpers */
 
 function updateTimestamp() {
-    elements.updated.textContent = (
-        `Updated ${formatTimestamp(new Date())}`
-    );
+    elements.updated.textContent = `Last updated ${formatTimestamp(new Date())}`;
 }
 
 function clearTimestamp() {
-    elements.updated.textContent =
-        "Service status unavailable";
+    elements.updated.textContent = "Service status unavailable";
 }
 
-function setConnectionState(
-    state,
-    label
-) {
+function setConnectionState(state, label) {
     const connection = elements.connection;
 
     connection.classList.remove(
         "status-connecting",
         "status-connected",
-        "status-error"
+        "status-error",
     );
 
     if (state === "connected") {
-        connection.classList.add(
-            "status-connected"
-        );
+        connection.classList.add("status-connected");
     } else if (state === "error") {
-        connection.classList.add(
-            "status-error"
-        );
+        connection.classList.add("status-error");
     } else {
-        connection.classList.add(
-            "status-connecting"
-        );
+        connection.classList.add("status-connecting");
     }
 
     connection.textContent = label;
 }
 
-function setLoadingState(
-    loading
-) {
+function setLoadingState(loading) {
     elements.refreshButton.disabled = loading;
     elements.retryButton.disabled = loading;
 
-    elements.refreshButton.textContent = (
-        loading
-            ? "Refreshing…"
-            : "Refresh"
-    );
+    elements.refreshButton.textContent = loading ? "Refreshing…" : "Refresh";
 
     if (loading) {
-        setConnectionState(
-            "connecting",
-            "Loading…"
-        );
+        setConnectionState("connecting", "Updating…");
     }
 }
 
-function showError(
-    message
-) {
-    elements.errorMessage.textContent = (
-        message
-    );
+function showError(message) {
+    elements.errorMessage.textContent = message;
 
     elements.errorPanel.hidden = false;
 
-    setConnectionState(
-        "error",
-        "Unavailable"
-    );
+    setConnectionState("error", "Unavailable");
 }
 
 function hideError() {
     elements.errorPanel.hidden = true;
 }
 
-
 /* Rendering */
 
-function renderOverview(
-    summary
-) {
-    const overall = overallState(
-        summary
-    );
+function renderOverview(summary) {
+    const overall = overallState(summary);
 
-    elements.overallStatus.textContent = (
-        overall.label
-    );
+    elements.overallStatus.textContent = overall.label;
 
     elements.overallIndicator.classList.remove(
         "status-healthy",
         "status-warning",
         "status-error",
-        "status-unknown"
+        "status-unknown",
     );
 
-    elements.overallIndicator.classList.add(
-        overall.className
-    );
+    elements.overallIndicator.classList.add(overall.className);
 
-    elements.healthyCount.textContent = (
-        summary.healthy ?? 0
-    );
+    elements.healthyCount.textContent = summary.healthy ?? 0;
 
-    elements.warningCount.textContent = (
-        summary.warning ?? 0
-    );
+    elements.warningCount.textContent = summary.warning ?? 0;
 
-    elements.errorCount.textContent = (
-        summary.error ?? 0
-    );
+    elements.errorCount.textContent = summary.error ?? 0;
 
-    elements.unknownCount.textContent = (
-        summary.unknown ?? 0
-    );
+    elements.unknownCount.textContent = summary.unknown ?? 0;
 
-    elements.totalCount.textContent = (
-        summary.total ?? 0
-    );
+    elements.totalCount.textContent = summary.total ?? 0;
 }
 
-function createMetaItem(
-    label,
-    value
-) {
-    const item = document.createElement(
-        "div"
-    );
+function createMetaItem(label, value) {
+    const item = document.createElement("div");
 
     item.className = "detail-card";
 
-    const itemLabel = document.createElement(
-        "span"
-    );
+    const itemLabel = document.createElement("span");
 
-    itemLabel.className = (
-        "detail-label"
-    );
+    itemLabel.className = "detail-label";
 
     itemLabel.textContent = label;
 
-    const itemValue = document.createElement(
-        "strong"
-    );
+    const itemValue = document.createElement("strong");
 
-    itemValue.className = (
-        "detail-value"
-    );
+    itemValue.className = "detail-value";
 
     itemValue.textContent = value;
 
-    item.append(
-        itemLabel,
-        itemValue
-    );
+    item.append(itemLabel, itemValue);
 
     return item;
 }
 
-function createServiceCard(
-    service
-) {
-    const article = document.createElement(
-        "article"
+function createServiceCard(service) {
+    const article = document.createElement("article");
+
+    article.className = ["service-card", serviceCardClass(service.health)].join(
+        " ",
     );
 
-    article.className = [
-        "service-card",
-        serviceCardClass(
-            service.health
-        ),
-    ].join(" ");
-
-    const header = document.createElement(
-        "div"
-    );
+    const header = document.createElement("div");
 
     header.className = "service-card-header";
 
-    const identity = document.createElement(
-        "div"
-    );
+    const identity = document.createElement("div");
 
-    identity.className = (
-        "service-card-identity"
-    );
+    identity.className = "service-card-identity";
 
-    const indicator = document.createElement(
-        "span"
-    );
+    const indicator = document.createElement("span");
 
-    indicator.className = [
-        "status-dot",
-        healthClass(service.health),
-    ].join(" ");
+    indicator.className = ["status-dot", healthClass(service.health)].join(" ");
 
-    indicator.setAttribute(
-        "aria-hidden",
-        "true"
-    );
+    indicator.setAttribute("aria-hidden", "true");
 
-    const titleGroup = document.createElement(
-        "div"
-    );
+    const titleGroup = document.createElement("div");
 
-    const title = document.createElement(
-        "h3"
-    );
+    const title = document.createElement("h3");
 
-    title.textContent = (
-        service.display_name
-        || service.name
-        || service.unit
-        || "Unknown Service"
-    );
+    title.textContent =
+        service.display_name ||
+        service.name ||
+        service.unit ||
+        "Unknown Service";
 
-    const unit = document.createElement(
-        "p"
-    );
+    const unit = document.createElement("p");
 
     unit.className = "service-unit";
-    unit.textContent = (
-        service.unit || "Unknown unit"
-    );
+    unit.textContent = service.unit || "Unknown unit";
 
-    titleGroup.append(
-        title,
-        unit
-    );
+    titleGroup.append(title, unit);
 
-    identity.append(
-        indicator,
-        titleGroup
-    );
+    identity.append(indicator, titleGroup);
 
-    const state = document.createElement(
-        "span"
-    );
+    const state = document.createElement("span");
 
     state.className = [
         "service-state-badge",
         `service-state-${service.state || "unknown"}`,
     ].join(" ");
 
-    state.textContent = stateLabel(
-        service.state
-    );
+    state.textContent = stateLabel(service.state);
 
-    header.append(
-        identity,
-        state
-    );
+    header.append(identity, state);
 
-    const description = document.createElement(
-        "p"
-    );
+    const description = document.createElement("p");
 
-    description.className = (
-        "service-description"
-    );
+    description.className = "service-description";
 
-    description.textContent = (
-        service.description
-        || "No description is available."
-    );
+    description.textContent =
+        service.description || "No description is available.";
 
-    const meta = document.createElement(
-        "div"
-    );
+    const meta = document.createElement("div");
 
     meta.className = "service-meta";
 
     meta.append(
-        createMetaItem(
-            "Type",
-            categoryLabel(
-                service.category
-            )
-        ),
-        createMetaItem(
-            "Startup",
-            startupLabel(
-                service.startup
-            )
-        ),
-        createMetaItem(
-            "Installed",
-            service.installed
-                ? "Yes"
-                : "No"
-        )
+        createMetaItem("Type", categoryLabel(service.category)),
+        createMetaItem("Startup", startupLabel(service.startup)),
+        createMetaItem("Installed", service.installed ? "Yes" : "No"),
     );
 
-    article.append(
-        header,
-        description,
-        meta
-    );
+    article.append(header, description, meta);
 
     return article;
 }
 
-function renderServices(
-    services
-) {
+function renderServices(services) {
     elements.servicesList.replaceChildren();
 
-    if (
-        !Array.isArray(services)
-        || services.length === 0
-    ) {
-        const placeholder = document.createElement(
-            "p"
-        );
+    if (!Array.isArray(services) || services.length === 0) {
+        const placeholder = document.createElement("p");
 
-        placeholder.className = (
-            "empty-state"
-        );
+        placeholder.className = "empty-state";
 
-        placeholder.textContent = (
-            "No managed services were found."
-        );
+        placeholder.textContent = "No managed services were found.";
 
-        elements.servicesList.append(
-            placeholder
-        );
+        elements.servicesList.append(placeholder);
 
         return;
     }
 
     for (const service of services) {
-        elements.servicesList.append(
-            createServiceCard(service)
-        );
+        elements.servicesList.append(createServiceCard(service));
     }
 }
 
-function createAttentionItem(
-    service
-) {
-    const item = document.createElement(
-        "article"
-    );
+function createAttentionItem(service) {
+    const item = document.createElement("article");
 
     item.className = [
         "attention-item",
@@ -649,61 +406,31 @@ function createAttentionItem(
             : "attention-critical",
     ].join(" ");
 
-    const indicator = document.createElement(
-        "span"
-    );
+    const indicator = document.createElement("span");
 
-    indicator.className = [
-        "status-dot",
-        healthClass(service.health),
-    ].join(" ");
+    indicator.className = ["status-dot", healthClass(service.health)].join(" ");
 
-    indicator.setAttribute(
-        "aria-hidden",
-        "true"
-    );
+    indicator.setAttribute("aria-hidden", "true");
 
-    const content = document.createElement(
-        "div"
-    );
+    const content = document.createElement("div");
 
-    const title = document.createElement(
-        "strong"
-    );
+    const title = document.createElement("strong");
 
-    title.textContent = (
-        service.display_name
-        || service.name
-        || service.unit
-    );
+    title.textContent = service.display_name || service.name || service.unit;
 
-    const message = document.createElement(
-        "p"
-    );
+    const message = document.createElement("p");
 
-    message.textContent = attentionMessage(
-        service
-    );
+    message.textContent = attentionMessage(service);
 
-    content.append(
-        title,
-        message
-    );
+    content.append(title, message);
 
-    item.append(
-        indicator,
-        content
-    );
+    item.append(indicator, content);
 
     return item;
 }
 
-function renderAttention(
-    services
-) {
-    const attentionServices = services.filter(
-        serviceNeedsAttention
-    );
+function renderAttention(services) {
+    const attentionServices = services.filter(serviceNeedsAttention);
 
     elements.attentionList.replaceChildren();
 
@@ -712,63 +439,38 @@ function renderAttention(
         return;
     }
 
-    for (
-        const service
-        of attentionServices
-    ) {
-        elements.attentionList.append(
-            createAttentionItem(service)
-        );
+    for (const service of attentionServices) {
+        elements.attentionList.append(createAttentionItem(service));
     }
 
     elements.attentionSection.hidden = false;
 }
 
 function renderPage(payload) {
-    renderOverview(
-        payload.summary
-    );
+    renderOverview(payload.summary);
 
-    renderAttention(
-        payload.services
-    );
+    renderAttention(payload.services);
 
-    renderServices(
-        payload.services
-    );
+    renderServices(payload.services);
 }
-
 
 /* Validation */
 
-function validatePayload(
-    payload
-) {
-    if (
-        !payload
-        || typeof payload !== "object"
-    ) {
-        throw new Error(
-            "The services API returned an invalid response."
-        );
+function validatePayload(payload) {
+    if (!payload || typeof payload !== "object") {
+        throw new Error("The services API returned an invalid response.");
     }
 
-    if (
-        !payload.summary
-        || typeof payload.summary !== "object"
-    ) {
-        throw new Error(
-            "The services response does not include a summary."
-        );
+    if (!payload.summary || typeof payload.summary !== "object") {
+        throw new Error("The services response does not include a summary.");
     }
 
     if (!Array.isArray(payload.services)) {
         throw new Error(
-            "The services response does not include a service list."
+            "The services response does not include a service list.",
         );
     }
 }
-
 
 /* API */
 
@@ -782,27 +484,19 @@ async function loadServices() {
     hideError();
 
     try {
-        const response = await fetch(
-            SERVICES_API_URL,
-            {
-                method: "GET",
-                headers: {
-                    Accept: "application/json",
-                },
-                cache: "no-store",
-            }
-        );
+        const response = await fetch(SERVICES_API_URL, {
+            method: "GET",
+            headers: {
+                Accept: "application/json",
+            },
+            cache: "no-store",
+        });
 
         if (!response.ok) {
-            let message = (
-                `Services API returned HTTP `
-                + `${response.status}.`
-            );
+            let message = `Services API returned HTTP ` + `${response.status}.`;
 
             try {
-                const errorPayload = (
-                    await response.json()
-                );
+                const errorPayload = await response.json();
 
                 if (errorPayload.message) {
                     message = errorPayload.message;
@@ -822,21 +516,14 @@ async function loadServices() {
 
         updateTimestamp();
 
-        setConnectionState(
-            "connected",
-            "Live"
-        );
+        setConnectionState("connected", "Connected");
     } catch (error) {
-        console.error(
-            "Unable to load services:",
-            error
-        );
+        console.error("Unable to load services:", error);
 
-        const message = (
+        const message =
             error instanceof Error
                 ? error.message
-                : "The services API did not respond."
-        );
+                : "The services API did not respond.";
 
         showError(message);
 
@@ -847,37 +534,26 @@ async function loadServices() {
     }
 }
 
-
 /* UI */
 
 function setupEventListeners() {
-    elements.refreshButton.addEventListener(
-        "click",
-        () => {
-            void loadServices();
-        }
-    );
+    elements.refreshButton.addEventListener("click", () => {
+        void loadServices();
+    });
 
-    elements.retryButton.addEventListener(
-        "click",
-        () => {
-            void loadServices();
-        }
-    );
+    elements.retryButton.addEventListener("click", () => {
+        void loadServices();
+    });
 }
-
 
 /* Refresh lifecycle */
 
 function startAutomaticRefresh() {
     stopAutomaticRefresh();
 
-    refreshTimer = window.setInterval(
-        () => {
-            void loadServices();
-        },
-        REFRESH_INTERVAL_MS
-    );
+    refreshTimer = window.setInterval(() => {
+        void loadServices();
+    }, REFRESH_INTERVAL_MS);
 }
 
 function stopAutomaticRefresh() {
@@ -889,7 +565,6 @@ function stopAutomaticRefresh() {
     refreshTimer = null;
 }
 
-
 /* Initialization */
 
 function initializeServicesPage() {
@@ -898,34 +573,22 @@ function initializeServicesPage() {
     void loadServices();
 }
 
-
 /* Event listeners */
 
-if (
-    document.readyState === "loading"
-) {
-    document.addEventListener(
-        "DOMContentLoaded",
-        initializeServicesPage
-    );
+if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initializeServicesPage);
 } else {
     initializeServicesPage();
 }
 
-document.addEventListener(
-    "visibilitychange",
-    () => {
-        if (document.hidden) {
-            stopAutomaticRefresh();
-            return;
-        }
-
-        startAutomaticRefresh();
-        void loadServices();
+document.addEventListener("visibilitychange", () => {
+    if (document.hidden) {
+        stopAutomaticRefresh();
+        return;
     }
-);
 
-window.addEventListener(
-    "beforeunload",
-    stopAutomaticRefresh
-);
+    startAutomaticRefresh();
+    void loadServices();
+});
+
+window.addEventListener("beforeunload", stopAutomaticRefresh);

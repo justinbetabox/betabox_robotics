@@ -136,7 +136,7 @@ async def events_api(
         return web.json_response(
             {
                 "error": "events_unavailable",
-                "message": ("Unable to load platform events."),
+                "message": "Unable to load platform events.",
                 "detail": str(exc),
             },
             status=500,

@@ -11,20 +11,6 @@
     >
 {% endblock %}
 
-{% block header_actions %}
-    <div
-        id="camera-status"
-        class="
-            connection-status
-            status-connecting
-        "
-        role="status"
-        aria-live="polite"
-    >
-        Connecting…
-    </div>
-{% endblock %}
-
 {% block page_content %}
     <section
         class="camera-view"
@@ -40,10 +26,19 @@
         ></video>
 
         <div
-            class="camera-message"
+            id="camera-status"
+            class="
+                camera-status
+                connection-status
+                status-connecting
+            "
             role="status"
             aria-live="polite"
         >
+            Connecting…
+        </div>
+
+        <div class="camera-message">
             Connecting vision…
         </div>
     </section>

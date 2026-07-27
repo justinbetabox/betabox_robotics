@@ -52,7 +52,7 @@ async def diagnostics_api(
         return web.json_response(
             {
                 "error": "diagnostics_unavailable",
-                "message": ("Unable to run platform diagnostics."),
+                "message": "Unable to run platform diagnostics.",
             },
             status=500,
         )

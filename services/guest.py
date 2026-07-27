@@ -8,13 +8,13 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from betabox_robotics.services.accounts import (
+    ProvisionedAccount,
     account_by_username,
 )
 from betabox_robotics.services.privileges import (
     require_root_or_elevate,
 )
 from betabox_robotics.services.workspace import (
-    ProvisionedAccount,
     account_ids,
     create_workspace,
     populate_media,

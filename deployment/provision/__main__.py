@@ -6,8 +6,8 @@ from pathlib import Path
 
 from betabox_robotics.services.workspace import (
     BETABOX_ACCOUNTS,
+    create_workspace,
     populate_media,
-    provision_workspace,
 )
 
 from .accounts import provision_accounts
@@ -53,7 +53,7 @@ def main() -> None:
     print("Provisioning Betabox workspaces...")
 
     for account in BETABOX_ACCOUNTS:
-        provision_workspace(account)
+        create_workspace(account)
 
     print("Provisioning Betabox media...")
 

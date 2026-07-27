@@ -10,6 +10,7 @@ from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
     PlatformConfig,
 )
+from betabox_robotics.services.accounts import BETABOX_ACCOUNTS
 
 
 @dataclass(frozen=True)
@@ -64,10 +65,7 @@ def check_command(
     return CheckResult(
         name,
         result.returncode == 0,
-        (
-            result.stdout.strip()
-            or result.stderr.strip()
-        ),
+        (result.stdout.strip() or result.stderr.strip()),
     )
 
 
@@ -75,9 +73,7 @@ def check_config_line(
     line: str,
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> CheckResult:
-    config_file = (
-        config.verification.boot_config_file
-    )
+    config_file = config.verification.boot_config_file
 
     if not config_file.exists():
         return CheckResult(
@@ -124,12 +120,11 @@ def check_executable(command: str) -> CheckResult:
         path if path else "not found",
     )
 
+
 def check_service_installed(
     unit: str,
 ) -> CheckResult:
-    path = Path(
-        "/etc/systemd/system"
-    ) / unit
+    path = Path("/etc/systemd/system") / unit
 
     return CheckResult(
         f"service-installed:{unit}",
@@ -159,16 +154,43 @@ def check_service_enabled(
             "systemctl command failed",
         )
 
-    output = (
-        result.stdout.strip()
-        or result.stderr.strip()
-        or "unknown"
-    )
+    output = result.stdout.strip() or result.stderr.strip() or "unknown"
 
     return CheckResult(
         f"service-enabled:{unit}",
         result.returncode == 0,
         output,
+    )
+
+
+def check_account_workspace(
+    username: str,
+    home: Path,
+) -> CheckResult:
+    media_root = home / "media"
+
+    required_paths = (
+        media_root / "pictures",
+        media_root / "videos",
+        media_root / "sounds",
+        media_root / "sounds" / "car-honk.mp3",
+    )
+
+    missing_paths = [path for path in required_paths if not path.exists()]
+
+    if missing_paths:
+        missing = ", ".join(str(path) for path in missing_paths)
+
+        return CheckResult(
+            f"workspace:{username}",
+            False,
+            f"missing: {missing}",
+        )
+
+    return CheckResult(
+        f"workspace:{username}",
+        True,
+        str(home),
     )
 
 
@@ -178,20 +200,14 @@ def collect_checks(
     checks: list[CheckResult] = []
     verification = config.verification
 
-    for module in (
-        verification.required_python_modules
-    ):
-        checks.append(
-            check_import(module)
-        )
+    for module in verification.required_python_modules:
+        checks.append(check_import(module))
 
     checks.append(
         check_command(
             ["betabox", "--help"],
             "cli:betabox",
-            timeout=(
-                verification.command_timeout_seconds
-            ),
+            timeout=(verification.command_timeout_seconds),
         )
     )
 
@@ -203,15 +219,11 @@ def collect_checks(
                 "--help",
             ],
             "cli:betabox-launchpad",
-            timeout=(
-                verification.command_timeout_seconds
-            ),
+            timeout=(verification.command_timeout_seconds),
         )
     )
 
-    for line in (
-        verification.required_boot_config_lines
-    ):
+    for line in verification.required_boot_config_lines:
         checks.append(
             check_config_line(
                 line,
@@ -219,38 +231,24 @@ def collect_checks(
             )
         )
 
-    required_paths = (
-        config.paths.pictures_dir,
-        config.paths.videos_dir,
-        config.paths.sounds_dir,
-        config.paths.car_honk_sound,
-    )
-
-    for path in required_paths:
+    for account in BETABOX_ACCOUNTS:
         checks.append(
-            check_path(path)
-        )
-
-    for executable in (
-        verification.required_executables
-    ):
-        checks.append(
-            check_executable(executable)
-        )
-
-    for unit in config.services.all_units:
-        checks.append(
-            check_service_installed(
-                unit
+            check_account_workspace(
+                account.username,
+                account.home,
             )
         )
+
+    for executable in verification.required_executables:
+        checks.append(check_executable(executable))
+
+    for unit in config.services.all_units:
+        checks.append(check_service_installed(unit))
 
         checks.append(
             check_service_enabled(
                 unit,
-                timeout=(
-                    verification.command_timeout_seconds
-                ),
+                timeout=(verification.command_timeout_seconds),
             )
         )
 
@@ -296,11 +294,7 @@ def main() -> int:
     config = DEFAULT_PLATFORM_CONFIG
     checks = collect_checks(config)
 
-    return (
-        0
-        if print_results(checks)
-        else 1
-    )
+    return 0 if print_results(checks) else 1
 
 
 if __name__ == "__main__":

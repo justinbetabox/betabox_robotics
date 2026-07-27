@@ -32,6 +32,17 @@ BETABOX_ACCOUNTS: tuple[ProvisionedAccount, ...] = (
         persistent=False,
     ),
     ProvisionedAccount(
+        username="admin",
+        display_name="Administrator",
+        group="admin",
+        home=Path("/home/admin"),
+        shell=Path("/bin/bash"),
+        password="teachthefuture",  # or another default if you prefer
+        password_max_days=None,
+        supplemental_groups=(),
+        persistent=True,
+    ),
+    ProvisionedAccount(
         username="student",
         display_name="Student",
         group="student",

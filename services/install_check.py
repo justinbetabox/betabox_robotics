@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import argparse
 import importlib
+import os
+import pwd
 import shutil
 import subprocess
 import sys
@@ -36,13 +39,18 @@ def run(
         return None
 
 
-def path_status(path: Path) -> str | None:
-    try:
-        return None if path.exists() else "missing"
-    except PermissionError:
-        return "permission denied"
-    except OSError as exc:
-        return str(exc)
+def resolve_service_user(
+    requested_user: str | None = None,
+) -> str:
+    if requested_user:
+        return requested_user
+
+    sudo_user = os.environ.get("SUDO_USER")
+
+    if sudo_user:
+        return sudo_user
+
+    return pwd.getpwuid(os.getuid()).pw_name
 
 
 def check_import(module: str) -> CheckResult:
@@ -113,26 +121,54 @@ def check_config_line(
     )
 
 
-def check_path(path: Path) -> CheckResult:
+def check_runtime_media(
+    username: str,
+) -> CheckResult:
     try:
-        exists = path.exists()
-    except PermissionError:
+        user = pwd.getpwnam(username)
+    except KeyError:
         return CheckResult(
-            f"path:{path}",
+            f"runtime-media:{username}",
             False,
-            "permission denied",
+            "service user does not exist",
         )
-    except OSError as exc:
+
+    home = Path(user.pw_dir)
+    media_root = home / "media"
+
+    required_paths = (
+        media_root / "pictures",
+        media_root / "videos",
+        media_root / "sounds",
+        media_root / "sounds" / "car-honk.mp3",
+    )
+
+    problems: list[str] = []
+
+    for path in required_paths:
+        try:
+            exists = path.exists()
+        except PermissionError:
+            problems.append(f"{path}: permission denied")
+            continue
+        except OSError as exc:
+            problems.append(f"{path}: {exc}")
+            continue
+
+        if not exists:
+            problems.append(f"{path}: missing")
+
+    if problems:
         return CheckResult(
-            f"path:{path}",
+            f"runtime-media:{username}",
             False,
-            str(exc),
+            "; ".join(problems),
         )
 
     return CheckResult(
-        f"path:{path}",
-        exists,
-        "exists" if exists else "missing",
+        f"runtime-media:{username}",
+        True,
+        str(media_root),
     )
 
 
@@ -232,6 +268,8 @@ def check_account_workspace(
 
 def collect_checks(
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+    *,
+    service_user: str,
 ) -> list[CheckResult]:
     betabox_command = str(Path(sys.executable).parent / "betabox")
 
@@ -276,6 +314,8 @@ def collect_checks(
                 account.home,
             )
         )
+
+    checks.append(check_runtime_media(service_user))
 
     for executable in verification.required_executables:
         checks.append(check_executable(executable))
@@ -328,9 +368,32 @@ def print_results(checks: list[CheckResult]) -> bool:
     return all_ok
 
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Verify the Betabox software installation.",
+    )
+
+    parser.add_argument(
+        "--service-user",
+        help=(
+            "Linux account used by Betabox services. "
+            "Defaults to SUDO_USER when run through sudo."
+        ),
+    )
+
+    return parser.parse_args()
+
+
 def main() -> int:
+    args = parse_args()
     config = DEFAULT_PLATFORM_CONFIG
-    checks = collect_checks(config)
+
+    service_user = resolve_service_user(args.service_user)
+
+    checks = collect_checks(
+        config,
+        service_user=service_user,
+    )
 
     return 0 if print_results(checks) else 1
 

@@ -234,7 +234,7 @@ for service in "${SERVICES[@]}"; do
 done
 
 echo "[11/11] Running install check..."
-python -m betabox_robotics.services.install_check
+sudo "$VENV_DIR/bin/betabox" install-check
 
 echo
 echo "======================================"

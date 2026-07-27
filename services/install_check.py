@@ -35,6 +35,15 @@ def run(
         return None
 
 
+def path_status(path: Path) -> str | None:
+    try:
+        return None if path.exists() else "missing"
+    except PermissionError:
+        return "permission denied"
+    except OSError as exc:
+        return str(exc)
+
+
 def check_import(module: str) -> CheckResult:
     try:
         imported = importlib.import_module(module)
@@ -104,10 +113,25 @@ def check_config_line(
 
 
 def check_path(path: Path) -> CheckResult:
+    try:
+        exists = path.exists()
+    except PermissionError:
+        return CheckResult(
+            f"path:{path}",
+            False,
+            "permission denied",
+        )
+    except OSError as exc:
+        return CheckResult(
+            f"path:{path}",
+            False,
+            str(exc),
+        )
+
     return CheckResult(
         f"path:{path}",
-        path.exists(),
-        "exists" if path.exists() else "missing",
+        exists,
+        "exists" if exists else "missing",
     )
 
 
@@ -176,15 +200,26 @@ def check_account_workspace(
         media_root / "sounds" / "car-honk.mp3",
     )
 
-    missing_paths = [path for path in required_paths if not path.exists()]
+    problems: list[str] = []
 
-    if missing_paths:
-        missing = ", ".join(str(path) for path in missing_paths)
+    for path in required_paths:
+        try:
+            exists = path.exists()
+        except PermissionError:
+            problems.append(f"{path}: permission denied")
+            continue
+        except OSError as exc:
+            problems.append(f"{path}: {exc}")
+            continue
 
+        if not exists:
+            problems.append(f"{path}: missing")
+
+    if problems:
         return CheckResult(
             f"workspace:{username}",
             False,
-            f"missing: {missing}",
+            "; ".join(problems),
         )
 
     return CheckResult(

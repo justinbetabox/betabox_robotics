@@ -39,20 +39,32 @@
             </h1>
         </div>
 
-        {% block header %}
         <div class="interior-header-actions">
             {% block header_actions %}
             {% endblock %}
 
             {% include "_identity_badge.html" %}
         </div>
-        {% endblock %}
     </header>
+
+    {% if page.show_toolbar | default(false) %}
+        <div class="interior-toolbar">
+            <div class="interior-toolbar-status">
+                {% block toolbar_status %}
+                {% endblock %}
+            </div>
+
+            <div class="interior-toolbar-actions">
+                {% block toolbar_actions %}
+                {% endblock %}
+            </div>
+        </div>
+    {% endif %}
 
     <main
         class="
             interior-content
-            {{ page.main_class }}
+            {{ page.main_class | default("") }}
         "
     >
         {% block page_content %}

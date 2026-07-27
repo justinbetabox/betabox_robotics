@@ -7,20 +7,6 @@
     >
 {% endblock %}
 
-{% block header_actions %}
-    <div
-        id="jupyter-status"
-        class="
-            connection-status
-            status-connecting
-        "
-        role="status"
-        aria-live="polite"
-    >
-        Checking…
-    </div>
-{% endblock %}
-
 {% block page_content %}
     <section class="page-section jupyter-card">
         <div class="section-heading jupyter-card-heading">
@@ -34,14 +20,22 @@
                 </h2>
             </div>
 
-            <span
-                id="jupyter-health-dot"
-                class="
-                    status-dot
-                    status-unknown
-                "
-                aria-hidden="true"
-            ></span>
+            <div
+                class="jupyter-card-status"
+                role="status"
+                aria-live="polite"
+            >
+
+                <span
+                    id="jupyter-status"
+                    class="
+                        connection-status
+                        status-connecting
+                    "
+                >
+                    Checking…
+                </span>
+            </div>
         </div>
 
         <p class="jupyter-description">
@@ -107,8 +101,6 @@
         <p
             id="jupyter-message"
             class="jupyter-message"
-            role="status"
-            aria-live="polite"
         >
             Checking JupyterHub…
         </p>

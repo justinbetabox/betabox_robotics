@@ -2,40 +2,30 @@ from __future__ import annotations
 
 import argparse
 import os
-
 from pathlib import Path
 
-from .accounts import provision_accounts
 from betabox_robotics.services.workspace import (
     BETABOX_ACCOUNTS,
-    provision_media,
+    populate_media,
     provision_workspace,
 )
 
-REPOSITORY_ROOT = (
-    Path(__file__)
-    .resolve()
-    .parents[2]
-)
+from .accounts import provision_accounts
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 
 def parse_args() -> argparse.Namespace:
     """Parse provisioning command-line arguments."""
 
     parser = argparse.ArgumentParser(
-        description=(
-            "Provision Betabox accounts and "
-            "workspaces."
-        )
+        description=("Provision Betabox accounts and workspaces.")
     )
 
     parser.add_argument(
         "--service-user",
         required=True,
-        help=(
-            "Linux user that runs Betabox "
-            "services, normally pi."
-        ),
+        help=("Linux user that runs Betabox services, normally pi."),
     )
 
     return parser.parse_args()
@@ -45,9 +35,7 @@ def require_root() -> None:
     """Require provisioning to run with root privileges."""
 
     if os.geteuid() != 0:
-        raise SystemExit(
-            "Provisioning must run as root."
-        )
+        raise SystemExit("Provisioning must run as root.")
 
 
 def main() -> None:
@@ -65,13 +53,11 @@ def main() -> None:
     print("Provisioning Betabox workspaces...")
 
     for account in BETABOX_ACCOUNTS:
-        provision_workspace(
-            account
-        )
+        provision_workspace(account)
 
     print("Provisioning Betabox media...")
 
-    provision_media(
+    populate_media(
         REPOSITORY_ROOT,
     )
 

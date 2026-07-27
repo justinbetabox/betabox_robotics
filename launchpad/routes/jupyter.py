@@ -66,7 +66,7 @@ async def jupyter_status(
             "responding": responding,
             "state": state,
             "health_message": health_message,
-            "port": (platform.network.jupyterhub_port),
+            "port": platform.network.jupyterhub_port,
         }
     )
 

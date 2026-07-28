@@ -202,6 +202,10 @@ echo "[10/11] Installing systemd services..."
 SYSTEMD_SOURCE="$SDK_DIR/deployment/systemd"
 SYSTEMD_TARGET="/etc/systemd/system"
 
+AVAHI_OVERRIDE_SOURCE="$SYSTEMD_SOURCE/avahi-daemon.service.d/override.conf"
+AVAHI_OVERRIDE_DIR="$SYSTEMD_TARGET/avahi-daemon.service.d"
+AVAHI_OVERRIDE_TARGET="$AVAHI_OVERRIDE_DIR/override.conf"
+
 SERVICES=(
     betabox-boot-announce.service
     betabox-monitor.service
@@ -223,6 +227,28 @@ for service in "${SERVICES[@]}"; do
         "$SYSTEMD_SOURCE/$service" \
         "$SYSTEMD_TARGET/$service"
 done
+
+echo "Installing Avahi startup-order override..."
+
+if [[ ! -f "$AVAHI_OVERRIDE_SOURCE" ]]; then
+    echo "ERROR: Missing Avahi systemd override:"
+    echo "  $AVAHI_OVERRIDE_SOURCE"
+    exit 1
+fi
+
+sudo install \
+    -d \
+    -o root \
+    -g root \
+    -m 0755 \
+    "$AVAHI_OVERRIDE_DIR"
+
+sudo install \
+    -o root \
+    -g root \
+    -m 0644 \
+    "$AVAHI_OVERRIDE_SOURCE" \
+    "$AVAHI_OVERRIDE_TARGET"
 
 echo "Reloading systemd..."
 sudo systemctl daemon-reload

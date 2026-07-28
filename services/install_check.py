@@ -121,57 +121,6 @@ def check_config_line(
     )
 
 
-def check_runtime_media(
-    username: str,
-) -> CheckResult:
-    try:
-        user = pwd.getpwnam(username)
-    except KeyError:
-        return CheckResult(
-            f"runtime-media:{username}",
-            False,
-            "service user does not exist",
-        )
-
-    home = Path(user.pw_dir)
-    media_root = home / "media"
-
-    required_paths = (
-        media_root / "pictures",
-        media_root / "videos",
-        media_root / "sounds",
-        media_root / "sounds" / "car-honk.mp3",
-    )
-
-    problems: list[str] = []
-
-    for path in required_paths:
-        try:
-            exists = path.exists()
-        except PermissionError:
-            problems.append(f"{path}: permission denied")
-            continue
-        except OSError as exc:
-            problems.append(f"{path}: {exc}")
-            continue
-
-        if not exists:
-            problems.append(f"{path}: missing")
-
-    if problems:
-        return CheckResult(
-            f"runtime-media:{username}",
-            False,
-            "; ".join(problems),
-        )
-
-    return CheckResult(
-        f"runtime-media:{username}",
-        True,
-        str(media_root),
-    )
-
-
 def check_executable(command: str) -> CheckResult:
     path = shutil.which(command)
 
@@ -224,11 +173,13 @@ def check_service_enabled(
     )
 
 
-def check_account_workspace(
-    username: str,
-    home: Path,
+def check_media_root(
+    name: str,
+    media_root: Path,
+    *,
+    success_message: str | None = None,
 ) -> CheckResult:
-    media_root = home / "media"
+    """Verify that a Betabox media directory contains all required paths."""
 
     required_paths = (
         media_root / "pictures",
@@ -241,28 +192,59 @@ def check_account_workspace(
 
     for path in required_paths:
         try:
-            exists = path.exists()
+            if not path.exists():
+                problems.append(f"{path}: missing")
         except PermissionError:
             problems.append(f"{path}: permission denied")
-            continue
         except OSError as exc:
             problems.append(f"{path}: {exc}")
-            continue
-
-        if not exists:
-            problems.append(f"{path}: missing")
 
     if problems:
         return CheckResult(
-            f"workspace:{username}",
+            name,
             False,
             "; ".join(problems),
         )
 
     return CheckResult(
-        f"workspace:{username}",
+        name,
         True,
-        str(home),
+        success_message or str(media_root),
+    )
+
+
+def check_runtime_media(
+    username: str,
+) -> CheckResult:
+    """Verify the runtime media tree for the Betabox service account."""
+
+    try:
+        user = pwd.getpwnam(username)
+    except KeyError:
+        return CheckResult(
+            f"runtime-media:{username}",
+            False,
+            "service user does not exist",
+        )
+
+    media_root = Path(user.pw_dir) / "media"
+
+    return check_media_root(
+        f"runtime-media:{username}",
+        media_root,
+    )
+
+
+def check_account_workspace(
+    username: str,
+    home: Path,
+) -> CheckResult:
+    """Verify the media tree within a managed account workspace."""
+
+    return check_media_root(
+        f"workspace:{username}",
+        home / "media",
+        success_message=str(home),
     )
 
 

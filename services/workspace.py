@@ -66,6 +66,43 @@ def ensure_directory(
     directory.chmod(WORKSPACE_MODE)
 
 
+def create_runtime_media(
+    service_user: str,
+    repository_root: Path,
+) -> None:
+    """Create the runtime media tree for the Betabox service account."""
+
+    try:
+        account = pwd.getpwnam(service_user)
+    except KeyError as exc:
+        raise RuntimeError(f"Linux account does not exist: {service_user}") from exc
+
+    home = Path(account.pw_dir)
+    media = home / "media"
+    sounds = media / "sounds"
+
+    for directory in (
+        media,
+        media / "pictures",
+        media / "videos",
+        sounds,
+    ):
+        ensure_directory(
+            directory,
+            uid=account.pw_uid,
+            gid=account.pw_gid,
+        )
+
+    assets = repository_root / "deployment" / "assets" / "sounds"
+
+    install_directory(
+        assets,
+        sounds,
+        uid=account.pw_uid,
+        gid=account.pw_gid,
+    )
+
+
 def create_workspace(
     account: ProvisionedAccount,
 ) -> None:

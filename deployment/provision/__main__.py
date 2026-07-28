@@ -8,6 +8,7 @@ from betabox_robotics.services.accounts import (
     BETABOX_ACCOUNTS,
 )
 from betabox_robotics.services.workspace import (
+    create_runtime_media,
     create_workspace,
     populate_media,
 )
@@ -67,6 +68,11 @@ def main() -> None:
     populate_media(
         REPOSITORY_ROOT,
         accounts=BETABOX_ACCOUNTS,
+    )
+
+    create_runtime_media(
+        args.service_user,
+        REPOSITORY_ROOT,
     )
 
     print("Betabox provisioning complete.")

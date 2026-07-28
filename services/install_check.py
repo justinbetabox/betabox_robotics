@@ -16,6 +16,16 @@ from betabox_robotics.config import (
 )
 from betabox_robotics.services.accounts import BETABOX_ACCOUNTS
 
+AVAHI_OVERRIDE_PATH = Path("/etc/systemd/system/avahi-daemon.service.d/override.conf")
+
+AVAHI_OVERRIDE_REQUIRED_LINES = (
+    "After=set-hostname-from-serial.service",
+    "After=NetworkManager.service",
+    "After=NetworkManager-wait-online.service",
+    "Wants=set-hostname-from-serial.service",
+    "Wants=NetworkManager-wait-online.service",
+)
+
 
 @dataclass(frozen=True)
 class CheckResult:
@@ -173,6 +183,46 @@ def check_service_enabled(
     )
 
 
+def check_avahi_override(
+    path: Path = AVAHI_OVERRIDE_PATH,
+) -> CheckResult:
+    """Verify the Avahi systemd startup-ordering override."""
+
+    if not path.is_file():
+        return CheckResult(
+            "systemd-override:avahi-daemon",
+            False,
+            f"{path} missing",
+        )
+
+    try:
+        text = path.read_text(
+            encoding="utf-8",
+            errors="ignore",
+        )
+    except OSError as exc:
+        return CheckResult(
+            "systemd-override:avahi-daemon",
+            False,
+            str(exc),
+        )
+
+    missing_lines = [line for line in AVAHI_OVERRIDE_REQUIRED_LINES if line not in text]
+
+    if missing_lines:
+        return CheckResult(
+            "systemd-override:avahi-daemon",
+            False,
+            "missing: " + ", ".join(missing_lines),
+        )
+
+    return CheckResult(
+        "systemd-override:avahi-daemon",
+        True,
+        str(path),
+    )
+
+
 def check_media_root(
     name: str,
     media_root: Path,
@@ -311,6 +361,8 @@ def collect_checks(
                 timeout=(verification.command_timeout_seconds),
             )
         )
+
+    checks.append(check_avahi_override())
 
     return checks
 

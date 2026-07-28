@@ -13,14 +13,12 @@ from betabox_robotics.services.accounts import (
 from betabox_robotics.services.workspace import (
     workspace_directories,
 )
-
 from deployment.provision.accounts import (
     create_account,
     ensure_account_group,
     ensure_account_password,
     ensure_group_member,
     ensure_password_policy,
-    ensure_service_user_access,
     reconcile_account,
     user_is_group_member,
 )
@@ -40,6 +38,7 @@ class ManagedAccountDefinitionTests(
             usernames,
             {
                 "guest",
+                "admin",
                 "student",
                 "student1",
                 "student2",
@@ -119,15 +118,28 @@ class ManagedAccountDefinitionTests(
 
         self.assertIsNone(guest.password)
 
-    def test_account_definitions_have_no_machine_specific_groups(
+    def test_account_definitions_have_expected_supplemental_groups(
         self,
     ) -> None:
+        expected = (
+            "betabox",
+            "i2c",
+            "gpio",
+            "spi",
+        )
+
         for account in BETABOX_ACCOUNTS:
             with self.subTest(username=account.username):
                 self.assertEqual(
                     account.supplemental_groups,
-                    (),
+                    expected,
                 )
+
+    def test_admin_is_persistent(self) -> None:
+        admin = account_by_username("admin")
+
+        self.assertTrue(admin.persistent)
+        self.assertEqual(admin.shell, Path("/bin/bash"))
 
 
 class AccountCreationTests(
@@ -473,71 +485,6 @@ class SupplementalGroupTests(
         )
 
         run_command.assert_not_called()
-
-
-class ServiceUserAccessTests(
-    unittest.TestCase,
-):
-    """Tests for service-user workspace access."""
-
-    @patch("deployment.provision.accounts.ensure_group_member")
-    def test_service_user_is_added_to_student_group(
-        self,
-        ensure_member,
-    ) -> None:
-        account = account_by_username("student")
-
-        ensure_service_user_access(
-            account,
-            "pi",
-        )
-
-        ensure_member.assert_called_once_with(
-            "pi",
-            "student",
-        )
-
-    @patch("deployment.provision.accounts.ensure_group_member")
-    def test_service_user_is_not_added_to_guest_group(
-        self,
-        ensure_member,
-    ) -> None:
-        account = account_by_username("guest")
-
-        ensure_service_user_access(
-            account,
-            "pi",
-        )
-
-        ensure_member.assert_not_called()
-
-    @patch("deployment.provision.accounts.ensure_group_member")
-    def test_missing_service_user_is_ignored(
-        self,
-        ensure_member,
-    ) -> None:
-        account = account_by_username("student")
-
-        ensure_service_user_access(
-            account,
-            None,
-        )
-
-        ensure_member.assert_not_called()
-
-    @patch("deployment.provision.accounts.ensure_group_member")
-    def test_account_is_not_added_to_its_own_group(
-        self,
-        ensure_member,
-    ) -> None:
-        account = account_by_username("student")
-
-        ensure_service_user_access(
-            account,
-            "student",
-        )
-
-        ensure_member.assert_not_called()
 
 
 if __name__ == "__main__":

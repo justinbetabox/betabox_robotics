@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import fcntl
+import grp
 import json
 import os
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import IO, Any
 
@@ -12,10 +13,71 @@ from betabox_robotics.exceptions import (
     RobotBusyError,
 )
 
+ROBOT_LOCK_PATH = Path("/tmp/betabox-robot.lock")
+ROBOT_LOCK_GROUP = "betabox"
+ROBOT_LOCK_MODE = 0o660
 
-ROBOT_LOCK_PATH = Path(
-    "/tmp/betabox-robot.lock"
-)
+
+def _open_robot_lock(
+    lock_path: Path,
+) -> IO[str]:
+    """Open or safely create the shared robot lock."""
+
+    try:
+        group = grp.getgrnam(ROBOT_LOCK_GROUP)
+    except KeyError as exc:
+        raise RuntimeError(
+            f"Required Linux group does not exist: {ROBOT_LOCK_GROUP}"
+        ) from exc
+
+    base_flags = os.O_RDWR | os.O_CLOEXEC
+
+    if hasattr(os, "O_NOFOLLOW"):
+        base_flags |= os.O_NOFOLLOW
+
+    created = False
+
+    try:
+        fd = os.open(
+            lock_path,
+            base_flags,
+        )
+    except FileNotFoundError:
+        try:
+            fd = os.open(
+                lock_path,
+                base_flags | os.O_CREAT | os.O_EXCL,
+                ROBOT_LOCK_MODE,
+            )
+            created = True
+        except FileExistsError:
+            # Another process created it between the two open calls.
+            fd = os.open(
+                lock_path,
+                base_flags,
+            )
+
+    try:
+        if created:
+            os.fchown(
+                fd,
+                -1,
+                group.gr_gid,
+            )
+            os.fchmod(
+                fd,
+                ROBOT_LOCK_MODE,
+            )
+
+        return os.fdopen(
+            fd,
+            "r+",
+            encoding="utf-8",
+        )
+    except BaseException:
+        os.close(fd)
+        raise
+
 
 @dataclass(frozen=True)
 class RobotOwnershipStatus:
@@ -63,21 +125,15 @@ class RobotOwnership:
             exist_ok=True,
         )
 
-        lock_file = self.lock_path.open(
-            "a+",
-            encoding="utf-8",
-        )
+        lock_file = _open_robot_lock(self.lock_path)
 
         try:
             fcntl.flock(
                 lock_file.fileno(),
-                fcntl.LOCK_EX
-                | fcntl.LOCK_NB,
+                fcntl.LOCK_EX | fcntl.LOCK_NB,
             )
         except BlockingIOError:
-            details = self._read_owner(
-                lock_file
-            )
+            details = self._read_owner(lock_file)
 
             lock_file.close()
 
@@ -99,19 +155,13 @@ class RobotOwnership:
             {
                 "pid": os.getpid(),
                 "owner": self.owner,
-                "acquired_at": (
-                    datetime.now(
-                        timezone.utc
-                    ).isoformat()
-                ),
+                "acquired_at": (datetime.now(UTC).isoformat()),
             },
             lock_file,
         )
 
         lock_file.flush()
-        os.fsync(
-            lock_file.fileno()
-        )
+        os.fsync(lock_file.fileno())
 
         self._file = lock_file
 
@@ -141,9 +191,7 @@ class RobotOwnership:
     ) -> dict[str, object]:
         try:
             lock_file.seek(0)
-            value = json.load(
-                lock_file
-            )
+            value = json.load(lock_file)
 
             if isinstance(value, dict):
                 return value
@@ -159,7 +207,7 @@ class RobotOwnership:
 
     def __enter__(
         self,
-    ) -> "RobotOwnership":
+    ) -> RobotOwnership:
         self.acquire()
         return self
 
@@ -171,14 +219,12 @@ class RobotOwnership:
     ) -> None:
         self.release()
 
+
 def probe_robot_ownership(
     lock_path: Path = ROBOT_LOCK_PATH,
 ) -> RobotOwnershipStatus:
     try:
-        lock_file = lock_path.open(
-            "a+",
-            encoding="utf-8",
-        )
+        lock_file = _open_robot_lock(lock_path)
     except OSError as exc:
         return RobotOwnershipStatus(
             available=False,
@@ -194,27 +240,18 @@ def probe_robot_ownership(
         try:
             fcntl.flock(
                 lock_file.fileno(),
-                fcntl.LOCK_EX
-                | fcntl.LOCK_NB,
+                fcntl.LOCK_EX | fcntl.LOCK_NB,
             )
             acquired = True
 
         except BlockingIOError:
-            details = _read_lock_metadata(
-                lock_file
-            )
+            details = _read_lock_metadata(lock_file)
 
             return RobotOwnershipStatus(
                 available=False,
-                owner=_optional_string(
-                    details.get("owner")
-                ),
-                pid=_optional_int(
-                    details.get("pid")
-                ),
-                acquired_at=_optional_string(
-                    details.get("acquired_at")
-                ),
+                owner=_optional_string(details.get("owner")),
+                pid=_optional_int(details.get("pid")),
+                acquired_at=_optional_string(details.get("acquired_at")),
             )
 
         return RobotOwnershipStatus(
@@ -242,9 +279,7 @@ def _read_lock_metadata(
 ) -> dict[str, object]:
     try:
         lock_file.seek(0)
-        value = json.load(
-            lock_file
-        )
+        value = json.load(lock_file)
 
         if isinstance(value, dict):
             return value
@@ -262,18 +297,10 @@ def _read_lock_metadata(
 def _optional_string(
     value: object,
 ) -> str | None:
-    return (
-        value
-        if isinstance(value, str)
-        else None
-    )
+    return value if isinstance(value, str) else None
 
 
 def _optional_int(
     value: object,
 ) -> int | None:
-    return (
-        value
-        if isinstance(value, int)
-        else None
-    )
+    return value if isinstance(value, int) else None

@@ -31,7 +31,12 @@ BETABOX_ACCOUNTS: tuple[ProvisionedAccount, ...] = (
         group="guest",
         home=Path("/home/guest"),
         shell=Path("/usr/sbin/nologin"),
-        supplemental_groups=(BETABOX_SHARED_GROUP,),
+        supplemental_groups=(
+            BETABOX_SHARED_GROUP,
+            "i2c",
+            "gpio",
+            "spi",
+        ),
         persistent=False,
     ),
     ProvisionedAccount(
@@ -42,7 +47,12 @@ BETABOX_ACCOUNTS: tuple[ProvisionedAccount, ...] = (
         shell=Path("/bin/bash"),
         password="teachthefuture",  # or another default if you prefer
         password_max_days=None,
-        supplemental_groups=(BETABOX_SHARED_GROUP,),
+        supplemental_groups=(
+            BETABOX_SHARED_GROUP,
+            "i2c",
+            "gpio",
+            "spi",
+        ),
         persistent=True,
     ),
     ProvisionedAccount(
@@ -52,7 +62,13 @@ BETABOX_ACCOUNTS: tuple[ProvisionedAccount, ...] = (
         home=Path("/home/student"),
         shell=Path("/bin/bash"),
         password="learnbydoing",
-        supplemental_groups=(BETABOX_SHARED_GROUP,),
+        supplemental_groups=(
+            BETABOX_SHARED_GROUP,
+            "i2c",
+            "gpio",
+            "spi",
+        ),
+        persistent=True,
     ),
     ProvisionedAccount(
         username="student1",
@@ -61,7 +77,13 @@ BETABOX_ACCOUNTS: tuple[ProvisionedAccount, ...] = (
         home=Path("/home/student1"),
         shell=Path("/bin/bash"),
         password="learnbydoing",
-        supplemental_groups=(BETABOX_SHARED_GROUP,),
+        supplemental_groups=(
+            BETABOX_SHARED_GROUP,
+            "i2c",
+            "gpio",
+            "spi",
+        ),
+        persistent=True,
     ),
     ProvisionedAccount(
         username="student2",
@@ -70,7 +92,13 @@ BETABOX_ACCOUNTS: tuple[ProvisionedAccount, ...] = (
         home=Path("/home/student2"),
         shell=Path("/bin/bash"),
         password="learnbydoing",
-        supplemental_groups=(BETABOX_SHARED_GROUP,),
+        supplemental_groups=(
+            BETABOX_SHARED_GROUP,
+            "i2c",
+            "gpio",
+            "spi",
+        ),
+        persistent=True,
     ),
     ProvisionedAccount(
         username="student3",
@@ -79,7 +107,13 @@ BETABOX_ACCOUNTS: tuple[ProvisionedAccount, ...] = (
         home=Path("/home/student3"),
         shell=Path("/bin/bash"),
         password="learnbydoing",
-        supplemental_groups=(BETABOX_SHARED_GROUP,),
+        supplemental_groups=(
+            BETABOX_SHARED_GROUP,
+            "i2c",
+            "gpio",
+            "spi",
+        ),
+        persistent=True,
     ),
 )
 

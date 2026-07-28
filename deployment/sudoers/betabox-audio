@@ -1,0 +1,2 @@
+%betabox ALL=(root) NOPASSWD: /usr/bin/pinctrl set 20 op dh
+%betabox ALL=(root) NOPASSWD: /usr/bin/pinctrl set 20 op dl

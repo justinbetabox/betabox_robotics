@@ -11,6 +11,15 @@ from betabox_robotics.services.accounts import (
     ProvisionedAccount,
 )
 
+SERVICE_USER_GROUPS = (
+    BETABOX_SHARED_GROUP,
+    "i2c",
+    "gpio",
+    "spi",
+    "audio",
+    "video",
+)
+
 
 def run_command(
     *command: str,
@@ -267,10 +276,11 @@ def provision_accounts(
 
     ensure_shared_group()
 
-    ensure_group_member(
-        service_user,
-        BETABOX_SHARED_GROUP,
-    )
+    for group in SERVICE_USER_GROUPS:
+        ensure_group_member(
+            service_user,
+            group,
+        )
 
     for account in BETABOX_ACCOUNTS:
         ensure_account(account)

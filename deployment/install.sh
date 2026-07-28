@@ -10,9 +10,6 @@ VENV_DIR="$BETABOX_DIR/venv"
 JUPYTERHUB_DIR="/opt/jupyterhub"
 JUPYTERHUB_VENV_DIR="$JUPYTERHUB_DIR/venv"
 
-SUDOERS_SOURCE="$SDK_DIR/deployment/sudoers/betabox-guest"
-SUDOERS_TARGET="/etc/sudoers.d/betabox-guest"
-
 echo "======================================"
 echo " Betabox Robotics SDK Installer"
 echo "======================================"
@@ -178,37 +175,58 @@ if ! nmcli connection show PiAP >/dev/null 2>&1; then
         ipv6.method ignore
 fi
 
-echo "[9/11] Installing Betabox privilege policy..."
+echo "[9/11] Installing Betabox privilege policies..."
 
-if [[ ! -f "$SUDOERS_SOURCE" ]]; then
-    echo "ERROR: Missing sudoers policy:"
-    echo "  $SUDOERS_SOURCE"
+SUDOERS_DIR="$SDK_DIR/deployment/sudoers"
+
+if [[ ! -d "$SUDOERS_DIR" ]]; then
+    echo "ERROR: Missing sudoers policy directory:"
+    echo "  $SUDOERS_DIR"
     exit 1
 fi
 
-if ! sudo visudo \
-    --check \
-    --file="$SUDOERS_SOURCE"
-then
-    echo "ERROR: Invalid Betabox sudoers policy."
+shopt -s nullglob
+SUDOERS_POLICIES=("$SUDOERS_DIR"/*)
+shopt -u nullglob
+
+if [[ "${#SUDOERS_POLICIES[@]}" -eq 0 ]]; then
+    echo "ERROR: No sudoers policies found in:"
+    echo "  $SUDOERS_DIR"
     exit 1
 fi
 
-sudo install \
-    -o root \
-    -g root \
-    -m 0440 \
-    "$SUDOERS_SOURCE" \
-    "$SUDOERS_TARGET"
+for policy in "${SUDOERS_POLICIES[@]}"; do
+    if [[ ! -f "$policy" ]]; then
+        continue
+    fi
 
-if ! sudo visudo \
-    --check \
-    --file="$SUDOERS_TARGET"
-then
-    echo "ERROR: Installed sudoers policy is invalid."
-    sudo rm -f "$SUDOERS_TARGET"
-    exit 1
-fi
+    name="$(basename "$policy")"
+    target="/etc/sudoers.d/$name"
+
+    echo "Validating sudoers policy: $name"
+
+    if ! sudo visudo --check --file="$policy"; then
+        echo "ERROR: Invalid sudoers policy:"
+        echo "  $policy"
+        exit 1
+    fi
+
+    echo "Installing sudoers policy: $name"
+
+    sudo install \
+        -o root \
+        -g root \
+        -m 0440 \
+        "$policy" \
+        "$target"
+
+    if ! sudo visudo --check --file="$target"; then
+        echo "ERROR: Installed sudoers policy is invalid:"
+        echo "  $target"
+        sudo rm -f "$target"
+        exit 1
+    fi
+done
 
 echo "[10/11] Installing systemd services..."
 

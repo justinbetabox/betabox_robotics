@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import grp
 import os
 import pwd
 import shutil
@@ -8,6 +9,7 @@ from pathlib import Path
 
 from betabox_robotics.services.accounts import (
     BETABOX_ACCOUNTS,
+    BETABOX_SHARED_GROUP,
     ProvisionedAccount,
 )
 
@@ -25,6 +27,19 @@ def account_ids(
         raise RuntimeError(f"Linux account does not exist: {username}") from exc
 
     return account.pw_uid, account.pw_gid
+
+
+def group_id(
+    group_name: str,
+) -> int:
+    """Return the GID for a Linux group."""
+
+    try:
+        group = grp.getgrnam(group_name)
+    except KeyError as exc:
+        raise RuntimeError(f"Linux group does not exist: {group_name}") from exc
+
+    return group.gr_gid
 
 
 def workspace_directories(
@@ -111,7 +126,8 @@ def create_workspace(
     if not account.home.is_dir():
         raise RuntimeError(f"Account home directory does not exist: {account.home}")
 
-    uid, gid = account_ids(account.username)
+    uid, _ = account_ids(account.username)
+    gid = group_id(BETABOX_SHARED_GROUP)
 
     for directory in workspace_directories(account):
         ensure_directory(
@@ -206,12 +222,13 @@ def populate_media(
     """Install starter media for managed accounts."""
 
     assets = repository_root / "deployment" / "assets" / "sounds"
+    gid = group_id(BETABOX_SHARED_GROUP)
 
     for account in accounts:
         if not account.install_media:
             continue
 
-        uid, gid = account_ids(account.username)
+        uid, _ = account_ids(account.username)
 
         install_directory(
             assets,

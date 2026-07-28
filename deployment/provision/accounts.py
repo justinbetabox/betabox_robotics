@@ -7,6 +7,7 @@ from pathlib import Path
 
 from betabox_robotics.services.accounts import (
     BETABOX_ACCOUNTS,
+    BETABOX_SHARED_GROUP,
     ProvisionedAccount,
 )
 
@@ -44,21 +45,25 @@ def group_exists(group: str) -> bool:
     return True
 
 
-def group_members(username: str) -> set[str]:
-    """Return the explicit members of a Linux group."""
+def ensure_shared_group() -> None:
+    """Ensure the shared Betabox group exists."""
 
-    try:
-        group = grp.getgrnam(username)
-    except KeyError:
-        return set()
+    if group_exists(BETABOX_SHARED_GROUP):
+        print(f"Group already exists: {BETABOX_SHARED_GROUP}")
+        return
 
-    return set(group.gr_mem)
+    print(f"Creating group: {BETABOX_SHARED_GROUP}")
+
+    run_command(
+        "groupadd",
+        BETABOX_SHARED_GROUP,
+    )
 
 
 def ensure_account_group(
     account: ProvisionedAccount,
 ) -> None:
-    """Ensure a managed account group exists."""
+    """Ensure a managed account's primary group exists."""
 
     if group_exists(account.group):
         print(f"Group already exists: {account.group}")
@@ -92,80 +97,12 @@ def create_account(
     )
 
 
-def update_account(
-    account: ProvisionedAccount,
-) -> None:
-    """Apply the expected home and shell to an existing account."""
-
-    entry = pwd.getpwnam(account.username)
-
-    command = [
-        "usermod",
-    ]
-
-    changed = False
-
-    if Path(entry.pw_dir) != account.home:
-        command.extend(
-            [
-                "--home",
-                str(account.home),
-                "--move-home",
-            ]
-        )
-        changed = True
-
-    if Path(entry.pw_shell) != account.shell:
-        command.extend(
-            [
-                "--shell",
-                str(account.shell),
-            ]
-        )
-        changed = True
-
-    if not changed:
-        print(f"Account configuration is current: {account.username}")
-        return
-
-    command.append(account.username)
-
-    print(f"Updating account configuration: {account.username}")
-
-    run_command(*command)
-
-
-def ensure_account(
-    account: ProvisionedAccount,
-    *,
-    service_user: str | None = None,
-) -> None:
-    """Ensure a managed Linux account is fully configured."""
-
-    ensure_account_group(account)
-
-    if not account_exists(account.username):
-        create_account(account)
-    else:
-        print(f"Account already exists: {account.username}")
-        reconcile_account(account)
-
-    ensure_account_password(account)
-    ensure_password_policy(account)
-    ensure_supplemental_groups(account)
-    ensure_service_user_access(
-        account,
-        service_user,
-    )
-
-
 def reconcile_account(
     account: ProvisionedAccount,
 ) -> None:
     """Apply expected settings to an existing account."""
 
     entry = pwd.getpwnam(account.username)
-
     changes: list[str] = []
 
     if Path(entry.pw_dir) != account.home:
@@ -173,6 +110,7 @@ def reconcile_account(
             [
                 "--home",
                 str(account.home),
+                "--move-home",
             ]
         )
 
@@ -207,28 +145,42 @@ def reconcile_account(
     )
 
 
-def ensure_group_membership(
-    *,
+def user_is_group_member(
+    username: str,
+    group: str,
+) -> bool:
+    """Return whether a user belongs to a Linux group."""
+
+    try:
+        account = pwd.getpwnam(username)
+    except KeyError as exc:
+        raise RuntimeError(f"Linux account does not exist: {username}") from exc
+
+    try:
+        group_entry = grp.getgrnam(group)
+    except KeyError as exc:
+        raise RuntimeError(f"Linux group does not exist: {group}") from exc
+
+    if account.pw_gid == group_entry.gr_gid:
+        return True
+
+    return username in group_entry.gr_mem
+
+
+def ensure_group_member(
     username: str,
     group: str,
 ) -> None:
     """Ensure a user belongs to a supplementary group."""
 
-    try:
-        user = pwd.getpwnam(username)
-    except KeyError as exc:
-        raise RuntimeError(f"Service account does not exist: {username}") from exc
-
-    try:
-        group_entry = grp.getgrnam(group)
-    except KeyError as exc:
-        raise RuntimeError(f"Required group does not exist: {group}") from exc
-
-    if user.pw_gid == group_entry.gr_gid or username in group_members(group):
-        print(f"{username} already has access to group {group}")
+    if user_is_group_member(
+        username,
+        group,
+    ):
+        print(f"Group membership is current: {username} -> {group}")
         return
 
-    print(f"Adding {username} to group {group}")
+    print(f"Adding group membership: {username} -> {group}")
 
     run_command(
         "usermod",
@@ -237,19 +189,6 @@ def ensure_group_membership(
         group,
         username,
     )
-
-
-def provision_accounts(
-    *,
-    service_user: str,
-) -> None:
-    """Provision required Linux accounts."""
-
-    for account in BETABOX_ACCOUNTS:
-        ensure_account(
-            account,
-            service_user=service_user,
-        )
 
 
 def ensure_account_password(
@@ -264,7 +203,7 @@ def ensure_account_password(
 
     subprocess.run(
         ["chpasswd"],
-        input=(f"{account.username}:{account.password}\n"),
+        input=f"{account.username}:{account.password}\n",
         text=True,
         check=True,
     )
@@ -290,45 +229,6 @@ def ensure_password_policy(
     )
 
 
-def user_is_group_member(
-    username: str,
-    group: str,
-) -> bool:
-    """Return whether a user belongs to a Linux group."""
-
-    account = pwd.getpwnam(username)
-    group_entry = grp.getgrnam(group)
-
-    if account.pw_gid == group_entry.gr_gid:
-        return True
-
-    return username in group_entry.gr_mem
-
-
-def ensure_group_member(
-    username: str,
-    group: str,
-) -> None:
-    """Ensure a user belongs to a Linux group."""
-
-    if user_is_group_member(
-        username,
-        group,
-    ):
-        print(f"Group membership is current: {username} -> {group}")
-        return
-
-    print(f"Adding group membership: {username} -> {group}")
-
-    run_command(
-        "usermod",
-        "--append",
-        "--groups",
-        group,
-        username,
-    )
-
-
 def ensure_supplemental_groups(
     account: ProvisionedAccount,
 ) -> None:
@@ -341,22 +241,36 @@ def ensure_supplemental_groups(
         )
 
 
-def ensure_service_user_access(
+def ensure_account(
     account: ProvisionedAccount,
-    service_user: str | None,
 ) -> None:
-    """Give the service user access to a persistent workspace."""
+    """Ensure a managed Linux account is fully configured."""
 
-    if service_user is None:
-        return
+    ensure_account_group(account)
 
-    if not account.persistent:
-        return
+    if not account_exists(account.username):
+        create_account(account)
+    else:
+        print(f"Account already exists: {account.username}")
+        reconcile_account(account)
 
-    if service_user == account.username:
-        return
+    ensure_account_password(account)
+    ensure_password_policy(account)
+    ensure_supplemental_groups(account)
+
+
+def provision_accounts(
+    *,
+    service_user: str,
+) -> None:
+    """Provision required Linux accounts and shared access."""
+
+    ensure_shared_group()
 
     ensure_group_member(
         service_user,
-        account.group,
+        BETABOX_SHARED_GROUP,
     )
+
+    for account in BETABOX_ACCOUNTS:
+        ensure_account(account)

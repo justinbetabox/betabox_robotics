@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+BETABOX_SHARED_GROUP = "betabox"
+
 
 @dataclass(frozen=True)
 class ProvisionedAccount:
@@ -29,6 +31,7 @@ BETABOX_ACCOUNTS: tuple[ProvisionedAccount, ...] = (
         group="guest",
         home=Path("/home/guest"),
         shell=Path("/usr/sbin/nologin"),
+        supplemental_groups=(BETABOX_SHARED_GROUP,),
         persistent=False,
     ),
     ProvisionedAccount(
@@ -39,7 +42,7 @@ BETABOX_ACCOUNTS: tuple[ProvisionedAccount, ...] = (
         shell=Path("/bin/bash"),
         password="teachthefuture",  # or another default if you prefer
         password_max_days=None,
-        supplemental_groups=(),
+        supplemental_groups=(BETABOX_SHARED_GROUP,),
         persistent=True,
     ),
     ProvisionedAccount(
@@ -49,6 +52,7 @@ BETABOX_ACCOUNTS: tuple[ProvisionedAccount, ...] = (
         home=Path("/home/student"),
         shell=Path("/bin/bash"),
         password="learnbydoing",
+        supplemental_groups=(BETABOX_SHARED_GROUP,),
     ),
     ProvisionedAccount(
         username="student1",
@@ -57,6 +61,7 @@ BETABOX_ACCOUNTS: tuple[ProvisionedAccount, ...] = (
         home=Path("/home/student1"),
         shell=Path("/bin/bash"),
         password="learnbydoing",
+        supplemental_groups=(BETABOX_SHARED_GROUP,),
     ),
     ProvisionedAccount(
         username="student2",
@@ -65,6 +70,7 @@ BETABOX_ACCOUNTS: tuple[ProvisionedAccount, ...] = (
         home=Path("/home/student2"),
         shell=Path("/bin/bash"),
         password="learnbydoing",
+        supplemental_groups=(BETABOX_SHARED_GROUP,),
     ),
     ProvisionedAccount(
         username="student3",
@@ -73,6 +79,7 @@ BETABOX_ACCOUNTS: tuple[ProvisionedAccount, ...] = (
         home=Path("/home/student3"),
         shell=Path("/bin/bash"),
         password="learnbydoing",
+        supplemental_groups=(BETABOX_SHARED_GROUP,),
     ),
 )
 

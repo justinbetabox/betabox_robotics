@@ -1,15 +1,15 @@
 import asyncio
 import fractions
 import threading
-from typing import Any, Dict, Optional, Set
+from typing import Any
 
 from aiortc import MediaStreamTrack, RTCPeerConnection, RTCSessionDescription
 from av.video.frame import VideoFrame
 
 from betabox_robotics.vision.frame import Frame
-from betabox_robotics.vision.stream import Streamer
 from betabox_robotics.vision.metadata_bus import MetadataBus
 from betabox_robotics.vision.overlay import OverlayRenderer
+from betabox_robotics.vision.stream import Streamer
 
 
 class VisionVideoTrack(MediaStreamTrack):
@@ -32,12 +32,18 @@ class VisionVideoTrack(MediaStreamTrack):
         frame = self.streamer.rendered_frame()
 
         if frame is None:
-            video_frame = VideoFrame(width=640, height=480, format="rgb24")
+            video_frame = VideoFrame(
+                width=640,
+                height=480,
+                format="rgb24",
+            )
         else:
-            video_frame = VideoFrame.from_ndarray(frame.image, format="rgb24")
+            video_frame = VideoFrame.from_ndarray(
+                frame.image.copy(),
+                format="rgb24",
+            )
 
         self._timestamp += int(90000 / self.fps)
-
         video_frame.pts = self._timestamp
         video_frame.time_base = self._time_base
 
@@ -64,10 +70,10 @@ class WebRTCStreamer(Streamer):
         self.overlay_enabled = False
         self.overlay_source: str | None = None
         self._running = False
-        self._latest_frame: Optional[Frame] = None
+        self._latest_frame: Frame | None = None
         self._frames_received = 0
         self._lock = threading.Lock()
-        self._peer_connections: Set[RTCPeerConnection] = set()
+        self._peer_connections: set[RTCPeerConnection] = set()
 
     def start(self) -> None:
         self._running = True
@@ -84,11 +90,13 @@ class WebRTCStreamer(Streamer):
             self._latest_frame = frame
             self._frames_received += 1
 
-    def latest_frame(self) -> Optional[Frame]:
+    def latest_frame(self) -> Frame | None:
         with self._lock:
-            return self._latest_frame
+            frame = self._latest_frame
 
-    async def offer(self, sdp: str, type: str) -> Dict[str, str]:
+        return frame
+
+    async def offer(self, sdp: str, type: str) -> dict[str, str]:
         """
         Handle a browser WebRTC offer and return an answer.
         """
@@ -97,7 +105,7 @@ class WebRTCStreamer(Streamer):
 
         @pc.on("connectionstatechange")
         async def on_connectionstatechange():
-            if pc.connectionState in ("failed", "closed", "disconnected"):
+            if pc.connectionState in ("failed", "closed"):
                 await pc.close()
                 self._peer_connections.discard(pc)
 

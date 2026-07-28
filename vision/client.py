@@ -3,11 +3,13 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from time import strftime
 from typing import TYPE_CHECKING, Any
 from urllib import error, parse, request
 
 if TYPE_CHECKING:
     from betabox_robotics.robots.config import VisionConfig
+
 
 class VisionClientError(Exception):
     """Raised when the managed Vision service cannot complete a request."""
@@ -57,18 +59,12 @@ class ClientDetectionStatus:
 
     @property
     def enabled(self) -> list[str]:
-        return sorted(
-            name
-            for name, is_enabled in self.detectors.items()
-            if is_enabled
-        )
+        return sorted(name for name, is_enabled in self.detectors.items() if is_enabled)
 
     @property
     def disabled(self) -> list[str]:
         return sorted(
-            name
-            for name, is_enabled in self.detectors.items()
-            if not is_enabled
+            name for name, is_enabled in self.detectors.items() if not is_enabled
         )
 
     def is_enabled(self, name: str) -> bool:
@@ -145,18 +141,87 @@ class VisionClient:
             raise VisionClientError("base_url cannot be empty")
 
         if timeout <= 0:
-            raise VisionClientError(
-                "timeout must be greater than 0"
-            )
+            raise VisionClientError("timeout must be greater than 0")
 
         self.base_url = base_url.rstrip("/")
         self.timeout = float(timeout)
 
+    def _snapshot_format(
+        self,
+        filename: str | None,
+    ) -> str:
+        if filename is None:
+            return "jpg"
+
+        suffix = Path(filename).suffix.lower()
+
+        if suffix in (".jpg", ".jpeg"):
+            return "jpg"
+
+        if suffix == ".png":
+            return "png"
+
+        if suffix:
+            raise VisionClientError("snapshot filename must use .jpg, .jpeg, or .png")
+
+        return "jpg"
+
+    def _request_bytes(
+        self,
+        method: str,
+        path: str,
+    ) -> tuple[bytes, Any]:
+        url = f"{self.base_url}{path}"
+
+        req = request.Request(
+            url,
+            method=method,
+        )
+
+        try:
+            with request.urlopen(
+                req,
+                timeout=self.timeout,
+            ) as response:
+                return (
+                    response.read(),
+                    response.headers,
+                )
+
+        except error.HTTPError as exc:
+            response_body = exc.read().decode(
+                "utf-8",
+                errors="replace",
+            )
+
+            try:
+                error_data = json.loads(response_body)
+            except json.JSONDecodeError:
+                raise VisionClientError(
+                    f"Vision service snapshot request failed with HTTP {exc.code}"
+                ) from exc
+
+            raise VisionClientError(
+                str(
+                    error_data.get(
+                        "error",
+                        f"HTTP {exc.code}",
+                    )
+                )
+            ) from exc
+
+        except error.URLError as exc:
+            raise VisionClientError(
+                "Betabox Vision service is not "
+                "available. Run: sudo systemctl "
+                "start betabox-video.service"
+            ) from exc
+
     @classmethod
     def default(
         cls,
-        config: "VisionConfig",
-    ) -> "VisionClient":
+        config: VisionConfig,
+    ) -> VisionClient:
         return cls(
             base_url=config.service_url,
             timeout=config.request_timeout,
@@ -173,20 +238,78 @@ class VisionClient:
         overlay: bool = False,
         source: str | None = None,
     ) -> ClientSnapshot:
+        image_format = self._snapshot_format(
+            filename,
+        )
+
         path = self._path_with_query(
             "/snapshot",
             {
-                "filename": filename,
-                "overlay": "true" if overlay else None,
+                "format": image_format,
+                "overlay": ("true" if overlay else None),
                 "source": source,
             },
         )
-        data = self._post(path)
+
+        image_data, headers = self._request_bytes(
+            "POST",
+            path,
+        )
+
+        returned_format = headers.get(
+            "X-Betabox-Format",
+            image_format,
+        ).lower()
+
+        timestamp_value = headers.get(
+            "X-Betabox-Timestamp",
+            "0",
+        )
+
+        try:
+            timestamp = float(timestamp_value)
+        except ValueError as exc:
+            raise VisionClientError(
+                "Vision service returned an invalid snapshot timestamp"
+            ) from exc
+
+        pictures = Path.home() / "media" / "pictures"
+        pictures.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        if filename is None:
+            filename = f"snapshot_{strftime('%Y%m%d_%H%M%S')}.{returned_format}"
+        else:
+            filename_path = Path(filename)
+
+            if filename_path.name != filename or not filename:
+                raise VisionClientError(
+                    "snapshot filename must be a plain "
+                    "filename without directory components"
+                )
+
+        output_path = pictures / filename
+
+        if output_path.suffix.lower() not in (
+            ".jpg",
+            ".jpeg",
+            ".png",
+        ):
+            output_path = output_path.with_suffix(f".{returned_format}")
+
+        try:
+            output_path.write_bytes(image_data)
+        except OSError as exc:
+            raise VisionClientError(
+                f"failed to save snapshot: {output_path}: {exc}"
+            ) from exc
 
         return ClientSnapshot(
-            path=Path(data["path"]),
-            timestamp=float(data["timestamp"]),
-            format=str(data["format"]),
+            path=output_path,
+            timestamp=timestamp,
+            format=returned_format,
         )
 
     def start_recording(
@@ -356,11 +479,7 @@ class VisionClient:
         path: str,
         params: dict[str, Any],
     ) -> str:
-        filtered = {
-            key: value
-            for key, value in params.items()
-            if value is not None
-        }
+        filtered = {key: value for key, value in params.items() if value is not None}
 
         if not filtered:
             return path
@@ -392,11 +511,7 @@ class VisionClient:
             )
 
         confidence_value = data.get("confidence")
-        confidence = (
-            float(confidence_value)
-            if confidence_value is not None
-            else None
-        )
+        confidence = float(confidence_value) if confidence_value is not None else None
 
         extra_data = data.get("data", {})
 
@@ -442,28 +557,20 @@ class VisionClient:
         if isinstance(detectors_data, dict):
             # Enable/disable endpoints return the state map directly.
             detectors = {
-                str(name): bool(enabled)
-                for name, enabled in detectors_data.items()
+                str(name): bool(enabled) for name, enabled in detectors_data.items()
             }
 
         elif isinstance(detectors_data, list):
             # GET /detection returns detector names plus a separate
             # enabled-state mapping.
-            state_map = (
-                enabled_data
-                if isinstance(enabled_data, dict)
-                else {}
-            )
+            state_map = enabled_data if isinstance(enabled_data, dict) else {}
 
             detectors = {
-                str(name): bool(state_map.get(name, False))
-                for name in detectors_data
+                str(name): bool(state_map.get(name, False)) for name in detectors_data
             }
 
         else:
-            raise VisionClientError(
-                "Vision service returned invalid detector status"
-            )
+            raise VisionClientError("Vision service returned invalid detector status")
 
         changed: str | None = None
 
@@ -544,17 +651,13 @@ class VisionClient:
 
         if isinstance(detectors_data, dict):
             detectors = {
-                str(name): bool(enabled)
-                for name, enabled in detectors_data.items()
+                str(name): bool(enabled) for name, enabled in detectors_data.items()
             }
 
         metadata_sources: list[str] = []
 
         if isinstance(metadata_sources_data, list):
-            metadata_sources = [
-                str(source)
-                for source in metadata_sources_data
-            ]
+            metadata_sources = [str(source) for source in metadata_sources_data]
 
         return ClientDetectionStatistics(
             detectors=detectors,

@@ -19,6 +19,13 @@ class Snapshot:
     format: str
 
 
+@dataclass(frozen=True)
+class SnapshotData:
+    data: bytes
+    timestamp: float
+    format: str
+
+
 class SnapshotError(FrameSourceError):
     """Raised when snapshot operations fail."""
 
@@ -55,6 +62,53 @@ class SnapshotService:
             filename=filename,
             directory=directory,
             image_format=image_format,
+        )
+
+    def capture_data(
+        self,
+        *,
+        image_format: ImageFormat | None = None,
+    ) -> SnapshotData:
+        frame = self.frame_source.latest_frame()
+        return self.capture_frame_data(
+            frame,
+            image_format=image_format,
+        )
+
+    def capture_frame_data(
+        self,
+        frame: Frame,
+        *,
+        image_format: ImageFormat | None = None,
+    ) -> SnapshotData:
+        fmt = image_format or self.default_format
+
+        if fmt == "jpeg":
+            fmt = "jpg"
+
+        if fmt not in ("jpg", "png"):
+            raise SnapshotError(f"unsupported snapshot format: {fmt}")
+
+        image = frame.image
+
+        if len(image.shape) == 3 and image.shape[2] == 3:
+            image = cv2.cvtColor(
+                image,
+                cv2.COLOR_RGB2BGR,
+            )
+
+        success, encoded = cv2.imencode(
+            f".{fmt}",
+            image,
+        )
+
+        if not success:
+            raise SnapshotError(f"failed to encode snapshot as {fmt}")
+
+        return SnapshotData(
+            data=encoded.tobytes(),
+            timestamp=frame.timestamp,
+            format=fmt,
         )
 
     def capture_frame(

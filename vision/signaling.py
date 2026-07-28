@@ -1,6 +1,6 @@
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from aiohttp import web
 
@@ -90,6 +90,7 @@ INDEX_HTML = """
 </html>
 """
 
+
 def to_json(value: Any) -> Any:
     if value is None:
         return None
@@ -108,6 +109,7 @@ def to_json(value: Any) -> Any:
 
     return value
 
+
 def ok(data=None):
     return web.json_response(
         {
@@ -115,6 +117,7 @@ def ok(data=None):
             "data": to_json(data) if data is not None else {},
         }
     )
+
 
 def fail(message: str, *, status: int = 400):
     return web.json_response(
@@ -176,18 +179,38 @@ class WebRTCSignalingServer:
 
     async def snapshot(self, request):
         try:
-            overlay = request.query.get("overlay", "false").lower() in (
+            overlay = request.query.get(
+                "overlay",
+                "false",
+            ).lower() in (
                 "1",
                 "true",
                 "yes",
             )
-            source = request.query.get("source")
 
-            snapshot = self.vision.capture_snapshot(
+            source = request.query.get("source")
+            image_format = request.query.get(
+                "format",
+                "jpg",
+            )
+
+            snapshot = self.vision.capture_snapshot_data(
                 overlay=overlay,
                 source=source,
+                image_format=image_format,
             )
-            return ok(snapshot)
+
+            content_type = "image/png" if snapshot.format == "png" else "image/jpeg"
+
+            return web.Response(
+                body=snapshot.data,
+                content_type=content_type,
+                headers={
+                    "X-Betabox-Timestamp": str(snapshot.timestamp),
+                    "X-Betabox-Format": snapshot.format,
+                },
+            )
+
         except Exception as exc:
             return fail(str(exc))
 
@@ -199,8 +222,10 @@ class WebRTCSignalingServer:
                 "yes",
             )
             source = request.query.get("source")
+            filename = request.query.get("filename")
 
             path = self.vision.start_recording(
+                filename=filename,
                 overlay=overlay,
                 source=source,
             )

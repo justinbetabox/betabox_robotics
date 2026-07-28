@@ -149,6 +149,19 @@ else
     echo "WARNING: $CONFIG_FILE not found. Boot config was not updated."
 fi
 
+echo "Ensuring Wi-Fi radio is enabled..."
+
+if command -v rfkill >/dev/null 2>&1; then
+    sudo rfkill unblock wifi
+fi
+
+sudo nmcli radio wifi on
+
+if [[ "$(nmcli -t -f WIFI general 2>/dev/null)" != "enabled" ]]; then
+    echo "ERROR: Unable to enable the Wi-Fi radio." >&2
+    exit 1
+fi
+
 echo "Configuring Wi-Fi fallback AP profile..."
 if ! nmcli connection show PiAP >/dev/null 2>&1; then
     sudo nmcli connection add \

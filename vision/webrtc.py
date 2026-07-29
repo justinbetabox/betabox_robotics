@@ -19,14 +19,18 @@ class VisionVideoTrack(MediaStreamTrack):
 
     kind = "video"
 
-    def __init__(self, streamer: "WebRTCStreamer", fps: float = 20.0) -> None:
+    def __init__(
+        self,
+        streamer: "WebRTCStreamer",
+        fps: float = 20.0,
+    ) -> None:
         super().__init__()
         self.streamer = streamer
         self.fps = float(fps)
         self._timestamp = 0
         self._time_base = fractions.Fraction(1, 90000)
 
-    async def recv(self):
+    async def recv(self) -> VideoFrame:
         await asyncio.sleep(1.0 / self.fps)
 
         frame = self.streamer.rendered_frame()
@@ -80,7 +84,9 @@ class WebRTCStreamer(Streamer):
 
     def stop(self) -> None:
         self._running = False
-        self._latest_frame = None
+
+        with self._lock:
+            self._latest_frame = None
 
     def on_frame(self, frame: Frame) -> None:
         if not self._running:
@@ -92,11 +98,13 @@ class WebRTCStreamer(Streamer):
 
     def latest_frame(self) -> Frame | None:
         with self._lock:
-            frame = self._latest_frame
+            return self._latest_frame
 
-        return frame
-
-    async def offer(self, sdp: str, type: str) -> dict[str, str]:
+    async def offer(
+        self,
+        sdp: str,
+        type: str,
+    ) -> dict[str, str]:
         """
         Handle a browser WebRTC offer and return an answer.
         """
@@ -104,14 +112,27 @@ class WebRTCStreamer(Streamer):
         self._peer_connections.add(pc)
 
         @pc.on("connectionstatechange")
-        async def on_connectionstatechange():
-            if pc.connectionState in ("failed", "closed"):
+        async def on_connectionstatechange() -> None:
+            if pc.connectionState in (
+                "failed",
+                "disconnected",
+            ):
                 await pc.close()
+
+            if pc.connectionState == "closed":
                 self._peer_connections.discard(pc)
 
-        pc.addTrack(VisionVideoTrack(self, fps=self.fps))
+        pc.addTrack(
+            VisionVideoTrack(
+                self,
+                fps=self.fps,
+            )
+        )
 
-        offer = RTCSessionDescription(sdp=sdp, type=type)
+        offer = RTCSessionDescription(
+            sdp=sdp,
+            type=type,
+        )
         await pc.setRemoteDescription(offer)
 
         answer = await pc.createAnswer()
@@ -122,7 +143,23 @@ class WebRTCStreamer(Streamer):
             "type": pc.localDescription.type,
         }
 
-    def enable_overlay(self, source: str | None = None) -> None:
+    async def close_peers(self) -> None:
+        peers = tuple(self._peer_connections)
+
+        if not peers:
+            return
+
+        await asyncio.gather(
+            *(pc.close() for pc in peers),
+            return_exceptions=True,
+        )
+
+        self._peer_connections.clear()
+
+    def enable_overlay(
+        self,
+        source: str | None = None,
+    ) -> None:
         self.overlay_enabled = True
         self.overlay_source = source
 
@@ -130,7 +167,7 @@ class WebRTCStreamer(Streamer):
         self.overlay_enabled = False
         self.overlay_source = None
 
-    def overlay_status(self) -> dict:
+    def overlay_status(self) -> dict[str, Any]:
         return {
             "enabled": self.overlay_enabled,
             "source": self.overlay_source,
@@ -145,20 +182,17 @@ class WebRTCStreamer(Streamer):
         if not self.overlay_enabled or self.metadata_bus is None:
             return frame
 
-        metadata = self.metadata_bus.latest(self.overlay_source)
+        metadata = self.metadata_bus.latest(
+            self.overlay_source,
+        )
 
         if metadata is None:
             return frame
 
-        return self.overlay.draw_metadata(frame, metadata)
-
-    async def close_peers(self) -> None:
-        pcs = list(self._peer_connections)
-
-        for pc in pcs:
-            await pc.close()
-
-        self._peer_connections.clear()
+        return self.overlay.draw_metadata(
+            frame,
+            metadata,
+        )
 
     def clients(self) -> int:
         return len(self._peer_connections)

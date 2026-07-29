@@ -149,6 +149,7 @@ class WebRTCSignalingServer:
         self.host = host
         self.port = int(port)
         self.app = web.Application()
+        self.app.on_shutdown.append(self.on_shutdown)
 
         self.app.router.add_get("/", self.index)
         self.app.router.add_post("/offer", self.offer)
@@ -323,6 +324,9 @@ class WebRTCSignalingServer:
             return ok(self.vision.stream_overlay_status())
         except Exception as exc:
             return fail(str(exc))
+
+    async def on_shutdown(self, app: web.Application) -> None:
+        await self.streamer.close_peers()
 
     def run(self, *, handle_signals: bool = True) -> None:
         web.run_app(

@@ -97,6 +97,12 @@ class VisionService:
         self.server.run()
 
     def stop(self) -> None:
+        """
+        Stop the local vision pipeline.
+
+        Active WebRTC peers should normally be closed first through
+        stop_async() by the signaling server's aiohttp shutdown hook.
+        """
         if not self._running:
             return
 

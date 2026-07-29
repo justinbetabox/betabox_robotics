@@ -216,7 +216,10 @@ class WebRTCSignalingServer:
 
     async def recording_start(self, request):
         try:
-            overlay = request.query.get("overlay", "false").lower() in (
+            overlay = request.query.get(
+                "overlay",
+                "false",
+            ).lower() in (
                 "1",
                 "true",
                 "yes",
@@ -224,7 +227,7 @@ class WebRTCSignalingServer:
             source = request.query.get("source")
             filename = request.query.get("filename")
 
-            path = self.vision.start_recording(
+            self.vision.start_recording(
                 filename=filename,
                 overlay=overlay,
                 source=source,
@@ -233,16 +236,28 @@ class WebRTCSignalingServer:
             return ok(
                 {
                     "recording": True,
-                    "path": str(path),
                 }
             )
+
         except Exception as exc:
             return fail(str(exc))
 
     async def recording_stop(self, request):
         try:
-            recording = self.vision.stop_recording()
-            return ok(recording)
+            recording = self.vision.stop_recording_data()
+
+            return web.Response(
+                body=recording.data,
+                content_type="video/mp4",
+                headers={
+                    "X-Betabox-Format": recording.format,
+                    "X-Betabox-Start-Timestamp": str(recording.start_timestamp),
+                    "X-Betabox-End-Timestamp": str(recording.end_timestamp),
+                    "X-Betabox-Frame-Count": str(recording.frame_count),
+                    "X-Betabox-FPS": str(recording.fps),
+                },
+            )
+
         except Exception as exc:
             return fail(str(exc))
 

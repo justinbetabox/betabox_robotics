@@ -8,7 +8,11 @@ from betabox_robotics.vision.frame_source import FrameSource
 from betabox_robotics.vision.metadata import Metadata
 from betabox_robotics.vision.metadata_bus import MetadataBus
 from betabox_robotics.vision.overlay import OverlayRenderer
-from betabox_robotics.vision.recording import Recording, RecordingService
+from betabox_robotics.vision.recording import (
+    Recording,
+    RecordingData,
+    RecordingService,
+)
 from betabox_robotics.vision.signaling import WebRTCSignalingServer
 from betabox_robotics.vision.snapshot import Snapshot, SnapshotData, SnapshotService
 from betabox_robotics.vision.webrtc import WebRTCStreamer
@@ -99,7 +103,12 @@ class VisionService:
         self.streamer.stop()
 
         if self.recording.is_recording():
-            self.recording.stop()
+            recording = self.recording.stop()
+
+            try:
+                recording.path.unlink()
+            except FileNotFoundError:
+                pass
 
         self.frame_source.stop()
         self._running = False
@@ -191,6 +200,9 @@ class VisionService:
 
     def stop_recording(self) -> Recording:
         return self.recording.stop()
+
+    def stop_recording_data(self) -> RecordingData:
+        return self.recording.stop_data()
 
     def enable_detection(self, name: str) -> None:
         self.detection.enable(name)

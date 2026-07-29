@@ -145,9 +145,10 @@ class VisionClient:
 
         self.base_url = base_url.rstrip("/")
         self.timeout = float(timeout)
+        self._recording_filename: str | None = None
 
+    @staticmethod
     def _snapshot_format(
-        self,
         filename: str | None,
     ) -> str:
         if filename is None:
@@ -198,7 +199,7 @@ class VisionClient:
                 error_data = json.loads(response_body)
             except json.JSONDecodeError:
                 raise VisionClientError(
-                    f"Vision service snapshot request failed with HTTP {exc.code}"
+                    f"Vision service request failed with HTTP {exc.code}"
                 ) from exc
 
             raise VisionClientError(
@@ -215,6 +216,61 @@ class VisionClient:
                 "Betabox Vision service is not "
                 "available. Run: sudo systemctl "
                 "start betabox-video.service"
+            ) from exc
+
+    @staticmethod
+    def _media_output_path(
+        *,
+        directory: Path,
+        filename: str | None,
+        media_name: str,
+        extension: str,
+    ) -> Path:
+        directory.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        if filename is None:
+            filename = f"{media_name}_{strftime('%Y%m%d_%H%M%S')}.{extension}"
+        else:
+            filename_path = Path(filename)
+
+            if filename_path.name != filename or not filename:
+                raise VisionClientError(
+                    f"{media_name} filename must be a plain "
+                    "filename without directory components"
+                )
+
+        output_path = directory / filename
+
+        if output_path.suffix.lower() != f".{extension}":
+            output_path = output_path.with_suffix(f".{extension}")
+
+        return output_path
+
+    def _recording_output_path(
+        self,
+        filename: str | None,
+    ) -> Path:
+        return self._media_output_path(
+            directory=Path.home() / "media" / "videos",
+            filename=filename,
+            media_name="recording",
+            extension="mp4",
+        )
+
+    @staticmethod
+    def _save_media_file(
+        output_path: Path,
+        data: bytes,
+        media_name: str,
+    ) -> None:
+        try:
+            output_path.write_bytes(data)
+        except OSError as exc:
+            raise VisionClientError(
+                f"failed to save {media_name}: {output_path}: {exc}"
             ) from exc
 
     @classmethod
@@ -273,38 +329,18 @@ class VisionClient:
                 "Vision service returned an invalid snapshot timestamp"
             ) from exc
 
-        pictures = Path.home() / "media" / "pictures"
-        pictures.mkdir(
-            parents=True,
-            exist_ok=True,
+        output_path = self._media_output_path(
+            directory=Path.home() / "media" / "pictures",
+            filename=filename,
+            media_name="snapshot",
+            extension=returned_format,
         )
 
-        if filename is None:
-            filename = f"snapshot_{strftime('%Y%m%d_%H%M%S')}.{returned_format}"
-        else:
-            filename_path = Path(filename)
-
-            if filename_path.name != filename or not filename:
-                raise VisionClientError(
-                    "snapshot filename must be a plain "
-                    "filename without directory components"
-                )
-
-        output_path = pictures / filename
-
-        if output_path.suffix.lower() not in (
-            ".jpg",
-            ".jpeg",
-            ".png",
-        ):
-            output_path = output_path.with_suffix(f".{returned_format}")
-
-        try:
-            output_path.write_bytes(image_data)
-        except OSError as exc:
-            raise VisionClientError(
-                f"failed to save snapshot: {output_path}: {exc}"
-            ) from exc
+        self._save_media_file(
+            output_path,
+            image_data,
+            "snapshot",
+        )
 
         return ClientSnapshot(
             path=output_path,
@@ -319,6 +355,8 @@ class VisionClient:
         overlay: bool = False,
         source: str | None = None,
     ) -> Path:
+        self._recording_filename = filename
+
         path = self._path_with_query(
             "/recording/start",
             {
@@ -327,18 +365,79 @@ class VisionClient:
                 "source": source,
             },
         )
-        data = self._post(path)
-        return Path(data["path"])
 
-    def stop_recording(self) -> ClientRecording:
-        data = self._post("/recording/stop")
+        self._post(path)
+
+        return self._recording_output_path(filename)
+
+    def stop_recording(
+        self,
+        *,
+        filename: str | None = None,
+    ) -> ClientRecording:
+        if filename is None:
+            filename = self._recording_filename
+
+        self._recording_filename = None
+
+        video_data, headers = self._request_bytes(
+            "POST",
+            "/recording/stop",
+        )
+
+        returned_format = headers.get(
+            "X-Betabox-Format",
+            "mp4",
+        ).lower()
+
+        try:
+            start_timestamp = float(
+                headers.get(
+                    "X-Betabox-Start-Timestamp",
+                    "0",
+                )
+            )
+
+            end_timestamp = float(
+                headers.get(
+                    "X-Betabox-End-Timestamp",
+                    "0",
+                )
+            )
+
+            frame_count = int(
+                headers.get(
+                    "X-Betabox-Frame-Count",
+                    "0",
+                )
+            )
+
+            fps = float(
+                headers.get(
+                    "X-Betabox-FPS",
+                    "0",
+                )
+            )
+
+        except ValueError as exc:
+            raise VisionClientError(
+                "Vision service returned invalid recording metadata"
+            ) from exc
+
+        output_path = self._recording_output_path(filename)
+
+        self._save_media_file(
+            output_path,
+            video_data,
+            "recording",
+        )
 
         return ClientRecording(
-            path=Path(data["path"]),
-            start_timestamp=float(data["start_timestamp"]),
-            end_timestamp=float(data["end_timestamp"]),
-            frame_count=int(data["frame_count"]),
-            fps=float(data["fps"]),
+            path=output_path,
+            start_timestamp=start_timestamp,
+            end_timestamp=end_timestamp,
+            frame_count=frame_count,
+            fps=fps,
         )
 
     def metadata(

@@ -2,11 +2,9 @@ import shutil
 import subprocess
 import tempfile
 import threading
-
 from dataclasses import dataclass
 from pathlib import Path
 from time import strftime
-from typing import Optional
 
 import cv2
 
@@ -30,6 +28,16 @@ class Recording:
         return max(0.0, self.end_timestamp - self.start_timestamp)
 
 
+@dataclass(frozen=True)
+class RecordingData:
+    data: bytes
+    format: str
+    start_timestamp: float
+    end_timestamp: float
+    frame_count: int
+    fps: float
+
+
 class RecordingError(FrameSourceError):
     """Raised when recording operations fail."""
 
@@ -45,7 +53,7 @@ class RecordingService(FrameConsumer):
     def __init__(
         self,
         *,
-        directory: str | Path = Path.home() / "media" / "videos",
+        directory: str | Path = Path("/tmp/betabox-video"),
         fps: float = 20.0,
         filename_prefix: str = "recording",
         metadata_bus: MetadataBus | None = None,
@@ -63,30 +71,29 @@ class RecordingService(FrameConsumer):
         self.overlay_source: str | None = None
 
         self._process: subprocess.Popen[bytes] | None = None
-        self._path: Optional[Path] = None
+        self._path: Path | None = None
         self._last_error: Exception | None = None
-        self._start_timestamp: Optional[float] = None
-        self._end_timestamp: Optional[float] = None
+        self._start_timestamp: float | None = None
+        self._end_timestamp: float | None = None
         self._frame_count = 0
         self._recording = False
-        self._size: Optional[tuple[int, int]] = None
+        self._size: tuple[int, int] | None = None
         self._lock = threading.Lock()
+        self._frame_condition = threading.Condition(self._lock)
+        self._pending_frame: Frame | None = None
+        self._worker: threading.Thread | None = None
 
     def start(
         self,
         *,
         filename: str | None = None,
     ) -> Path:
-        with self._lock:
+        with self._frame_condition:
             if self._recording:
-                raise RecordingError(
-                    "recording is already running"
-                )
+                raise RecordingError("recording is already running")
 
             if shutil.which("ffmpeg") is None:
-                raise RecordingError(
-                    "ffmpeg is not installed"
-                )
+                raise RecordingError("ffmpeg is not installed")
 
             try:
                 self.directory.mkdir(
@@ -102,22 +109,15 @@ class RecordingService(FrameConsumer):
 
             except OSError as exc:
                 raise RecordingError(
-                    "recording directory is not writable: "
-                    f"{self.directory}: {exc}"
+                    f"recording directory is not writable: {self.directory}: {exc}"
                 ) from exc
 
             if filename is None:
-                filename = (
-                    f"{self.filename_prefix}_"
-                    f"{strftime('%Y%m%d_%H%M%S')}.mp4"
-                )
+                filename = f"{self.filename_prefix}_{strftime('%Y%m%d_%H%M%S')}.mp4"
             else:
                 filename_path = Path(filename)
 
-                if (
-                    not filename
-                    or filename_path.name != filename
-                ):
+                if not filename or filename_path.name != filename:
                     raise RecordingError(
                         "recording filename must be a plain "
                         "filename without directory components"
@@ -135,122 +135,196 @@ class RecordingService(FrameConsumer):
             self._end_timestamp = None
             self._frame_count = 0
             self._size = None
+            self._pending_frame = None
             self._recording = True
+
+            worker = threading.Thread(
+                target=self._recording_loop,
+                name="BetaboxRecording",
+                daemon=True,
+            )
+
+            self._worker = worker
+
+            worker.start()
 
             return path
 
     def stop(self) -> Recording:
-        with self._lock:
-            if not self._recording:
+        with self._frame_condition:
+            worker = self._worker
+
+            if not self._recording and worker is None:
                 if self._last_error is not None:
                     raise RecordingError(
                         f"recording failed: {self._last_error}"
                     ) from self._last_error
 
-                raise RecordingError(
-                    "recording is not running"
-                )
+                raise RecordingError("recording is not running")
 
             self._recording = False
+            self._frame_condition.notify_all()
+
+        if worker is not None:
+            worker.join(timeout=5.0)
+
+            if worker.is_alive():
+                self._abort_encoder()
+                worker.join(timeout=5.0)
+
+            if worker.is_alive():
+                failure = RecordingError(
+                    "recording worker did not stop within 10 seconds"
+                )
+
+                with self._lock:
+                    self._last_error = failure
+
+                raise failure
+
+        with self._lock:
+            self._worker = None
+            self._pending_frame = None
 
             process = self._process
             self._process = None
 
-            if process is not None:
-                if process.stdin is not None:
-                    process.stdin.close()
-
+        if process is not None:
+            if process.stdin is not None:
                 try:
-                    returncode = process.wait(
-                        timeout=30.0,
-                    )
+                    process.stdin.close()
+                except OSError:
+                    pass
 
-                except subprocess.TimeoutExpired as exc:
-                    process.kill()
-                    process.wait()
-
-                    failure = RecordingError(
-                        "FFmpeg did not finish within 30 seconds"
-                    )
-
-                    self._last_error = failure
-                    raise failure from exc
-
-                error = ""
-
-                if process.stderr is not None:
-                    error = (
-                        process.stderr.read()
-                        .decode(
-                            "utf-8",
-                            errors="replace",
-                        )
-                        .strip()
-                    )
-
-                if returncode != 0:
-                    failure = RecordingError(
-                        "FFmpeg failed"
-                        + (
-                            f": {error}"
-                            if error
-                            else ""
-                        )
-                    )
-
-                    self._last_error = failure
-                    raise failure
-
-            if (
-                self._path is None
-                or self._start_timestamp is None
-            ):
-                if self._last_error is not None:
-                    raise RecordingError(
-                        "recording failed before the first "
-                        f"frame: {self._last_error}"
-                    ) from self._last_error
-
-                raise RecordingError(
-                    "recording stopped before any frames "
-                    "were captured"
+            try:
+                returncode = process.wait(
+                    timeout=30.0,
                 )
 
-            end_timestamp = (
-                self._end_timestamp
-                or self._start_timestamp
-            )
+            except subprocess.TimeoutExpired as exc:
+                process.kill()
+                process.wait()
 
-            return Recording(
-                path=self._path,
-                start_timestamp=self._start_timestamp,
-                end_timestamp=end_timestamp,
-                frame_count=self._frame_count,
-                fps=self.fps,
-            )
+                failure = RecordingError("FFmpeg did not finish within 30 seconds")
+
+                with self._lock:
+                    self._last_error = failure
+
+                raise failure from exc
+
+            error = ""
+
+            if process.stderr is not None:
+                error = (
+                    process.stderr.read()
+                    .decode(
+                        "utf-8",
+                        errors="replace",
+                    )
+                    .strip()
+                )
+
+            if returncode != 0:
+                failure = RecordingError(
+                    "FFmpeg failed" + (f": {error}" if error else "")
+                )
+
+                with self._lock:
+                    self._last_error = failure
+
+                raise failure
+
+        with self._lock:
+            last_error = self._last_error
+            path = self._path
+            start_timestamp = self._start_timestamp
+            end_timestamp = self._end_timestamp
+            frame_count = self._frame_count
+
+        if last_error is not None:
+            raise RecordingError(f"recording failed: {last_error}") from last_error
+
+        if path is None or start_timestamp is None:
+            raise RecordingError("recording stopped before any frames were captured")
+
+        final_timestamp = end_timestamp or start_timestamp
+
+        return Recording(
+            path=path,
+            start_timestamp=start_timestamp,
+            end_timestamp=final_timestamp,
+            frame_count=frame_count,
+            fps=self.fps,
+        )
+
+    def stop_data(self) -> RecordingData:
+        recording = self.stop()
+
+        try:
+            data = recording.path.read_bytes()
+        finally:
+            try:
+                recording.path.unlink()
+            except FileNotFoundError:
+                pass
+
+        return RecordingData(
+            data=data,
+            format=recording.path.suffix.lstrip("."),
+            start_timestamp=recording.start_timestamp,
+            end_timestamp=recording.end_timestamp,
+            frame_count=recording.frame_count,
+            fps=recording.fps,
+        )
 
     def is_recording(self) -> bool:
-        return self._recording
+        with self._frame_condition:
+            return self._recording
 
     def last_error(self) -> Exception | None:
-        return self._last_error
+        with self._frame_condition:
+            return self._last_error
 
     def on_frame(
         self,
         frame: Frame,
     ) -> None:
-        with self._lock:
+        with self._frame_condition:
             if not self._recording:
                 return
+
+            self._pending_frame = frame
+            self._frame_condition.notify_all()
+
+    def _recording_loop(self) -> None:
+        while True:
+            with self._frame_condition:
+                while self._recording and self._pending_frame is None:
+                    self._frame_condition.wait()
+
+                if not self._recording and self._pending_frame is None:
+                    return
+
+                frame = self._pending_frame
+                self._pending_frame = None
+
+            if frame is None:
+                continue
 
             try:
                 self._write_frame(frame)
 
             except Exception as exc:
-                self._last_error = exc
-                self._recording = False
+                with self._frame_condition:
+                    failure = RecordingError(str(exc))
+
+                    self._last_error = failure
+                    self._recording = False
+                    self._pending_frame = None
+                    self._frame_condition.notify_all()
+
                 self._abort_encoder()
-                raise
+                return
 
     def _write_frame(
         self,
@@ -258,13 +332,8 @@ class RecordingService(FrameConsumer):
     ) -> None:
         image = frame.image
 
-        if (
-            len(image.shape) != 3
-            or image.shape[2] != 3
-        ):
-            raise RecordingError(
-                "recording requires a 3-channel image"
-            )
+        if len(image.shape) != 3 or image.shape[2] != 3:
+            raise RecordingError("recording requires a 3-channel image")
 
         height, width = image.shape[:2]
         size = (width, height)
@@ -276,17 +345,10 @@ class RecordingService(FrameConsumer):
             )
 
         if self._size != size:
-            raise RecordingError(
-                "frame size changed during recording"
-            )
+            raise RecordingError("frame size changed during recording")
 
-        if (
-            self.overlay_enabled
-            and self.metadata_bus is not None
-        ):
-            metadata = self.metadata_bus.latest(
-                self.overlay_source
-            )
+        if self.overlay_enabled and self.metadata_bus is not None:
+            metadata = self.metadata_bus.latest(self.overlay_source)
 
             if metadata is not None:
                 frame = self.overlay.draw_metadata(
@@ -305,9 +367,7 @@ class RecordingService(FrameConsumer):
         assert self._process.stdin is not None
 
         try:
-            self._process.stdin.write(
-                image.tobytes()
-            )
+            self._process.stdin.write(image.tobytes())
 
         except BrokenPipeError as exc:
             error = ""
@@ -323,12 +383,7 @@ class RecordingService(FrameConsumer):
                 )
 
             raise RecordingError(
-                "FFmpeg stopped accepting frames"
-                + (
-                    f": {error}"
-                    if error
-                    else ""
-                )
+                "FFmpeg stopped accepting frames" + (f": {error}" if error else "")
             ) from exc
 
         self._frame_count += 1
@@ -354,9 +409,7 @@ class RecordingService(FrameConsumer):
         timestamp: float,
     ) -> None:
         if self._path is None:
-            raise RecordingError(
-                "recording path has not been initialized"
-            )
+            raise RecordingError("recording path has not been initialized")
 
         width, height = size
 
@@ -398,17 +451,13 @@ class RecordingService(FrameConsumer):
             )
 
         except OSError as exc:
-            raise RecordingError(
-                f"failed to start FFmpeg: {exc}"
-            ) from exc
+            raise RecordingError(f"failed to start FFmpeg: {exc}") from exc
 
         if process.stdin is None:
             process.kill()
             process.wait()
 
-            raise RecordingError(
-                "failed to open FFmpeg input pipe"
-            )
+            raise RecordingError("failed to open FFmpeg input pipe")
 
         self._process = process
         self._size = size

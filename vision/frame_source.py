@@ -1,6 +1,5 @@
 import threading
 import time
-from typing import Optional
 
 from betabox_robotics.vision.camera import CameraError, CameraManager
 from betabox_robotics.vision.consumer import FrameConsumer
@@ -19,7 +18,7 @@ class FrameSource:
 
     def __init__(
         self,
-        camera: Optional[CameraManager] = None,
+        camera: CameraManager | None = None,
         *,
         fps: float = 20.0,
     ) -> None:
@@ -29,13 +28,13 @@ class FrameSource:
         self.camera = camera or CameraManager()
         self.fps = float(fps)
 
-        self._latest_frame: Optional[Frame] = None
+        self._latest_frame: Frame | None = None
         self._running = False
-        self._thread: Optional[threading.Thread] = None
+        self._thread: threading.Thread | None = None
         self._lock = threading.Lock()
         self._consumer_lock = threading.Lock()
         self._consumers: list[FrameConsumer] = []
-        self._last_error: Optional[Exception] = None
+        self._last_error: Exception | None = None
 
     def start(self) -> None:
         if self._running:
@@ -90,7 +89,7 @@ class FrameSource:
 
         return frame
 
-    def last_error(self) -> Optional[Exception]:
+    def last_error(self) -> Exception | None:
         return self._last_error
 
     def statistics(self) -> dict:
@@ -135,14 +134,14 @@ class FrameSource:
             consumers = list(self._consumers)
 
         for consumer in consumers:
+            consumer_name = type(consumer).__name__
+            start_time = time.monotonic()
+
             try:
                 consumer.on_frame(frame)
 
             except Exception as exc:
-                wrapped = FrameSourceError(
-                    f"{type(consumer).__name__} "
-                    f"failed: {exc}"
-                )
+                wrapped = FrameSourceError(f"{consumer_name} failed: {exc}")
 
                 self._last_error = wrapped
 
@@ -150,6 +149,17 @@ class FrameSource:
                     f"Vision consumer error: {wrapped}",
                     flush=True,
                 )
+
+            finally:
+                elapsed = time.monotonic() - start_time
+
+                if elapsed >= 0.05:
+                    print(
+                        f"Vision consumer timing: "
+                        f"{consumer_name} took "
+                        f"{elapsed:.3f} seconds",
+                        flush=True,
+                    )
 
     def close(self) -> None:
         self.stop()

@@ -8,7 +8,8 @@ def close_gpio_factory() -> None:
     Close gpiozero's process-wide pin factory.
 
     This releases lgpio's gpiochip handle and allows another process to
-    acquire the robot GPIO lines.
+    acquire the robot GPIO lines. Call this only when the current process
+    has finished using all gpiozero-backed hardware.
     """
 
     factory = Device.pin_factory

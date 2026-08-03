@@ -1,10 +1,24 @@
-from enum import Enum
-from typing import Any, Callable, Optional, Union
+from __future__ import annotations
 
-from gpiozero import Button, InputDevice, OutputDevice
+from collections.abc import Callable
+from enum import Enum
+from typing import Self, cast
+
+from gpiozero import (
+    Button,
+    InputDevice,
+    OutputDevice,
+)
 
 from .board import BOARD_PINS, DigitalPin
-from .exceptions import InvalidModeError, InvalidPinError, PinModeError
+from .exceptions import (
+    InvalidModeError,
+    InvalidPinError,
+    PinModeError,
+)
+
+PinDevice = InputDevice | OutputDevice | Button
+IRQHandler = Callable[[], None]
 
 
 class PinMode(Enum):
@@ -26,9 +40,11 @@ class Trigger(Enum):
 
 class Pin:
     """
-    Betabox hardware pin abstraction.
+    Betabox digital pin abstraction.
 
-    gpiozero is the current backend, but the public API belongs to Betabox.
+    gpiozero is the current backend, but the public API and lifecycle
+    belong to Betabox. A Pin closes only its individual gpiozero device;
+    top-level hardware owners manage the process-wide pin factory.
     """
 
     OUT = PinMode.OUT
@@ -46,43 +62,57 @@ class Pin:
 
     def __init__(
         self,
-        pin: Union[int, str, DigitalPin],
+        pin: int | str | DigitalPin,
         mode: PinMode = OUT,
         pull: Pull = PULL_NONE,
-        active_state: Optional[bool] = None,
+        active_state: bool | None = None,
     ) -> None:
         if isinstance(pin, DigitalPin):
-            self.board_name = pin.name
+            self.board_name: str | None = pin.name
         elif isinstance(pin, str):
             self.board_name = pin
         else:
             self.board_name = None
+
         self.pin_number = self._resolve_pin(pin)
 
-        self._mode: Optional[PinMode] = None
-        self._pull: Optional[Pull] = None
-        self._active_state = active_state
-        self._device: Optional[Any] = None
-        self._bounce_time: Optional[float] = None
+        self._mode: PinMode | None = None
+        self._pull: Pull | None = None
+        self._active_state: bool | None = None
+        self._device: PinDevice | None = None
+        self._bounce_time: float | None = None
 
-        self.set_mode(mode, pull=pull, active_state=active_state)
+        self.set_mode(
+            mode,
+            pull=pull,
+            active_state=active_state,
+        )
 
-    def _resolve_pin(self, pin: Union[int, str, DigitalPin]) -> int:
+    def _resolve_pin(
+        self,
+        pin: int | str | DigitalPin,
+    ) -> int:
         if isinstance(pin, DigitalPin):
-            return pin.value
+            return int(pin)
 
         if isinstance(pin, str):
             if pin not in self.BOARD_PINS:
+                valid_names = ", ".join(self.BOARD_PINS)
+
                 raise InvalidPinError(
-                    f'Unknown pin name "{pin}". Valid names: {list(self.BOARD_PINS.keys())}'
+                    f'Unknown pin name "{pin}". Valid names: {valid_names}'
                 )
+
             return self.BOARD_PINS[pin]
 
         if isinstance(pin, int):
-            if pin not in self.BOARD_PINS.values():
+            valid_pins = set(self.BOARD_PINS.values())
+
+            if pin not in valid_pins:
                 raise InvalidPinError(
-                    f"Unknown GPIO pin {pin}. Valid pins: {sorted(set(self.BOARD_PINS.values()))}"
+                    f"Unknown GPIO pin {pin}. Valid pins: {sorted(valid_pins)}"
                 )
+
             return pin
 
         raise InvalidPinError(
@@ -90,82 +120,140 @@ class Pin:
         )
 
     @property
-    def mode(self) -> Optional[PinMode]:
+    def mode(self) -> PinMode | None:
         return self._mode
 
     @property
-    def pull(self) -> Optional[Pull]:
+    def pull(self) -> Pull | None:
         return self._pull
 
     @property
-    def device(self):
-        if self._device is None:
-            raise RuntimeError("Pin has not been initialized")
+    def active_state(self) -> bool | None:
+        return self._active_state
 
-        return self._device
+    @property
+    def bounce_time(self) -> float | None:
+        return self._bounce_time
+
+    @property
+    def closed(self) -> bool:
+        return self._device is None
+
+    @property
+    def device(self) -> PinDevice:
+        device = self._device
+
+        if device is None:
+            raise RuntimeError("Pin has not been initialized or is closed")
+
+        return device
+
+    def _input_device(self) -> InputDevice:
+        if self._mode is not PinMode.IN:
+            raise PinModeError("Pin is not configured as input")
+
+        return cast(
+            InputDevice,
+            self.device,
+        )
+
+    def _output_device(self) -> OutputDevice:
+        if self._mode is not PinMode.OUT:
+            raise PinModeError("Pin is not configured as output")
+
+        return cast(
+            OutputDevice,
+            self.device,
+        )
 
     def set_mode(
         self,
         mode: PinMode,
         pull: Pull = PULL_NONE,
-        active_state: Optional[bool] = None,
+        active_state: bool | None = None,
     ) -> None:
         if not isinstance(mode, PinMode):
-            raise InvalidModeError(f"mode must be Pin.OUT or Pin.IN, not {mode!r}")
+            raise TypeError(f"mode must be Pin.OUT or Pin.IN, not {mode!r}")
 
         if not isinstance(pull, Pull):
-            raise InvalidModeError(
-                f"pull must be Pin.PULL_UP, Pin.PULL_DOWN, or Pin.PULL_NONE, not {pull!r}"
+            raise TypeError(
+                "pull must be Pin.PULL_UP, "
+                "Pin.PULL_DOWN, or Pin.PULL_NONE, "
+                f"not {pull!r}"
             )
+
+        if mode is PinMode.IN and pull is Pull.NONE and active_state is None:
+            raise InvalidModeError("active_state is required when using Pin.PULL_NONE")
 
         self.close()
 
+        if mode is PinMode.OUT:
+            new_device: PinDevice = OutputDevice(self.pin_number)
+        elif pull is Pull.UP:
+            new_device = InputDevice(
+                self.pin_number,
+                pull_up=True,
+                active_state=None,
+            )
+        elif pull is Pull.DOWN:
+            new_device = InputDevice(
+                self.pin_number,
+                pull_up=False,
+                active_state=None,
+            )
+        else:
+            # gpiozero supports pull_up=None for an externally pulled,
+            # floating input, although its installed type information
+            # declares this parameter as bool.
+            new_device = InputDevice(
+                self.pin_number,
+                pull_up=None,  # pyright: ignore[reportArgumentType]
+                active_state=active_state,
+            )
+
+        self._device = new_device
         self._mode = mode
         self._pull = pull
         self._active_state = active_state
-
-        if mode == PinMode.OUT:
-            self._device = OutputDevice(self.pin_number)
-        else:
-            if pull == Pull.UP:
-                self._device = InputDevice(
-                    self.pin_number, pull_up=True, active_state=None
-                )
-            elif pull == Pull.DOWN:
-                self._device = InputDevice(
-                    self.pin_number, pull_up=False, active_state=None
-                )
-            else:
-                self._device = InputDevice(
-                    self.pin_number,
-                    pull_up=False,
-                    active_state=active_state,
-                )
+        self._bounce_time = None
 
     def input(
-        self, pull: Pull = PULL_NONE, active_state: Optional[bool] = None
+        self,
+        pull: Pull = PULL_NONE,
+        active_state: bool | None = None,
     ) -> None:
-        self.set_mode(PinMode.IN, pull=pull, active_state=active_state)
+        self.set_mode(
+            PinMode.IN,
+            pull=pull,
+            active_state=active_state,
+        )
 
     def output(self) -> None:
         self.set_mode(PinMode.OUT)
 
     def read(self) -> int:
-        if self._mode != PinMode.IN:
-            raise PinModeError("Cannot read from a pin that is not configured as input")
+        return int(self._input_device().value)
 
-        return int(self.device.value)
-
-    def write(self, value: bool) -> int:
-        if self._mode != PinMode.OUT:
-            raise PinModeError("Cannot write to a pin that is not configured as output")
+    def write(
+        self,
+        value: bool,
+    ) -> int:
+        device = self._output_device()
 
         if bool(value):
-            self.device.on()
+            device.on()
             return 1
 
-        self.device.off()
+        device.off()
         return 0
+
+    def toggle(self) -> int:
+        device = self._output_device()
+
+        if device.value:
+            return self.off()
+
+        return self.on()
 
     def on(self) -> int:
         return self.write(True)
@@ -179,76 +267,123 @@ class Pin:
     def low(self) -> int:
         return self.off()
 
-    def toggle(self) -> int:
-        if self._mode != PinMode.OUT:
-            raise RuntimeError("Cannot toggle a pin that is not configured as output")
-
-        if self.device.value:
-            return self.off()
-
-        return self.on()
-
     def irq(
         self,
-        handler: Callable,
+        handler: IRQHandler,
         trigger: Trigger = IRQ_FALLING,
         bouncetime: int = 200,
         pull: Pull = PULL_UP,
     ) -> None:
+        if not callable(handler):
+            raise TypeError("handler must be callable")
+
         if not isinstance(trigger, Trigger):
-            raise ValueError(
+            raise TypeError(
                 "trigger must be Pin.IRQ_FALLING, Pin.IRQ_RISING, or Pin.IRQ_BOTH"
             )
 
         if not isinstance(pull, Pull):
-            raise ValueError(
-                "pull must be Pin.PULL_UP, Pin.PULL_DOWN, or Pin.PULL_NONE"
+            raise TypeError("pull must be Pin.PULL_UP, Pin.PULL_DOWN, or Pin.PULL_NONE")
+
+        if pull is Pull.NONE:
+            raise InvalidModeError(
+                "interrupt pins require Pin.PULL_UP or Pin.PULL_DOWN"
             )
+
+        if isinstance(bouncetime, bool) or not isinstance(bouncetime, int):
+            raise TypeError("bouncetime must be an integer")
+
+        if bouncetime < 0:
+            raise ValueError("bouncetime cannot be negative")
 
         self.close()
 
-        pull_up = True if pull == Pull.UP else False
+        bounce_seconds = bouncetime / 1000
+        pull_up = pull is Pull.UP
 
-        self._device = Button(
+        button = Button(
             pin=self.pin_number,
             pull_up=pull_up,
-            bounce_time=bouncetime / 1000,
+            bounce_time=bounce_seconds,
         )
 
+        if pull is Pull.UP:
+            falling_callback = "when_pressed"
+            rising_callback = "when_released"
+        else:
+            falling_callback = "when_released"
+            rising_callback = "when_pressed"
+
+        if trigger in (
+            Trigger.FALLING,
+            Trigger.BOTH,
+        ):
+            setattr(
+                button,
+                falling_callback,
+                handler,
+            )
+
+        if trigger in (
+            Trigger.RISING,
+            Trigger.BOTH,
+        ):
+            setattr(
+                button,
+                rising_callback,
+                handler,
+            )
+
+        self._device = button
         self._mode = PinMode.IN
         self._pull = pull
-        self._bounce_time = bouncetime / 1000
+        self._active_state = None
+        self._bounce_time = bounce_seconds
 
-        if trigger in (Trigger.FALLING, Trigger.BOTH):
-            self._device.when_pressed = handler
-
-        if trigger in (Trigger.RISING, Trigger.BOTH):
-            self._device.when_released = handler
-
-    def value(self, value: Optional[bool] = None) -> int:
+    def value(
+        self,
+        value: bool | None = None,
+    ) -> int:
         if value is None:
             return self.read()
 
         return self.write(value)
 
-    def __call__(self, value: Optional[bool] = None) -> int:
+    def __call__(
+        self,
+        value: bool | None = None,
+    ) -> int:
         return self.value(value)
 
     def name(self) -> str:
         return f"GPIO{self.pin_number}"
 
     def close(self) -> None:
-        if self._device is not None:
-            try:
-                self._device.close()
-            finally:
-                self._device = None
+        device = self._device
+
+        try:
+            if device is not None:
+                device.close()
+        finally:
+            self._device = None
+            self._mode = None
+            self._pull = None
+            self._active_state = None
+            self._bounce_time = None
 
     def deinit(self) -> None:
         self.close()
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
+        if self.closed:
+            raise RuntimeError("Cannot enter a closed Pin")
+
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(
+        self,
+        exc_type: object,
+        exc_value: object,
+        traceback: object,
+    ) -> None:
         self.close()

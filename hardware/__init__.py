@@ -9,43 +9,43 @@ from .board import (
     PWMChannel,
 )
 from .exceptions import HardwareError, InvalidModeError, InvalidPinError, PinModeError
+from .gpio import close_gpio_factory
 from .i2c import I2C, I2CError
 from .motor import Motor, MotorError, MotorMode
-from .pin import Pin, PinMode, Pull, Trigger
-from .pwm import PWM, PWMError
-from .servo import Servo, ServoError
-from .gpio import close_gpio_factory
 from .ownership import (
     RobotOwnership,
 )
+from .pin import Pin, PinMode, Pull, Trigger
+from .pwm import PWM, PWMError
+from .servo import Servo, ServoError
 
 __all__ = [
-    "Pins",
-    "DigitalPin",
-    "PWMChannel",
-    "BOARD_PINS",
-    "PWM_CHANNELS",
-    "Pin",
-    "PinMode",
-    "Pull",
-    "Trigger",
-    "I2C",
-    "I2CError",
-    "HardwareError",
-    "InvalidPinError",
-    "InvalidModeError",
-    "PinModeError",
-    "AnalogChannel",
-    "ADC_CHANNELS",
     "ADC",
-    "ADCError",
+    "ADC_CHANNELS",
+    "BOARD_PINS",
+    "I2C",
     "PWM",
-    "PWMError",
-    "Servo",
-    "ServoError",
+    "PWM_CHANNELS",
+    "ADCError",
+    "AnalogChannel",
+    "DigitalPin",
+    "HardwareError",
+    "I2CError",
+    "InvalidModeError",
+    "InvalidPinError",
     "Motor",
     "MotorError",
     "MotorMode",
-    "close_gpio_factory",
+    "PWMChannel",
+    "PWMError",
+    "Pin",
+    "PinMode",
+    "PinModeError",
+    "Pins",
+    "Pull",
     "RobotOwnership",
+    "Servo",
+    "ServoError",
+    "Trigger",
+    "close_gpio_factory",
 ]

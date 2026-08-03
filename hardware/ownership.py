@@ -7,7 +7,7 @@ import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import IO, Any
+from typing import IO, Any, Self
 
 from betabox_robotics.exceptions import (
     RobotBusyError,
@@ -32,7 +32,10 @@ def _open_robot_lock(
 
     base_flags = os.O_RDWR | os.O_CLOEXEC
 
-    if hasattr(os, "O_NOFOLLOW"):
+    if hasattr(
+        os,
+        "O_NOFOLLOW",
+    ):
         base_flags |= os.O_NOFOLLOW
 
     created = False
@@ -46,12 +49,12 @@ def _open_robot_lock(
         try:
             fd = os.open(
                 lock_path,
-                base_flags | os.O_CREAT | os.O_EXCL,
+                (base_flags | os.O_CREAT | os.O_EXCL),
                 ROBOT_LOCK_MODE,
             )
             created = True
+
         except FileExistsError:
-            # Another process created it between the two open calls.
             fd = os.open(
                 lock_path,
                 base_flags,
@@ -74,12 +77,13 @@ def _open_robot_lock(
             "r+",
             encoding="utf-8",
         )
+
     except BaseException:
         os.close(fd)
         raise
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RobotOwnershipStatus:
     available: bool
     owner: str | None
@@ -87,7 +91,9 @@ class RobotOwnershipStatus:
     acquired_at: str | None
     error: str | None = None
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(
+        self,
+    ) -> dict[str, Any]:
         return {
             "available": self.available,
             "owner": self.owner,
@@ -98,9 +104,7 @@ class RobotOwnershipStatus:
 
 
 class RobotOwnership:
-    """
-    Cross-process exclusive ownership of robot hardware.
-    """
+    """Cross-process exclusive ownership of robot hardware."""
 
     def __init__(
         self,
@@ -108,8 +112,13 @@ class RobotOwnership:
         owner: str = "Python application",
         lock_path: Path = ROBOT_LOCK_PATH,
     ) -> None:
-        self.owner = owner
-        self.lock_path = lock_path
+        normalized_owner = owner.strip()
+
+        if not normalized_owner:
+            raise ValueError("owner cannot be empty")
+
+        self.owner = normalized_owner
+        self.lock_path = Path(lock_path)
         self._file: IO[str] | None = None
 
     @property
@@ -130,38 +139,47 @@ class RobotOwnership:
         try:
             fcntl.flock(
                 lock_file.fileno(),
-                fcntl.LOCK_EX | fcntl.LOCK_NB,
+                (fcntl.LOCK_EX | fcntl.LOCK_NB),
             )
-        except BlockingIOError:
-            details = self._read_owner(lock_file)
 
+        except BlockingIOError:
+            details = _read_lock_metadata(lock_file)
             lock_file.close()
 
-            owner = details.get(
-                "owner",
-                "another application",
-            )
+            owner = _optional_string(details.get("owner")) or "another application"
 
             raise RobotBusyError(
-                f"The robot is currently being used by {owner}. "
-                "Close that application or finish its robot code, "
-                "then try again."
+                "The robot is currently being used by "
+                f"{owner}. Close that application or "
+                "finish its robot code, then try again."
             ) from None
 
-        lock_file.seek(0)
-        lock_file.truncate()
+        try:
+            lock_file.seek(0)
+            lock_file.truncate()
 
-        json.dump(
-            {
-                "pid": os.getpid(),
-                "owner": self.owner,
-                "acquired_at": (datetime.now(UTC).isoformat()),
-            },
-            lock_file,
-        )
+            json.dump(
+                {
+                    "pid": os.getpid(),
+                    "owner": self.owner,
+                    "acquired_at": (datetime.now(UTC).isoformat()),
+                },
+                lock_file,
+            )
 
-        lock_file.flush()
-        os.fsync(lock_file.fileno())
+            lock_file.flush()
+            os.fsync(lock_file.fileno())
+
+        except BaseException:
+            try:
+                fcntl.flock(
+                    lock_file.fileno(),
+                    fcntl.LOCK_UN,
+                )
+            finally:
+                lock_file.close()
+
+            raise
 
         self._file = lock_file
 
@@ -182,32 +200,13 @@ class RobotOwnership:
                 lock_file.fileno(),
                 fcntl.LOCK_UN,
             )
+
         finally:
             lock_file.close()
 
-    def _read_owner(
-        self,
-        lock_file: IO[str],
-    ) -> dict[str, object]:
-        try:
-            lock_file.seek(0)
-            value = json.load(lock_file)
-
-            if isinstance(value, dict):
-                return value
-
-        except (
-            OSError,
-            ValueError,
-            json.JSONDecodeError,
-        ):
-            pass
-
-        return {}
-
     def __enter__(
         self,
-    ) -> RobotOwnership:
+    ) -> Self:
         self.acquire()
         return self
 
@@ -224,8 +223,12 @@ def probe_robot_ownership(
     lock_path: Path = ROBOT_LOCK_PATH,
 ) -> RobotOwnershipStatus:
     try:
-        lock_file = _open_robot_lock(lock_path)
-    except OSError as exc:
+        lock_file = _open_robot_lock(Path(lock_path))
+
+    except (
+        OSError,
+        RuntimeError,
+    ) as exc:
         return RobotOwnershipStatus(
             available=False,
             owner=None,
@@ -240,7 +243,7 @@ def probe_robot_ownership(
         try:
             fcntl.flock(
                 lock_file.fileno(),
-                fcntl.LOCK_EX | fcntl.LOCK_NB,
+                (fcntl.LOCK_EX | fcntl.LOCK_NB),
             )
             acquired = True
 
@@ -281,7 +284,10 @@ def _read_lock_metadata(
         lock_file.seek(0)
         value = json.load(lock_file)
 
-        if isinstance(value, dict):
+        if isinstance(
+            value,
+            dict,
+        ):
             return value
 
     except (
@@ -303,4 +309,7 @@ def _optional_string(
 def _optional_int(
     value: object,
 ) -> int | None:
+    if isinstance(value, bool):
+        return None
+
     return value if isinstance(value, int) else None

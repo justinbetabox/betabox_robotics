@@ -11,6 +11,7 @@ from aiohttp.test_utils import (
     TestClient,
     TestServer,
 )
+
 from betabox_robotics.config import PlatformConfig
 from betabox_robotics.launchpad.auth import (
     LAUNCHPAD_CONTEXT_KEY,
@@ -42,6 +43,7 @@ def create_test_services() -> LaunchpadServices:
     return LaunchpadServices(
         calibration_manager=Mock(),
         calibration_service=Mock(),
+        calibration_hardware=Mock(),
         status_cache=Mock(),
     )
 

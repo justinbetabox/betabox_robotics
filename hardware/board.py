@@ -1,7 +1,20 @@
-from enum import Enum
+"""
+Board-level hardware identifiers.
+
+These enums define the logical Betabox pin and channel names used
+throughout the library. Digital pin values use Raspberry Pi BCM
+numbering, while PWM and analog values identify Robot HAT channels.
+"""
+
+from __future__ import annotations
+
+from enum import IntEnum
+from typing import NoReturn
 
 
-class DigitalPin(Enum):
+class DigitalPin(IntEnum):
+    """Raspberry Pi BCM GPIO identifiers used by the Robot HAT."""
+
     D0 = 17
     D1 = 4
     D2 = 27
@@ -9,7 +22,11 @@ class DigitalPin(Enum):
     D4 = 23
     D5 = 24
     D6 = 25
+
+    # D7 intentionally shares BCM GPIO 4 with D1 for compatibility
+    # with the original Robot HAT board mapping.
     D7 = 4
+
     D8 = 5
     D9 = 6
     D10 = 12
@@ -20,6 +37,7 @@ class DigitalPin(Enum):
     D15 = 20
     D16 = 21
 
+    # Named board-function aliases.
     SW = 25
     USER = 25
     LED = 26
@@ -31,7 +49,9 @@ class DigitalPin(Enum):
     CE = 8
 
 
-class PWMChannel(Enum):
+class PWMChannel(IntEnum):
+    """Robot HAT PWM channel identifiers."""
+
     P0 = 0
     P1 = 1
     P2 = 2
@@ -54,7 +74,9 @@ class PWMChannel(Enum):
     P19 = 19
 
 
-class AnalogChannel(Enum):
+class AnalogChannel(IntEnum):
+    """Robot HAT analog-to-digital converter channel identifiers."""
+
     A0 = 0
     A1 = 1
     A2 = 2
@@ -66,6 +88,17 @@ class AnalogChannel(Enum):
 
 
 class Pins:
+    """
+    Compatibility namespace containing all board identifiers.
+
+    Prefer the specific DigitalPin, PWMChannel, and AnalogChannel enums
+    in new internal code. Pins remains available as a convenient combined
+    namespace for public and compatibility APIs.
+    """
+
+    def __new__(cls) -> NoReturn:
+        raise TypeError("Pins is a namespace and cannot be instantiated")
+
     D0 = DigitalPin.D0
     D1 = DigitalPin.D1
     D2 = DigitalPin.D2
@@ -125,6 +158,16 @@ class Pins:
     P19 = PWMChannel.P19
 
 
-BOARD_PINS = {pin.name: pin.value for pin in DigitalPin}
-PWM_CHANNELS = {channel.name: channel.value for channel in PWMChannel}
-ADC_CHANNELS = {channel.name: channel.value for channel in AnalogChannel}
+# Use __members__ rather than enum iteration so aliases such as D7,
+# SW, and USER remain available through string-based lookup.
+BOARD_PINS: dict[str, int] = {
+    name: member.value for name, member in DigitalPin.__members__.items()
+}
+
+PWM_CHANNELS: dict[str, int] = {
+    name: member.value for name, member in PWMChannel.__members__.items()
+}
+
+ADC_CHANNELS: dict[str, int] = {
+    name: member.value for name, member in AnalogChannel.__members__.items()
+}

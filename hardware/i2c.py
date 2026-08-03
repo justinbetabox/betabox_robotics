@@ -1,7 +1,10 @@
+from __future__ import annotations
+
 import logging
 import subprocess
+from collections.abc import Callable, Sequence
 from functools import wraps
-from typing import Any, Callable, List, Optional, ParamSpec, TypeVar, Union
+from typing import Concatenate, ParamSpec, Self, TypeVar
 
 from smbus2 import SMBus
 
@@ -16,70 +19,170 @@ P = ParamSpec("P")
 R = TypeVar("R")
 
 
-def retry_i2c(func: Callable[..., Any]) -> Callable[..., Any]:
+def retry_i2c(
+    func: Callable[Concatenate[I2C, P], R],
+) -> Callable[Concatenate[I2C, P], R]:
+    """Retry an I2C operation when the SMBus backend raises OSError."""
+
     @wraps(func)
-    def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
+    def wrapper(
+        self: I2C,
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ) -> R:
         last_error: OSError | None = None
 
-        for _ in range(self.retry_count):
+        for attempt in range(
+            1,
+            self.retry_count + 1,
+        ):
             try:
-                return func(self, *args, **kwargs)
-            except OSError as error:
-                last_error = error
-                self.logger.debug("I2C OSError in %s: %s", func.__name__, error)
+                return func(
+                    self,
+                    *args,
+                    **kwargs,
+                )
+
+            except OSError as exc:
+                last_error = exc
+
+                self.logger.debug(
+                    "I2C OSError in %s (attempt %d/%d): %s",
+                    func.__name__,
+                    attempt,
+                    self.retry_count,
+                    exc,
+                )
 
         raise I2CError(
-            f"I2C operation failed after {self.retry_count} retries"
+            f"I2C operation failed after {self.retry_count} attempts"
         ) from last_error
 
     return wrapper
 
 
 class I2C:
-    """
-    Betabox I2C device abstraction.
-    """
+    """Betabox I2C device abstraction."""
 
     DEFAULT_RETRY_COUNT = 5
 
     def __init__(
         self,
-        address: Union[int, List[int], None] = None,
+        address: int | Sequence[int] | None = None,
         bus: int = 1,
         retry_count: int = DEFAULT_RETRY_COUNT,
     ) -> None:
+        if isinstance(bus, bool) or not isinstance(
+            bus,
+            int,
+        ):
+            raise TypeError("bus must be an integer")
+
+        if bus < 0:
+            raise ValueError("bus cannot be negative")
+
+        if isinstance(retry_count, bool) or not isinstance(retry_count, int):
+            raise TypeError("retry_count must be an integer")
+
+        if retry_count < 1:
+            raise ValueError("retry_count must be at least 1")
+
+        normalized_address = self._validate_address_argument(address)
+
         self.logger = logging.getLogger(__name__)
 
         self.bus_number = bus
         self.retry_count = retry_count
-        self._smbus: Optional[SMBus] = SMBus(self.bus_number)
+        self.address: int | None = None
+        self._smbus: SMBus | None = None
 
-        if isinstance(address, list):
-            connected_devices = self.scan()
-            for candidate in address:
-                if candidate in connected_devices:
-                    self.address = candidate
-                    break
-            else:
-                self.address = address[0]
-        else:
-            self.address = address
+        try:
+            self._smbus = SMBus(self.bus_number)
+
+            self.address = self._select_address(normalized_address)
+
+        except BaseException:
+            self.close()
+            raise
+
+    @staticmethod
+    def _validate_address(
+        address: object,
+    ) -> int:
+        if isinstance(address, bool) or not isinstance(
+            address,
+            int,
+        ):
+            raise TypeError("I2C addresses must be integers")
+
+        if not 0 <= address <= 0x7F:
+            raise ValueError("I2C address must be between 0x00 and 0x7F")
+
+        return address
+
+    @classmethod
+    def _validate_address_argument(
+        cls,
+        address: int | Sequence[int] | None,
+    ) -> int | list[int] | None:
+        if address is None:
+            return None
+
+        if isinstance(address, Sequence) and not isinstance(
+            address,
+            str | bytes | bytearray,
+        ):
+            if not address:
+                raise ValueError("address candidate sequence cannot be empty")
+
+            return [cls._validate_address(candidate) for candidate in address]
+
+        return cls._validate_address(address)
+
+    def _select_address(
+        self,
+        address: int | list[int] | None,
+    ) -> int | None:
+        if not isinstance(address, list):
+            return address
+
+        connected_devices = self.scan()
+
+        for candidate in address:
+            if candidate in connected_devices:
+                return candidate
+
+        # Preserve the existing compatibility behavior for now:
+        # when no candidate is detected, use the first configured address.
+        return address[0]
 
     def _bus(self) -> SMBus:
-        if self._smbus is None:
+        bus = self._smbus
+
+        if bus is None:
             raise I2CError("I2C bus is closed")
 
-        return self._smbus
+        return bus
 
     def _address(self) -> int:
-        if self.address is None:
+        address = self.address
+
+        if address is None:
             raise I2CError("I2C address is not set")
 
-        return self.address
+        return address
+
+    @property
+    def closed(self) -> bool:
+        return self._smbus is None
 
     def close(self) -> None:
-        if self._smbus is not None:
-            self._smbus.close()
+        bus = self._smbus
+
+        try:
+            if bus is not None:
+                bus.close()
+        finally:
             self._smbus = None
 
     @retry_i2c
@@ -98,7 +201,7 @@ class I2C:
         self._bus().write_word_data(self._address(), reg, data)
 
     @retry_i2c
-    def _write_i2c_block_data(self, reg: int, data: List[int]) -> None:
+    def _write_i2c_block_data(self, reg: int, data: list[int]) -> None:
         self.logger.debug(
             "_write_i2c_block_data: [0x%02X] %s",
             reg,
@@ -119,14 +222,14 @@ class I2C:
         return result
 
     @retry_i2c
-    def _read_word_data(self, reg: int) -> List[int]:
+    def _read_word_data(self, reg: int) -> list[int]:
         result = self._bus().read_word_data(self._address(), reg)
         result_list = [result & 0xFF, (result >> 8) & 0xFF]
         self.logger.debug("_read_word_data: [0x%02X] [0x%04X]", reg, result)
         return result_list
 
     @retry_i2c
-    def _read_i2c_block_data(self, reg: int, length: int) -> List[int]:
+    def _read_i2c_block_data(self, reg: int, length: int) -> list[int]:
         result = self._bus().read_i2c_block_data(self._address(), reg, length)
         self.logger.debug(
             "_read_i2c_block_data: [0x%02X] %s",
@@ -135,28 +238,57 @@ class I2C:
         )
         return result
 
-    def scan(self) -> List[int]:
-        result = subprocess.run(
-            ["i2cdetect", "-y", str(self.bus_number)],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+    def scan(self) -> list[int]:
+        try:
+            result = subprocess.run(
+                [
+                    "i2cdetect",
+                    "-y",
+                    str(self.bus_number),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except OSError as exc:
+            raise I2CError("Unable to run i2cdetect") from exc
 
         if result.returncode != 0:
             raise I2CError(result.stderr.strip() or "i2cdetect failed")
 
-        addresses: List[int] = []
+        addresses: list[int] = []
 
-        for line in result.stdout.splitlines()[1:]:
-            if not line or ":" not in line:
+        for line in result.stdout.splitlines():
+            if ":" not in line:
                 continue
 
-            _, values = line.split(":", 1)
+            row_text, values_text = line.split(
+                ":",
+                1,
+            )
 
-            for value in values.strip().split():
-                if value != "--":
+            try:
+                row_start = int(
+                    row_text.strip(),
+                    16,
+                )
+            except ValueError:
+                continue
+
+            for offset, value in enumerate(values_text.split()):
+                if value == "--":
+                    continue
+
+                if value == "UU":
+                    addresses.append(row_start + offset)
+                    continue
+
+                try:
                     addresses.append(int(value, 16))
+                except ValueError:
+                    continue
+
+        addresses = sorted(set(addresses))
 
         self.logger.debug(
             "Connected I2C devices: %s",
@@ -174,7 +306,10 @@ class I2C:
     def is_available(self) -> bool:
         return self.is_ready()
 
-    def write(self, data: Union[int, List[int], bytearray]) -> None:
+    def write(
+        self,
+        data: int | list[int] | bytearray,
+    ) -> None:
         data_all = self._normalize_write_data(data)
 
         if len(data_all) == 1:
@@ -189,36 +324,73 @@ class I2C:
             reg = data_all[0]
             self._write_i2c_block_data(reg, list(data_all[1:]))
 
-    def read(self, length: int = 1) -> List[int]:
-        if not isinstance(length, int):
-            raise ValueError(f"length must be int, not {type(length)}")
+    def read(
+        self,
+        length: int = 1,
+    ) -> list[int]:
+        if isinstance(length, bool) or not isinstance(
+            length,
+            int,
+        ):
+            raise TypeError("length must be an integer")
 
         if length <= 0:
             raise ValueError("length must be greater than 0")
 
         return [self._read_byte() for _ in range(length)]
 
-    def mem_write(self, data: Union[int, List[int], bytearray], memaddr: int) -> None:
+    def mem_write(
+        self,
+        data: int | list[int] | bytearray,
+        memaddr: int,
+    ) -> None:
         data_all = self._normalize_write_data(data)
-        self._write_i2c_block_data(memaddr, data_all)
 
-    def mem_read(self, length: int, memaddr: int) -> List[int]:
-        if not isinstance(length, int):
-            raise ValueError(f"length must be int, not {type(length)}")
+        self._write_i2c_block_data(
+            memaddr,
+            data_all,
+        )
+
+    def mem_read(
+        self,
+        length: int,
+        memaddr: int,
+    ) -> list[int]:
+        if isinstance(length, bool) or not isinstance(
+            length,
+            int,
+        ):
+            raise TypeError("length must be an integer")
 
         if length <= 0:
             raise ValueError("length must be greater than 0")
 
-        return self._read_i2c_block_data(memaddr, length)
+        return self._read_i2c_block_data(
+            memaddr,
+            length,
+        )
+
+    @staticmethod
+    def _validate_byte(
+        value: object,
+    ) -> int:
+        if isinstance(value, bool) or not isinstance(
+            value,
+            int,
+        ):
+            raise TypeError("I2C data values must be integers")
+
+        if not 0 <= value <= 0xFF:
+            raise ValueError("I2C data values must be between 0 and 255")
+
+        return value
 
     def _normalize_write_data(
-        self, data: Union[int, List[int], bytearray]
-    ) -> List[int]:
-        if isinstance(data, bytearray):
-            return list(data)
-
-        if isinstance(data, list):
-            return data
+        self,
+        data: int | list[int] | bytearray,
+    ) -> list[int]:
+        if isinstance(data, bool):
+            raise TypeError("write data must be an int, list, or bytearray")
 
         if isinstance(data, int):
             if data < 0:
@@ -227,20 +399,38 @@ class I2C:
             if data == 0:
                 return [0]
 
-            data_all: List[int] = []
+            values: list[int] = []
 
-            while data > 0:
-                data_all.append(data & 0xFF)
-                data //= 256
+            while data:
+                values.append(data & 0xFF)
+                data >>= 8
 
-            return data_all
+            return values
 
-        raise ValueError(
-            f"write data must be int, list, or bytearray, not {type(data)}"
-        )
+        if isinstance(data, bytearray):
+            values = list(data)
 
-    def __enter__(self):
+        elif isinstance(data, list):
+            values = [self._validate_byte(value) for value in data]
+
+        else:
+            raise TypeError("write data must be an int, list, or bytearray")
+
+        if not values:
+            raise ValueError("write data cannot be empty")
+
+        return values
+
+    def __enter__(self) -> Self:
+        if self.closed:
+            raise I2CError("Cannot enter a closed I2C bus")
+
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(
+        self,
+        exc_type: object,
+        exc_value: object,
+        traceback: object,
+    ) -> None:
         self.close()

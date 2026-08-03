@@ -7,47 +7,75 @@ from betabox_robotics.vision.metadata import Metadata
 
 class MetadataBus:
     """
-    Stores and publishes metadata produced by Vision components.
+    Thread-safe store for metadata produced by Vision components.
 
-    Detectors publish metadata to the bus. Streamers, APIs, and future
-    user interfaces can read metadata without depending on detector
-    internals.
+    Detectors and other producers publish metadata to the bus. Streamers,
+    APIs, overlays, and user interfaces can then consume that metadata
+    without depending directly on producer implementations.
+
+    The bus retains the latest item from each source and a bounded history of
+    recently published metadata.
     """
 
     def __init__(self, *, max_history: int = 500) -> None:
+        if max_history <= 0:
+            raise ValueError("max_history must be greater than zero")
+
         self._latest_by_source: dict[str, Metadata] = {}
         self._history: deque[Metadata] = deque(maxlen=max_history)
         self._lock = threading.Lock()
 
     def publish(self, metadata: Metadata) -> None:
+        """
+        Publish metadata and make it the latest item for its source.
+        """
         with self._lock:
             self._latest_by_source[metadata.source] = metadata
             self._history.append(metadata)
 
     def latest(self, source: str | None = None) -> Metadata | None:
+        """
+        Return the latest published metadata.
+
+        When source is provided, return the latest metadata from that source.
+        Otherwise, return the most recently published metadata from any
+        source.
+        """
         with self._lock:
             if source is not None:
                 return self._latest_by_source.get(source)
 
-            if not self._history:
-                return None
-
-            return self._history[-1]
+            return self._history[-1] if self._history else None
 
     def all_latest(self) -> dict[str, Metadata]:
+        """
+        Return the latest metadata from every known source.
+        """
         with self._lock:
             return dict(self._latest_by_source)
 
     def history(self, limit: int | None = None) -> Sequence[Metadata]:
+        """
+        Return metadata history in oldest-to-newest order.
+
+        When limit is supplied, return at most that many of the newest items.
+        """
+        if limit is not None and limit < 0:
+            raise ValueError("limit must be zero or greater")
+
         with self._lock:
-            items = list(self._history)
+            if limit is None:
+                return tuple(self._history)
 
-        if limit is None:
-            return items
+            if limit == 0:
+                return ()
 
-        return items[-limit:]
+            return tuple(list(self._history)[-limit:])
 
     def clear(self) -> None:
+        """
+        Remove all current and historical metadata.
+        """
         with self._lock:
             self._latest_by_source.clear()
             self._history.clear()

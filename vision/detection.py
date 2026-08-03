@@ -1,5 +1,6 @@
+from __future__ import annotations
+
 import threading
-from typing import Dict
 
 from betabox_robotics.vision.consumer import FrameConsumer
 from betabox_robotics.vision.detector import Detector
@@ -13,25 +14,26 @@ from betabox_robotics.vision.metadata_bus import MetadataBus
 
 
 class DetectionError(Exception):
-    """Raised when detection operations fail."""
+    """Raised when detector management or execution fails."""
 
 
 class DetectionManager(FrameConsumer):
     """
-    Runs registered detectors against frames from the Vision pipeline.
+    Run registered detectors against frames from the Vision pipeline.
 
-    DetectionManager consumes frames from FrameSource and publishes
-    detector results to MetadataBus.
+    DetectionManager consumes frames from FrameSource and publishes detector
+    results to MetadataBus. It does not own the camera or modify frame images.
     """
 
     def __init__(self, metadata_bus: MetadataBus) -> None:
         self.metadata_bus = metadata_bus
-        self._detectors: Dict[str, Detector] = {}
+        self._detectors: dict[str, Detector] = {}
         self._lock = threading.Lock()
 
         self.color = ColorDetector()
         self.face = FaceDetector()
         self.objects = ObjectDetector()
+
         self.register(self.color)
         self.register(self.face)
         self.register(self.objects)
@@ -45,28 +47,26 @@ class DetectionManager(FrameConsumer):
 
     def unregister(self, name: str) -> None:
         with self._lock:
-            if name in self._detectors:
-                del self._detectors[name]
+            self._detectors.pop(name, None)
 
     def enable(self, name: str) -> None:
-        detector = self._get_detector(name)
-        detector.enable()
+        self._get_detector(name).enable()
 
     def disable(self, name: str) -> None:
-        detector = self._get_detector(name)
-        detector.disable()
+        self._get_detector(name).disable()
 
     def is_enabled(self, name: str) -> bool:
-        detector = self._get_detector(name)
-        return detector.enabled
+        return self._get_detector(name).enabled
 
     def names(self) -> list[str]:
         with self._lock:
-            return list(self._detectors.keys())
+            return list(self._detectors)
 
     def on_frame(self, frame: Frame) -> None:
         with self._lock:
-            detectors = list(self._detectors.values())
+            detectors = tuple(self._detectors.values())
+
+        first_error: DetectionError | None = None
 
         for detector in detectors:
             if not detector.enabled:
@@ -75,10 +75,18 @@ class DetectionManager(FrameConsumer):
             try:
                 metadata = detector.detect(frame)
             except Exception as exc:
-                raise DetectionError(f"{detector.name} detector failed: {exc}") from exc
+                if first_error is None:
+                    first_error = DetectionError(
+                        f"{detector.name} detector failed: {exc}"
+                    )
+
+                continue
 
             if metadata is not None:
                 self.metadata_bus.publish(metadata)
+
+        if first_error is not None:
+            raise first_error
 
     def _get_detector(self, name: str) -> Detector:
         with self._lock:

@@ -6,7 +6,7 @@ from betabox_robotics.vision.frame import Frame
 from betabox_robotics.vision.metadata import Box
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ModelDetection:
     label: str
     confidence: float

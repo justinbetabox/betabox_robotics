@@ -1,50 +1,95 @@
-#!/usr/bin/env python3
+import unittest
 
-from betabox_robotics.vision import Detection, Metadata, MetadataBus
+from betabox_robotics.vision.metadata import Detection, Metadata
+from betabox_robotics.vision.metadata_bus import MetadataBus
 
-print("\nMetadata hardware-independent test")
-print("==================================")
 
-bus = MetadataBus()
+class MetadataTests(unittest.TestCase):
+    def test_create_converts_detections_to_tuple(self) -> None:
+        detection = Detection(label="red")
 
-detection = Detection(
-    label="red",
-    confidence=0.95,
-    box=(10, 20, 30, 40),
-    center=(25, 40),
-)
+        metadata = Metadata.create(
+            "color",
+            detections=[detection],
+        )
 
-metadata = Metadata.create(
-    source="color",
-    detections=[detection],
-    data={"count": 1},
-)
+        self.assertEqual(metadata.detections, (detection,))
 
-bus.publish(metadata)
+    def test_create_accepts_source_frame_timestamp(self) -> None:
+        metadata = Metadata.create(
+            "color",
+            timestamp=123.5,
+        )
 
-latest = bus.latest("color")
-all_latest = bus.all_latest()
-history = bus.history()
+        self.assertEqual(metadata.timestamp, 123.5)
 
-print(f"latest_source={latest.source if latest else None}")
-print(f"latest_count={len(latest.detections) if latest else 0}")
-print(f"all_latest_sources={list(all_latest.keys())}")
-print(f"history_count={len(history)}")
+    def test_create_copies_data_dictionary(self) -> None:
+        data = {"threshold": 10}
 
-assert latest is not None
-assert latest.source == "color"
-assert latest.detections[0].label == "red"
-assert latest.detections[0].confidence == 0.95
-assert latest.detections[0].box == (10, 20, 30, 40)
-assert latest.detections[0].center == (25, 40)
-assert latest.data["count"] == 1
-assert "color" in all_latest
-assert len(history) == 1
+        metadata = Metadata.create("color", data=data)
+        data["threshold"] = 20
 
-bus.clear()
+        self.assertEqual(metadata.data["threshold"], 10)
 
-assert bus.latest() is None
-assert bus.all_latest() == {}
-assert bus.history() == []
 
-print("\nMetadata test complete.")
+class MetadataBusTests(unittest.TestCase):
+    def test_rejects_invalid_history_size(self) -> None:
+        with self.assertRaises(ValueError):
+            MetadataBus(max_history=0)
+
+    def test_latest_returns_most_recent_metadata(self) -> None:
+        bus = MetadataBus()
+        first = Metadata.create("color", timestamp=1.0)
+        second = Metadata.create("face", timestamp=2.0)
+
+        bus.publish(first)
+        bus.publish(second)
+
+        self.assertIs(bus.latest(), second)
+        self.assertIs(bus.latest("color"), first)
+
+    def test_history_zero_returns_empty_sequence(self) -> None:
+        bus = MetadataBus()
+        bus.publish(Metadata.create("color"))
+
+        self.assertEqual(bus.history(limit=0), ())
+
+    def test_history_limit_returns_newest_items(self) -> None:
+        bus = MetadataBus()
+        first = Metadata.create("color", timestamp=1.0)
+        second = Metadata.create("color", timestamp=2.0)
+        third = Metadata.create("color", timestamp=3.0)
+
+        bus.publish(first)
+        bus.publish(second)
+        bus.publish(third)
+
+        self.assertEqual(bus.history(limit=2), (second, third))
+
+    def test_history_rejects_negative_limit(self) -> None:
+        bus = MetadataBus()
+
+        with self.assertRaises(ValueError):
+            bus.history(limit=-1)
+
+    def test_history_is_bounded(self) -> None:
+        bus = MetadataBus(max_history=2)
+        first = Metadata.create("color", timestamp=1.0)
+        second = Metadata.create("color", timestamp=2.0)
+        third = Metadata.create("color", timestamp=3.0)
+
+        bus.publish(first)
+        bus.publish(second)
+        bus.publish(third)
+
+        self.assertEqual(bus.history(), (second, third))
+
+    def test_clear_removes_latest_and_history(self) -> None:
+        bus = MetadataBus()
+        bus.publish(Metadata.create("color"))
+
+        bus.clear()
+
+        self.assertIsNone(bus.latest())
+        self.assertEqual(bus.all_latest(), {})
+        self.assertEqual(bus.history(), ())

@@ -11,19 +11,21 @@ from betabox_robotics.vision.interfaces import FrameProvider
 
 ImageFormat = Literal["jpg", "jpeg", "png"]
 
+NormalizedImageFormat = Literal["jpg", "png"]
 
-@dataclass(frozen=True)
+
+@dataclass(frozen=True, slots=True)
 class Snapshot:
     path: Path
     timestamp: float
-    format: str
+    format: NormalizedImageFormat
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SnapshotData:
     data: bytes
     timestamp: float
-    format: str
+    format: NormalizedImageFormat
 
 
 class SnapshotError(FrameSourceError):
@@ -47,7 +49,29 @@ class SnapshotService:
     ) -> None:
         self.frame_source = frame_source
         self.directory = Path(directory)
-        self.default_format = default_format
+        fmt = default_format.lower()
+
+        if fmt == "jpeg":
+            fmt = "jpg"
+
+        if fmt not in ("jpg", "png"):
+            raise ValueError(f"unsupported snapshot format: {default_format}")
+
+        self.default_format: NormalizedImageFormat = fmt
+
+    def _normalize_format(
+        self,
+        image_format: ImageFormat | None,
+    ) -> NormalizedImageFormat:
+        fmt = (image_format or self.default_format).lower()
+
+        if fmt == "jpeg":
+            fmt = "jpg"
+
+        if fmt not in ("jpg", "png"):
+            raise SnapshotError(f"unsupported snapshot format: {fmt}")
+
+        return fmt
 
     def capture(
         self,
@@ -81,13 +105,7 @@ class SnapshotService:
         *,
         image_format: ImageFormat | None = None,
     ) -> SnapshotData:
-        fmt = image_format or self.default_format
-
-        if fmt == "jpeg":
-            fmt = "jpg"
-
-        if fmt not in ("jpg", "png"):
-            raise SnapshotError(f"unsupported snapshot format: {fmt}")
+        fmt = self._normalize_format(image_format)
 
         image = frame.image
 
@@ -97,10 +115,13 @@ class SnapshotService:
                 cv2.COLOR_RGB2BGR,
             )
 
-        success, encoded = cv2.imencode(
-            f".{fmt}",
-            image,
-        )
+        try:
+            success, encoded = cv2.imencode(
+                f".{fmt}",
+                image,
+            )
+        except cv2.error as exc:
+            raise SnapshotError(f"failed to encode snapshot as {fmt}") from exc
 
         if not success:
             raise SnapshotError(f"failed to encode snapshot as {fmt}")
@@ -120,15 +141,14 @@ class SnapshotService:
         image_format: ImageFormat | None = None,
     ) -> Snapshot:
         output_dir = Path(directory) if directory is not None else self.directory
-        fmt = image_format or self.default_format
+        fmt = self._normalize_format(image_format)
 
-        if fmt == "jpeg":
-            fmt = "jpg"
-
-        if fmt not in ("jpg", "png"):
-            raise SnapshotError(f"unsupported snapshot format: {fmt}")
-
-        output_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            output_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise SnapshotError(
+                f"failed to create snapshot directory: {output_dir}"
+            ) from exc
 
         if filename is None:
             filename = f"snapshot_{strftime('%Y%m%d_%H%M%S')}.{fmt}"
@@ -152,7 +172,10 @@ class SnapshotService:
         if len(image.shape) == 3 and image.shape[2] == 3:
             image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
-        success = cv2.imwrite(str(path), image)
+        try:
+            success = cv2.imwrite(str(path), image)
+        except cv2.error as exc:
+            raise SnapshotError(f"failed to write snapshot: {path}") from exc
 
         if not success:
             raise SnapshotError(f"failed to write snapshot: {path}")

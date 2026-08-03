@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from betabox_robotics.vision.detection import DetectionManager
 from betabox_robotics.vision.frame_source import FrameSource
@@ -18,11 +19,21 @@ from betabox_robotics.vision.snapshot import Snapshot, SnapshotData, SnapshotSer
 from betabox_robotics.vision.webrtc import WebRTCStreamer
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class VisionServiceConfig:
     host: str = "0.0.0.0"
     port: int = 8080
     fps: int = 20
+
+    def __post_init__(self) -> None:
+        if not self.host.strip():
+            raise ValueError("host cannot be empty")
+
+        if not 1 <= self.port <= 65535:
+            raise ValueError("port must be between 1 and 65535")
+
+        if self.fps <= 0:
+            raise ValueError("fps must be greater than zero")
 
 
 class VisionService:
@@ -89,7 +100,13 @@ class VisionService:
             return
 
         self.frame_source.start()
-        self.streamer.start()
+
+        try:
+            self.streamer.start()
+        except Exception:
+            self.frame_source.stop()
+            raise
+
         self._running = True
 
     def run(self) -> None:
@@ -98,28 +115,42 @@ class VisionService:
 
     def stop(self) -> None:
         """
-        Stop the local vision pipeline.
+        Stop the local Vision pipeline.
 
-        Active WebRTC peers should normally be closed first through
-        stop_async() by the signaling server's aiohttp shutdown hook.
+        Active WebRTC peers are normally closed by the signaling server's
+        aiohttp shutdown hook before this synchronous pipeline shutdown runs.
         """
         if not self._running:
             return
 
-        self.streamer.stop()
+        error: Exception | None = None
 
-        if self.recording.is_recording():
-            recording = self.recording.stop()
+        try:
+            self.streamer.stop()
 
+            if self.recording.is_recording():
+                try:
+                    recording = self.recording.stop()
+                except Exception as exc:
+                    error = exc
+                else:
+                    try:
+                        recording.path.unlink()
+                    except FileNotFoundError:
+                        pass
+                    except OSError as exc:
+                        error = exc
+
+        finally:
             try:
-                recording.path.unlink()
-            except FileNotFoundError:
-                pass
+                self.frame_source.stop()
+            finally:
+                self._running = False
 
-        self.frame_source.stop()
-        self._running = False
+        if error is not None:
+            raise error
 
-    def statistics(self) -> dict:
+    def statistics(self) -> dict[str, Any]:
         return {
             "running": self._running,
             "camera": self.frame_source.statistics(),
@@ -158,11 +189,16 @@ class VisionService:
         frame = self.frame_source.latest_frame()
         metadata = self.latest_metadata(source)
 
-        if metadata is None:
-            return self.snapshot.capture(**kwargs)
+        if metadata is not None:
+            frame = self.overlay.draw_metadata(
+                frame,
+                metadata,
+            )
 
-        annotated = self.overlay.draw_metadata(frame, metadata)
-        return self.snapshot.capture_frame(annotated, **kwargs)
+        return self.snapshot.capture_frame(
+            frame,
+            **kwargs,
+        )
 
     def capture_snapshot_data(
         self,
@@ -230,7 +266,7 @@ class VisionService:
     def disable_stream_overlay(self) -> None:
         self.streamer.disable_overlay()
 
-    def stream_overlay_status(self) -> dict:
+    def stream_overlay_status(self) -> dict[str, bool | str | None]:
         return self.streamer.overlay_status()
 
     def enable_recording_overlay(self, source: str | None = None) -> None:
@@ -239,7 +275,7 @@ class VisionService:
     def disable_recording_overlay(self) -> None:
         self.recording.disable_overlay()
 
-    def recording_overlay_status(self) -> dict:
+    def recording_overlay_status(self) -> dict[str, bool | str | None]:
         return self.recording.overlay_status()
 
     def latest_metadata(self, source: str | None = None) -> Metadata | None:

@@ -7,10 +7,11 @@ class FrameConsumer(ABC):
     """
     Interface for objects that consume frames from FrameSource.
 
-    Streamers, recorders, snapshot services, and detectors can all
-    implement this interface.
+    Streamers, recorders, and detection managers implement this interface
+    so FrameSource can publish each completed frame without depending on
+    concrete consumer implementations.
     """
 
     @abstractmethod
     def on_frame(self, frame: Frame) -> None:
-        pass
+        """Receive a frame from the Vision pipeline."""

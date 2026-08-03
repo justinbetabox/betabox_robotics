@@ -126,6 +126,8 @@ class ManagedAccountDefinitionTests(
             "i2c",
             "gpio",
             "spi",
+            "audio",
+            "video",
         )
 
         for account in BETABOX_ACCOUNTS:

@@ -52,6 +52,7 @@ def build_account_context(
         root,
         persistent=account.persistent,
     )
+    workspace.ensure_exists()
 
     return LaunchpadContext(
         platform=platform,

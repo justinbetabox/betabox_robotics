@@ -15,7 +15,7 @@ from betabox_robotics.vision.metadata_bus import MetadataBus
 from betabox_robotics.vision.overlay import OverlayRenderer
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class Recording:
     path: Path
     start_timestamp: float
@@ -28,7 +28,7 @@ class Recording:
         return max(0.0, self.end_timestamp - self.start_timestamp)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class RecordingData:
     data: bytes
     format: str
@@ -72,7 +72,7 @@ class RecordingService(FrameConsumer):
 
         self._process: subprocess.Popen[bytes] | None = None
         self._path: Path | None = None
-        self._last_error: Exception | None = None
+        self._last_error: RecordingError | None = None
         self._start_timestamp: float | None = None
         self._end_timestamp: float | None = None
         self._frame_count = 0
@@ -281,7 +281,7 @@ class RecordingService(FrameConsumer):
         with self._frame_condition:
             return self._recording
 
-    def last_error(self) -> Exception | None:
+    def last_error(self) -> RecordingError | None:
         with self._frame_condition:
             return self._last_error
 
@@ -351,10 +351,11 @@ class RecordingService(FrameConsumer):
             metadata = self.metadata_bus.latest(self.overlay_source)
 
             if metadata is not None:
-                frame = self.overlay.draw_metadata(
-                    frame,
-                    metadata,
-                )
+                try:
+                    frame = self.overlay.draw_metadata(frame, metadata)
+                except Exception:
+                    # Optionally log the error.
+                    pass
 
         image = frame.image
 
@@ -397,7 +398,7 @@ class RecordingService(FrameConsumer):
         self.overlay_enabled = False
         self.overlay_source = None
 
-    def overlay_status(self) -> dict:
+    def overlay_status(self) -> dict[str, str | bool | None]:
         return {
             "enabled": self.overlay_enabled,
             "source": self.overlay_source,

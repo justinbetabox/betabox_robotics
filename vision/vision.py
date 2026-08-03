@@ -1,18 +1,24 @@
+from __future__ import annotations
+
+from typing import Self
+
 from betabox_robotics.vision.consumer import FrameConsumer
 from betabox_robotics.vision.detection import DetectionManager
 from betabox_robotics.vision.frame import Frame
 from betabox_robotics.vision.frame_source import FrameSource
 from betabox_robotics.vision.metadata_bus import MetadataBus
+from betabox_robotics.vision.overlay import OverlayRenderer
 from betabox_robotics.vision.recording import RecordingService
 from betabox_robotics.vision.snapshot import SnapshotService
 
 
 class Vision:
     """
-    Vision subsystem container.
+    Direct Vision subsystem container.
 
-    This direct subsystem owns a FrameSource and therefore opens the camera.
-    It should be used when the managed betabox-video.service is not running.
+    This subsystem owns a FrameSource and therefore opens the physical
+    camera. Use it only when the managed betabox-video.service is not
+    running.
 
     Long-running platform video should use VisionService instead.
     """
@@ -22,23 +28,45 @@ class Vision:
         frame_source: FrameSource | None = None,
         metadata_bus: MetadataBus | None = None,
     ) -> None:
-        self.frame_source = frame_source or FrameSource()
-        self.metadata = metadata_bus or MetadataBus()
+        self.frame_source = frame_source if frame_source is not None else FrameSource()
+        self.metadata = metadata_bus if metadata_bus is not None else MetadataBus()
+
+        self.overlay = OverlayRenderer()
         self.detection = DetectionManager(self.metadata)
         self.snapshot = SnapshotService(self.frame_source)
-        self.recording = RecordingService()
+        self.recording = RecordingService(
+            fps=self.frame_source.fps,
+            metadata_bus=self.metadata,
+            overlay=self.overlay,
+        )
+
         self.register_consumer(self.recording)
         self.register_consumer(self.detection)
 
     @classmethod
-    def default(cls, robot_config=None) -> "Vision":
+    def default(
+        cls,
+        robot_config=None,
+    ) -> Self:
         return cls()
 
     def start(self) -> None:
         self.frame_source.start()
 
     def stop(self) -> None:
-        self.frame_source.stop()
+        error: Exception | None = None
+
+        if self.recording.is_recording():
+            try:
+                self.recording.stop()
+            except Exception as exc:
+                error = exc
+
+        try:
+            self.frame_source.stop()
+        finally:
+            if error is not None:
+                raise error
 
     def is_running(self) -> bool:
         return self.frame_source.is_running()
@@ -46,10 +74,16 @@ class Vision:
     def latest_frame(self) -> Frame:
         return self.frame_source.latest_frame()
 
-    def register_consumer(self, consumer: FrameConsumer) -> None:
+    def register_consumer(
+        self,
+        consumer: FrameConsumer,
+    ) -> None:
         self.frame_source.register_consumer(consumer)
 
-    def unregister_consumer(self, consumer: FrameConsumer) -> None:
+    def unregister_consumer(
+        self,
+        consumer: FrameConsumer,
+    ) -> None:
         self.frame_source.unregister_consumer(consumer)
 
     def close(self) -> None:
@@ -58,9 +92,14 @@ class Vision:
     def deinit(self) -> None:
         self.close()
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         self.start()
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(
+        self,
+        exc_type,
+        exc_value,
+        traceback,
+    ) -> None:
         self.close()

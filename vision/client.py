@@ -15,14 +15,14 @@ class VisionClientError(Exception):
     """Raised when the managed Vision service cannot complete a request."""
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ClientSnapshot:
     path: Path
     timestamp: float
     format: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ClientRecording:
     path: Path
     start_timestamp: float
@@ -35,7 +35,7 @@ class ClientRecording:
         return max(0.0, self.end_timestamp - self.start_timestamp)
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ClientDetection:
     label: str
     confidence: float | None
@@ -44,7 +44,7 @@ class ClientDetection:
     data: dict[str, Any]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ClientMetadata:
     source: str
     timestamp: float
@@ -52,7 +52,7 @@ class ClientMetadata:
     data: dict[str, Any]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ClientDetectionStatus:
     detectors: dict[str, bool]
     changed: str | None = None
@@ -71,13 +71,13 @@ class ClientDetectionStatus:
         return bool(self.detectors.get(name, False))
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ClientStreamOverlayStatus:
     enabled: bool
     source: str | None = None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ClientCameraStatistics:
     running: bool
     fps: float
@@ -86,7 +86,7 @@ class ClientCameraStatistics:
     last_error: str | None
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ClientStreamingStatistics:
     running: bool
     clients: int
@@ -95,26 +95,26 @@ class ClientStreamingStatistics:
     overlay: ClientStreamOverlayStatus
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ClientRecordingStatus:
     active: bool
     overlay: ClientStreamOverlayStatus
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ClientDetectionStatistics:
     detectors: dict[str, bool]
     metadata_sources: list[str]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ClientVisionServerStatistics:
     host: str
     port: int
     fps: float
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ClientVisionStatistics:
     running: bool
     camera: ClientCameraStatistics
@@ -226,14 +226,20 @@ class VisionClient:
         media_name: str,
         extension: str,
     ) -> Path:
-        directory.mkdir(
-            parents=True,
-            exist_ok=True,
-        )
+        try:
+            directory.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+        except OSError as exc:
+            raise VisionClientError(
+                f"failed to create media directory: {directory}: {exc}"
+            ) from exc
 
         if filename is None:
             filename = f"{media_name}_{strftime('%Y%m%d_%H%M%S')}.{extension}"
         else:
+            filename = filename.strip()
             filename_path = Path(filename)
 
             if filename_path.name != filename or not filename:
@@ -324,7 +330,7 @@ class VisionClient:
 
         try:
             timestamp = float(timestamp_value)
-        except ValueError as exc:
+        except (TypeError, ValueError) as exc:
             raise VisionClientError(
                 "Vision service returned an invalid snapshot timestamp"
             ) from exc
@@ -355,8 +361,6 @@ class VisionClient:
         overlay: bool = False,
         source: str | None = None,
     ) -> Path:
-        self._recording_filename = filename
-
         path = self._path_with_query(
             "/recording/start",
             {
@@ -368,6 +372,8 @@ class VisionClient:
 
         self._post(path)
 
+        self._recording_filename = filename
+
         return self._recording_output_path(filename)
 
     def stop_recording(
@@ -375,10 +381,10 @@ class VisionClient:
         *,
         filename: str | None = None,
     ) -> ClientRecording:
-        if filename is None:
-            filename = self._recording_filename
+        stored_filename = self._recording_filename
 
-        self._recording_filename = None
+        if filename is None:
+            filename = stored_filename
 
         video_data, headers = self._request_bytes(
             "POST",
@@ -397,29 +403,25 @@ class VisionClient:
                     "0",
                 )
             )
-
             end_timestamp = float(
                 headers.get(
                     "X-Betabox-End-Timestamp",
                     "0",
                 )
             )
-
             frame_count = int(
                 headers.get(
                     "X-Betabox-Frame-Count",
                     "0",
                 )
             )
-
             fps = float(
                 headers.get(
                     "X-Betabox-FPS",
                     "0",
                 )
             )
-
-        except ValueError as exc:
+        except (TypeError, ValueError) as exc:
             raise VisionClientError(
                 "Vision service returned invalid recording metadata"
             ) from exc
@@ -431,6 +433,8 @@ class VisionClient:
             video_data,
             "recording",
         )
+
+        self._recording_filename = None
 
         return ClientRecording(
             path=output_path,
@@ -585,6 +589,28 @@ class VisionClient:
 
         return f"{path}?{parse.urlencode(filtered)}"
 
+    @staticmethod
+    def _parse_float(
+        value: Any,
+        *,
+        field: str,
+    ) -> float:
+        try:
+            return float(value)
+        except (TypeError, ValueError) as exc:
+            raise VisionClientError(f"Vision service returned invalid {field}") from exc
+
+    @staticmethod
+    def _parse_int(
+        value: Any,
+        *,
+        field: str,
+    ) -> int:
+        try:
+            return int(value)
+        except (TypeError, ValueError) as exc:
+            raise VisionClientError(f"Vision service returned invalid {field}") from exc
+
     def _parse_detection(
         self,
         data: dict[str, Any],
@@ -596,21 +622,39 @@ class VisionClient:
         center: tuple[int, int] | None = None
 
         if isinstance(box_data, (list, tuple)) and len(box_data) == 4:
-            box = (
-                int(box_data[0]),
-                int(box_data[1]),
-                int(box_data[2]),
-                int(box_data[3]),
-            )
+            try:
+                box = (
+                    int(box_data[0]),
+                    int(box_data[1]),
+                    int(box_data[2]),
+                    int(box_data[3]),
+                )
+            except (TypeError, ValueError) as exc:
+                raise VisionClientError(
+                    "Vision service returned an invalid detection box"
+                ) from exc
 
         if isinstance(center_data, (list, tuple)) and len(center_data) == 2:
-            center = (
-                int(center_data[0]),
-                int(center_data[1]),
-            )
+            try:
+                center = (
+                    int(center_data[0]),
+                    int(center_data[1]),
+                )
+            except (TypeError, ValueError) as exc:
+                raise VisionClientError(
+                    "Vision service returned an invalid detection center"
+                ) from exc
 
         confidence_value = data.get("confidence")
-        confidence = float(confidence_value) if confidence_value is not None else None
+
+        confidence = (
+            None
+            if confidence_value is None
+            else self._parse_float(
+                confidence_value,
+                field="detection confidence",
+            )
+        )
 
         extra_data = data.get("data", {})
 
@@ -628,6 +672,9 @@ class VisionClient:
     ) -> ClientMetadata:
         detections_data = data.get("detections", [])
 
+        if not isinstance(detections_data, (list, tuple)):
+            detections_data = []
+
         detections = [
             self._parse_detection(item)
             for item in detections_data
@@ -638,7 +685,10 @@ class VisionClient:
 
         return ClientMetadata(
             source=str(data.get("source", "")),
-            timestamp=float(data.get("timestamp", 0.0)),
+            timestamp=self._parse_float(
+                data.get("timestamp", 0.0),
+                field="metadata timestamp",
+            ),
             detections=detections,
             data=extra_data if isinstance(extra_data, dict) else {},
         )
@@ -702,10 +752,16 @@ class VisionClient:
 
         return ClientCameraStatistics(
             running=bool(data.get("running", False)),
-            fps=float(data.get("fps", 0.0)),
-            consumer_count=int(data.get("consumer_count", 0)),
+            fps=self._parse_float(
+                data.get("fps", 0.0),
+                field="camera FPS",
+            ),
+            consumer_count=self._parse_int(
+                data.get("consumer_count", 0),
+                field="camera consumer count",
+            ),
             has_frame=bool(data.get("has_frame", False)),
-            last_error=str(last_error) if last_error is not None else None,
+            last_error=(str(last_error) if last_error is not None else None),
         )
 
     def _parse_streaming_statistics(
@@ -719,8 +775,14 @@ class VisionClient:
 
         return ClientStreamingStatistics(
             running=bool(data.get("running", False)),
-            clients=int(data.get("clients", 0)),
-            frames_received=int(data.get("frames_received", 0)),
+            clients=self._parse_int(
+                data.get("clients", 0),
+                field="streaming client count",
+            ),
+            frames_received=self._parse_int(
+                data.get("frames_received", 0),
+                field="streaming frame count",
+            ),
             has_frame=bool(data.get("has_frame", False)),
             overlay=self._parse_stream_overlay_status(overlay_data),
         )
@@ -769,8 +831,14 @@ class VisionClient:
     ) -> ClientVisionServerStatistics:
         return ClientVisionServerStatistics(
             host=str(data.get("host", "")),
-            port=int(data.get("port", 0)),
-            fps=float(data.get("fps", 0.0)),
+            port=self._parse_int(
+                data.get("port", 0),
+                field="server port",
+            ),
+            fps=self._parse_float(
+                data.get("fps", 0.0),
+                field="server FPS",
+            ),
         )
 
     def _parse_statistics(

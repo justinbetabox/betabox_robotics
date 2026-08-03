@@ -53,37 +53,64 @@ INDEX_HTML = """
     };
 
     async function start() {
-      const pc = new RTCPeerConnection();
+      let pc = null;
 
-      pc.ontrack = (event) => {
-        log("Received track");
-        document.getElementById("video").srcObject = event.streams[0];
-      };
+      try {
+        pc = new RTCPeerConnection();
 
-      pc.onconnectionstatechange = () => {
-        log("Connection state: " + pc.connectionState);
-      };
+        pc.ontrack = (event) => {
+          log("Received track");
+          document.getElementById("video").srcObject = event.streams[0];
+        };
 
-      pc.addTransceiver("video", { direction: "recvonly" });
+        pc.onconnectionstatechange = () => {
+          log("Connection state: " + pc.connectionState);
 
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
+          if (pc.connectionState === "closed") {
+              log("Connection closed");
+          }
+        };
 
-      const response = await fetch("/offer", {
-        method: "POST",
-        body: JSON.stringify({
-          sdp: pc.localDescription.sdp,
-          type: pc.localDescription.type
-        }),
-        headers: {
-          "Content-Type": "application/json"
+        pc.addTransceiver("video", { direction: "recvonly" });
+
+        const offer = await pc.createOffer();
+        await pc.setLocalDescription(offer);
+
+        const response = await fetch("/offer", {
+          method: "POST",
+          body: JSON.stringify({
+            sdp: pc.localDescription.sdp,
+            type: pc.localDescription.type
+          }),
+          headers: {
+            "Content-Type": "application/json"
+          }
+        });
+
+        const answer = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            answer.error || `WebRTC offer failed with HTTP ${response.status}`
+          );
         }
-      });
 
-      const answer = await response.json();
-      await pc.setRemoteDescription(answer);
+        await pc.setRemoteDescription(answer);
 
-      log("WebRTC answer applied");
+        log("WebRTC answer applied");
+      } catch (error) {
+        console.error(error);
+
+        log("Error: " + (error instanceof Error ? error.message : String(error)));
+
+        if (pc !== null) {
+          try {
+            pc.close();
+          } catch {
+            // Ignore cleanup failures.
+          }
+        }
+      }
     }
   </script>
 </body>
@@ -101,7 +128,7 @@ def to_json(value: Any) -> Any:
     if isinstance(value, dict):
         return {key: to_json(item) for key, item in value.items()}
 
-    if isinstance(value, (list, tuple)):
+    if isinstance(value, (list, tuple, set)):
         return [to_json(item) for item in value]
 
     if isinstance(value, Path):
@@ -110,7 +137,7 @@ def to_json(value: Any) -> Any:
     return value
 
 
-def ok(data=None):
+def ok(data: Any = None) -> web.Response:
     return web.json_response(
         {
             "success": True,
@@ -119,7 +146,11 @@ def ok(data=None):
     )
 
 
-def fail(message: str, *, status: int = 400):
+def fail(
+    message: str,
+    *,
+    status: int = 400,
+) -> web.Response:
     return web.json_response(
         {
             "success": False,
@@ -127,6 +158,50 @@ def fail(message: str, *, status: int = 400):
         },
         status=status,
     )
+
+
+def query_bool(
+    request: web.Request,
+    name: str,
+    *,
+    default: bool = False,
+) -> bool:
+    value = request.query.get(name)
+
+    if value is None:
+        return default
+
+    return value.casefold() in {
+        "1",
+        "true",
+        "yes",
+    }
+
+
+async def json_object(
+    request: web.Request,
+) -> dict[str, Any]:
+    try:
+        data = await request.json()
+    except Exception as exc:
+        raise ValueError("request body must contain valid JSON") from exc
+
+    if not isinstance(data, dict):
+        raise ValueError("request JSON must be an object")
+
+    return data
+
+
+def required_string(
+    data: dict[str, Any],
+    name: str,
+) -> str:
+    value = data.get(name)
+
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{name} is required")
+
+    return value.strip()
 
 
 class WebRTCSignalingServer:
@@ -164,29 +239,46 @@ class WebRTCSignalingServer:
         self.app.router.add_post("/stream/overlay/enable", self.stream_overlay_enable)
         self.app.router.add_post("/stream/overlay/disable", self.stream_overlay_disable)
 
-    async def index(self, request):
+    async def index(
+        self,
+        request: web.Request,
+    ) -> web.Response:
         return web.Response(text=INDEX_HTML, content_type="text/html")
 
-    async def offer(self, request):
-        params = await request.json()
-        answer = await self.streamer.offer(
-            sdp=params["sdp"],
-            type=params["type"],
-        )
-        return web.json_response(answer)
+    async def offer(
+        self,
+        request: web.Request,
+    ) -> web.Response:
+        try:
+            params = await json_object(request)
 
-    async def stats(self, request):
+            sdp = required_string(params, "sdp")
+            offer_type = required_string(params, "type")
+
+            answer = await self.streamer.offer(
+                sdp=sdp,
+                type=offer_type,
+            )
+
+            return web.json_response(answer)
+
+        except Exception as exc:
+            return fail(str(exc))
+
+    async def stats(
+        self,
+        request: web.Request,
+    ) -> web.Response:
         return ok(self.vision.statistics())
 
-    async def snapshot(self, request):
+    async def snapshot(
+        self,
+        request: web.Request,
+    ) -> web.Response:
         try:
-            overlay = request.query.get(
+            overlay = query_bool(
+                request,
                 "overlay",
-                "false",
-            ).lower() in (
-                "1",
-                "true",
-                "yes",
             )
 
             source = request.query.get("source")
@@ -215,15 +307,14 @@ class WebRTCSignalingServer:
         except Exception as exc:
             return fail(str(exc))
 
-    async def recording_start(self, request):
+    async def recording_start(
+        self,
+        request: web.Request,
+    ) -> web.Response:
         try:
-            overlay = request.query.get(
+            overlay = query_bool(
+                request,
                 "overlay",
-                "false",
-            ).lower() in (
-                "1",
-                "true",
-                "yes",
             )
             source = request.query.get("source")
             filename = request.query.get("filename")
@@ -243,7 +334,10 @@ class WebRTCSignalingServer:
         except Exception as exc:
             return fail(str(exc))
 
-    async def recording_stop(self, request):
+    async def recording_stop(
+        self,
+        request: web.Request,
+    ) -> web.Response:
         try:
             recording = self.vision.stop_recording_data()
 
@@ -262,7 +356,10 @@ class WebRTCSignalingServer:
         except Exception as exc:
             return fail(str(exc))
 
-    async def metadata(self, request):
+    async def metadata(
+        self,
+        request: web.Request,
+    ) -> web.Response:
         try:
             source = request.query.get("source")
             metadata = self.vision.latest_metadata(source)
@@ -270,7 +367,10 @@ class WebRTCSignalingServer:
         except Exception as exc:
             return fail(str(exc))
 
-    async def detection_status(self, request):
+    async def detection_status(
+        self,
+        request: web.Request,
+    ) -> web.Response:
         try:
             return ok(
                 {
@@ -281,24 +381,33 @@ class WebRTCSignalingServer:
         except Exception as exc:
             return fail(str(exc))
 
-    async def detection_enable(self, request):
+    async def detection_enable(
+        self,
+        request: web.Request,
+    ) -> web.Response:
         try:
-            params = await request.json()
-            name = params["name"]
+            params = await json_object(request)
+            name = required_string(params, "name")
+
             self.vision.enable_detection(name)
+
             return ok(
                 {
                     "enabled": name,
                     "detectors": self.vision.detection_status(),
                 }
             )
+
         except Exception as exc:
             return fail(str(exc))
 
-    async def detection_disable(self, request):
+    async def detection_disable(
+        self,
+        request: web.Request,
+    ) -> web.Response:
         try:
-            params = await request.json()
-            name = params["name"]
+            params = await json_object(request)
+            name = required_string(params, "name")
             self.vision.disable_detection(name)
             return ok(
                 {
@@ -309,16 +418,28 @@ class WebRTCSignalingServer:
         except Exception as exc:
             return fail(str(exc))
 
-    async def stream_overlay_enable(self, request):
+    async def stream_overlay_enable(
+        self,
+        request: web.Request,
+    ) -> web.Response:
         try:
-            params = await request.json()
+            params = await json_object(request)
             source = params.get("source")
+
+            if source is not None and not isinstance(source, str):
+                raise ValueError("source must be a string")
+
             self.vision.enable_stream_overlay(source)
+
             return ok(self.vision.stream_overlay_status())
+
         except Exception as exc:
             return fail(str(exc))
 
-    async def stream_overlay_disable(self, request):
+    async def stream_overlay_disable(
+        self,
+        request: web.Request,
+    ) -> web.Response:
         try:
             self.vision.disable_stream_overlay()
             return ok(self.vision.stream_overlay_status())

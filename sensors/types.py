@@ -11,7 +11,10 @@ class BatteryState(str, Enum):
     CRITICAL = "critical"
 
 
-@dataclass(frozen=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+)
 class BatteryReading:
     voltage: float
     state: BatteryState
@@ -27,28 +30,41 @@ class BatteryReading:
     def critical(self) -> bool:
         return self.state is BatteryState.CRITICAL
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(
+        self,
+    ) -> dict[str, Any]:
         return {
             "voltage": self.voltage,
             "state": self.state.value,
             "low": self.low,
+            "critical": self.critical,
         }
 
 
-@dataclass(frozen=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+)
 class GrayscaleReading:
     raw: tuple[int, int, int]
     status: tuple[int, int, int]
     normalized: tuple[float, float, float] | None
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(
+        self,
+    ) -> dict[str, Any]:
         return asdict(self)
 
 
-@dataclass(frozen=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+)
 class UltrasonicReading:
     distance_cm: float
     samples_requested: int
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(
+        self,
+    ) -> dict[str, Any]:
         return asdict(self)

@@ -4,8 +4,10 @@ from betabox_robotics.hardware import HardwareError
 class SensorError(HardwareError):
     """Base exception for sensor subsystem failures."""
 
+
 class SensorsError(SensorError):
     """Raised when the combined Sensors subsystem fails."""
+
 
 class BatteryError(SensorError):
     """Raised when a battery sensor operation fails."""

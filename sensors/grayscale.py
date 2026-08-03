@@ -1,28 +1,41 @@
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, ClassVar, Self
 
-from betabox_robotics.hardware import ADC
+from betabox_robotics.hardware import (
+    ADC,
+    HardwareError,
+)
 
 from .exceptions import GrayscaleError
 from .types import GrayscaleReading
 
 if TYPE_CHECKING:
-    from betabox_robotics.robots.config import GrayscaleConfig
+    from betabox_robotics.robots.config import (
+        GrayscaleConfig,
+    )
+
 
 class Grayscale:
     """
     Three-channel grayscale sensor.
 
-    Channels are ordered left, middle, right.
+    Channels are ordered left, middle, right. The Grayscale subsystem
+    owns all three ADC objects and closes them when it is closed.
     """
 
-    LEFT = 0
-    MIDDLE = 1
-    RIGHT = 2
+    LEFT: ClassVar[int] = 0
+    MIDDLE: ClassVar[int] = 1
+    RIGHT: ClassVar[int] = 2
 
-    REFERENCE_DEFAULT = (1000, 1000, 1000)
+    CHANNEL_COUNT: ClassVar[int] = 3
+    REFERENCE_DEFAULT: ClassVar[tuple[int, int, int]] = (
+        1000,
+        1000,
+        1000,
+    )
 
     def __init__(
         self,
@@ -31,40 +44,187 @@ class Grayscale:
         right: ADC,
         reference: Sequence[int] | None = None,
     ) -> None:
+        if not isinstance(left, ADC):
+            raise TypeError("left must be an ADC instance")
+
+        if not isinstance(middle, ADC):
+            raise TypeError("middle must be an ADC instance")
+
+        if not isinstance(right, ADC):
+            raise TypeError("right must be an ADC instance")
+
         self.channels = (
             left,
             middle,
             right,
         )
 
-        selected_reference = (
-            self.REFERENCE_DEFAULT
-            if reference is None
-            else reference
-        )
+        selected_reference = self.REFERENCE_DEFAULT if reference is None else reference
 
-        if len(selected_reference) != 3:
-            raise GrayscaleError(
-                "reference values must contain 3 values"
-            )
+        self._reference = self._validated_reference(selected_reference)
 
-        self._reference = tuple(
-            int(value)
-            for value in selected_reference
-        )
+        self._floor: (
+            tuple[
+                float,
+                float,
+                float,
+            ]
+            | None
+        ) = None
 
-        self._floor: tuple[float, float, float] | None = None
-        self._line: tuple[float, float, float] | None = None
+        self._line: (
+            tuple[
+                float,
+                float,
+                float,
+            ]
+            | None
+        ) = None
+
         self._closed = False
 
     @classmethod
-    def default(cls, config: "GrayscaleConfig") -> "Grayscale":
-        return cls(
-            left=ADC(config.left),
-            middle=ADC(config.middle),
-            right=ADC(config.right),
-            reference=config.reference,
+    def default(
+        cls,
+        config: GrayscaleConfig,
+    ) -> Self:
+        left: ADC | None = None
+        middle: ADC | None = None
+        right: ADC | None = None
+
+        try:
+            left = ADC(config.left)
+
+            middle = ADC(config.middle)
+
+            right = ADC(config.right)
+
+            return cls(
+                left=left,
+                middle=middle,
+                right=right,
+                reference=config.reference,
+            )
+
+        except (
+            HardwareError,
+            OSError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ):
+            # Close in reverse construction order.
+            for adc in (
+                right,
+                middle,
+                left,
+            ):
+                if adc is None:
+                    continue
+
+                try:
+                    adc.close()
+                except (
+                    HardwareError,
+                    OSError,
+                    RuntimeError,
+                ):
+                    pass
+
+            raise
+
+    @staticmethod
+    def _require_finite_number(
+        value: object,
+        *,
+        name: str,
+    ) -> float:
+        if isinstance(value, bool) or not isinstance(
+            value,
+            int | float,
+        ):
+            raise TypeError(f"{name} must be a number")
+
+        result = float(value)
+
+        if not math.isfinite(result):
+            raise ValueError(f"{name} must be finite")
+
+        return result
+
+    @classmethod
+    def _validated_reference(
+        cls,
+        values: Sequence[int],
+    ) -> tuple[int, int, int]:
+        if isinstance(
+            values,
+            str | bytes | bytearray,
+        ):
+            raise TypeError("reference values must be a sequence of integers")
+
+        if len(values) != cls.CHANNEL_COUNT:
+            raise GrayscaleError("reference values must contain 3 values")
+
+        validated: list[int] = []
+
+        for index, value in enumerate(values):
+            if isinstance(value, bool) or not isinstance(
+                value,
+                int,
+            ):
+                raise TypeError(f"reference value {index} must be an integer")
+
+            if not 0 <= value <= ADC.MAX_VALUE:
+                raise GrayscaleError(
+                    f"reference value {index} must be between 0 and {ADC.MAX_VALUE}"
+                )
+
+            validated.append(value)
+
+        return (
+            validated[0],
+            validated[1],
+            validated[2],
         )
+
+    @classmethod
+    def _validated_triplet(
+        cls,
+        values: Sequence[int | float],
+        *,
+        name: str,
+    ) -> tuple[float, float, float]:
+        if isinstance(
+            values,
+            str | bytes | bytearray,
+        ):
+            raise TypeError(f"{name} must be a sequence of numbers")
+
+        if len(values) != cls.CHANNEL_COUNT:
+            raise GrayscaleError(f"{name} must contain 3 values")
+
+        validated = [
+            cls._require_finite_number(
+                value,
+                name=f"{name}[{index}]",
+            )
+            for index, value in enumerate(values)
+        ]
+
+        return (
+            validated[0],
+            validated[1],
+            validated[2],
+        )
+
+    @property
+    def closed(self) -> bool:
+        return self._closed
+
+    def _require_open(self) -> None:
+        if self._closed:
+            raise GrayscaleError("grayscale sensor is closed")
 
     def read(
         self,
@@ -74,36 +234,30 @@ class Grayscale:
 
         try:
             if channel is None:
-                return [
-                    adc.read()
-                    for adc in self.channels
-                ]
+                return [adc.read() for adc in self.channels]
 
-            self._validate_channel(channel)
-            return [self.channels[channel].read()]
+            channel_index = self._validate_channel(channel)
+
+            return [self.channels[channel_index].read()]
 
         except GrayscaleError:
             raise
-        except Exception as exc:
-            raise GrayscaleError(
-                f"failed to read grayscale sensor: {exc}"
-            ) from exc
+
+        except (
+            HardwareError,
+            OSError,
+            RuntimeError,
+        ) as exc:
+            raise GrayscaleError(f"failed to read grayscale sensor: {exc}") from exc
 
     def reference(
         self,
         values: Sequence[int] | None = None,
     ) -> list[int]:
         self._require_open()
-        if values is not None:
-            if len(values) != 3:
-                raise GrayscaleError(
-                    "reference values must contain 3 values"
-                )
 
-            self._reference = tuple(
-                int(value)
-                for value in values
-            )
+        if values is not None:
+            self._reference = self._validated_reference(values)
 
         return list(self._reference)
 
@@ -114,21 +268,33 @@ class Grayscale:
     ) -> None:
         self._require_open()
 
-        if len(floor) != 3 or len(line) != 3:
-            raise GrayscaleError(
-                "floor and line must each contain 3 values"
-            )
+        floor_values = self._validated_triplet(
+            floor,
+            name="floor",
+        )
 
-        self._floor = (
-            float(floor[0]),
-            float(floor[1]),
-            float(floor[2]),
+        line_values = self._validated_triplet(
+            line,
+            name="line",
         )
-        self._line = (
-            float(line[0]),
-            float(line[1]),
-            float(line[2]),
-        )
+
+        for index, (
+            floor_value,
+            line_value,
+        ) in enumerate(
+            zip(
+                floor_values,
+                line_values,
+                strict=True,
+            )
+        ):
+            if floor_value == line_value:
+                raise GrayscaleError(
+                    f"floor and line calibration values must differ for channel {index}"
+                )
+
+        self._floor = floor_values
+        self._line = line_values
 
     def get_calibration(
         self,
@@ -137,86 +303,120 @@ class Grayscale:
         tuple[float, float, float] | None,
     ]:
         self._require_open()
-        return self._floor, self._line
+
+        return (
+            self._floor,
+            self._line,
+        )
 
     def normalized(
         self,
-        raw: Sequence[int] | None = None,
+        raw: Sequence[int | float] | None = None,
     ) -> list[float]:
         self._require_open()
 
-        if self._floor is None or self._line is None:
+        floor = self._floor
+        line = self._line
+
+        if floor is None or line is None:
             raise GrayscaleError(
                 "calibration not set. Call set_calibration(floor, line) first."
             )
 
-        values = raw if raw is not None else self.read()
+        values = (
+            self._validated_triplet(
+                raw,
+                name="raw values",
+            )
+            if raw is not None
+            else self._validated_triplet(
+                self.read(),
+                name="raw values",
+            )
+        )
 
-        if len(values) != 3:
-            raise GrayscaleError("raw values must contain 3 readings")
-
-        normalized_values = []
+        normalized_values: list[float] = []
 
         for index, value in enumerate(values):
-            floor = self._floor[index]
-            line = self._line[index]
+            floor_value = floor[index]
+            line_value = line[index]
 
-            if line > floor:
-                span = max(line - floor, 1e-6)
-                normalized = (value - floor) / span
+            if line_value > floor_value:
+                normalized = (value - floor_value) / (line_value - floor_value)
             else:
-                span = max(floor - line, 1e-6)
-                normalized = (floor - value) / span
+                normalized = (floor_value - value) / (floor_value - line_value)
 
-            normalized = self._clamp(normalized, 0.0, 1.0)
-            normalized_values.append(normalized)
+            normalized_values.append(
+                self._clamp(
+                    normalized,
+                    0.0,
+                    1.0,
+                )
+            )
 
         return normalized_values
 
     def status(
         self,
-        raw: Sequence[int] | None = None,
+        raw: Sequence[int | float] | None = None,
         threshold: float = 0.5,
     ) -> list[int]:
         """
         Return 0 for floor and 1 for line.
 
-        If floor/line calibration is available, normalized values are used.
-        Otherwise, legacy reference thresholds are used.
+        When floor/line calibration is available, normalized values are
+        used. Otherwise, the legacy reference thresholds are used.
         """
 
-        if not 0.0 <= threshold <= 1.0:
-            raise GrayscaleError(
-                "threshold must be between 0.0 and 1.0"
-            )
+        self._require_open()
+
+        threshold_value = self._require_finite_number(
+            threshold,
+            name="threshold",
+        )
+
+        if not 0.0 <= threshold_value <= 1.0:
+            raise GrayscaleError("threshold must be between 0.0 and 1.0")
 
         if self._floor is not None and self._line is not None:
-            return [1 if value > threshold else 0 for value in self.normalized(raw)]
+            return [
+                1 if value > threshold_value else 0 for value in self.normalized(raw)
+            ]
 
-        values = raw if raw is not None else self.read()
-
-        if len(values) != 3:
-            raise GrayscaleError("raw values must contain 3 readings")
+        values = (
+            self._validated_triplet(
+                raw,
+                name="raw values",
+            )
+            if raw is not None
+            else self._validated_triplet(
+                self.read(),
+                name="raw values",
+            )
+        )
 
         return [
-            0 if value > self._reference[index] else 1
+            (0 if value > self._reference[index] else 1)
             for index, value in enumerate(values)
         ]
 
     def read_status(
         self,
-        datas: Sequence[int] | None = None,
+        datas: Sequence[int | float] | None = None,
         threshold: float = 0.5,
     ) -> list[int]:
-        """
-        Compatibility alias for old API.
-        """
-        return self.status(raw=datas, threshold=threshold)
+        """Compatibility alias for the legacy API."""
 
-    def get_grayscale_normalized(self) -> list[float]:
-        """
-        Compatibility alias for old API.
-        """
+        return self.status(
+            raw=datas,
+            threshold=threshold,
+        )
+
+    def get_grayscale_normalized(
+        self,
+    ) -> list[float]:
+        """Compatibility alias for the legacy API."""
+
         return self.normalized()
 
     def reading(
@@ -224,7 +424,10 @@ class Grayscale:
         *,
         threshold: float = 0.5,
     ) -> GrayscaleReading:
+        self._require_open()
+
         raw_values = self.read()
+
         status_values = self.status(
             raw=raw_values,
             threshold=threshold,
@@ -234,6 +437,7 @@ class Grayscale:
 
         if self._floor is not None and self._line is not None:
             values = self.normalized(raw_values)
+
             normalized_values = (
                 values[0],
                 values[1],
@@ -258,36 +462,74 @@ class Grayscale:
         if self._closed:
             return
 
+        first_error: HardwareError | OSError | RuntimeError | None = None
+
         try:
-            for adc in self.channels:
-                adc.close()
+            # Close in reverse construction order.
+            for adc in reversed(self.channels):
+                try:
+                    adc.close()
+                except (
+                    HardwareError,
+                    OSError,
+                    RuntimeError,
+                ) as exc:
+                    if first_error is None:
+                        first_error = exc
+
         finally:
             self._closed = True
+
+        if first_error is not None:
+            raise first_error
 
     def deinit(self) -> None:
         self.close()
 
-    @property
-    def closed(self) -> bool:
-        return self._closed
+    @classmethod
+    def _validate_channel(
+        cls,
+        channel: object,
+    ) -> int:
+        if isinstance(channel, bool) or not isinstance(
+            channel,
+            int,
+        ):
+            raise TypeError("channel must be an integer")
 
-
-    def _require_open(self) -> None:
-        if self._closed:
-            raise GrayscaleError("grayscale sensor is closed")
-
-    def _validate_channel(self, channel: int) -> None:
-        if channel not in (self.LEFT, self.MIDDLE, self.RIGHT):
+        if channel not in (
+            cls.LEFT,
+            cls.MIDDLE,
+            cls.RIGHT,
+        ):
             raise GrayscaleError(
                 "channel must be Grayscale.LEFT, Grayscale.MIDDLE, or Grayscale.RIGHT"
             )
 
-    def _clamp(self, value: float, minimum: float, maximum: float) -> float:
-        return max(minimum, min(maximum, value))
+        return channel
+
+    @staticmethod
+    def _clamp(
+        value: float,
+        minimum: float,
+        maximum: float,
+    ) -> float:
+        return max(
+            minimum,
+            min(
+                maximum,
+                value,
+            ),
+        )
 
     def __enter__(self) -> Self:
         self._require_open()
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback) -> None:
+    def __exit__(
+        self,
+        exc_type: object,
+        exc_value: object,
+        traceback: object,
+    ) -> None:
         self.close()

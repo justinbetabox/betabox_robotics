@@ -1,13 +1,30 @@
+from __future__ import annotations
+
+import math
 from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING, Any, Self
 
-from betabox_robotics.hardware import PWM, Motor, Pin, Servo
+from betabox_robotics.hardware import (
+    PWM,
+    HardwareError,
+    Motor,
+    Pin,
+    PinMode,
+    Servo,
+)
+
 from .exceptions import DriveError
 
 if TYPE_CHECKING:
-    from betabox_robotics.robots.config import DriveConfig
+    from betabox_robotics.robots.config import (
+        DriveConfig,
+    )
 
-@dataclass(frozen=True)
+
+@dataclass(
+    frozen=True,
+    slots=True,
+)
 class DriveStatus:
     closed: bool
     left_trim: float
@@ -16,6 +33,7 @@ class DriveStatus:
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
+
 
 class Drive:
     """
@@ -34,24 +52,70 @@ class Drive:
         left_trim: float = 1.0,
         right_trim: float = 1.0,
     ) -> None:
-        if left_trim < 0:
+        if not isinstance(
+            left_motor,
+            Motor,
+        ):
+            raise TypeError("left_motor must be a Motor instance")
+
+        if not isinstance(
+            right_motor,
+            Motor,
+        ):
+            raise TypeError("right_motor must be a Motor instance")
+
+        if not isinstance(
+            steering,
+            Servo,
+        ):
+            raise TypeError("steering must be a Servo instance")
+
+        left_trim_value = self._require_finite_number(
+            left_trim,
+            name="left_trim",
+        )
+
+        right_trim_value = self._require_finite_number(
+            right_trim,
+            name="right_trim",
+        )
+
+        if left_trim_value < 0:
             raise DriveError("left_trim cannot be negative")
 
-        if right_trim < 0:
+        if right_trim_value < 0:
             raise DriveError("right_trim cannot be negative")
 
         self.left_motor = left_motor
         self.right_motor = right_motor
         self.steering = steering
 
-        self.left_trim = float(left_trim)
-        self.right_trim = float(right_trim)
+        self.left_trim = left_trim_value
+        self.right_trim = right_trim_value
         self._closed = False
+
+    @staticmethod
+    def _require_finite_number(
+        value: object,
+        *,
+        name: str,
+    ) -> float:
+        if isinstance(value, bool) or not isinstance(
+            value,
+            int | float,
+        ):
+            raise TypeError(f"{name} must be a number")
+
+        result = float(value)
+
+        if not math.isfinite(result):
+            raise ValueError(f"{name} must be finite")
+
+        return result
 
     @property
     def closed(self) -> bool:
         return self._closed
-
 
     def _require_open(self) -> None:
         if self._closed:
@@ -60,7 +124,7 @@ class Drive:
     @classmethod
     def default(
         cls,
-        config: "DriveConfig",
+        config: DriveConfig,
         *,
         left_reversed: bool | None = None,
         right_reversed: bool | None = None,
@@ -69,106 +133,279 @@ class Drive:
         steering_min: float | None = None,
         steering_max: float | None = None,
         steering_offset: float = 0.0,
-    ) -> "Drive":
-        left_cfg = config.left_motor
-        right_cfg = config.right_motor
-        steering_cfg = config.steering
+    ) -> Self:
+        left_motor: Motor | None = None
+        right_motor: Motor | None = None
+        steering: Servo | None = None
 
-        left_motor = Motor(
-            PWM(left_cfg.pwm),
-            Pin(left_cfg.direction, mode=Pin.OUT),
-            reversed=(
-                left_cfg.reversed
-                if left_reversed is None
-                else left_reversed
-            ),
-        )
+        try:
+            left_cfg = config.left_motor
+            right_cfg = config.right_motor
+            steering_cfg = config.steering
 
-        right_motor = Motor(
-            PWM(right_cfg.pwm),
-            Pin(right_cfg.direction, mode=Pin.OUT),
-            reversed=(
-                right_cfg.reversed
-                if right_reversed is None
-                else right_reversed
-            ),
-        )
+            left_motor = Motor(
+                PWM(left_cfg.pwm),
+                Pin(
+                    left_cfg.direction,
+                    mode=PinMode.OUT,
+                ),
+                reversed=(
+                    left_cfg.reversed if left_reversed is None else left_reversed
+                ),
+            )
 
-        steering = Servo(
-            steering_cfg.servo,
-            min_angle=(
-                steering_cfg.min_angle
-                if steering_min is None
-                else steering_min
-            ),
-            max_angle=(
-                steering_cfg.max_angle
-                if steering_max is None
-                else steering_max
-            ),
-            offset=steering_offset,
-        )
+            right_motor = Motor(
+                PWM(right_cfg.pwm),
+                Pin(
+                    right_cfg.direction,
+                    mode=PinMode.OUT,
+                ),
+                reversed=(
+                    right_cfg.reversed if right_reversed is None else right_reversed
+                ),
+            )
 
-        return cls(
-            left_motor=left_motor,
-            right_motor=right_motor,
-            steering=steering,
-            left_trim=(
-                left_cfg.trim
-                if left_trim is None
-                else left_trim
-            ),
-            right_trim=(
-                right_cfg.trim
-                if right_trim is None
-                else right_trim
-            ),
-        )
+            steering = Servo(
+                steering_cfg.servo,
+                min_angle=(
+                    steering_cfg.min_angle if steering_min is None else steering_min
+                ),
+                max_angle=(
+                    steering_cfg.max_angle if steering_max is None else steering_max
+                ),
+                offset=steering_offset,
+            )
 
-    def speed(self, left: float, right: float) -> None:
+            return cls(
+                left_motor=left_motor,
+                right_motor=right_motor,
+                steering=steering,
+                left_trim=(left_cfg.trim if left_trim is None else left_trim),
+                right_trim=(right_cfg.trim if right_trim is None else right_trim),
+            )
+
+        except (
+            HardwareError,
+            OSError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ):
+            for component in (
+                steering,
+                right_motor,
+                left_motor,
+            ):
+                if component is None:
+                    continue
+
+                try:
+                    component.close()
+                except (
+                    HardwareError,
+                    OSError,
+                    RuntimeError,
+                ):
+                    pass
+
+            raise
+
+    def speed(
+        self,
+        left: float,
+        right: float,
+        *,
+        smooth: bool = True,
+    ) -> None:
         self._require_open()
+
+        if not isinstance(
+            smooth,
+            bool,
+        ):
+            raise TypeError("smooth must be a boolean")
 
         left_speed = self._validate_speed(left)
         right_speed = self._validate_speed(right)
 
-        self.left_motor.set_speed(
-            self._clamp_speed(left_speed * self.left_trim)
+        left_target = self._clamp_speed(left_speed * self.left_trim)
+
+        right_target = self._clamp_speed(right_speed * self.right_trim)
+
+        try:
+            self.left_motor.set_speed(
+                left_target,
+                smooth=smooth,
+            )
+
+            self.right_motor.set_speed(
+                right_target,
+                smooth=smooth,
+            )
+
+        except (
+            HardwareError,
+            OSError,
+            RuntimeError,
+        ):
+            self._emergency_stop_motors()
+            raise
+
+    def forward(
+        self,
+        speed: float = 50,
+        *,
+        smooth: bool = True,
+    ) -> None:
+        self._require_open()
+
+        value = self._require_finite_number(
+            speed,
+            name="speed",
         )
-        self.right_motor.set_speed(
-            self._clamp_speed(right_speed * self.right_trim)
+
+        magnitude = self._validate_speed(abs(value))
+
+        self.speed(
+            magnitude,
+            magnitude,
+            smooth=smooth,
         )
 
-    def forward(self, speed: float = 50) -> None:
+    def backward(
+        self,
+        speed: float = 50,
+        *,
+        smooth: bool = True,
+    ) -> None:
         self._require_open()
-        speed = self._validate_speed(abs(speed))
-        self.speed(speed, speed)
 
+        value = self._require_finite_number(
+            speed,
+            name="speed",
+        )
 
-    def backward(self, speed: float = 50) -> None:
+        magnitude = self._validate_speed(abs(value))
+
+        self.speed(
+            -magnitude,
+            -magnitude,
+            smooth=smooth,
+        )
+
+    def left(
+        self,
+        angle: float = 30,
+        *,
+        smooth: bool = True,
+    ) -> None:
         self._require_open()
-        speed = self._validate_speed(abs(speed))
-        self.speed(-speed, -speed)
 
+        value = self._require_finite_number(
+            angle,
+            name="angle",
+        )
 
-    def left(self, angle: float = 30) -> None:
+        self.steering.move_to(
+            -abs(value),
+            smooth=smooth,
+        )
+
+    def right(
+        self,
+        angle: float = 30,
+        *,
+        smooth: bool = True,
+    ) -> None:
         self._require_open()
-        self.steering.move_to(-abs(float(angle)))
 
+        value = self._require_finite_number(
+            angle,
+            name="angle",
+        )
 
-    def right(self, angle: float = 30) -> None:
+        self.steering.move_to(
+            abs(value),
+            smooth=smooth,
+        )
+
+    def center(
+        self,
+        *,
+        smooth: bool = True,
+    ) -> None:
         self._require_open()
-        self.steering.move_to(abs(float(angle)))
 
-
-    def center(self) -> None:
-        self._require_open()
-        self.steering.center()
-
+        self.steering.move_to(
+            0,
+            smooth=smooth,
+        )
 
     def stop(self) -> None:
+        """Ramp both motors to a controlled stop."""
+
         self._require_open()
-        self.left_motor.stop()
-        self.right_motor.stop()
+
+        first_error: HardwareError | OSError | RuntimeError | None = None
+
+        for motor in (
+            self.left_motor,
+            self.right_motor,
+        ):
+            try:
+                motor.stop()
+            except (
+                HardwareError,
+                OSError,
+                RuntimeError,
+            ) as exc:
+                if first_error is None:
+                    first_error = exc
+
+        if first_error is not None:
+            self._emergency_stop_motors()
+            raise first_error
+
+    def emergency_stop(self) -> None:
+        """Immediately remove drive output from both motors."""
+
+        self._require_open()
+
+        first_error: HardwareError | OSError | RuntimeError | None = None
+
+        for motor in (
+            self.left_motor,
+            self.right_motor,
+        ):
+            try:
+                motor.emergency_stop()
+            except (
+                HardwareError,
+                OSError,
+                RuntimeError,
+            ) as exc:
+                if first_error is None:
+                    first_error = exc
+
+        if first_error is not None:
+            raise first_error
+
+    def _emergency_stop_motors(
+        self,
+    ) -> None:
+        for motor in (
+            self.left_motor,
+            self.right_motor,
+        ):
+            try:
+                if not motor.closed:
+                    motor.emergency_stop()
+            except (
+                HardwareError,
+                OSError,
+                RuntimeError,
+            ):
+                pass
 
     def status(self) -> DriveStatus:
         return DriveStatus(
@@ -178,9 +415,15 @@ class Drive:
             steering_offset=self.steering.offset,
         )
 
-    @staticmethod
-    def _validate_speed(value: float) -> float:
-        speed = float(value)
+    @classmethod
+    def _validate_speed(
+        cls,
+        value: float,
+    ) -> float:
+        speed = cls._require_finite_number(
+            value,
+            name="speed",
+        )
 
         if not -100.0 <= speed <= 100.0:
             raise DriveError("speed must be between -100 and 100")
@@ -188,16 +431,26 @@ class Drive:
         return speed
 
     @staticmethod
-    def _clamp_speed(value: float) -> float:
-        return max(-100.0, min(100.0, value))
+    def _clamp_speed(
+        value: float,
+    ) -> float:
+        return max(
+            -100.0,
+            min(
+                100.0,
+                value,
+            ),
+        )
+
+    def deinit(self) -> None:
+        self.close()
 
     def close(self) -> None:
         if self._closed:
             return
 
         try:
-            self.left_motor.stop()
-            self.right_motor.stop()
+            self._emergency_stop_motors()
         finally:
             try:
                 self.left_motor.close()
@@ -210,14 +463,9 @@ class Drive:
                     finally:
                         self._closed = True
 
-    def deinit(self) -> None:
-        self.close()
-
-
     def __enter__(self) -> Self:
         self._require_open()
         return self
-
 
     def __exit__(
         self,

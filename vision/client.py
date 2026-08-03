@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from time import strftime
@@ -469,6 +470,27 @@ class VisionClient:
             "/detection/enable",
             {"name": name},
         )
+        return self._parse_detection_status(data)
+
+    def enable_color_detection(
+        self,
+        colors: str | Sequence[str] | None = None,
+        *,
+        min_area: float | None = None,
+    ) -> ClientDetectionStatus:
+        payload: dict[str, Any] = {}
+
+        if colors is not None:
+            payload["colors"] = colors if isinstance(colors, str) else list(colors)
+
+        if min_area is not None:
+            payload["min_area"] = float(min_area)
+
+        data = self._post_json(
+            "/detection/color/enable",
+            payload,
+        )
+
         return self._parse_detection_status(data)
 
     def disable_detection(self, name: str) -> ClientDetectionStatus:

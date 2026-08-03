@@ -236,6 +236,10 @@ class WebRTCSignalingServer:
         self.app.router.add_get("/detection", self.detection_status)
         self.app.router.add_post("/detection/enable", self.detection_enable)
         self.app.router.add_post("/detection/disable", self.detection_disable)
+        self.app.router.add_post(
+            "/detection/color/enable",
+            self.color_detection_enable,
+        )
         self.app.router.add_post("/stream/overlay/enable", self.stream_overlay_enable)
         self.app.router.add_post("/stream/overlay/disable", self.stream_overlay_disable)
 
@@ -415,6 +419,49 @@ class WebRTCSignalingServer:
                     "detectors": self.vision.detection_status(),
                 }
             )
+        except Exception as exc:
+            return fail(str(exc))
+
+    async def color_detection_enable(
+        self,
+        request: web.Request,
+    ) -> web.Response:
+        try:
+            params = await json_object(request)
+
+            colors = params.get("colors")
+            min_area = params.get("min_area")
+
+            if colors is not None:
+                if isinstance(colors, str):
+                    pass
+                elif isinstance(colors, list):
+                    if not all(isinstance(color, str) for color in colors):
+                        raise ValueError("colors must contain only strings")
+                else:
+                    raise ValueError("colors must be a string or list of strings")
+
+            if min_area is not None:
+                try:
+                    min_area = float(min_area)
+                except (TypeError, ValueError) as exc:
+                    raise ValueError("min_area must be a number") from exc
+
+                if min_area < 0:
+                    raise ValueError("min_area cannot be negative")
+
+            self.vision.enable_color_detection(
+                colors,
+                min_area=min_area,
+            )
+
+            return ok(
+                {
+                    "enabled": "color",
+                    "detectors": self.vision.detection_status(),
+                }
+            )
+
         except Exception as exc:
             return fail(str(exc))
 

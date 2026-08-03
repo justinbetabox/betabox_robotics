@@ -303,6 +303,47 @@ class VisionTests(unittest.TestCase):
 
         close.assert_called_once_with()
 
+    def test_enable_color_detection_delegates(self) -> None:
+        self.vision.enable_color_detection(
+            ["red", "blue"],
+            min_area=200,
+        )
+
+        self.detection.enable_color.assert_called_once_with(
+            ["red", "blue"],
+            min_area=200,
+        )
+
+    def test_disable_color_detection_delegates(self) -> None:
+        self.vision.disable_color_detection()
+
+        self.detection.disable.assert_called_once_with("color")
+
+    def test_generic_detection_methods_delegate(self) -> None:
+        self.detection.names.return_value = [
+            "color",
+            "face",
+        ]
+        self.detection.is_enabled.side_effect = lambda name: name == "color"
+
+        self.vision.enable_detection("face")
+        self.vision.disable_detection("color")
+
+        self.assertEqual(
+            self.vision.detection_names(),
+            ["color", "face"],
+        )
+        self.assertEqual(
+            self.vision.detection_status(),
+            {
+                "color": True,
+                "face": False,
+            },
+        )
+
+        self.detection.enable.assert_called_once_with("face")
+        self.detection.disable.assert_called_once_with("color")
+
 
 if __name__ == "__main__":
     unittest.main()

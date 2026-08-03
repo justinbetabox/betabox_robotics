@@ -520,6 +520,29 @@ class VisionServiceTests(unittest.TestCase):
         self.recording.enable_overlay.assert_called_once_with("face")
         self.recording.disable_overlay.assert_called_once_with()
 
+    def test_enable_color_detection_delegates_configuration(
+        self,
+    ) -> None:
+        self.service.enable_color_detection(
+            ["red", "green", "blue"],
+            min_area=275,
+        )
+
+        self.detection.enable_color.assert_called_once_with(
+            ["red", "green", "blue"],
+            min_area=275,
+        )
+
+    def test_enable_color_detection_allows_current_configuration(
+        self,
+    ) -> None:
+        self.service.enable_color_detection()
+
+        self.detection.enable_color.assert_called_once_with(
+            None,
+            min_area=None,
+        )
+
     def test_latest_metadata_delegates(self) -> None:
         metadata = Metadata.create("face")
         self.metadata_bus.latest.return_value = metadata

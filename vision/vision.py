@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Self
 
 from betabox_robotics.vision.consumer import FrameConsumer
 from betabox_robotics.vision.detection import DetectionManager
 from betabox_robotics.vision.frame import Frame
 from betabox_robotics.vision.frame_source import FrameSource
+from betabox_robotics.vision.metadata import Metadata
 from betabox_robotics.vision.metadata_bus import MetadataBus
 from betabox_robotics.vision.overlay import OverlayRenderer
 from betabox_robotics.vision.recording import RecordingService
@@ -67,6 +69,46 @@ class Vision:
         finally:
             if error is not None:
                 raise error
+
+    def enable_detection(
+        self,
+        name: str,
+    ) -> None:
+        self.detection.enable(name)
+
+    def disable_detection(
+        self,
+        name: str,
+    ) -> None:
+        self.detection.disable(name)
+
+    def enable_color_detection(
+        self,
+        colors: str | Sequence[str] | None = None,
+        *,
+        min_area: float | None = None,
+    ) -> None:
+        self.detection.enable_color(
+            colors,
+            min_area=min_area,
+        )
+
+    def disable_color_detection(self) -> None:
+        self.disable_detection("color")
+
+    def detection_names(self) -> list[str]:
+        return self.detection.names()
+
+    def detection_status(self) -> dict[str, bool]:
+        return {
+            name: self.detection.is_enabled(name) for name in self.detection.names()
+        }
+
+    def latest_metadata(
+        self,
+        source: str | None = None,
+    ) -> Metadata | None:
+        return self.metadata.latest(source)
 
     def is_running(self) -> bool:
         return self.frame_source.is_running()

@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from pathlib import Path
 
 from betabox_robotics.audio import (
@@ -6,7 +7,11 @@ from betabox_robotics.audio import (
     MelodyNote,
     NoteValue,
 )
-from betabox_robotics.drive import Drive, DriveStatus, DriveError
+from betabox_robotics.camera import (
+    CameraMount,
+    CameraMountStatus,
+)
+from betabox_robotics.drive import Drive, DriveStatus
 from betabox_robotics.sensors import (
     BatteryReading,
     BatteryState,
@@ -15,25 +20,21 @@ from betabox_robotics.sensors import (
     SensorsStatus,
     UltrasonicReading,
 )
-from betabox_robotics.system import MediaPaths, System, SystemStatus, SystemHealth
+from betabox_robotics.system import MediaPaths, System, SystemHealth, SystemStatus
 from betabox_robotics.vision import (
+    ClientDetection,
     ClientDetectionStatus,
     ClientMetadata,
     ClientRecording,
     ClientSnapshot,
     ClientStreamOverlayStatus,
-    VisionClient,
     ClientVisionStatistics,
+    VisionClient,
 )
 
 from .capabilities import RobotCapability
 from .health import HealthCheck, RobotHealth
 from .robot import Robot
-
-from betabox_robotics.camera import (
-    CameraMount,
-    CameraMountStatus,
-)
 
 
 class CarRobot(Robot):
@@ -105,7 +106,6 @@ class CarRobot(Robot):
             smooth=smooth,
         )
 
-
     def camera_pan(
         self,
         angle: float,
@@ -118,7 +118,6 @@ class CarRobot(Robot):
             angle,
             smooth=smooth,
         )
-
 
     def camera_tilt(
         self,
@@ -133,7 +132,6 @@ class CarRobot(Robot):
             smooth=smooth,
         )
 
-
     def look_center(
         self,
         *,
@@ -144,7 +142,6 @@ class CarRobot(Robot):
         self.camera_mount.center(
             smooth=smooth,
         )
-
 
     def camera_mount_status(
         self,
@@ -312,17 +309,168 @@ class CarRobot(Robot):
         self._require_ready()
         return self.vision.metadata(source)
 
+    def _detections(
+        self,
+        source: str,
+        *,
+        label: str | None = None,
+    ) -> list[ClientDetection]:
+        metadata = self.metadata(source)
+
+        if metadata is None:
+            return []
+
+        detections = metadata.detections
+
+        if label is None:
+            return list(detections)
+
+        normalized = label.strip().casefold()
+
+        return [
+            detection
+            for detection in detections
+            if detection.label.casefold() == normalized
+        ]
+
     def enable_detection(self, name: str) -> ClientDetectionStatus:
         self._require_ready()
         return self.vision.enable_detection(name)
+
+    def enable_color_detection(
+        self,
+        colors: str | Sequence[str] | None = None,
+        *,
+        min_area: float | None = None,
+    ) -> ClientDetectionStatus:
+        self._require_ready()
+
+        return self.vision.enable_color_detection(
+            colors,
+            min_area=min_area,
+        )
 
     def disable_detection(self, name: str) -> ClientDetectionStatus:
         self._require_ready()
         return self.vision.disable_detection(name)
 
+    def disable_color_detection(
+        self,
+    ) -> ClientDetectionStatus:
+        return self.disable_detection("color")
+
     def detection_status(self) -> ClientDetectionStatus:
         self._require_ready()
         return self.vision.detection_status()
+
+    def sees_color(
+        self,
+        color: str,
+    ) -> bool:
+        return bool(
+            self._detections(
+                "color",
+                label=color,
+            )
+        )
+
+    def color_count(
+        self,
+        color: str,
+    ) -> int:
+        return len(
+            self._detections(
+                "color",
+                label=color,
+            )
+        )
+
+    def visible_colors(self) -> list[str]:
+        return sorted({detection.label for detection in self._detections("color")})
+
+    def largest_color(
+        self,
+        color: str | None = None,
+    ) -> ClientDetection | None:
+        detections = self._detections(
+            "color",
+            label=color,
+        )
+
+        if not detections:
+            return None
+
+        return max(
+            detections,
+            key=lambda detection: float(detection.data.get("area", 0.0)),
+        )
+
+    def color_center(
+        self,
+        color: str,
+    ) -> tuple[int, int] | None:
+        detection = self.largest_color(color)
+
+        if detection is None:
+            return None
+
+        return detection.center
+
+    def color_area(
+        self,
+        color: str,
+    ) -> float | None:
+        detection = self.largest_color(color)
+
+        if detection is None:
+            return None
+
+        return float(detection.data.get("area", 0.0))
+
+    def sees_face(self) -> bool:
+        return bool(self._detections("face"))
+
+    def face_count(self) -> int:
+        return len(self._detections("face"))
+
+    def largest_face(self) -> ClientDetection | None:
+        detections = self._detections("face")
+
+        if not detections:
+            return None
+
+        def box_area(
+            detection: ClientDetection,
+        ) -> int:
+            if detection.box is None:
+                return 0
+
+            _, _, width, height = detection.box
+            return width * height
+
+        return max(
+            detections,
+            key=box_area,
+        )
+
+    def face_center(
+        self,
+    ) -> tuple[int, int] | None:
+        detection = self.largest_face()
+
+        if detection is None:
+            return None
+
+        return detection.center
+
+    def face_centers(
+        self,
+    ) -> list[tuple[int, int]]:
+        return [
+            detection.center
+            for detection in self._detections("face")
+            if detection.center is not None
+        ]
 
     def enable_stream_overlay(
         self,

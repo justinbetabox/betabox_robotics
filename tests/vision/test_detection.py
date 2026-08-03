@@ -148,6 +148,58 @@ class DetectionManagerTests(unittest.TestCase):
             [self.frame],
         )
 
+    def test_enable_color_configures_and_enables_detector(self) -> None:
+        self.manager.enable_color(
+            ["red", "blue"],
+            min_area=250,
+        )
+
+        self.assertTrue(self.manager.color.enabled)
+        self.assertEqual(
+            self.manager.color.colors,
+            ["red", "blue"],
+        )
+        self.assertEqual(
+            self.manager.color.min_area,
+            250.0,
+        )
+
+    def test_enable_color_preserves_configuration_when_omitted(
+        self,
+    ) -> None:
+        self.manager.color.configure(
+            ["green", "yellow"],
+            min_area=300,
+        )
+
+        self.manager.enable_color()
+
+        self.assertTrue(self.manager.color.enabled)
+        self.assertEqual(
+            self.manager.color.colors,
+            ["green", "yellow"],
+        )
+        self.assertEqual(
+            self.manager.color.min_area,
+            300.0,
+        )
+
+    def test_enable_color_accepts_single_color(self) -> None:
+        self.manager.enable_color("blue")
+
+        self.assertTrue(self.manager.color.enabled)
+        self.assertEqual(
+            self.manager.color.colors,
+            ["blue"],
+        )
+
+    def test_enable_color_rejects_unsupported_color(self) -> None:
+        with self.assertRaisesRegex(
+            ValueError,
+            "unsupported color",
+        ):
+            self.manager.enable_color("purple")
+
     def test_metadata_is_published(self):
         metadata = Metadata(
             source="custom",

@@ -1158,6 +1158,140 @@ class VisionClientPublicApiTests(unittest.TestCase):
         )
         self.assertFalse(result.enabled)
 
+    def test_enable_color_detection_with_multiple_colors(
+        self,
+    ) -> None:
+        with patch.object(
+            self.client,
+            "_post_json",
+            return_value={
+                "enabled": "color",
+                "detectors": {
+                    "color": True,
+                    "face": False,
+                },
+            },
+        ) as post:
+            result = self.client.enable_color_detection(
+                [
+                    "red",
+                    "green",
+                    "blue",
+                ],
+                min_area=250,
+            )
+
+        post.assert_called_once_with(
+            "/detection/color/enable",
+            {
+                "colors": [
+                    "red",
+                    "green",
+                    "blue",
+                ],
+                "min_area": 250.0,
+            },
+        )
+
+        self.assertEqual(result.changed, "color")
+        self.assertTrue(result.is_enabled("color"))
+
+    def test_enable_color_detection_with_single_color(
+        self,
+    ) -> None:
+        with patch.object(
+            self.client,
+            "_post_json",
+            return_value={
+                "enabled": "color",
+                "detectors": {
+                    "color": True,
+                },
+            },
+        ) as post:
+            self.client.enable_color_detection("yellow")
+
+        post.assert_called_once_with(
+            "/detection/color/enable",
+            {
+                "colors": "yellow",
+            },
+        )
+
+    def test_enable_color_detection_with_current_configuration(
+        self,
+    ) -> None:
+        with patch.object(
+            self.client,
+            "_post_json",
+            return_value={
+                "enabled": "color",
+                "detectors": {
+                    "color": True,
+                },
+            },
+        ) as post:
+            self.client.enable_color_detection()
+
+        post.assert_called_once_with(
+            "/detection/color/enable",
+            {},
+        )
+
+    def test_enable_color_detection_with_min_area_only(
+        self,
+    ) -> None:
+        with patch.object(
+            self.client,
+            "_post_json",
+            return_value={
+                "enabled": "color",
+                "detectors": {
+                    "color": True,
+                },
+            },
+        ) as post:
+            self.client.enable_color_detection(
+                min_area=125,
+            )
+
+        post.assert_called_once_with(
+            "/detection/color/enable",
+            {
+                "min_area": 125.0,
+            },
+        )
+
+    def test_enable_color_detection_converts_sequence_to_list(
+        self,
+    ) -> None:
+        with patch.object(
+            self.client,
+            "_post_json",
+            return_value={
+                "enabled": "color",
+                "detectors": {
+                    "color": True,
+                },
+            },
+        ) as post:
+            self.client.enable_color_detection(
+                (
+                    "red",
+                    "blue",
+                )
+            )
+
+        post.assert_called_once_with(
+            "/detection/color/enable",
+            {
+                "colors": [
+                    "red",
+                    "blue",
+                ],
+            },
+        )
+
 
 class VisionClientMediaTests(unittest.TestCase):
     def setUp(self) -> None:

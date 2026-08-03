@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import threading
+from collections.abc import Sequence
 
 from betabox_robotics.vision.consumer import FrameConsumer
 from betabox_robotics.vision.detector import Detector
@@ -51,6 +52,17 @@ class DetectionManager(FrameConsumer):
 
     def enable(self, name: str) -> None:
         self._get_detector(name).enable()
+
+    def enable_color(
+        self,
+        colors: str | Sequence[str] | None = None,
+        *,
+        min_area: float | None = None,
+    ) -> None:
+        self.color.enable(
+            colors,
+            min_area=min_area,
+        )
 
     def disable(self, name: str) -> None:
         self._get_detector(name).disable()

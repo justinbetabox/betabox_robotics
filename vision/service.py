@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -245,6 +246,17 @@ class VisionService:
 
     def stop_recording_data(self) -> RecordingData:
         return self.recording.stop_data()
+
+    def enable_color_detection(
+        self,
+        colors: str | Sequence[str] | None = None,
+        *,
+        min_area: float | None = None,
+    ) -> None:
+        self.detection.enable_color(
+            colors,
+            min_area=min_area,
+        )
 
     def enable_detection(self, name: str) -> None:
         self.detection.enable(name)

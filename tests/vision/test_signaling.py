@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 from aiohttp import web
 from aiohttp.test_utils import AioHTTPTestCase
+
 from betabox_robotics.vision.metadata import Detection, Metadata
 from betabox_robotics.vision.recording import RecordingData
 from betabox_robotics.vision.signaling import (
@@ -288,6 +289,7 @@ class WebRTCSignalingServerTests(AioHTTPTestCase):
             ("GET", "/metadata"),
             ("GET", "/detection"),
             ("POST", "/detection/enable"),
+            ("POST", "/detection/color/enable"),
             ("POST", "/detection/disable"),
             ("POST", "/stream/overlay/enable"),
             ("POST", "/stream/overlay/disable"),
@@ -713,6 +715,182 @@ class WebRTCSignalingServerTests(AioHTTPTestCase):
                     },
                 },
             },
+        )
+
+    async def test_color_detection_enable_with_multiple_colors(
+        self,
+    ) -> None:
+        self.vision.detection_status.return_value = {
+            "color": True,
+            "face": False,
+        }
+
+        response = await self.client.post(
+            "/detection/color/enable",
+            json={
+                "colors": [
+                    "red",
+                    "green",
+                    "blue",
+                ],
+                "min_area": 250,
+            },
+        )
+
+        self.assertEqual(response.status, 200)
+
+        self.vision.enable_color_detection.assert_called_once_with(
+            [
+                "red",
+                "green",
+                "blue",
+            ],
+            min_area=250.0,
+        )
+
+        self.assertEqual(
+            await response.json(),
+            {
+                "success": True,
+                "data": {
+                    "enabled": "color",
+                    "detectors": {
+                        "color": True,
+                        "face": False,
+                    },
+                },
+            },
+        )
+
+    async def test_color_detection_enable_with_single_color(
+        self,
+    ) -> None:
+        self.vision.detection_status.return_value = {
+            "color": True,
+        }
+
+        response = await self.client.post(
+            "/detection/color/enable",
+            json={
+                "colors": "blue",
+            },
+        )
+
+        self.assertEqual(response.status, 200)
+
+        self.vision.enable_color_detection.assert_called_once_with(
+            "blue",
+            min_area=None,
+        )
+
+    async def test_color_detection_enable_with_empty_payload(
+        self,
+    ) -> None:
+        self.vision.detection_status.return_value = {
+            "color": True,
+        }
+
+        response = await self.client.post(
+            "/detection/color/enable",
+            json={},
+        )
+
+        self.assertEqual(response.status, 200)
+
+        self.vision.enable_color_detection.assert_called_once_with(
+            None,
+            min_area=None,
+        )
+
+    async def test_color_detection_enable_rejects_invalid_colors_type(
+        self,
+    ) -> None:
+        response = await self.client.post(
+            "/detection/color/enable",
+            json={
+                "colors": 123,
+            },
+        )
+
+        self.assertEqual(response.status, 400)
+        self.assertEqual(
+            (await response.json())["error"],
+            "colors must be a string or list of strings",
+        )
+
+        self.vision.enable_color_detection.assert_not_called()
+
+    async def test_color_detection_enable_rejects_non_string_list_item(
+        self,
+    ) -> None:
+        response = await self.client.post(
+            "/detection/color/enable",
+            json={
+                "colors": [
+                    "red",
+                    123,
+                ],
+            },
+        )
+
+        self.assertEqual(response.status, 400)
+        self.assertEqual(
+            (await response.json())["error"],
+            "colors must contain only strings",
+        )
+
+    async def test_color_detection_enable_rejects_invalid_min_area(
+        self,
+    ) -> None:
+        response = await self.client.post(
+            "/detection/color/enable",
+            json={
+                "colors": "red",
+                "min_area": "large",
+            },
+        )
+
+        self.assertEqual(response.status, 400)
+        self.assertEqual(
+            (await response.json())["error"],
+            "min_area must be a number",
+        )
+
+    async def test_color_detection_enable_rejects_negative_min_area(
+        self,
+    ) -> None:
+        response = await self.client.post(
+            "/detection/color/enable",
+            json={
+                "colors": "red",
+                "min_area": -1,
+            },
+        )
+
+        self.assertEqual(response.status, 400)
+        self.assertEqual(
+            (await response.json())["error"],
+            "min_area cannot be negative",
+        )
+
+    async def test_color_detection_enable_wraps_service_failure(
+        self,
+    ) -> None:
+        self.vision.enable_color_detection.side_effect = ValueError(
+            "unsupported color(s): purple"
+        )
+
+        response = await self.client.post(
+            "/detection/color/enable",
+            json={
+                "colors": "purple",
+            },
+        )
+
+        self.assertEqual(response.status, 400)
+        self.assertEqual(
+            (await response.json())["error"],
+            "unsupported color(s): purple",
         )
 
     async def test_stream_overlay_enable(self) -> None:

@@ -2,44 +2,55 @@ from __future__ import annotations
 
 import io
 import json
+import tempfile
 import unittest
+from email.message import Message
 from pathlib import Path
-from tempfile import TemporaryDirectory
-from unittest.mock import MagicMock, patch
-from urllib import error, request
+from types import SimpleNamespace
+from unittest.mock import patch
+from urllib import error
 
 from betabox_robotics.vision.client import (
-    ClientCameraStatistics,
     ClientDetection,
-    ClientDetectionStatistics,
     ClientDetectionStatus,
     ClientMetadata,
     ClientRecording,
-    ClientRecordingStatus,
     ClientSnapshot,
-    ClientStreamingStatistics,
     ClientStreamOverlayStatus,
-    ClientVisionServerStatistics,
     ClientVisionStatistics,
     VisionClient,
     VisionClientError,
+    _validate_base_url,
+    _validate_timeout,
 )
 
 
-def mock_response(
-    body: bytes,
-    *,
-    headers: dict[str, str] | None = None,
-) -> MagicMock:
-    response = MagicMock()
-    response.read.return_value = body
-    response.headers = headers or {}
-    response.__enter__.return_value = response
-    response.__exit__.return_value = False
-    return response
+class FakeResponse:
+    def __init__(
+        self,
+        body: bytes,
+        *,
+        headers: dict[str, str] | None = None,
+    ) -> None:
+        self._body = body
+        self.headers = headers or {}
+
+    def read(self) -> bytes:
+        return self._body
+
+    def __enter__(self) -> FakeResponse:
+        return self
+
+    def __exit__(
+        self,
+        exc_type: object,
+        exc_value: object,
+        traceback: object,
+    ) -> None:
+        return None
 
 
-def http_error(
+def make_http_error(
     *,
     code: int = 400,
     body: bytes = b"",
@@ -48,377 +59,515 @@ def http_error(
         url="http://127.0.0.1:8080/test",
         code=code,
         msg="error",
-        hdrs=None,
+        hdrs=Message(),
         fp=io.BytesIO(body),
     )
 
 
-class ClientModelTests(unittest.TestCase):
+class VisionClientValidationTests(unittest.TestCase):
+    def test_validate_base_url(self) -> None:
+        self.assertEqual(
+            _validate_base_url("  http://127.0.0.1:8080/  "),
+            "http://127.0.0.1:8080",
+        )
+
+    def test_validate_base_url_accepts_https(self) -> None:
+        self.assertEqual(
+            _validate_base_url("https://robot.example.com"),
+            "https://robot.example.com",
+        )
+
+    def test_validate_base_url_rejects_invalid_type(
+        self,
+    ) -> None:
+        with self.assertRaisesRegex(
+            TypeError,
+            "base_url must be a string",
+        ):
+            _validate_base_url(
+                123  # type: ignore[arg-type]
+            )
+
+    def test_validate_base_url_rejects_empty_value(
+        self,
+    ) -> None:
+        with self.assertRaisesRegex(
+            ValueError,
+            "base_url cannot be empty",
+        ):
+            _validate_base_url(" ")
+
+    def test_validate_base_url_rejects_invalid_url(
+        self,
+    ) -> None:
+        for value in (
+            "localhost:8080",
+            "ftp://robot.example.com",
+            "http://",
+        ):
+            with (
+                self.subTest(value=value),
+                self.assertRaisesRegex(
+                    ValueError,
+                    "valid HTTP or HTTPS URL",
+                ),
+            ):
+                _validate_base_url(value)
+
+    def test_validate_timeout(self) -> None:
+        self.assertEqual(
+            _validate_timeout(5),
+            5.0,
+        )
+
+    def test_validate_timeout_rejects_invalid_type(
+        self,
+    ) -> None:
+        for value in (
+            True,
+            "5",
+            object(),
+        ):
+            with (
+                self.subTest(value=value),
+                self.assertRaisesRegex(
+                    TypeError,
+                    "timeout must be a number",
+                ),
+            ):
+                _validate_timeout(value)
+
+    def test_validate_timeout_rejects_non_finite_value(
+        self,
+    ) -> None:
+        for value in (
+            float("nan"),
+            float("inf"),
+            float("-inf"),
+        ):
+            with (
+                self.subTest(value=value),
+                self.assertRaisesRegex(
+                    ValueError,
+                    "timeout must be finite",
+                ),
+            ):
+                _validate_timeout(value)
+
+    def test_validate_timeout_rejects_non_positive_value(
+        self,
+    ) -> None:
+        for value in (
+            0,
+            -1,
+        ):
+            with (
+                self.subTest(value=value),
+                self.assertRaisesRegex(
+                    ValueError,
+                    "timeout must be greater than zero",
+                ),
+            ):
+                _validate_timeout(value)
+
+    def test_constructor(self) -> None:
+        client = VisionClient(
+            " http://robot.local:9000/ ",
+            timeout=4,
+        )
+
+        self.assertEqual(
+            client.base_url,
+            "http://robot.local:9000",
+        )
+        self.assertEqual(
+            client.timeout,
+            4.0,
+        )
+        self.assertIsNone(client._recording_filename)
+
+    def test_default_uses_vision_config(self) -> None:
+        config = SimpleNamespace(
+            service_url="http://robot.local:8080",
+            request_timeout=7.5,
+        )
+
+        client = VisionClient.default(
+            config  # type: ignore[arg-type]
+        )
+
+        self.assertEqual(
+            client.base_url,
+            "http://robot.local:8080",
+        )
+        self.assertEqual(
+            client.timeout,
+            7.5,
+        )
+
+
+class VisionClientDataTests(unittest.TestCase):
     def test_recording_duration(self) -> None:
         recording = ClientRecording(
-            path=Path("/tmp/video.mp4"),
+            path=Path("video.mp4"),
             start_timestamp=10.0,
             end_timestamp=12.5,
             frame_count=50,
             fps=20.0,
         )
 
-        self.assertEqual(recording.duration, 2.5)
+        self.assertEqual(
+            recording.duration,
+            2.5,
+        )
 
-    def test_recording_duration_never_negative(self) -> None:
+    def test_recording_duration_cannot_be_negative(
+        self,
+    ) -> None:
         recording = ClientRecording(
-            path=Path("/tmp/video.mp4"),
+            path=Path("video.mp4"),
             start_timestamp=12.0,
             end_timestamp=10.0,
             frame_count=0,
             fps=20.0,
         )
 
-        self.assertEqual(recording.duration, 0.0)
+        self.assertEqual(
+            recording.duration,
+            0.0,
+        )
 
     def test_detection_status_properties(self) -> None:
         status = ClientDetectionStatus(
             detectors={
-                "color": True,
                 "face": False,
-                "object": True,
+                "color": True,
+                "objects": False,
             },
         )
 
         self.assertEqual(
             status.enabled,
-            ["color", "object"],
+            ["color"],
         )
         self.assertEqual(
             status.disabled,
-            ["face"],
+            [
+                "face",
+                "objects",
+            ],
         )
         self.assertTrue(status.is_enabled("color"))
         self.assertFalse(status.is_enabled("face"))
-        self.assertFalse(status.is_enabled("missing"))
+        self.assertFalse(status.is_enabled("unknown"))
 
 
-class VisionClientConstructionTests(unittest.TestCase):
-    def test_defaults(self) -> None:
-        client = VisionClient()
-
-        self.assertEqual(
-            client.base_url,
-            "http://127.0.0.1:8080",
-        )
-        self.assertEqual(client.timeout, 10.0)
-        self.assertIsNone(client._recording_filename)
-
-    def test_trailing_slash_is_removed(self) -> None:
-        client = VisionClient(
-            "http://example.test:8080/",
-        )
-
-        self.assertEqual(
-            client.base_url,
-            "http://example.test:8080",
-        )
-
-    def test_empty_base_url_is_rejected(self) -> None:
-        with self.assertRaisesRegex(
-            VisionClientError,
-            "base_url cannot be empty",
-        ):
-            VisionClient("")
-
-    def test_invalid_timeout_is_rejected(self) -> None:
-        for timeout in (0, -1):
-            with (
-                self.subTest(timeout=timeout),
-                self.assertRaisesRegex(
-                    VisionClientError,
-                    "timeout must be greater than 0",
-                ),
-            ):
-                VisionClient(timeout=timeout)
-
-    def test_default_uses_vision_config(self) -> None:
-        config = MagicMock()
-        config.service_url = "http://robot.local:9000"
-        config.request_timeout = 4.5
-
-        client = VisionClient.default(config)
-
-        self.assertEqual(
-            client.base_url,
-            "http://robot.local:9000",
-        )
-        self.assertEqual(client.timeout, 4.5)
-
-
-class VisionClientPathTests(unittest.TestCase):
-    def setUp(self) -> None:
-        self.client = VisionClient()
-
+class VisionClientFormatTests(unittest.TestCase):
     def test_snapshot_format_defaults_to_jpg(self) -> None:
         self.assertEqual(
-            self.client._snapshot_format(None),
-            "jpg",
-        )
-        self.assertEqual(
-            self.client._snapshot_format("photo"),
+            VisionClient._snapshot_format(None),
             "jpg",
         )
 
-    def test_snapshot_format_accepts_jpeg_extensions(self) -> None:
-        self.assertEqual(
-            self.client._snapshot_format("photo.jpg"),
-            "jpg",
-        )
-        self.assertEqual(
-            self.client._snapshot_format("photo.JPEG"),
-            "jpg",
-        )
+    def test_snapshot_format_from_filename(self) -> None:
+        expected = {
+            "picture": "jpg",
+            "picture.jpg": "jpg",
+            "picture.JPEG": "jpg",
+            "picture.png": "png",
+            "picture.PNG": "png",
+        }
 
-    def test_snapshot_format_accepts_png(self) -> None:
-        self.assertEqual(
-            self.client._snapshot_format("photo.PNG"),
-            "png",
-        )
+        for filename, image_format in expected.items():
+            with self.subTest(filename=filename):
+                self.assertEqual(
+                    VisionClient._snapshot_format(filename),
+                    image_format,
+                )
 
-    def test_snapshot_format_rejects_unknown_extension(self) -> None:
+    def test_snapshot_format_rejects_invalid_type(
+        self,
+    ) -> None:
         with self.assertRaisesRegex(
-            VisionClientError,
-            "snapshot filename must use",
+            TypeError,
+            "filename must be a string",
         ):
-            self.client._snapshot_format("photo.gif")
+            VisionClient._snapshot_format(
+                123  # type: ignore[arg-type]
+            )
 
-    def test_path_with_query_without_parameters(self) -> None:
-        self.assertEqual(
-            self.client._path_with_query(
-                "/metadata",
-                {
-                    "source": None,
-                },
-            ),
-            "/metadata",
-        )
+    def test_snapshot_format_rejects_empty_filename(
+        self,
+    ) -> None:
+        with self.assertRaisesRegex(
+            ValueError,
+            "filename cannot be empty",
+        ):
+            VisionClient._snapshot_format(" ")
 
-    def test_path_with_query_filters_none(self) -> None:
-        result = self.client._path_with_query(
-            "/snapshot",
-            {
-                "format": "jpg",
-                "overlay": None,
-                "source": "face",
-            },
-        )
+    def test_snapshot_format_rejects_unsupported_suffix(
+        self,
+    ) -> None:
+        with self.assertRaisesRegex(
+            ValueError,
+            r"\.jpg, \.jpeg, or \.png",
+        ):
+            VisionClient._snapshot_format("picture.gif")
 
-        self.assertEqual(
-            result,
-            "/snapshot?format=jpg&source=face",
-        )
 
-    def test_path_with_query_encodes_values(self) -> None:
-        result = self.client._path_with_query(
-            "/metadata",
-            {
-                "source": "face detector",
-            },
-        )
+class VisionClientMediaPathTests(unittest.TestCase):
+    def test_media_output_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            directory = Path(temp_dir) / "pictures"
 
-        self.assertEqual(
-            result,
-            "/metadata?source=face+detector",
-        )
-
-    def test_media_output_path_creates_directory(self) -> None:
-        with TemporaryDirectory() as tmp:
-            directory = Path(tmp) / "pictures"
-
-            result = self.client._media_output_path(
+            path = VisionClient._media_output_path(
                 directory=directory,
-                filename="photo.jpg",
+                filename="lesson.jpg",
                 media_name="snapshot",
                 extension="jpg",
             )
 
+            self.assertEqual(
+                path,
+                directory / "lesson.jpg",
+            )
             self.assertTrue(directory.is_dir())
-            self.assertEqual(
-                result,
-                directory / "photo.jpg",
+
+    def test_media_output_path_replaces_suffix(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            directory = Path(temp_dir)
+
+            path = VisionClient._media_output_path(
+                directory=directory,
+                filename="lesson.png",
+                media_name="recording",
+                extension="mp4",
             )
 
-    def test_media_output_path_adds_extension(self) -> None:
-        with TemporaryDirectory() as tmp:
-            directory = Path(tmp)
+            self.assertEqual(
+                path,
+                directory / "lesson.mp4",
+            )
 
-            result = self.client._media_output_path(
+    def test_media_output_path_generates_filename(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            directory = Path(temp_dir)
+
+            path = VisionClient._media_output_path(
                 directory=directory,
-                filename="photo",
+                filename=None,
                 media_name="snapshot",
                 extension="jpg",
             )
 
             self.assertEqual(
-                result,
-                directory / "photo.jpg",
+                path.parent,
+                directory,
             )
-
-    def test_media_output_path_replaces_extension(self) -> None:
-        with TemporaryDirectory() as tmp:
-            directory = Path(tmp)
-
-            result = self.client._media_output_path(
-                directory=directory,
-                filename="photo.jpeg",
-                media_name="snapshot",
-                extension="jpg",
-            )
-
+            self.assertTrue(path.name.startswith("snapshot_"))
             self.assertEqual(
-                result,
-                directory / "photo.jpg",
+                path.suffix,
+                ".jpg",
             )
 
-    def test_media_output_path_rejects_directory_components(self) -> None:
+    def test_media_output_path_rejects_directory_components(
+        self,
+    ) -> None:
         with (
-            TemporaryDirectory() as tmp,
+            tempfile.TemporaryDirectory() as temp_dir,
             self.assertRaisesRegex(
                 VisionClientError,
                 "plain filename",
             ),
         ):
-            self.client._media_output_path(
-                directory=Path(tmp),
-                filename="../photo.jpg",
+            VisionClient._media_output_path(
+                directory=Path(temp_dir),
+                filename="../picture.jpg",
                 media_name="snapshot",
                 extension="jpg",
             )
 
-    def test_media_output_path_rejects_blank_filename(self) -> None:
+    def test_media_output_path_rejects_empty_filename(
+        self,
+    ) -> None:
         with (
-            TemporaryDirectory() as tmp,
+            tempfile.TemporaryDirectory() as temp_dir,
             self.assertRaisesRegex(
                 VisionClientError,
                 "plain filename",
             ),
         ):
-            self.client._media_output_path(
-                directory=Path(tmp),
-                filename="   ",
+            VisionClient._media_output_path(
+                directory=Path(temp_dir),
+                filename=" ",
                 media_name="snapshot",
                 extension="jpg",
             )
 
-    def test_media_output_path_wraps_directory_error(self) -> None:
-        directory = MagicMock(spec=Path)
-        directory.mkdir.side_effect = OSError("permission denied")
-
-        with self.assertRaisesRegex(
-            VisionClientError,
-            "failed to create media directory",
+    def test_media_output_path_wraps_directory_failure(
+        self,
+    ) -> None:
+        with (
+            patch(
+                "betabox_robotics.vision.client.Path.mkdir",
+                side_effect=OSError("permission denied"),
+            ),
+            self.assertRaisesRegex(
+                VisionClientError,
+                "failed to create media directory",
+            ),
         ):
-            self.client._media_output_path(
-                directory=directory,
-                filename="photo.jpg",
+            VisionClient._media_output_path(
+                directory=Path("/pictures"),
+                filename="picture.jpg",
                 media_name="snapshot",
                 extension="jpg",
             )
 
     def test_save_media_file(self) -> None:
-        with TemporaryDirectory() as tmp:
-            path = Path(tmp) / "data.bin"
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "picture.jpg"
 
-            self.client._save_media_file(
+            VisionClient._save_media_file(
                 path,
-                b"content",
+                b"image-data",
                 "snapshot",
             )
 
             self.assertEqual(
                 path.read_bytes(),
-                b"content",
+                b"image-data",
             )
 
-    def test_save_media_file_wraps_os_error(self) -> None:
-        path = MagicMock(spec=Path)
-        path.write_bytes.side_effect = OSError("permission denied")
-
-        with self.assertRaisesRegex(
-            VisionClientError,
-            "failed to save snapshot",
+    def test_save_media_file_wraps_failure(
+        self,
+    ) -> None:
+        with (
+            patch(
+                "betabox_robotics.vision.client.Path.write_bytes",
+                side_effect=OSError("permission denied"),
+            ),
+            self.assertRaisesRegex(
+                VisionClientError,
+                "failed to save snapshot",
+            ),
         ):
-            self.client._save_media_file(
-                path,
-                b"content",
+            VisionClient._save_media_file(
+                Path("/picture.jpg"),
+                b"data",
                 "snapshot",
             )
+
+
+class VisionClientQueryTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.client = VisionClient()
+
+    def test_path_with_query(self) -> None:
+        result = self.client._path_with_query(
+            "/snapshot",
+            {
+                "format": "png",
+                "overlay": "true",
+                "source": "face detection",
+            },
+        )
+
+        self.assertEqual(
+            result,
+            ("/snapshot?format=png&overlay=true&source=face+detection"),
+        )
+
+    def test_path_with_query_omits_none(self) -> None:
+        result = self.client._path_with_query(
+            "/metadata",
+            {
+                "source": None,
+            },
+        )
+
+        self.assertEqual(
+            result,
+            "/metadata",
+        )
 
 
 class VisionClientRequestTests(unittest.TestCase):
     def setUp(self) -> None:
         self.client = VisionClient(
-            "http://robot.local:8080",
-            timeout=3.0,
+            timeout=3,
         )
 
-    @patch("betabox_robotics.vision.client.request.urlopen")
-    def test_request_returns_success_payload(
-        self,
-        urlopen,
-    ) -> None:
-        urlopen.return_value = mock_response(
+    def test_request_returns_data(self) -> None:
+        response = FakeResponse(
             json.dumps(
                 {
                     "success": True,
                     "data": {
-                        "running": True,
+                        "value": 10,
                     },
                 }
-            ).encode()
+            ).encode("utf-8")
         )
 
-        result = self.client._request(
-            "GET",
-            "/stats",
-        )
+        with patch(
+            "betabox_robotics.vision.client.request.urlopen",
+            return_value=response,
+        ) as urlopen:
+            result = self.client._request(
+                "GET",
+                "/stats",
+            )
 
         self.assertEqual(
             result,
             {
-                "running": True,
+                "value": 10,
             },
         )
 
         req = urlopen.call_args.args[0]
 
-        self.assertIsInstance(req, request.Request)
         self.assertEqual(
             req.full_url,
-            "http://robot.local:8080/stats",
+            "http://127.0.0.1:8080/stats",
         )
-        self.assertEqual(req.method, "GET")
         self.assertEqual(
-            urlopen.call_args.kwargs["timeout"],
-            3.0,
+            req.method,
+            "GET",
+        )
+        urlopen.assert_called_once_with(
+            req,
+            timeout=3.0,
         )
 
-    @patch("betabox_robotics.vision.client.request.urlopen")
-    def test_request_posts_json(
-        self,
-        urlopen,
-    ) -> None:
-        urlopen.return_value = mock_response(b'{"success": true, "data": {}}')
+    def test_request_sends_json(self) -> None:
+        response = FakeResponse(b'{"success": true, "data": {}}')
 
-        self.client._request(
-            "POST",
-            "/detection/enable",
-            data={
-                "name": "face",
-            },
-        )
+        with patch(
+            "betabox_robotics.vision.client.request.urlopen",
+            return_value=response,
+        ) as urlopen:
+            self.client._request(
+                "POST",
+                "/detection/enable",
+                data={
+                    "name": "face",
+                },
+            )
 
         req = urlopen.call_args.args[0]
 
-        self.assertEqual(req.method, "POST")
         self.assertEqual(
-            json.loads(req.data),
+            req.method,
+            "POST",
+        )
+        self.assertEqual(
+            json.loads(req.data.decode("utf-8")),
             {
                 "name": "face",
             },
@@ -428,174 +577,225 @@ class VisionClientRequestTests(unittest.TestCase):
             "application/json",
         )
 
-    @patch("betabox_robotics.vision.client.request.urlopen")
-    def test_request_wraps_json_http_error(
+    def test_request_accepts_empty_success_payload(
         self,
-        urlopen,
     ) -> None:
-        urlopen.side_effect = http_error(
-            code=400,
-            body=b'{"error": "unknown detector"}',
-        )
+        response = FakeResponse(b'{"success": true}')
 
-        with self.assertRaisesRegex(
-            VisionClientError,
-            "unknown detector",
+        with patch(
+            "betabox_robotics.vision.client.request.urlopen",
+            return_value=response,
         ):
-            self.client._request(
+            result = self.client._request(
                 "POST",
-                "/detection/enable",
+                "/test",
             )
 
-    @patch("betabox_robotics.vision.client.request.urlopen")
-    def test_request_wraps_non_json_http_error(
+        self.assertEqual(
+            result,
+            {},
+        )
+
+    def test_request_rejects_invalid_json(self) -> None:
+        response = FakeResponse(b"not-json")
+
+        with (
+            patch(
+                "betabox_robotics.vision.client.request.urlopen",
+                return_value=response,
+            ),
+            self.assertRaisesRegex(
+                VisionClientError,
+                "invalid Vision service response",
+            ),
+        ):
+            self.client._request(
+                "GET",
+                "/stats",
+            )
+
+    def test_request_rejects_non_object_response(
         self,
-        urlopen,
     ) -> None:
-        urlopen.side_effect = http_error(
+        response = FakeResponse(b'["unexpected"]')
+
+        with (
+            patch(
+                "betabox_robotics.vision.client.request.urlopen",
+                return_value=response,
+            ),
+            self.assertRaisesRegex(
+                VisionClientError,
+                "unexpected response",
+            ),
+        ):
+            self.client._request(
+                "GET",
+                "/stats",
+            )
+
+    def test_request_rejects_failed_response(
+        self,
+    ) -> None:
+        response = FakeResponse(b'{"success": false, "error": "camera unavailable"}')
+
+        with (
+            patch(
+                "betabox_robotics.vision.client.request.urlopen",
+                return_value=response,
+            ),
+            self.assertRaisesRegex(
+                VisionClientError,
+                "camera unavailable",
+            ),
+        ):
+            self.client._request(
+                "GET",
+                "/stats",
+            )
+
+    def test_request_rejects_invalid_payload(
+        self,
+    ) -> None:
+        response = FakeResponse(b'{"success": true, "data": []}')
+
+        with (
+            patch(
+                "betabox_robotics.vision.client.request.urlopen",
+                return_value=response,
+            ),
+            self.assertRaisesRegex(
+                VisionClientError,
+                "returned invalid data",
+            ),
+        ):
+            self.client._request(
+                "GET",
+                "/stats",
+            )
+
+    def test_request_handles_http_error_json(
+        self,
+    ) -> None:
+        failure = make_http_error(
+            code=400,
+            body=(b'{"success": false, "error": "bad request"}'),
+        )
+
+        with (
+            patch(
+                "betabox_robotics.vision.client.request.urlopen",
+                side_effect=failure,
+            ),
+            self.assertRaisesRegex(
+                VisionClientError,
+                "bad request",
+            ),
+        ):
+            self.client._request(
+                "GET",
+                "/stats",
+            )
+
+    def test_request_handles_http_error_without_json(
+        self,
+    ) -> None:
+        failure = make_http_error(
             code=500,
             body=b"server error",
         )
 
-        with self.assertRaisesRegex(
-            VisionClientError,
-            "HTTP 500",
+        with (
+            patch(
+                "betabox_robotics.vision.client.request.urlopen",
+                side_effect=failure,
+            ),
+            self.assertRaisesRegex(
+                VisionClientError,
+                "HTTP 500",
+            ),
         ):
             self.client._request(
                 "GET",
                 "/stats",
             )
 
-    @patch("betabox_robotics.vision.client.request.urlopen")
-    def test_request_wraps_url_error(
-        self,
-        urlopen,
-    ) -> None:
-        urlopen.side_effect = error.URLError("connection refused")
-
-        with self.assertRaisesRegex(
-            VisionClientError,
-            "Betabox Vision service is not available",
+    def test_request_handles_url_error(self) -> None:
+        with (
+            patch(
+                "betabox_robotics.vision.client.request.urlopen",
+                side_effect=error.URLError("connection refused"),
+            ),
+            self.assertRaisesRegex(
+                VisionClientError,
+                "betabox-video.service",
+            ),
         ):
             self.client._request(
                 "GET",
                 "/stats",
             )
 
-    @patch("betabox_robotics.vision.client.request.urlopen")
-    def test_request_rejects_invalid_json(
-        self,
-        urlopen,
-    ) -> None:
-        urlopen.return_value = mock_response(b"not-json")
-
-        with self.assertRaisesRegex(
-            VisionClientError,
-            "invalid Vision service response",
-        ):
-            self.client._request(
-                "GET",
-                "/stats",
-            )
-
-    @patch("betabox_robotics.vision.client.request.urlopen")
-    def test_request_rejects_non_object_response(
-        self,
-        urlopen,
-    ) -> None:
-        urlopen.return_value = mock_response(b'["unexpected"]')
-
-        with self.assertRaisesRegex(
-            VisionClientError,
-            "unexpected response",
-        ):
-            self.client._request(
-                "GET",
-                "/stats",
-            )
-
-    @patch("betabox_robotics.vision.client.request.urlopen")
-    def test_request_rejects_unsuccessful_response(
-        self,
-        urlopen,
-    ) -> None:
-        urlopen.return_value = mock_response(b'{"success": false, "error": "boom"}')
-
-        with self.assertRaisesRegex(
-            VisionClientError,
-            "boom",
-        ):
-            self.client._request(
-                "GET",
-                "/stats",
-            )
-
-    @patch("betabox_robotics.vision.client.request.urlopen")
-    def test_request_rejects_non_object_data(
-        self,
-        urlopen,
-    ) -> None:
-        urlopen.return_value = mock_response(b'{"success": true, "data": []}')
-
-        with self.assertRaisesRegex(
-            VisionClientError,
-            "invalid data",
-        ):
-            self.client._request(
-                "GET",
-                "/stats",
-            )
-
-    @patch("betabox_robotics.vision.client.request.urlopen")
-    def test_request_bytes_returns_body_and_headers(
-        self,
-        urlopen,
-    ) -> None:
-        headers = {
-            "X-Betabox-Format": "jpg",
-        }
-        urlopen.return_value = mock_response(
-            b"image-data",
-            headers=headers,
+    def test_request_bytes(self) -> None:
+        response = FakeResponse(
+            b"binary-data",
+            headers={
+                "X-Test": "value",
+            },
         )
 
-        body, returned_headers = self.client._request_bytes(
-            "POST",
-            "/snapshot",
+        with patch(
+            "betabox_robotics.vision.client.request.urlopen",
+            return_value=response,
+        ):
+            body, headers = self.client._request_bytes(
+                "POST",
+                "/snapshot",
+            )
+
+        self.assertEqual(
+            body,
+            b"binary-data",
+        )
+        self.assertEqual(
+            headers["X-Test"],
+            "value",
         )
 
-        self.assertEqual(body, b"image-data")
-        self.assertIs(returned_headers, headers)
-
-    @patch("betabox_robotics.vision.client.request.urlopen")
-    def test_request_bytes_wraps_http_error(
+    def test_request_bytes_handles_http_error(
         self,
-        urlopen,
     ) -> None:
-        urlopen.side_effect = http_error(
-            code=400,
+        failure = make_http_error(
             body=b'{"error": "snapshot failed"}',
         )
 
-        with self.assertRaisesRegex(
-            VisionClientError,
-            "snapshot failed",
+        with (
+            patch(
+                "betabox_robotics.vision.client.request.urlopen",
+                side_effect=failure,
+            ),
+            self.assertRaisesRegex(
+                VisionClientError,
+                "snapshot failed",
+            ),
         ):
             self.client._request_bytes(
                 "POST",
                 "/snapshot",
             )
 
-    @patch("betabox_robotics.vision.client.request.urlopen")
-    def test_request_bytes_wraps_url_error(
+    def test_request_bytes_handles_url_error(
         self,
-        urlopen,
     ) -> None:
-        urlopen.side_effect = error.URLError("connection refused")
-
-        with self.assertRaisesRegex(
-            VisionClientError,
-            "Betabox Vision service is not available",
+        with (
+            patch(
+                "betabox_robotics.vision.client.request.urlopen",
+                side_effect=error.URLError("connection refused"),
+            ),
+            self.assertRaisesRegex(
+                VisionClientError,
+                "betabox-video.service",
+            ),
         ):
             self.client._request_bytes(
                 "POST",
@@ -603,55 +803,739 @@ class VisionClientRequestTests(unittest.TestCase):
             )
 
 
-class VisionClientParsingTests(unittest.TestCase):
+class VisionClientSnapshotTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.client = VisionClient()
+
+    def test_snapshot(self) -> None:
+        output_path = Path("/media/pictures/lesson.png")
+
+        with (
+            patch.object(
+                self.client,
+                "_request_bytes",
+                return_value=(
+                    b"image-data",
+                    {
+                        "X-Betabox-Format": "png",
+                        "X-Betabox-Timestamp": "123.5",
+                    },
+                ),
+            ) as request_bytes,
+            patch.object(
+                self.client,
+                "_media_output_path",
+                return_value=output_path,
+            ) as media_path,
+            patch.object(
+                self.client,
+                "_save_media_file",
+            ) as save,
+        ):
+            result = self.client.snapshot(
+                filename="lesson.png",
+                overlay=True,
+                source="color",
+            )
+
+        self.assertEqual(
+            result,
+            ClientSnapshot(
+                path=output_path,
+                timestamp=123.5,
+                format="png",
+            ),
+        )
+        request_bytes.assert_called_once_with(
+            "POST",
+            ("/snapshot?format=png&overlay=true&source=color"),
+        )
+        media_path.assert_called_once_with(
+            directory=Path.home() / "media" / "pictures",
+            filename="lesson.png",
+            media_name="snapshot",
+            extension="png",
+        )
+        save.assert_called_once_with(
+            output_path,
+            b"image-data",
+            "snapshot",
+        )
+
+    def test_snapshot_defaults_to_jpg(self) -> None:
+        with (
+            patch.object(
+                self.client,
+                "_request_bytes",
+                return_value=(
+                    b"image",
+                    {
+                        "X-Betabox-Format": "jpg",
+                        "X-Betabox-Timestamp": "1.0",
+                    },
+                ),
+            ) as request_bytes,
+            patch.object(
+                self.client,
+                "_media_output_path",
+                return_value=Path("/media/picture.jpg"),
+            ),
+            patch.object(
+                self.client,
+                "_save_media_file",
+            ),
+        ):
+            result = self.client.snapshot()
+
+        self.assertEqual(
+            result.format,
+            "jpg",
+        )
+        request_bytes.assert_called_once_with(
+            "POST",
+            "/snapshot?format=jpg",
+        )
+
+    def test_snapshot_rejects_invalid_returned_format(
+        self,
+    ) -> None:
+        with (
+            patch.object(
+                self.client,
+                "_request_bytes",
+                return_value=(
+                    b"image",
+                    {
+                        "X-Betabox-Format": "gif",
+                        "X-Betabox-Timestamp": "1.0",
+                    },
+                ),
+            ),
+            self.assertRaisesRegex(
+                ValueError,
+                "snapshot filename",
+            ),
+        ):
+            self.client.snapshot()
+
+    def test_snapshot_rejects_invalid_timestamp(
+        self,
+    ) -> None:
+        with (
+            patch.object(
+                self.client,
+                "_request_bytes",
+                return_value=(
+                    b"image",
+                    {
+                        "X-Betabox-Format": "jpg",
+                        "X-Betabox-Timestamp": "nan",
+                    },
+                ),
+            ),
+            self.assertRaisesRegex(
+                VisionClientError,
+                "snapshot timestamp",
+            ),
+        ):
+            self.client.snapshot()
+
+
+class VisionClientRecordingTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.client = VisionClient()
+
+    def test_start_recording(self) -> None:
+        output_path = Path("/media/videos/lesson.mp4")
+
+        with (
+            patch.object(
+                self.client,
+                "_recording_output_path",
+                return_value=output_path,
+            ) as recording_path,
+            patch.object(
+                self.client,
+                "_post",
+                return_value={},
+            ) as post,
+        ):
+            result = self.client.start_recording(
+                filename="lesson.mp4",
+                overlay=True,
+                source="face",
+            )
+
+        self.assertEqual(
+            result,
+            output_path,
+        )
+        recording_path.assert_called_once_with("lesson.mp4")
+        post.assert_called_once_with(
+            "/recording/start?filename=lesson.mp4&overlay=true&source=face"
+        )
+        self.assertEqual(
+            self.client._recording_filename,
+            "lesson.mp4",
+        )
+
+    def test_start_recording_validates_path_before_request(
+        self,
+    ) -> None:
+        with (
+            patch.object(
+                self.client,
+                "_recording_output_path",
+                side_effect=VisionClientError("invalid filename"),
+            ),
+            patch.object(
+                self.client,
+                "_post",
+            ) as post,
+            self.assertRaisesRegex(
+                VisionClientError,
+                "invalid filename",
+            ),
+        ):
+            self.client.start_recording(filename="../bad.mp4")
+
+        post.assert_not_called()
+
+    def test_stop_recording(self) -> None:
+        self.client._recording_filename = "lesson.mp4"
+        output_path = Path("/media/videos/lesson.mp4")
+
+        headers = {
+            "X-Betabox-Format": "mp4",
+            "X-Betabox-Start-Timestamp": "10.0",
+            "X-Betabox-End-Timestamp": "12.5",
+            "X-Betabox-Frame-Count": "50",
+            "X-Betabox-FPS": "20.0",
+        }
+
+        with (
+            patch.object(
+                self.client,
+                "_request_bytes",
+                return_value=(
+                    b"video-data",
+                    headers,
+                ),
+            ) as request_bytes,
+            patch.object(
+                self.client,
+                "_recording_output_path",
+                return_value=output_path,
+            ) as recording_path,
+            patch.object(
+                self.client,
+                "_save_media_file",
+            ) as save,
+        ):
+            result = self.client.stop_recording()
+
+        self.assertEqual(
+            result,
+            ClientRecording(
+                path=output_path,
+                start_timestamp=10.0,
+                end_timestamp=12.5,
+                frame_count=50,
+                fps=20.0,
+            ),
+        )
+        self.assertEqual(
+            result.duration,
+            2.5,
+        )
+        request_bytes.assert_called_once_with(
+            "POST",
+            "/recording/stop",
+        )
+        recording_path.assert_called_once_with("lesson.mp4")
+        save.assert_called_once_with(
+            output_path,
+            b"video-data",
+            "recording",
+        )
+        self.assertIsNone(self.client._recording_filename)
+
+    def test_stop_recording_explicit_filename_overrides_stored(
+        self,
+    ) -> None:
+        self.client._recording_filename = "stored.mp4"
+
+        headers = {
+            "X-Betabox-Format": "mp4",
+            "X-Betabox-Start-Timestamp": "1",
+            "X-Betabox-End-Timestamp": "2",
+            "X-Betabox-Frame-Count": "20",
+            "X-Betabox-FPS": "20",
+        }
+
+        with (
+            patch.object(
+                self.client,
+                "_request_bytes",
+                return_value=(
+                    b"video",
+                    headers,
+                ),
+            ),
+            patch.object(
+                self.client,
+                "_recording_output_path",
+                return_value=Path("/explicit.mp4"),
+            ) as recording_path,
+            patch.object(
+                self.client,
+                "_save_media_file",
+            ),
+        ):
+            self.client.stop_recording(filename="explicit.mp4")
+
+        recording_path.assert_called_once_with("explicit.mp4")
+
+    def test_stop_recording_rejects_invalid_format(
+        self,
+    ) -> None:
+        with (
+            patch.object(
+                self.client,
+                "_request_bytes",
+                return_value=(
+                    b"video",
+                    {
+                        "X-Betabox-Format": "avi",
+                    },
+                ),
+            ),
+            self.assertRaisesRegex(
+                VisionClientError,
+                "invalid recording format",
+            ),
+        ):
+            self.client.stop_recording()
+
+    def test_stop_recording_rejects_invalid_metadata(
+        self,
+    ) -> None:
+        headers = {
+            "X-Betabox-Format": "mp4",
+            "X-Betabox-Start-Timestamp": "nan",
+            "X-Betabox-End-Timestamp": "2",
+            "X-Betabox-Frame-Count": "20",
+            "X-Betabox-FPS": "20",
+        }
+
+        with (
+            patch.object(
+                self.client,
+                "_request_bytes",
+                return_value=(
+                    b"video",
+                    headers,
+                ),
+            ),
+            self.assertRaisesRegex(
+                VisionClientError,
+                "recording start timestamp",
+            ),
+        ):
+            self.client.stop_recording()
+
+
+class VisionClientDetectionAPITests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.client = VisionClient()
+
+    def test_metadata_returns_none(self) -> None:
+        with patch.object(
+            self.client,
+            "_get",
+            return_value={},
+        ) as get:
+            result = self.client.metadata("color")
+
+        self.assertIsNone(result)
+        get.assert_called_once_with("/metadata?source=color")
+
+    def test_metadata(self) -> None:
+        payload = {
+            "source": "color",
+            "timestamp": 123.5,
+            "detections": [],
+            "data": {
+                "count": 0,
+            },
+        }
+
+        with patch.object(
+            self.client,
+            "_get",
+            return_value=payload,
+        ):
+            result = self.client.metadata("color")
+
+        self.assertEqual(
+            result,
+            ClientMetadata(
+                source="color",
+                timestamp=123.5,
+                detections=[],
+                data={
+                    "count": 0,
+                },
+            ),
+        )
+
+    def test_detection_status(self) -> None:
+        with patch.object(
+            self.client,
+            "_get",
+            return_value={
+                "detectors": [
+                    "color",
+                    "face",
+                ],
+                "enabled": {
+                    "color": True,
+                    "face": False,
+                },
+            },
+        ):
+            status = self.client.detection_status()
+
+        self.assertEqual(
+            status.detectors,
+            {
+                "color": True,
+                "face": False,
+            },
+        )
+
+    def test_enable_detection(self) -> None:
+        with patch.object(
+            self.client,
+            "_post_json",
+            return_value={
+                "detectors": {
+                    "color": False,
+                    "face": True,
+                },
+                "enabled": "face",
+            },
+        ) as post:
+            status = self.client.enable_detection("face")
+
+        post.assert_called_once_with(
+            "/detection/enable",
+            {
+                "name": "face",
+            },
+        )
+        self.assertEqual(
+            status.changed,
+            "face",
+        )
+        self.assertTrue(status.is_enabled("face"))
+
+    def test_disable_detection(self) -> None:
+        with patch.object(
+            self.client,
+            "_post_json",
+            return_value={
+                "detectors": {
+                    "color": True,
+                    "face": False,
+                },
+                "disabled": "face",
+            },
+        ) as post:
+            status = self.client.disable_detection("face")
+
+        post.assert_called_once_with(
+            "/detection/disable",
+            {
+                "name": "face",
+            },
+        )
+        self.assertEqual(
+            status.changed,
+            "face",
+        )
+
+    def test_enable_color_detection(self) -> None:
+        with patch.object(
+            self.client,
+            "_post_json",
+            return_value={
+                "detectors": {
+                    "color": True,
+                },
+                "enabled": "color",
+            },
+        ) as post:
+            status = self.client.enable_color_detection(
+                [
+                    "red",
+                    "blue",
+                ],
+                min_area=25,
+            )
+
+        post.assert_called_once_with(
+            "/detection/color/enable",
+            {
+                "colors": [
+                    "red",
+                    "blue",
+                ],
+                "min_area": 25,
+            },
+        )
+        self.assertTrue(status.is_enabled("color"))
+
+    def test_enable_color_detection_rejects_invalid_min_area(
+        self,
+    ) -> None:
+        for value in (
+            True,
+            "25",
+        ):
+            with (
+                self.subTest(value=value),
+                self.assertRaisesRegex(
+                    TypeError,
+                    "min_area must be a number",
+                ),
+            ):
+                self.client.enable_color_detection(
+                    min_area=value,  # type: ignore[arg-type]
+                )
+
+
+class VisionClientOverlayTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.client = VisionClient()
+
+    def test_enable_stream_overlay(self) -> None:
+        with patch.object(
+            self.client,
+            "_post_json",
+            return_value={
+                "enabled": True,
+                "source": "color",
+            },
+        ) as post:
+            result = self.client.enable_stream_overlay("color")
+
+        self.assertEqual(
+            result,
+            ClientStreamOverlayStatus(
+                enabled=True,
+                source="color",
+            ),
+        )
+        post.assert_called_once_with(
+            "/stream/overlay/enable",
+            {
+                "source": "color",
+            },
+        )
+
+    def test_enable_stream_overlay_without_source(
+        self,
+    ) -> None:
+        with patch.object(
+            self.client,
+            "_post_json",
+            return_value={
+                "enabled": True,
+                "source": None,
+            },
+        ) as post:
+            result = self.client.enable_stream_overlay()
+
+        self.assertTrue(result.enabled)
+        self.assertIsNone(result.source)
+        post.assert_called_once_with(
+            "/stream/overlay/enable",
+            {},
+        )
+
+    def test_disable_stream_overlay(self) -> None:
+        with patch.object(
+            self.client,
+            "_post_json",
+            return_value={
+                "enabled": False,
+                "source": None,
+            },
+        ) as post:
+            result = self.client.disable_stream_overlay()
+
+        self.assertEqual(
+            result,
+            ClientStreamOverlayStatus(
+                enabled=False,
+                source=None,
+            ),
+        )
+        post.assert_called_once_with(
+            "/stream/overlay/disable",
+            {},
+        )
+
+
+class VisionClientParserTests(unittest.TestCase):
     def setUp(self) -> None:
         self.client = VisionClient()
 
     def test_parse_float(self) -> None:
         self.assertEqual(
             self.client._parse_float(
-                "12.5",
+                "1.5",
                 field="value",
             ),
-            12.5,
+            1.5,
         )
 
-    def test_parse_float_wraps_invalid_value(self) -> None:
-        with self.assertRaisesRegex(
-            VisionClientError,
-            "invalid camera FPS",
+    def test_parse_float_rejects_invalid_values(
+        self,
+    ) -> None:
+        for value in (
+            True,
+            "bad",
+            float("nan"),
+            float("inf"),
         ):
-            self.client._parse_float(
-                "bad",
-                field="camera FPS",
-            )
+            with (
+                self.subTest(value=value),
+                self.assertRaisesRegex(
+                    VisionClientError,
+                    "invalid value",
+                ),
+            ):
+                self.client._parse_float(
+                    value,
+                    field="value",
+                )
 
     def test_parse_int(self) -> None:
         self.assertEqual(
             self.client._parse_int(
-                "12",
-                field="value",
+                "10",
+                field="count",
             ),
-            12,
+            10,
+        )
+        self.assertEqual(
+            self.client._parse_int(
+                10.0,
+                field="count",
+            ),
+            10,
         )
 
-    def test_parse_int_wraps_invalid_value(self) -> None:
-        with self.assertRaisesRegex(
-            VisionClientError,
-            "invalid server port",
+    def test_parse_int_rejects_invalid_values(
+        self,
+    ) -> None:
+        for value in (
+            True,
+            1.5,
+            "bad",
         ):
-            self.client._parse_int(
-                None,
-                field="server port",
+            with (
+                self.subTest(value=value),
+                self.assertRaisesRegex(
+                    VisionClientError,
+                    "invalid count",
+                ),
+            ):
+                self.client._parse_int(
+                    value,
+                    field="count",
+                )
+
+    def test_parse_bool(self) -> None:
+        self.assertTrue(
+            self.client._parse_bool(
+                True,
+                field="state",
             )
+        )
+        self.assertFalse(
+            self.client._parse_bool(
+                False,
+                field="state",
+            )
+        )
+
+    def test_parse_bool_rejects_non_boolean(
+        self,
+    ) -> None:
+        for value in (
+            1,
+            "false",
+            None,
+        ):
+            with (
+                self.subTest(value=value),
+                self.assertRaisesRegex(
+                    VisionClientError,
+                    "invalid state",
+                ),
+            ):
+                self.client._parse_bool(
+                    value,
+                    field="state",
+                )
+
+    def test_parse_string(self) -> None:
+        self.assertEqual(
+            self.client._parse_string(
+                " color ",
+                field="name",
+            ),
+            "color",
+        )
+
+    def test_parse_string_rejects_invalid_value(
+        self,
+    ) -> None:
+        for value in (
+            None,
+            123,
+            " ",
+        ):
+            with (
+                self.subTest(value=value),
+                self.assertRaisesRegex(
+                    VisionClientError,
+                    "invalid name",
+                ),
+            ):
+                self.client._parse_string(
+                    value,
+                    field="name",
+                )
 
     def test_parse_detection(self) -> None:
         result = self.client._parse_detection(
             {
                 "label": "face",
-                "confidence": "0.9",
-                "box": [1, 2, 30, 40],
-                "center": [16, 22],
+                "confidence": 0.75,
+                "box": [
+                    10,
+                    20,
+                    30,
+                    40,
+                ],
+                "center": [
+                    25,
+                    40,
+                ],
                 "data": {
                     "width": 30,
                 },
@@ -662,99 +1546,123 @@ class VisionClientParsingTests(unittest.TestCase):
             result,
             ClientDetection(
                 label="face",
-                confidence=0.9,
-                box=(1, 2, 30, 40),
-                center=(16, 22),
+                confidence=0.75,
+                box=(
+                    10,
+                    20,
+                    30,
+                    40,
+                ),
+                center=(
+                    25,
+                    40,
+                ),
                 data={
                     "width": 30,
                 },
             ),
         )
 
-    def test_parse_detection_allows_missing_optional_fields(
+    def test_parse_detection_without_optional_values(
         self,
     ) -> None:
         result = self.client._parse_detection(
             {
-                "label": "face",
+                "label": "red",
             }
         )
 
-        self.assertIsNone(result.confidence)
-        self.assertIsNone(result.box)
-        self.assertIsNone(result.center)
-        self.assertEqual(result.data, {})
-
-    def test_parse_detection_ignores_wrong_box_length(
-        self,
-    ) -> None:
-        result = self.client._parse_detection(
-            {
-                "label": "face",
-                "box": [1, 2],
-            }
+        self.assertEqual(
+            result,
+            ClientDetection(
+                label="red",
+                confidence=None,
+                box=None,
+                center=None,
+                data={},
+            ),
         )
 
-        self.assertIsNone(result.box)
-
-    def test_parse_detection_rejects_invalid_box_values(
+    def test_parse_detection_rejects_invalid_label(
         self,
     ) -> None:
         with self.assertRaisesRegex(
             VisionClientError,
-            "invalid detection box",
+            "detection label",
         ):
             self.client._parse_detection(
                 {
-                    "box": [
-                        1,
-                        2,
-                        "bad",
-                        4,
-                    ],
+                    "label": 123,
                 }
             )
 
-    def test_parse_detection_rejects_invalid_center_values(
+    def test_parse_detection_rejects_invalid_box(
         self,
     ) -> None:
-        with self.assertRaisesRegex(
-            VisionClientError,
-            "invalid detection center",
+        for box in (
+            [1, 2],
+            "box",
+            [
+                1,
+                2,
+                3,
+                "bad",
+            ],
         ):
-            self.client._parse_detection(
-                {
-                    "center": [
-                        1,
-                        "bad",
-                    ],
-                }
-            )
+            with (
+                self.subTest(box=box),
+                self.assertRaisesRegex(
+                    VisionClientError,
+                    "detection box",
+                ),
+            ):
+                self.client._parse_detection(
+                    {
+                        "label": "face",
+                        "box": box,
+                    }
+                )
 
-    def test_parse_detection_rejects_invalid_confidence(
+    def test_parse_detection_rejects_invalid_center(
         self,
     ) -> None:
-        with self.assertRaisesRegex(
-            VisionClientError,
-            "invalid detection confidence",
+        for center in (
+            [1],
+            "center",
+            [
+                1,
+                "bad",
+            ],
         ):
-            self.client._parse_detection(
-                {
-                    "confidence": "bad",
-                }
-            )
+            with (
+                self.subTest(center=center),
+                self.assertRaisesRegex(
+                    VisionClientError,
+                    "detection center",
+                ),
+            ):
+                self.client._parse_detection(
+                    {
+                        "label": "face",
+                        "center": center,
+                    }
+                )
 
     def test_parse_metadata(self) -> None:
         result = self.client._parse_metadata(
             {
                 "source": "face",
-                "timestamp": "12.5",
+                "timestamp": 100.5,
                 "detections": [
                     {
                         "label": "face",
-                        "box": [1, 2, 3, 4],
+                        "box": [
+                            1,
+                            2,
+                            3,
+                            4,
+                        ],
                     },
-                    "ignored",
                 ],
                 "data": {
                     "count": 1,
@@ -762,10 +1670,18 @@ class VisionClientParsingTests(unittest.TestCase):
             }
         )
 
-        self.assertIsInstance(result, ClientMetadata)
-        self.assertEqual(result.source, "face")
-        self.assertEqual(result.timestamp, 12.5)
-        self.assertEqual(len(result.detections), 1)
+        self.assertEqual(
+            result.source,
+            "face",
+        )
+        self.assertEqual(
+            result.timestamp,
+            100.5,
+        )
+        self.assertEqual(
+            len(result.detections),
+            1,
+        )
         self.assertEqual(
             result.data,
             {
@@ -773,20 +1689,20 @@ class VisionClientParsingTests(unittest.TestCase):
             },
         )
 
-    def test_parse_metadata_rejects_invalid_timestamp(
+    def test_parse_metadata_rejects_invalid_source(
         self,
     ) -> None:
         with self.assertRaisesRegex(
             VisionClientError,
-            "invalid metadata timestamp",
+            "metadata source",
         ):
             self.client._parse_metadata(
                 {
-                    "timestamp": "bad",
+                    "source": 123,
                 }
             )
 
-    def test_parse_detection_status_from_get_response(
+    def test_parse_detection_status_from_names(
         self,
     ) -> None:
         result = self.client._parse_detection_status(
@@ -809,49 +1725,37 @@ class VisionClientParsingTests(unittest.TestCase):
                 "face": False,
             },
         )
-        self.assertIsNone(result.changed)
 
-    def test_parse_detection_status_from_enable_response(
+    def test_parse_detection_status_from_map(
         self,
     ) -> None:
         result = self.client._parse_detection_status(
             {
-                "enabled": "face",
                 "detectors": {
-                    "color": False,
-                    "face": True,
-                },
-            }
-        )
-
-        self.assertEqual(result.changed, "face")
-        self.assertTrue(result.is_enabled("face"))
-
-    def test_parse_detection_status_from_disable_response(
-        self,
-    ) -> None:
-        result = self.client._parse_detection_status(
-            {
-                "disabled": "face",
-                "detectors": {
+                    "color": True,
                     "face": False,
                 },
+                "enabled": "color",
             }
         )
 
-        self.assertEqual(result.changed, "face")
-        self.assertFalse(result.is_enabled("face"))
+        self.assertEqual(
+            result.changed,
+            "color",
+        )
 
-    def test_parse_detection_status_rejects_bad_shape(
+    def test_parse_detection_status_rejects_invalid_boolean(
         self,
     ) -> None:
         with self.assertRaisesRegex(
             VisionClientError,
-            "invalid detector status",
+            "color detector state",
         ):
             self.client._parse_detection_status(
                 {
-                    "detectors": "bad",
+                    "detectors": {
+                        "color": "true",
+                    },
                 }
             )
 
@@ -859,7 +1763,7 @@ class VisionClientParsingTests(unittest.TestCase):
         result = self.client._parse_stream_overlay_status(
             {
                 "enabled": True,
-                "source": "face",
+                "source": "color",
             }
         )
 
@@ -867,692 +1771,152 @@ class VisionClientParsingTests(unittest.TestCase):
             result,
             ClientStreamOverlayStatus(
                 enabled=True,
-                source="face",
+                source="color",
             ),
         )
 
-    def test_parse_statistics(self) -> None:
-        result = self.client._parse_statistics(
-            {
-                "running": True,
-                "camera": {
-                    "running": True,
-                    "fps": 20.0,
-                    "consumer_count": 3,
-                    "has_frame": True,
-                    "last_error": None,
-                },
-                "streaming": {
-                    "running": True,
-                    "clients": 2,
-                    "frames_received": 100,
-                    "has_frame": True,
-                    "overlay": {
-                        "enabled": True,
-                        "source": "face",
-                    },
-                },
-                "recording": {
-                    "active": False,
-                    "overlay": {
-                        "enabled": False,
-                        "source": None,
-                    },
-                },
-                "detection": {
-                    "detectors": {
-                        "color": True,
-                        "face": False,
-                    },
-                    "metadata_sources": [
-                        "color",
-                    ],
-                },
-                "server": {
-                    "host": "0.0.0.0",
-                    "port": 8080,
-                    "fps": 20,
-                },
-            }
-        )
-
-        self.assertEqual(
-            result,
-            ClientVisionStatistics(
-                running=True,
-                camera=ClientCameraStatistics(
-                    running=True,
-                    fps=20.0,
-                    consumer_count=3,
-                    has_frame=True,
-                    last_error=None,
-                ),
-                streaming=ClientStreamingStatistics(
-                    running=True,
-                    clients=2,
-                    frames_received=100,
-                    has_frame=True,
-                    overlay=ClientStreamOverlayStatus(
-                        enabled=True,
-                        source="face",
-                    ),
-                ),
-                recording=ClientRecordingStatus(
-                    active=False,
-                    overlay=ClientStreamOverlayStatus(
-                        enabled=False,
-                        source=None,
-                    ),
-                ),
-                detection=ClientDetectionStatistics(
-                    detectors={
-                        "color": True,
-                        "face": False,
-                    },
-                    metadata_sources=[
-                        "color",
-                    ],
-                ),
-                server=ClientVisionServerStatistics(
-                    host="0.0.0.0",
-                    port=8080,
-                    fps=20.0,
-                ),
-            ),
-        )
-
-    def test_parse_statistics_rejects_invalid_camera_fps(
+    def test_parse_stream_overlay_rejects_invalid_state(
         self,
     ) -> None:
         with self.assertRaisesRegex(
             VisionClientError,
-            "invalid camera FPS",
+            "stream overlay enabled state",
         ):
-            self.client._parse_statistics(
+            self.client._parse_stream_overlay_status(
                 {
-                    "camera": {
-                        "fps": "bad",
-                    },
-                }
-            )
-
-    def test_parse_statistics_rejects_invalid_stream_clients(
-        self,
-    ) -> None:
-        with self.assertRaisesRegex(
-            VisionClientError,
-            "invalid streaming client count",
-        ):
-            self.client._parse_statistics(
-                {
-                    "streaming": {
-                        "clients": "bad",
-                    },
-                }
-            )
-
-    def test_parse_statistics_rejects_invalid_server_port(
-        self,
-    ) -> None:
-        with self.assertRaisesRegex(
-            VisionClientError,
-            "invalid server port",
-        ):
-            self.client._parse_statistics(
-                {
-                    "server": {
-                        "port": "bad",
-                    },
+                    "enabled": "true",
                 }
             )
 
 
-class VisionClientPublicApiTests(unittest.TestCase):
+class VisionClientStatisticsTests(unittest.TestCase):
     def setUp(self) -> None:
         self.client = VisionClient()
 
-    def test_statistics(self) -> None:
-        data = {
-            "running": False,
-            "camera": {},
-            "streaming": {},
-            "recording": {},
-            "detection": {},
-            "server": {},
+        self.payload = {
+            "running": True,
+            "camera": {
+                "running": True,
+                "fps": 20.0,
+                "consumer_count": 3,
+                "has_frame": True,
+                "last_error": None,
+            },
+            "streaming": {
+                "running": True,
+                "clients": 2,
+                "frames_received": 100,
+                "has_frame": True,
+                "overlay": {
+                    "enabled": True,
+                    "source": "color",
+                },
+            },
+            "recording": {
+                "active": False,
+                "overlay": {
+                    "enabled": False,
+                    "source": None,
+                },
+            },
+            "detection": {
+                "detectors": {
+                    "color": True,
+                    "face": False,
+                },
+                "metadata_sources": [
+                    "color",
+                ],
+            },
+            "server": {
+                "host": "0.0.0.0",
+                "port": 8080,
+                "fps": 20,
+            },
         }
 
-        with patch.object(
-            self.client,
-            "_get",
-            return_value=data,
-        ) as get:
-            result = self.client.statistics()
+    def test_parse_statistics(self) -> None:
+        result = self.client._parse_statistics(self.payload)
 
-        get.assert_called_once_with("/stats")
         self.assertIsInstance(
             result,
             ClientVisionStatistics,
         )
-
-    def test_metadata_returns_none_when_empty(self) -> None:
-        with patch.object(
-            self.client,
-            "_get",
-            return_value={},
-        ) as get:
-            result = self.client.metadata("face")
-
-        self.assertIsNone(result)
-        get.assert_called_once_with("/metadata?source=face")
-
-    def test_metadata_returns_parsed_metadata(self) -> None:
-        with patch.object(
-            self.client,
-            "_get",
-            return_value={
-                "source": "face",
-                "timestamp": 1.0,
-                "detections": [],
-                "data": {},
-            },
-        ):
-            result = self.client.metadata("face")
-
-        self.assertIsInstance(result, ClientMetadata)
-        self.assertEqual(result.source, "face")
-
-    def test_detection_status(self) -> None:
-        with patch.object(
-            self.client,
-            "_get",
-            return_value={
-                "detectors": [
-                    "face",
-                ],
-                "enabled": {
-                    "face": True,
-                },
-            },
-        ) as get:
-            result = self.client.detection_status()
-
-        get.assert_called_once_with("/detection")
-        self.assertTrue(result.is_enabled("face"))
-
-    def test_enable_detection(self) -> None:
-        with patch.object(
-            self.client,
-            "_post_json",
-            return_value={
-                "enabled": "face",
-                "detectors": {
-                    "face": True,
-                },
-            },
-        ) as post:
-            result = self.client.enable_detection("face")
-
-        post.assert_called_once_with(
-            "/detection/enable",
-            {
-                "name": "face",
-            },
-        )
-        self.assertEqual(result.changed, "face")
-
-    def test_disable_detection(self) -> None:
-        with patch.object(
-            self.client,
-            "_post_json",
-            return_value={
-                "disabled": "face",
-                "detectors": {
-                    "face": False,
-                },
-            },
-        ) as post:
-            result = self.client.disable_detection("face")
-
-        post.assert_called_once_with(
-            "/detection/disable",
-            {
-                "name": "face",
-            },
-        )
-        self.assertEqual(result.changed, "face")
-
-    def test_enable_stream_overlay(self) -> None:
-        with patch.object(
-            self.client,
-            "_post_json",
-            return_value={
-                "enabled": True,
-                "source": "face",
-            },
-        ) as post:
-            result = self.client.enable_stream_overlay("face")
-
-        post.assert_called_once_with(
-            "/stream/overlay/enable",
-            {
-                "source": "face",
-            },
-        )
-        self.assertTrue(result.enabled)
-        self.assertEqual(result.source, "face")
-
-    def test_disable_stream_overlay(self) -> None:
-        with patch.object(
-            self.client,
-            "_post_json",
-            return_value={
-                "enabled": False,
-                "source": None,
-            },
-        ) as post:
-            result = self.client.disable_stream_overlay()
-
-        post.assert_called_once_with(
-            "/stream/overlay/disable",
-            {},
-        )
-        self.assertFalse(result.enabled)
-
-    def test_enable_color_detection_with_multiple_colors(
-        self,
-    ) -> None:
-        with patch.object(
-            self.client,
-            "_post_json",
-            return_value={
-                "enabled": "color",
-                "detectors": {
-                    "color": True,
-                    "face": False,
-                },
-            },
-        ) as post:
-            result = self.client.enable_color_detection(
-                [
-                    "red",
-                    "green",
-                    "blue",
-                ],
-                min_area=250,
-            )
-
-        post.assert_called_once_with(
-            "/detection/color/enable",
-            {
-                "colors": [
-                    "red",
-                    "green",
-                    "blue",
-                ],
-                "min_area": 250.0,
-            },
-        )
-
-        self.assertEqual(result.changed, "color")
-        self.assertTrue(result.is_enabled("color"))
-
-    def test_enable_color_detection_with_single_color(
-        self,
-    ) -> None:
-        with patch.object(
-            self.client,
-            "_post_json",
-            return_value={
-                "enabled": "color",
-                "detectors": {
-                    "color": True,
-                },
-            },
-        ) as post:
-            self.client.enable_color_detection("yellow")
-
-        post.assert_called_once_with(
-            "/detection/color/enable",
-            {
-                "colors": "yellow",
-            },
-        )
-
-    def test_enable_color_detection_with_current_configuration(
-        self,
-    ) -> None:
-        with patch.object(
-            self.client,
-            "_post_json",
-            return_value={
-                "enabled": "color",
-                "detectors": {
-                    "color": True,
-                },
-            },
-        ) as post:
-            self.client.enable_color_detection()
-
-        post.assert_called_once_with(
-            "/detection/color/enable",
-            {},
-        )
-
-    def test_enable_color_detection_with_min_area_only(
-        self,
-    ) -> None:
-        with patch.object(
-            self.client,
-            "_post_json",
-            return_value={
-                "enabled": "color",
-                "detectors": {
-                    "color": True,
-                },
-            },
-        ) as post:
-            self.client.enable_color_detection(
-                min_area=125,
-            )
-
-        post.assert_called_once_with(
-            "/detection/color/enable",
-            {
-                "min_area": 125.0,
-            },
-        )
-
-    def test_enable_color_detection_converts_sequence_to_list(
-        self,
-    ) -> None:
-        with patch.object(
-            self.client,
-            "_post_json",
-            return_value={
-                "enabled": "color",
-                "detectors": {
-                    "color": True,
-                },
-            },
-        ) as post:
-            self.client.enable_color_detection(
-                (
-                    "red",
-                    "blue",
-                )
-            )
-
-        post.assert_called_once_with(
-            "/detection/color/enable",
-            {
-                "colors": [
-                    "red",
-                    "blue",
-                ],
-            },
-        )
-
-
-class VisionClientMediaTests(unittest.TestCase):
-    def setUp(self) -> None:
-        self.client = VisionClient()
-
-    def test_snapshot_saves_returned_data(self) -> None:
-        with TemporaryDirectory() as tmp:
-            home = Path(tmp)
-
-            with (
-                patch.object(
-                    Path,
-                    "home",
-                    return_value=home,
-                ),
-                patch.object(
-                    self.client,
-                    "_request_bytes",
-                    return_value=(
-                        b"image-data",
-                        {
-                            "X-Betabox-Format": "jpg",
-                            "X-Betabox-Timestamp": "12.5",
-                        },
-                    ),
-                ) as request_bytes,
-            ):
-                result = self.client.snapshot(
-                    filename="photo.jpg",
-                    overlay=True,
-                    source="face",
-                )
-
-            self.assertEqual(
-                result,
-                ClientSnapshot(
-                    path=home / "media" / "pictures" / "photo.jpg",
-                    timestamp=12.5,
-                    format="jpg",
-                ),
-            )
-            self.assertEqual(
-                result.path.read_bytes(),
-                b"image-data",
-            )
-            request_bytes.assert_called_once_with(
-                "POST",
-                "/snapshot?format=jpg&overlay=true&source=face",
-            )
-
-    def test_snapshot_rejects_invalid_timestamp(
-        self,
-    ) -> None:
-        with (
-            patch.object(
-                self.client,
-                "_request_bytes",
-                return_value=(
-                    b"image-data",
-                    {
-                        "X-Betabox-Timestamp": "bad",
-                    },
-                ),
-            ),
-            self.assertRaisesRegex(
-                VisionClientError,
-                "invalid snapshot timestamp",
-            ),
-        ):
-            self.client.snapshot(filename="photo.jpg")
-
-    def test_start_recording_stores_filename_after_success(
-        self,
-    ) -> None:
-        with (
-            patch.object(
-                self.client,
-                "_post",
-            ) as post,
-            patch.object(
-                self.client,
-                "_recording_output_path",
-                return_value=Path("/tmp/lesson.mp4"),
-            ),
-        ):
-            result = self.client.start_recording(
-                filename="lesson.mp4",
-                overlay=True,
-                source="face",
-            )
-
-        post.assert_called_once_with(
-            "/recording/start?filename=lesson.mp4&overlay=true&source=face"
+        self.assertTrue(result.running)
+        self.assertTrue(result.camera.running)
+        self.assertEqual(
+            result.camera.fps,
+            20.0,
         )
         self.assertEqual(
-            self.client._recording_filename,
-            "lesson.mp4",
+            result.streaming.clients,
+            2,
+        )
+        self.assertTrue(result.streaming.overlay.enabled)
+        self.assertFalse(result.recording.active)
+        self.assertEqual(
+            result.detection.metadata_sources,
+            ["color"],
         )
         self.assertEqual(
+            result.server.host,
+            "0.0.0.0",
+        )
+        self.assertEqual(
+            result.server.port,
+            8080,
+        )
+
+    def test_statistics_requests_stats_endpoint(
+        self,
+    ) -> None:
+        with patch.object(
+            self.client,
+            "_get",
+            return_value=self.payload,
+        ) as get:
+            result = self.client.statistics()
+
+        self.assertIsInstance(
             result,
-            Path("/tmp/lesson.mp4"),
+            ClientVisionStatistics,
         )
+        get.assert_called_once_with("/stats")
 
-    def test_failed_start_does_not_store_filename(
+    def test_parse_statistics_rejects_string_boolean(
         self,
     ) -> None:
-        with (
-            patch.object(
-                self.client,
-                "_post",
-                side_effect=VisionClientError("start failed"),
-            ),
-            self.assertRaisesRegex(
-                VisionClientError,
-                "start failed",
-            ),
+        self.payload["running"] = "true"
+
+        with self.assertRaisesRegex(
+            VisionClientError,
+            "Vision running state",
         ):
-            self.client.start_recording(filename="lesson.mp4")
+            self.client._parse_statistics(self.payload)
 
-        self.assertIsNone(self.client._recording_filename)
-
-    def test_stop_recording_uses_stored_filename(
+    def test_parse_statistics_rejects_invalid_server_host(
         self,
     ) -> None:
-        self.client._recording_filename = "lesson.mp4"
+        self.payload["server"]["host"] = 123
 
-        with TemporaryDirectory() as tmp:
-            home = Path(tmp)
-
-            with (
-                patch.object(
-                    Path,
-                    "home",
-                    return_value=home,
-                ),
-                patch.object(
-                    self.client,
-                    "_request_bytes",
-                    return_value=(
-                        b"video-data",
-                        {
-                            "X-Betabox-Format": "mp4",
-                            "X-Betabox-Start-Timestamp": "1.0",
-                            "X-Betabox-End-Timestamp": "3.5",
-                            "X-Betabox-Frame-Count": "50",
-                            "X-Betabox-FPS": "20",
-                        },
-                    ),
-                ),
-            ):
-                result = self.client.stop_recording()
-
-            self.assertEqual(
-                result.path,
-                home / "media" / "videos" / "lesson.mp4",
-            )
-            self.assertEqual(
-                result.path.read_bytes(),
-                b"video-data",
-            )
-            self.assertEqual(
-                result.duration,
-                2.5,
-            )
-            self.assertEqual(
-                result.frame_count,
-                50,
-            )
-            self.assertIsNone(self.client._recording_filename)
-
-    def test_failed_recording_request_preserves_filename(
-        self,
-    ) -> None:
-        self.client._recording_filename = "lesson.mp4"
-
-        with (
-            patch.object(
-                self.client,
-                "_request_bytes",
-                side_effect=VisionClientError("stop failed"),
-            ),
-            self.assertRaisesRegex(
-                VisionClientError,
-                "stop failed",
-            ),
+        with self.assertRaisesRegex(
+            VisionClientError,
+            "server host",
         ):
-            self.client.stop_recording()
+            self.client._parse_statistics(self.payload)
 
-        self.assertEqual(
-            self.client._recording_filename,
-            "lesson.mp4",
-        )
-
-    def test_invalid_recording_metadata_preserves_filename(
+    def test_parse_statistics_rejects_invalid_metadata_source(
         self,
     ) -> None:
-        self.client._recording_filename = "lesson.mp4"
+        self.payload["detection"]["metadata_sources"] = [
+            123,
+        ]
 
-        with (
-            patch.object(
-                self.client,
-                "_request_bytes",
-                return_value=(
-                    b"video-data",
-                    {
-                        "X-Betabox-Frame-Count": "bad",
-                    },
-                ),
-            ),
-            self.assertRaisesRegex(
-                VisionClientError,
-                "invalid recording metadata",
-            ),
+        with self.assertRaisesRegex(
+            VisionClientError,
+            "metadata source",
         ):
-            self.client.stop_recording()
-
-        self.assertEqual(
-            self.client._recording_filename,
-            "lesson.mp4",
-        )
-
-    def test_failed_recording_save_preserves_filename(
-        self,
-    ) -> None:
-        self.client._recording_filename = "lesson.mp4"
-
-        with (
-            patch.object(
-                self.client,
-                "_request_bytes",
-                return_value=(
-                    b"video-data",
-                    {
-                        "X-Betabox-Start-Timestamp": "1",
-                        "X-Betabox-End-Timestamp": "2",
-                        "X-Betabox-Frame-Count": "20",
-                        "X-Betabox-FPS": "20",
-                    },
-                ),
-            ),
-            patch.object(
-                self.client,
-                "_recording_output_path",
-                return_value=Path("/tmp/lesson.mp4"),
-            ),
-            patch.object(
-                self.client,
-                "_save_media_file",
-                side_effect=VisionClientError("save failed"),
-            ),
-            self.assertRaisesRegex(
-                VisionClientError,
-                "save failed",
-            ),
-        ):
-            self.client.stop_recording()
-
-        self.assertEqual(
-            self.client._recording_filename,
-            "lesson.mp4",
-        )
+            self.client._parse_statistics(self.payload)
 
 
 if __name__ == "__main__":

@@ -1,22 +1,30 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Self
 
 from betabox_robotics.vision.detection import DetectionManager
-from betabox_robotics.vision.frame_source import FrameSource
+from betabox_robotics.vision.detectors.color import HSVRangeInput
+from betabox_robotics.vision.frame_source import FrameSource, FrameSourceError
 from betabox_robotics.vision.metadata import Metadata
 from betabox_robotics.vision.metadata_bus import MetadataBus
 from betabox_robotics.vision.overlay import OverlayRenderer
 from betabox_robotics.vision.recording import (
     Recording,
     RecordingData,
+    RecordingError,
     RecordingService,
 )
 from betabox_robotics.vision.signaling import WebRTCSignalingServer
-from betabox_robotics.vision.snapshot import Snapshot, SnapshotData, SnapshotService
+from betabox_robotics.vision.snapshot import (
+    ImageFormat,
+    Snapshot,
+    SnapshotData,
+    SnapshotService,
+)
+from betabox_robotics.vision.stream import StreamError
 from betabox_robotics.vision.webrtc import WebRTCStreamer
 
 
@@ -27,14 +35,37 @@ class VisionServiceConfig:
     fps: int = 20
 
     def __post_init__(self) -> None:
-        if not self.host.strip():
+        if not isinstance(self.host, str):
+            raise TypeError("host must be a string")
+
+        host = self.host.strip()
+
+        if not host:
             raise ValueError("host cannot be empty")
+
+        if isinstance(self.port, bool) or not isinstance(
+            self.port,
+            int,
+        ):
+            raise TypeError("port must be an integer")
 
         if not 1 <= self.port <= 65535:
             raise ValueError("port must be between 1 and 65535")
 
+        if isinstance(self.fps, bool) or not isinstance(
+            self.fps,
+            int,
+        ):
+            raise TypeError("fps must be an integer")
+
         if self.fps <= 0:
             raise ValueError("fps must be greater than zero")
+
+        object.__setattr__(
+            self,
+            "host",
+            host,
+        )
 
 
 class VisionService:
@@ -49,7 +80,13 @@ class VisionService:
         self,
         config: VisionServiceConfig | None = None,
     ) -> None:
-        self.config = config or VisionServiceConfig()
+        if config is not None and not isinstance(
+            config,
+            VisionServiceConfig,
+        ):
+            raise TypeError("config must be a VisionServiceConfig")
+
+        self.config = config if config is not None else VisionServiceConfig()
 
         self.frame_source = FrameSource(
             fps=self.config.fps,
@@ -104,8 +141,12 @@ class VisionService:
 
         try:
             self.streamer.start()
-        except Exception:
-            self.frame_source.stop()
+        except StreamError:
+            try:
+                self.frame_source.stop()
+            except FrameSourceError:
+                pass
+
             raise
 
         self._running = True
@@ -124,41 +165,46 @@ class VisionService:
         if not self._running:
             return
 
-        error: Exception | None = None
+        shutdown_error: Exception | None = None
 
         try:
-            self.streamer.stop()
+            try:
+                self.streamer.stop()
+            except StreamError as exc:
+                shutdown_error = exc
 
             if self.recording.is_recording():
                 try:
                     recording = self.recording.stop()
-                except Exception as exc:
-                    error = exc
+                except RecordingError as exc:
+                    if shutdown_error is None:
+                        shutdown_error = exc
                 else:
                     try:
                         recording.path.unlink()
                     except FileNotFoundError:
                         pass
                     except OSError as exc:
-                        error = exc
+                        if shutdown_error is None:
+                            shutdown_error = exc
 
         finally:
             try:
                 self.frame_source.stop()
+            except FrameSourceError as exc:
+                if shutdown_error is None:
+                    shutdown_error = exc
             finally:
                 self._running = False
 
-        if error is not None:
-            raise error
+        if shutdown_error is not None:
+            raise shutdown_error
 
     def statistics(self) -> dict[str, Any]:
         return {
             "running": self._running,
             "camera": self.frame_source.statistics(),
-            "streaming": {
-                **self.streamer.statistics(),
-                "overlay": self.stream_overlay_status(),
-            },
+            "streaming": self.streamer.statistics(),
             "recording": {
                 "active": self.recording.is_recording(),
                 "overlay": self.recording_overlay_status(),
@@ -180,12 +226,18 @@ class VisionService:
     def capture_snapshot(
         self,
         *,
+        filename: str | None = None,
+        directory: str | Path | None = None,
+        image_format: ImageFormat | None = None,
         overlay: bool = False,
         source: str | None = None,
-        **kwargs,
     ) -> Snapshot:
         if not overlay:
-            return self.snapshot.capture(**kwargs)
+            return self.snapshot.capture(
+                filename=filename,
+                directory=directory,
+                image_format=image_format,
+            )
 
         frame = self.frame_source.latest_frame()
         metadata = self.latest_metadata(source)
@@ -198,7 +250,9 @@ class VisionService:
 
         return self.snapshot.capture_frame(
             frame,
-            **kwargs,
+            filename=filename,
+            directory=directory,
+            image_format=image_format,
         )
 
     def capture_snapshot_data(
@@ -206,7 +260,7 @@ class VisionService:
         *,
         overlay: bool = False,
         source: str | None = None,
-        image_format: str | None = None,
+        image_format: ImageFormat | None = None,
     ) -> SnapshotData:
         if not overlay:
             return self.snapshot.capture_data(
@@ -251,10 +305,16 @@ class VisionService:
         self,
         colors: str | Sequence[str] | None = None,
         *,
+        custom_ranges: Mapping[
+            str,
+            HSVRangeInput,
+        ]
+        | None = None,
         min_area: float | None = None,
     ) -> None:
         self.detection.enable_color(
             colors,
+            custom_ranges=custom_ranges,
             min_area=min_area,
         )
 
@@ -293,9 +353,14 @@ class VisionService:
     def latest_metadata(self, source: str | None = None) -> Metadata | None:
         return self.metadata_bus.latest(source)
 
-    def __enter__(self) -> VisionService:
+    def __enter__(self) -> Self:
         self.start()
         return self
 
-    def __exit__(self, exc_type, exc, tb) -> None:
+    def __exit__(
+        self,
+        exc_type: object,
+        exc_value: object,
+        traceback: object,
+    ) -> None:
         self.stop()

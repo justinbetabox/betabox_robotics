@@ -4,8 +4,47 @@ from typing import TYPE_CHECKING, Any
 
 from aiohttp import web
 
+from betabox_robotics.vision.detection import DetectionError
+from betabox_robotics.vision.frame_source import FrameSourceError
+from betabox_robotics.vision.overlay import OverlayError
+from betabox_robotics.vision.recording import RecordingError
+from betabox_robotics.vision.snapshot import (
+    SnapshotError,
+    _normalize_image_format,
+)
+from betabox_robotics.vision.stream import StreamError
+
 if TYPE_CHECKING:
     from betabox_robotics.vision.service import VisionService
+
+HANDLED_ERRORS = (
+    TypeError,
+    ValueError,
+    DetectionError,
+    FrameSourceError,
+    OverlayError,
+    RecordingError,
+    SnapshotError,
+    StreamError,
+)
+
+_TRUE_VALUES = frozenset(
+    {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+)
+
+_FALSE_VALUES = frozenset(
+    {
+        "0",
+        "false",
+        "no",
+        "off",
+    }
+)
 
 INDEX_HTML = """
 <!doctype html>
@@ -118,6 +157,49 @@ INDEX_HTML = """
 """
 
 
+def _validate_host(
+    value: object,
+) -> str:
+    if not isinstance(value, str):
+        raise TypeError("host must be a string")
+
+    host = value.strip()
+
+    if not host:
+        raise ValueError("host cannot be empty")
+
+    return host
+
+
+def _validate_port(
+    value: object,
+) -> int:
+    if isinstance(value, bool) or not isinstance(
+        value,
+        int,
+    ):
+        raise TypeError("port must be an integer")
+
+    if not 1 <= value <= 65535:
+        raise ValueError("port must be between 1 and 65535")
+
+    return value
+
+
+@web.middleware
+async def error_middleware(
+    request: web.Request,
+    handler,
+) -> web.StreamResponse:
+    try:
+        return await handler(request)
+    except HANDLED_ERRORS as exc:
+        return fail(
+            str(exc),
+            status=400,
+        )
+
+
 def to_json(value: Any) -> Any:
     if value is None:
         return None
@@ -126,7 +208,7 @@ def to_json(value: Any) -> Any:
         return to_json(asdict(value))
 
     if isinstance(value, dict):
-        return {key: to_json(item) for key, item in value.items()}
+        return {str(key): to_json(item) for key, item in value.items()}
 
     if isinstance(value, (list, tuple, set)):
         return [to_json(item) for item in value]
@@ -171,11 +253,15 @@ def query_bool(
     if value is None:
         return default
 
-    return value.casefold() in {
-        "1",
-        "true",
-        "yes",
-    }
+    normalized = value.strip().casefold()
+
+    if normalized in _TRUE_VALUES:
+        return True
+
+    if normalized in _FALSE_VALUES:
+        return False
+
+    raise ValueError(f"{name} must be a boolean")
 
 
 async def json_object(
@@ -183,11 +269,15 @@ async def json_object(
 ) -> dict[str, Any]:
     try:
         data = await request.json()
-    except Exception as exc:
+    except (
+        UnicodeDecodeError,
+        ValueError,
+        web.HTTPException,
+    ) as exc:
         raise ValueError("request body must contain valid JSON") from exc
 
     if not isinstance(data, dict):
-        raise ValueError("request JSON must be an object")
+        raise TypeError("request JSON must be an object")
 
     return data
 
@@ -219,11 +309,21 @@ class WebRTCSignalingServer:
         host: str = "0.0.0.0",
         port: int = 8080,
     ) -> None:
+        if not hasattr(
+            vision,
+            "streamer",
+        ):
+            raise TypeError("vision must provide a streamer")
+
         self.vision = vision
         self.streamer = vision.streamer
-        self.host = host
-        self.port = int(port)
-        self.app = web.Application()
+        self.host = _validate_host(host)
+        self.port = _validate_port(port)
+        self.app = web.Application(
+            middlewares=[
+                error_middleware,
+            ]
+        )
         self.app.on_shutdown.append(self.on_shutdown)
 
         self.app.router.add_get("/", self.index)
@@ -253,21 +353,23 @@ class WebRTCSignalingServer:
         self,
         request: web.Request,
     ) -> web.Response:
-        try:
-            params = await json_object(request)
+        params = await json_object(request)
 
-            sdp = required_string(params, "sdp")
-            offer_type = required_string(params, "type")
+        sdp = required_string(
+            params,
+            "sdp",
+        )
+        offer_type = required_string(
+            params,
+            "type",
+        )
 
-            answer = await self.streamer.offer(
-                sdp=sdp,
-                type=offer_type,
-            )
+        answer = await self.streamer.offer(
+            sdp=sdp,
+            offer_type=offer_type,
+        )
 
-            return web.json_response(answer)
-
-        except Exception as exc:
-            return fail(str(exc))
+        return web.json_response(answer)
 
     async def stats(
         self,
@@ -279,219 +381,170 @@ class WebRTCSignalingServer:
         self,
         request: web.Request,
     ) -> web.Response:
-        try:
-            overlay = query_bool(
-                request,
-                "overlay",
-            )
+        overlay = query_bool(
+            request,
+            "overlay",
+        )
 
-            source = request.query.get("source")
-            image_format = request.query.get(
+        source = request.query.get("source")
+        image_format = _normalize_image_format(
+            request.query.get(
                 "format",
                 "jpg",
             )
+        )
 
-            snapshot = self.vision.capture_snapshot_data(
-                overlay=overlay,
-                source=source,
-                image_format=image_format,
-            )
+        snapshot = self.vision.capture_snapshot_data(
+            overlay=overlay,
+            source=source,
+            image_format=image_format,
+        )
 
-            content_type = "image/png" if snapshot.format == "png" else "image/jpeg"
+        content_type = "image/png" if snapshot.format == "png" else "image/jpeg"
 
-            return web.Response(
-                body=snapshot.data,
-                content_type=content_type,
-                headers={
-                    "X-Betabox-Timestamp": str(snapshot.timestamp),
-                    "X-Betabox-Format": snapshot.format,
-                },
-            )
-
-        except Exception as exc:
-            return fail(str(exc))
+        return web.Response(
+            body=snapshot.data,
+            content_type=content_type,
+            headers={
+                "X-Betabox-Timestamp": str(snapshot.timestamp),
+                "X-Betabox-Format": snapshot.format,
+            },
+        )
 
     async def recording_start(
         self,
         request: web.Request,
     ) -> web.Response:
-        try:
-            overlay = query_bool(
-                request,
-                "overlay",
-            )
-            source = request.query.get("source")
-            filename = request.query.get("filename")
+        overlay = query_bool(
+            request,
+            "overlay",
+        )
+        source = request.query.get("source")
+        filename = request.query.get("filename")
 
-            self.vision.start_recording(
-                filename=filename,
-                overlay=overlay,
-                source=source,
-            )
+        self.vision.start_recording(
+            filename=filename,
+            overlay=overlay,
+            source=source,
+        )
 
-            return ok(
-                {
-                    "recording": True,
-                }
-            )
-
-        except Exception as exc:
-            return fail(str(exc))
+        return ok(
+            {
+                "recording": True,
+            }
+        )
 
     async def recording_stop(
         self,
         request: web.Request,
     ) -> web.Response:
-        try:
-            recording = self.vision.stop_recording_data()
+        recording = self.vision.stop_recording_data()
 
-            return web.Response(
-                body=recording.data,
-                content_type="video/mp4",
-                headers={
-                    "X-Betabox-Format": recording.format,
-                    "X-Betabox-Start-Timestamp": str(recording.start_timestamp),
-                    "X-Betabox-End-Timestamp": str(recording.end_timestamp),
-                    "X-Betabox-Frame-Count": str(recording.frame_count),
-                    "X-Betabox-FPS": str(recording.fps),
-                },
-            )
-
-        except Exception as exc:
-            return fail(str(exc))
+        return web.Response(
+            body=recording.data,
+            content_type="video/mp4",
+            headers={
+                "X-Betabox-Format": recording.format,
+                "X-Betabox-Start-Timestamp": str(recording.start_timestamp),
+                "X-Betabox-End-Timestamp": str(recording.end_timestamp),
+                "X-Betabox-Frame-Count": str(recording.frame_count),
+                "X-Betabox-FPS": str(recording.fps),
+            },
+        )
 
     async def metadata(
         self,
         request: web.Request,
     ) -> web.Response:
-        try:
-            source = request.query.get("source")
-            metadata = self.vision.latest_metadata(source)
-            return ok(metadata or {})
-        except Exception as exc:
-            return fail(str(exc))
+        source = request.query.get("source")
+        metadata = self.vision.latest_metadata(source)
+        return ok(metadata or {})
 
     async def detection_status(
         self,
         request: web.Request,
     ) -> web.Response:
-        try:
-            return ok(
-                {
-                    "detectors": self.vision.detection_names(),
-                    "enabled": self.vision.detection_status(),
-                }
-            )
-        except Exception as exc:
-            return fail(str(exc))
+        return ok(
+            {
+                "detectors": self.vision.detection_names(),
+                "enabled": self.vision.detection_status(),
+            }
+        )
 
     async def detection_enable(
         self,
         request: web.Request,
     ) -> web.Response:
-        try:
-            params = await json_object(request)
-            name = required_string(params, "name")
+        params = await json_object(request)
+        name = required_string(params, "name")
 
-            self.vision.enable_detection(name)
+        self.vision.enable_detection(name)
 
-            return ok(
-                {
-                    "enabled": name,
-                    "detectors": self.vision.detection_status(),
-                }
-            )
-
-        except Exception as exc:
-            return fail(str(exc))
+        return ok(
+            {
+                "enabled": name,
+                "detectors": self.vision.detection_status(),
+            }
+        )
 
     async def detection_disable(
         self,
         request: web.Request,
     ) -> web.Response:
-        try:
-            params = await json_object(request)
-            name = required_string(params, "name")
-            self.vision.disable_detection(name)
-            return ok(
-                {
-                    "disabled": name,
-                    "detectors": self.vision.detection_status(),
-                }
-            )
-        except Exception as exc:
-            return fail(str(exc))
+
+        params = await json_object(request)
+        name = required_string(params, "name")
+        self.vision.disable_detection(name)
+        return ok(
+            {
+                "disabled": name,
+                "detectors": self.vision.detection_status(),
+            }
+        )
 
     async def color_detection_enable(
         self,
         request: web.Request,
     ) -> web.Response:
-        try:
-            params = await json_object(request)
+        params = await json_object(request)
 
-            colors = params.get("colors")
-            min_area = params.get("min_area")
+        colors = params.get("colors")
+        custom_ranges = params.get("custom_ranges")
+        min_area = params.get("min_area")
 
-            if colors is not None:
-                if isinstance(colors, str):
-                    pass
-                elif isinstance(colors, list):
-                    if not all(isinstance(color, str) for color in colors):
-                        raise ValueError("colors must contain only strings")
-                else:
-                    raise ValueError("colors must be a string or list of strings")
+        self.vision.enable_color_detection(
+            colors,
+            custom_ranges=custom_ranges,
+            min_area=min_area,
+        )
 
-            if min_area is not None:
-                try:
-                    min_area = float(min_area)
-                except (TypeError, ValueError) as exc:
-                    raise ValueError("min_area must be a number") from exc
-
-                if min_area < 0:
-                    raise ValueError("min_area cannot be negative")
-
-            self.vision.enable_color_detection(
-                colors,
-                min_area=min_area,
-            )
-
-            return ok(
-                {
-                    "enabled": "color",
-                    "detectors": self.vision.detection_status(),
-                }
-            )
-
-        except Exception as exc:
-            return fail(str(exc))
+        return ok(
+            {
+                "enabled": "color",
+                "detectors": self.vision.detection_status(),
+            }
+        )
 
     async def stream_overlay_enable(
         self,
         request: web.Request,
     ) -> web.Response:
-        try:
-            params = await json_object(request)
-            source = params.get("source")
+        params = await json_object(request)
+        source = params.get("source")
 
-            if source is not None and not isinstance(source, str):
-                raise ValueError("source must be a string")
+        if source is not None and not isinstance(source, str):
+            raise ValueError("source must be a string")
 
-            self.vision.enable_stream_overlay(source)
+        self.vision.enable_stream_overlay(source)
 
-            return ok(self.vision.stream_overlay_status())
-
-        except Exception as exc:
-            return fail(str(exc))
+        return ok(self.vision.stream_overlay_status())
 
     async def stream_overlay_disable(
         self,
         request: web.Request,
     ) -> web.Response:
-        try:
-            self.vision.disable_stream_overlay()
-            return ok(self.vision.stream_overlay_status())
-        except Exception as exc:
-            return fail(str(exc))
+        self.vision.disable_stream_overlay()
+        return ok(self.vision.stream_overlay_status())
 
     async def on_shutdown(self, app: web.Application) -> None:
         await self.streamer.close_peers()

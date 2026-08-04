@@ -1,15 +1,100 @@
 from __future__ import annotations
 
+import math
 import threading
 import time
-from typing import Any, Self
+from typing import Any, Final, Self
 
 from betabox_robotics.hardware import HardwareError
 from betabox_robotics.vision.frame import Frame
 
+_CAMERA_OPERATION_ERRORS: Final = (
+    AttributeError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
 
 class CameraError(HardwareError):
     """Raised when a camera operation fails."""
+
+
+def _validate_resolution(
+    value: object,
+) -> tuple[int, int]:
+    if not isinstance(value, tuple) or len(value) != 2:
+        raise TypeError("resolution must be a tuple of two integers")
+
+    width, height = value
+
+    if (
+        isinstance(width, bool)
+        or not isinstance(width, int)
+        or isinstance(height, bool)
+        or not isinstance(height, int)
+    ):
+        raise TypeError("resolution must contain two integers")
+
+    if width <= 0 or height <= 0:
+        raise ValueError("camera resolution must be positive")
+
+    return width, height
+
+
+def _validate_format(
+    value: object,
+) -> str:
+    if not isinstance(value, str):
+        raise TypeError("format must be a string")
+
+    normalized = value.strip()
+
+    if not normalized:
+        raise ValueError("camera format cannot be empty")
+
+    return normalized
+
+
+def _validate_timeout(
+    value: object,
+) -> float:
+    if isinstance(value, bool) or not isinstance(
+        value,
+        int | float,
+    ):
+        raise TypeError("timeout must be a number")
+
+    timeout = float(value)
+
+    if not math.isfinite(timeout):
+        raise ValueError("timeout must be finite")
+
+    if timeout <= 0:
+        raise ValueError("timeout must be greater than zero")
+
+    return timeout
+
+
+def _validate_fps(
+    value: object,
+) -> float:
+    if isinstance(value, bool) or not isinstance(
+        value,
+        int | float,
+    ):
+        raise TypeError("fps must be a number")
+
+    fps = float(value)
+
+    if not math.isfinite(fps):
+        raise ValueError("fps must be finite")
+
+    if fps <= 0:
+        raise ValueError("fps must be greater than zero")
+
+    return fps
 
 
 class CameraManager:
@@ -28,9 +113,17 @@ class CameraManager:
         self,
         resolution: tuple[int, int] = (640, 480),
         format: str = "BGR888",
+        *,
+        fps: float = 20.0,
     ) -> None:
-        self.resolution = resolution
-        self.format = format
+        self.resolution = _validate_resolution(
+            resolution,
+        )
+        self.format = _validate_format(
+            format,
+        )
+
+        self.fps = _validate_fps(fps)
 
         self._camera: Any | None = None
         self._running = False
@@ -65,11 +158,19 @@ class CameraManager:
         try:
             camera = Picamera2()
 
+            frame_duration = round(1_000_000 / self.fps)
+
             config = camera.create_video_configuration(
                 main={
                     "size": self.resolution,
                     "format": self.format,
-                }
+                },
+                controls={
+                    "FrameDurationLimits": (
+                        frame_duration,
+                        frame_duration,
+                    ),
+                },
             )
 
             camera.configure(config)
@@ -91,7 +192,7 @@ class CameraManager:
 
             camera.start()
 
-        except Exception as exc:
+        except _CAMERA_OPERATION_ERRORS as exc:
             with self._frame_ready:
                 self._running = False
                 self._camera = None
@@ -100,12 +201,12 @@ class CameraManager:
             if camera is not None:
                 try:
                     camera.post_callback = None
-                except Exception:
+                except _CAMERA_OPERATION_ERRORS:
                     pass
 
                 try:
                     camera.close()
-                except Exception:
+                except _CAMERA_OPERATION_ERRORS:
                     pass
 
             raise CameraError(f"failed to start camera: {exc}") from exc
@@ -122,24 +223,25 @@ class CameraManager:
         with self._diagnostics_lock:
             self._frame_wait_in_progress = False
 
-        stop_error: Exception | None = None
+        shutdown_error: CameraError | None = None
 
         if camera is not None:
             try:
                 camera.post_callback = None
-            except Exception:
-                pass
+            except _CAMERA_OPERATION_ERRORS as exc:
+                shutdown_error = CameraError(f"failed to detach camera callback: {exc}")
 
             try:
                 camera.stop()
-            except Exception as exc:
-                stop_error = exc
+            except _CAMERA_OPERATION_ERRORS as exc:
+                if shutdown_error is None:
+                    shutdown_error = CameraError(f"failed to stop camera: {exc}")
 
             try:
                 camera.close()
-            except Exception as exc:
-                if stop_error is None:
-                    stop_error = exc
+            except _CAMERA_OPERATION_ERRORS as exc:
+                if shutdown_error is None:
+                    shutdown_error = CameraError(f"failed to close camera: {exc}")
 
         with self._frame_ready:
             self._latest_frame = None
@@ -147,8 +249,8 @@ class CameraManager:
             self._callback_error = None
             self._frame_ready.notify_all()
 
-        if stop_error is not None:
-            raise CameraError(f"failed to stop camera: {stop_error}") from stop_error
+        if shutdown_error is not None:
+            raise shutdown_error
 
     def is_running(self) -> bool:
         """Return whether the camera is currently running."""
@@ -156,7 +258,11 @@ class CameraManager:
         with self._frame_ready:
             return self._running
 
-    def capture_frame(self, *, timeout: float | None = None) -> Frame:
+    def capture_frame(
+        self,
+        *,
+        timeout: float | None = None,
+    ) -> Frame:
         """
         Wait for and return the next callback-produced frame.
 
@@ -172,11 +278,11 @@ class CameraManager:
                 expires.
         """
 
-        if timeout is not None and timeout <= 0:
-            raise ValueError("timeout must be greater than zero")
+        timeout_value = None if timeout is None else _validate_timeout(timeout)
 
         started = time.monotonic()
-        deadline = None if timeout is None else started + timeout
+
+        deadline = None if timeout_value is None else started + timeout_value
 
         with self._frame_ready:
             if not self._running:
@@ -203,7 +309,9 @@ class CameraManager:
                     if remaining <= 0:
                         raise CameraError("timed out waiting for camera frame")
 
-                    self._frame_ready.wait(timeout=remaining)
+                    self._frame_ready.wait(
+                        timeout=remaining,
+                    )
 
                 if self._callback_error is not None:
                     raise self._callback_error
@@ -257,14 +365,17 @@ class CameraManager:
                 "running": running,
                 "callback_frame_count": self._callback_frame_count,
                 "frame_wait_in_progress": self._frame_wait_in_progress,
-                "last_frame_wait_duration_seconds": (self._last_frame_wait_duration),
-                "max_frame_wait_duration_seconds": (self._max_frame_wait_duration),
+                "last_frame_wait_duration_seconds": self._last_frame_wait_duration,
+                "max_frame_wait_duration_seconds": self._max_frame_wait_duration,
                 "seconds_since_last_callback_frame": (
                     None if last_callback is None else now - last_callback
                 ),
             }
 
-    def _on_frame(self, request: Any) -> None:
+    def _on_frame(
+        self,
+        request: Any,
+    ) -> None:
         """
         Process a completed Picamera2 request.
 
@@ -281,7 +392,7 @@ class CameraManager:
             frame = Frame.create(image)
             completed = time.monotonic()
 
-        except Exception as exc:
+        except _CAMERA_OPERATION_ERRORS as exc:
             error = CameraError(f"failed to process camera frame: {exc}")
 
             with self._frame_ready:
@@ -308,6 +419,7 @@ class CameraManager:
         *,
         resolution: tuple[int, int] | None = None,
         format: str | None = None,
+        fps: float | None = None,
     ) -> None:
         """Update camera configuration while the camera is stopped."""
 
@@ -316,18 +428,17 @@ class CameraManager:
                 raise CameraError("cannot configure camera while running")
 
         if resolution is not None:
-            width, height = resolution
-
-            if width <= 0 or height <= 0:
-                raise ValueError("camera resolution must be positive")
-
-            self.resolution = resolution
+            self.resolution = _validate_resolution(
+                resolution,
+            )
 
         if format is not None:
-            if not format:
-                raise ValueError("camera format cannot be empty")
+            self.format = _validate_format(
+                format,
+            )
 
-            self.format = format
+        if fps is not None:
+            self.fps = _validate_fps(fps)
 
     def close(self) -> None:
         self.stop()
@@ -341,8 +452,8 @@ class CameraManager:
 
     def __exit__(
         self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: Any,
+        exc_type: object,
+        exc_value: object,
+        traceback: object,
     ) -> None:
         self.close()

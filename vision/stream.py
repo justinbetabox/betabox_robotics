@@ -4,6 +4,10 @@ from typing import Any
 from betabox_robotics.vision.consumer import FrameConsumer
 
 
+class StreamError(Exception):
+    """Raised when a streaming operation fails."""
+
+
 class Streamer(FrameConsumer, ABC):
     """
     Transport-independent streaming interface.

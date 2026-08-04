@@ -1,16 +1,18 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from pathlib import Path
 from time import strftime
 from typing import Literal
 
 import cv2
+import numpy as np
 
 from betabox_robotics.vision.frame import Frame
 from betabox_robotics.vision.frame_source import FrameSourceError
 from betabox_robotics.vision.interfaces import FrameProvider
 
 ImageFormat = Literal["jpg", "jpeg", "png"]
-
 NormalizedImageFormat = Literal["jpg", "png"]
 
 
@@ -32,9 +34,65 @@ class SnapshotError(FrameSourceError):
     """Raised when snapshot operations fail."""
 
 
+def _normalize_image_format(
+    value: object,
+) -> NormalizedImageFormat:
+    if not isinstance(value, str):
+        raise TypeError("image format must be a string")
+
+    image_format = value.strip().casefold()
+
+    if not image_format:
+        raise ValueError("image format cannot be empty")
+
+    if image_format in {
+        "jpg",
+        "jpeg",
+    }:
+        return "jpg"
+
+    if image_format == "png":
+        return "png"
+
+    raise ValueError(f"unsupported snapshot format: {value}")
+
+
+def _validate_directory(
+    value: object,
+    *,
+    name: str,
+) -> Path:
+    if isinstance(value, bool) or not isinstance(
+        value,
+        str | Path,
+    ):
+        raise TypeError(f"{name} must be a string or Path")
+
+    return Path(value).expanduser()
+
+
+def _validate_filename(
+    value: object,
+) -> str:
+    if not isinstance(value, str):
+        raise TypeError("filename must be a string")
+
+    filename = value.strip()
+
+    if not filename:
+        raise ValueError("filename cannot be empty")
+
+    path = Path(filename)
+
+    if path.name != filename:
+        raise ValueError("filename must not contain a directory")
+
+    return filename
+
+
 class SnapshotService:
     """
-    Saves still images from the existing Vision frame pipeline.
+    Save still images from the existing Vision frame pipeline.
 
     SnapshotService does not own or open the camera. It uses a frame
     provider that exposes the latest available frame.
@@ -44,34 +102,38 @@ class SnapshotService:
         self,
         frame_source: FrameProvider,
         *,
-        directory: str | Path = Path.home() / "media" / "pictures",
+        directory: str | Path | None = None,
         default_format: ImageFormat = "jpg",
     ) -> None:
+        if not hasattr(
+            frame_source,
+            "latest_frame",
+        ) or not callable(frame_source.latest_frame):
+            raise TypeError("frame_source must provide latest_frame()")
+
         self.frame_source = frame_source
-        self.directory = Path(directory)
-        fmt = default_format.lower()
 
-        if fmt == "jpeg":
-            fmt = "jpg"
+        self.directory = (
+            Path.home() / "media" / "pictures"
+            if directory is None
+            else _validate_directory(
+                directory,
+                name="directory",
+            )
+        )
 
-        if fmt not in ("jpg", "png"):
-            raise ValueError(f"unsupported snapshot format: {default_format}")
-
-        self.default_format: NormalizedImageFormat = fmt
+        self.default_format: NormalizedImageFormat = _normalize_image_format(
+            default_format
+        )
 
     def _normalize_format(
         self,
         image_format: ImageFormat | None,
     ) -> NormalizedImageFormat:
-        fmt = (image_format or self.default_format).lower()
+        if image_format is None:
+            return self.default_format
 
-        if fmt == "jpeg":
-            fmt = "jpg"
-
-        if fmt not in ("jpg", "png"):
-            raise SnapshotError(f"unsupported snapshot format: {fmt}")
-
-        return fmt
+        return _normalize_image_format(image_format)
 
     def capture(
         self,
@@ -81,6 +143,7 @@ class SnapshotService:
         image_format: ImageFormat | None = None,
     ) -> Snapshot:
         frame = self.frame_source.latest_frame()
+
         return self.capture_frame(
             frame,
             filename=filename,
@@ -94,6 +157,7 @@ class SnapshotService:
         image_format: ImageFormat | None = None,
     ) -> SnapshotData:
         frame = self.frame_source.latest_frame()
+
         return self.capture_frame_data(
             frame,
             image_format=image_format,
@@ -105,31 +169,29 @@ class SnapshotService:
         *,
         image_format: ImageFormat | None = None,
     ) -> SnapshotData:
-        fmt = self._normalize_format(image_format)
+        if not isinstance(frame, Frame):
+            raise TypeError("frame must be a Frame instance")
 
-        image = frame.image
-
-        if len(image.shape) == 3 and image.shape[2] == 3:
-            image = cv2.cvtColor(
-                image,
-                cv2.COLOR_RGB2BGR,
-            )
+        image = self._prepare_image(frame)
+        image_format_value = self._normalize_format(image_format)
 
         try:
             success, encoded = cv2.imencode(
-                f".{fmt}",
+                f".{image_format_value}",
                 image,
             )
         except cv2.error as exc:
-            raise SnapshotError(f"failed to encode snapshot as {fmt}") from exc
+            raise SnapshotError(
+                f"failed to encode snapshot as {image_format_value}: {exc}"
+            ) from exc
 
         if not success:
-            raise SnapshotError(f"failed to encode snapshot as {fmt}")
+            raise SnapshotError(f"failed to encode snapshot as {image_format_value}")
 
         return SnapshotData(
             data=encoded.tobytes(),
             timestamp=frame.timestamp,
-            format=fmt,
+            format=image_format_value,
         )
 
     def capture_frame(
@@ -140,40 +202,102 @@ class SnapshotService:
         directory: str | Path | None = None,
         image_format: ImageFormat | None = None,
     ) -> Snapshot:
-        output_dir = Path(directory) if directory is not None else self.directory
-        fmt = self._normalize_format(image_format)
+        if not isinstance(frame, Frame):
+            raise TypeError("frame must be a Frame instance")
+
+        output_directory = (
+            self.directory
+            if directory is None
+            else _validate_directory(
+                directory,
+                name="directory",
+            )
+        )
+
+        image_format_value = self._normalize_format(image_format)
 
         try:
-            output_dir.mkdir(parents=True, exist_ok=True)
+            output_directory.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
         except OSError as exc:
             raise SnapshotError(
-                f"failed to create snapshot directory: {output_dir}"
+                f"failed to create snapshot directory: {output_directory}"
             ) from exc
 
         if filename is None:
-            filename = f"snapshot_{strftime('%Y%m%d_%H%M%S')}.{fmt}"
+            filename_value = (
+                f"snapshot_{strftime('%Y%m%d_%H%M%S')}.{image_format_value}"
+            )
+        else:
+            filename_value = _validate_filename(filename)
 
-        path = output_dir / filename
+        path = (output_directory / filename_value).with_suffix(f".{image_format_value}")
 
-        if path.suffix.lower() not in (".jpg", ".jpeg", ".png"):
-            path = path.with_suffix(f".{fmt}")
-
-        self._write_frame(frame, path)
+        self._write_frame(
+            frame,
+            path,
+        )
 
         return Snapshot(
             path=path,
             timestamp=frame.timestamp,
-            format=fmt,
+            format=image_format_value,
         )
 
-    def _write_frame(self, frame: Frame, path: Path) -> None:
+    def _prepare_image(
+        self,
+        frame: Frame,
+    ) -> np.ndarray:
         image = frame.image
 
-        if len(image.shape) == 3 and image.shape[2] == 3:
-            image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+        if not isinstance(image, np.ndarray):
+            raise TypeError("frame image must be a NumPy array")
+
+        if image.ndim not in {
+            2,
+            3,
+        }:
+            raise SnapshotError("snapshot image must be two- or three-dimensional")
+
+        if image.ndim == 3 and image.shape[2] not in {
+            1,
+            3,
+            4,
+        }:
+            raise SnapshotError("snapshot image has an unsupported channel count")
 
         try:
-            success = cv2.imwrite(str(path), image)
+            if image.ndim == 3 and image.shape[2] == 3:
+                return cv2.cvtColor(
+                    image,
+                    cv2.COLOR_RGB2BGR,
+                )
+
+            if image.ndim == 3 and image.shape[2] == 4:
+                return cv2.cvtColor(
+                    image,
+                    cv2.COLOR_RGBA2BGRA,
+                )
+
+        except cv2.error as exc:
+            raise SnapshotError(f"failed to prepare snapshot image: {exc}") from exc
+
+        return image
+
+    def _write_frame(
+        self,
+        frame: Frame,
+        path: Path,
+    ) -> None:
+        image = self._prepare_image(frame)
+
+        try:
+            success = cv2.imwrite(
+                str(path),
+                image,
+            )
         except cv2.error as exc:
             raise SnapshotError(f"failed to write snapshot: {path}") from exc
 

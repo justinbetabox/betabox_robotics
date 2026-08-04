@@ -1,3 +1,4 @@
+import math
 import shutil
 import subprocess
 import tempfile
@@ -5,14 +6,87 @@ import threading
 from dataclasses import dataclass
 from pathlib import Path
 from time import strftime
+from typing import Literal
 
 import cv2
+import numpy as np
 
 from betabox_robotics.vision.consumer import FrameConsumer
 from betabox_robotics.vision.frame import Frame
 from betabox_robotics.vision.frame_source import FrameSourceError
 from betabox_robotics.vision.metadata_bus import MetadataBus
-from betabox_robotics.vision.overlay import OverlayRenderer
+from betabox_robotics.vision.overlay import (
+    OverlayError,
+    OverlayRenderer,
+)
+
+RecordingFormat = Literal["mp4"]
+
+
+def _validate_directory(
+    value: object,
+) -> Path:
+    if isinstance(value, bool) or not isinstance(
+        value,
+        str | Path,
+    ):
+        raise TypeError("directory must be a string or Path")
+
+    return Path(value).expanduser()
+
+
+def _validate_fps(
+    value: object,
+) -> float:
+    if isinstance(value, bool) or not isinstance(
+        value,
+        int | float,
+    ):
+        raise TypeError("fps must be a number")
+
+    fps = float(value)
+
+    if not math.isfinite(fps):
+        raise ValueError("fps must be finite")
+
+    if fps <= 0:
+        raise ValueError("fps must be greater than 0")
+
+    return fps
+
+
+def _validate_filename(
+    value: object,
+) -> str:
+    if not isinstance(value, str):
+        raise TypeError("filename must be a string")
+
+    filename = value.strip()
+
+    if not filename:
+        raise ValueError("filename cannot be empty")
+
+    if Path(filename).name != filename:
+        raise ValueError("filename must not contain a directory")
+
+    return filename
+
+
+def _validate_filename_prefix(
+    value: object,
+) -> str:
+    if not isinstance(value, str):
+        raise TypeError("filename_prefix must be a string")
+
+    prefix = value.strip()
+
+    if not prefix:
+        raise ValueError("filename_prefix cannot be empty")
+
+    if Path(prefix).name != prefix:
+        raise ValueError("filename_prefix must not contain a directory")
+
+    return prefix
 
 
 @dataclass(frozen=True, slots=True)
@@ -31,7 +105,7 @@ class Recording:
 @dataclass(frozen=True, slots=True)
 class RecordingData:
     data: bytes
-    format: str
+    format: RecordingFormat
     start_timestamp: float
     end_timestamp: float
     frame_count: int
@@ -53,35 +127,49 @@ class RecordingService(FrameConsumer):
     def __init__(
         self,
         *,
-        directory: str | Path = Path("/tmp/betabox-video"),
+        directory: str | Path | None = None,
         fps: float = 20.0,
         filename_prefix: str = "recording",
         metadata_bus: MetadataBus | None = None,
         overlay: OverlayRenderer | None = None,
     ) -> None:
-        if fps <= 0:
-            raise RecordingError("fps must be greater than 0")
+        if metadata_bus is not None and not isinstance(
+            metadata_bus,
+            MetadataBus,
+        ):
+            raise TypeError("metadata_bus must be a MetadataBus")
 
-        self.directory = Path(directory)
-        self.fps = float(fps)
-        self.filename_prefix = filename_prefix
+        if overlay is not None and not isinstance(
+            overlay,
+            OverlayRenderer,
+        ):
+            raise TypeError("overlay must be an OverlayRenderer")
+
+        self.directory = (
+            Path("/tmp/betabox-video")
+            if directory is None
+            else _validate_directory(directory)
+        )
+        self.fps = _validate_fps(fps)
+        self.filename_prefix = _validate_filename_prefix(filename_prefix)
         self.metadata_bus = metadata_bus
-        self.overlay = overlay or OverlayRenderer()
+        self.overlay = overlay if overlay is not None else OverlayRenderer()
         self.overlay_enabled = False
         self.overlay_source: str | None = None
 
-        self._process: subprocess.Popen[bytes] | None = None
-        self._path: Path | None = None
-        self._last_error: RecordingError | None = None
-        self._start_timestamp: float | None = None
-        self._end_timestamp: float | None = None
+        self._process = None
+        self._path = None
+        self._last_error = None
+        self._start_timestamp = None
+        self._end_timestamp = None
         self._frame_count = 0
         self._recording = False
-        self._size: tuple[int, int] | None = None
+        self._size = None
+
         self._lock = threading.Lock()
         self._frame_condition = threading.Condition(self._lock)
-        self._pending_frame: Frame | None = None
-        self._worker: threading.Thread | None = None
+        self._pending_frame = None
+        self._worker = None
 
     def start(
         self,
@@ -112,18 +200,13 @@ class RecordingService(FrameConsumer):
                     f"recording directory is not writable: {self.directory}: {exc}"
                 ) from exc
 
-            if filename is None:
-                filename = f"{self.filename_prefix}_{strftime('%Y%m%d_%H%M%S')}.mp4"
-            else:
-                filename_path = Path(filename)
+            filename_value = (
+                f"{self.filename_prefix}_{strftime('%Y%m%d_%H%M%S')}.mp4"
+                if filename is None
+                else _validate_filename(filename)
+            )
 
-                if not filename or filename_path.name != filename:
-                    raise RecordingError(
-                        "recording filename must be a plain "
-                        "filename without directory components"
-                    )
-
-            path = self.directory / filename
+            path = (self.directory / filename_value).with_suffix(".mp4")
 
             if path.suffix.lower() != ".mp4":
                 path = path.with_suffix(".mp4")
@@ -146,7 +229,13 @@ class RecordingService(FrameConsumer):
 
             self._worker = worker
 
-            worker.start()
+            try:
+                worker.start()
+            except RuntimeError:
+                self._worker = None
+                self._recording = False
+                self._path = None
+                raise
 
             return path
 
@@ -247,7 +336,7 @@ class RecordingService(FrameConsumer):
         if path is None or start_timestamp is None:
             raise RecordingError("recording stopped before any frames were captured")
 
-        final_timestamp = end_timestamp or start_timestamp
+        final_timestamp = start_timestamp if end_timestamp is None else end_timestamp
 
         return Recording(
             path=path,
@@ -270,7 +359,7 @@ class RecordingService(FrameConsumer):
 
         return RecordingData(
             data=data,
-            format=recording.path.suffix.lstrip("."),
+            format="mp4",
             start_timestamp=recording.start_timestamp,
             end_timestamp=recording.end_timestamp,
             frame_count=recording.frame_count,
@@ -289,6 +378,9 @@ class RecordingService(FrameConsumer):
         self,
         frame: Frame,
     ) -> None:
+        if not isinstance(frame, Frame):
+            raise TypeError("frame must be a Frame instance")
+
         with self._frame_condition:
             if not self._recording:
                 return
@@ -314,11 +406,9 @@ class RecordingService(FrameConsumer):
             try:
                 self._write_frame(frame)
 
-            except Exception as exc:
+            except RecordingError as exc:
                 with self._frame_condition:
-                    failure = RecordingError(str(exc))
-
-                    self._last_error = failure
+                    self._last_error = exc
                     self._recording = False
                     self._pending_frame = None
                     self._frame_condition.notify_all()
@@ -330,9 +420,15 @@ class RecordingService(FrameConsumer):
         self,
         frame: Frame,
     ) -> None:
+        if not isinstance(frame, Frame):
+            raise TypeError("frame must be a Frame instance")
+
         image = frame.image
 
-        if len(image.shape) != 3 or image.shape[2] != 3:
+        if not isinstance(image, np.ndarray):
+            raise TypeError("frame image must be a NumPy array")
+
+        if image.ndim != 3 or image.shape[2] != 3:
             raise RecordingError("recording requires a 3-channel image")
 
         height, width = image.shape[:2]
@@ -353,16 +449,18 @@ class RecordingService(FrameConsumer):
             if metadata is not None:
                 try:
                     frame = self.overlay.draw_metadata(frame, metadata)
-                except Exception:
-                    # Optionally log the error.
+                except OverlayError:
                     pass
 
         image = frame.image
 
-        image = cv2.cvtColor(
-            image,
-            cv2.COLOR_RGB2BGR,
-        )
+        try:
+            image = cv2.cvtColor(
+                image,
+                cv2.COLOR_RGB2BGR,
+            )
+        except cv2.error as exc:
+            raise RecordingError(f"failed to prepare recording frame: {exc}") from exc
 
         assert self._process is not None
         assert self._process.stdin is not None
@@ -390,7 +488,19 @@ class RecordingService(FrameConsumer):
         self._frame_count += 1
         self._end_timestamp = frame.timestamp
 
-    def enable_overlay(self, source: str | None = None) -> None:
+    def enable_overlay(
+        self,
+        source: str | None = None,
+    ) -> None:
+        if source is not None:
+            if not isinstance(source, str):
+                raise TypeError("source must be a string")
+
+            source = source.strip()
+
+            if not source:
+                raise ValueError("source cannot be empty")
+
         self.overlay_enabled = True
         self.overlay_source = source
 

@@ -1,10 +1,31 @@
+import math
 import threading
 import time
-from typing import Any
+from typing import Any, Self
 
 from betabox_robotics.vision.camera import CameraError, CameraManager
 from betabox_robotics.vision.consumer import FrameConsumer
 from betabox_robotics.vision.frame import Frame
+
+
+def _validate_fps(
+    value: object,
+) -> float:
+    if isinstance(value, bool) or not isinstance(
+        value,
+        int | float,
+    ):
+        raise TypeError("fps must be a number")
+
+    fps = float(value)
+
+    if not math.isfinite(fps):
+        raise ValueError("fps must be finite")
+
+    if fps <= 0:
+        raise ValueError("fps must be greater than 0")
+
+    return fps
 
 
 class FrameSourceError(CameraError):
@@ -26,11 +47,17 @@ class FrameSource:
         *,
         fps: float = 20.0,
     ) -> None:
-        if fps <= 0:
-            raise FrameSourceError("fps must be greater than 0")
+        fps_value = _validate_fps(fps)
 
-        self.camera = camera or CameraManager()
-        self.fps = float(fps)
+        self.camera = (
+            camera
+            if camera is not None
+            else CameraManager(
+                fps=fps_value,
+            )
+        )
+
+        self.fps = fps_value
 
         self._latest_frame: Frame | None = None
         self._running = False
@@ -41,7 +68,7 @@ class FrameSource:
         self._diagnostics_lock = threading.Lock()
 
         self._consumers: list[FrameConsumer] = []
-        self._last_error: Exception | None = None
+        self._last_error: FrameSourceError | None = None
 
         # Capture-loop diagnostics use monotonic time because they measure
         # elapsed durations rather than wall-clock timestamps.
@@ -68,39 +95,60 @@ class FrameSource:
         if self._running:
             return
 
-        self.camera.start()
-        self._running = True
-        self._last_error = None
-
-        with self._diagnostics_lock:
-            self._phase = "starting"
-            self._active_consumer = None
-            self._active_consumer_started = None
-
-        self._thread = threading.Thread(
+        thread = threading.Thread(
             target=self._capture_loop,
             name="BetaboxFrameSource",
             daemon=True,
         )
-        self._thread.start()
+
+        try:
+            self.camera.start()
+
+            self._running = True
+            self._last_error = None
+
+            with self._diagnostics_lock:
+                self._phase = "starting"
+                self._active_consumer = None
+                self._active_consumer_started = None
+
+            thread.start()
+
+        except RuntimeError:
+            self._running = False
+
+            try:
+                self.camera.stop()
+            except CameraError:
+                pass
+
+            raise
+
+        self._thread = thread
 
     def stop(self) -> None:
         self._running = False
 
         thread = self._thread
+        shutdown_error: CameraError | None = None
+
+        try:
+            self.camera.stop()
+        except CameraError as exc:
+            shutdown_error = exc
 
         if thread is not None:
             thread.join(timeout=2.0)
 
             if thread.is_alive():
-                print(
-                    "Vision warning: FrameSource thread did not stop within 2 seconds",
-                    flush=True,
+                warning = FrameSourceError(
+                    "frame source thread did not stop within 2 seconds"
                 )
+
+                if shutdown_error is None:
+                    shutdown_error = warning
             else:
                 self._thread = None
-
-        self.camera.stop()
 
         with self._lock:
             self._latest_frame = None
@@ -111,6 +159,9 @@ class FrameSource:
 
             self._active_consumer = None
             self._active_consumer_started = None
+
+        if shutdown_error is not None:
+            raise shutdown_error
 
     def is_running(self) -> bool:
         return self._running
@@ -146,7 +197,7 @@ class FrameSource:
 
         return frame
 
-    def last_error(self) -> Exception | None:
+    def last_error(self) -> FrameSourceError | None:
         return self._last_error
 
     def statistics(self) -> dict[str, Any]:
@@ -271,7 +322,6 @@ class FrameSource:
         }
 
     def _capture_loop(self) -> None:
-        interval = 1.0 / self.fps
 
         with self._diagnostics_lock:
             self._phase = "running"
@@ -313,8 +363,16 @@ class FrameSource:
                     self._last_publish_duration = publish_completed - publish_started
                     self._phase = "sleeping"
 
-            except Exception as exc:
-                self._last_error = exc
+            except CameraError as exc:
+                if (
+                    not self._running
+                    and "camera stopped while waiting for frame" in str(exc)
+                ):
+                    break
+
+                failure = FrameSourceError(f"frame capture failed: {exc}")
+
+                self._last_error = failure
 
                 with self._diagnostics_lock:
                     self._phase = "failed"
@@ -324,16 +382,11 @@ class FrameSource:
                 self._running = False
 
                 print(
-                    f"Vision frame source error: {exc}",
+                    f"Vision frame source error: {failure}",
                     flush=True,
                 )
+
                 break
-
-            elapsed = time.monotonic() - cycle_started
-            sleep_time = max(0.0, interval - elapsed)
-
-            if sleep_time > 0:
-                time.sleep(sleep_time)
 
         with self._diagnostics_lock:
             if self._phase != "failed":
@@ -434,9 +487,14 @@ class FrameSource:
     def deinit(self) -> None:
         self.close()
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
         self.start()
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(
+        self,
+        exc_type: object,
+        exc_value: object,
+        traceback: object,
+    ) -> None:
         self.close()

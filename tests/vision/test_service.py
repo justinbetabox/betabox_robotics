@@ -1,67 +1,143 @@
+from __future__ import annotations
+
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, call, patch
 
 from betabox_robotics.vision.frame import Frame
+from betabox_robotics.vision.frame_source import FrameSourceError
 from betabox_robotics.vision.metadata import Metadata
-from betabox_robotics.vision.recording import Recording, RecordingData
+from betabox_robotics.vision.recording import (
+    Recording,
+    RecordingData,
+    RecordingError,
+)
 from betabox_robotics.vision.service import (
     VisionService,
     VisionServiceConfig,
 )
-from betabox_robotics.vision.snapshot import Snapshot, SnapshotData
+from betabox_robotics.vision.snapshot import (
+    Snapshot,
+    SnapshotData,
+)
+from betabox_robotics.vision.stream import StreamError
 
 
 class VisionServiceConfigTests(unittest.TestCase):
-    def test_defaults(self) -> None:
+    def test_default_configuration(self) -> None:
         config = VisionServiceConfig()
 
-        self.assertEqual(config.host, "0.0.0.0")
-        self.assertEqual(config.port, 8080)
-        self.assertEqual(config.fps, 20)
-
-    def test_custom_values(self) -> None:
-        config = VisionServiceConfig(
-            host="127.0.0.1",
-            port=9000,
-            fps=15,
+        self.assertEqual(
+            config.host,
+            "0.0.0.0",
+        )
+        self.assertEqual(
+            config.port,
+            8080,
+        )
+        self.assertEqual(
+            config.fps,
+            20,
         )
 
-        self.assertEqual(config.host, "127.0.0.1")
-        self.assertEqual(config.port, 9000)
-        self.assertEqual(config.fps, 15)
+    def test_normalizes_host(self) -> None:
+        config = VisionServiceConfig(
+            host="  127.0.0.1  ",
+        )
 
-    def test_empty_host_is_rejected(self) -> None:
+        self.assertEqual(
+            config.host,
+            "127.0.0.1",
+        )
+
+    def test_rejects_non_string_host(self) -> None:
+        with self.assertRaisesRegex(
+            TypeError,
+            "host must be a string",
+        ):
+            VisionServiceConfig(
+                host=123,  # type: ignore[arg-type]
+            )
+
+    def test_rejects_empty_host(self) -> None:
         with self.assertRaisesRegex(
             ValueError,
             "host cannot be empty",
         ):
-            VisionServiceConfig(host="   ")
+            VisionServiceConfig(
+                host=" ",
+            )
 
-    def test_invalid_port_is_rejected(self) -> None:
-        for port in (0, -1, 65536):
+    def test_rejects_non_integer_port(self) -> None:
+        for value in (
+            True,
+            8080.0,
+            "8080",
+        ):
             with (
-                self.subTest(port=port),
+                self.subTest(value=value),
+                self.assertRaisesRegex(
+                    TypeError,
+                    "port must be an integer",
+                ),
+            ):
+                VisionServiceConfig(
+                    port=value,  # type: ignore[arg-type]
+                )
+
+    def test_rejects_out_of_range_port(self) -> None:
+        for value in (
+            0,
+            -1,
+            65536,
+        ):
+            with (
+                self.subTest(value=value),
                 self.assertRaisesRegex(
                     ValueError,
                     "port must be between 1 and 65535",
                 ),
             ):
-                VisionServiceConfig(port=port)
+                VisionServiceConfig(
+                    port=value,
+                )
 
-    def test_invalid_fps_is_rejected(self) -> None:
-        for fps in (0, -1):
+    def test_rejects_non_integer_fps(self) -> None:
+        for value in (
+            True,
+            20.0,
+            "20",
+        ):
             with (
-                self.subTest(fps=fps),
+                self.subTest(value=value),
+                self.assertRaisesRegex(
+                    TypeError,
+                    "fps must be an integer",
+                ),
+            ):
+                VisionServiceConfig(
+                    fps=value,  # type: ignore[arg-type]
+                )
+
+    def test_rejects_non_positive_fps(self) -> None:
+        for value in (
+            0,
+            -1,
+        ):
+            with (
+                self.subTest(value=value),
                 self.assertRaisesRegex(
                     ValueError,
                     "fps must be greater than zero",
                 ),
             ):
-                VisionServiceConfig(fps=fps)
+                VisionServiceConfig(
+                    fps=value,
+                )
 
 
-class VisionServiceTests(unittest.TestCase):
+class VisionServiceTestCase(unittest.TestCase):
     def setUp(self) -> None:
         self.frame_source = MagicMock()
         self.metadata_bus = MagicMock()
@@ -72,7 +148,37 @@ class VisionServiceTests(unittest.TestCase):
         self.snapshot = MagicMock()
         self.server = MagicMock()
 
-        patchers = [
+        self.recording.is_recording.return_value = False
+        self.recording.overlay_status.return_value = {
+            "enabled": False,
+            "source": None,
+        }
+        self.streamer.statistics.return_value = {
+            "running": False,
+            "clients": 0,
+            "overlay": {
+                "enabled": False,
+                "source": None,
+            },
+            "frames_received": 0,
+            "has_frame": False,
+        }
+        self.streamer.overlay_status.return_value = {
+            "enabled": False,
+            "source": None,
+        }
+        self.frame_source.statistics.return_value = {
+            "running": False,
+        }
+        self.metadata_bus.all_latest.return_value = {}
+        self.detection.names.return_value = [
+            "color",
+            "face",
+            "objects",
+        ]
+        self.detection.is_enabled.side_effect = lambda name: name == "color"
+
+        self.patchers = (
             patch(
                 "betabox_robotics.vision.service.FrameSource",
                 return_value=self.frame_source,
@@ -105,48 +211,118 @@ class VisionServiceTests(unittest.TestCase):
                 "betabox_robotics.vision.service.WebRTCSignalingServer",
                 return_value=self.server,
             ),
-        ]
+        )
 
-        for patcher in patchers:
-            patcher.start()
-            self.addCleanup(patcher.stop)
+        self.mocks = [patcher.start() for patcher in self.patchers]
 
-        self.config = VisionServiceConfig(
-            host="127.0.0.1",
-            port=9000,
-            fps=15,
-        )
-        self.service = VisionService(self.config)
+        self.addCleanup(self._stop_patchers)
 
-    def test_constructs_components_with_shared_dependencies(self) -> None:
-        from betabox_robotics.vision import service as service_module
+    def _stop_patchers(self) -> None:
+        for patcher in reversed(self.patchers):
+            patcher.stop()
 
-        service_module.FrameSource.assert_called_once_with(
-            fps=15,
+    def create_service(
+        self,
+        config: VisionServiceConfig | None = None,
+    ) -> VisionService:
+        return VisionService(config)
+
+
+class VisionServiceConstructionTests(VisionServiceTestCase):
+    def test_rejects_invalid_config(self) -> None:
+        with self.assertRaisesRegex(
+            TypeError,
+            "config must be a VisionServiceConfig",
+        ):
+            VisionService(
+                object(),  # type: ignore[arg-type]
+            )
+
+    def test_constructs_default_service(self) -> None:
+        service = self.create_service()
+
+        self.assertEqual(
+            service.config,
+            VisionServiceConfig(),
         )
-        service_module.DetectionManager.assert_called_once_with(
-            self.metadata_bus,
-        )
-        service_module.RecordingService.assert_called_once_with(
-            fps=15,
-            metadata_bus=self.metadata_bus,
-            overlay=self.overlay,
-        )
-        service_module.WebRTCStreamer.assert_called_once_with(
-            fps=15,
-            metadata_bus=self.metadata_bus,
-            overlay=self.overlay,
-        )
-        service_module.SnapshotService.assert_called_once_with(
+        self.assertIs(
+            service.frame_source,
             self.frame_source,
         )
-        service_module.WebRTCSignalingServer.assert_called_once_with(
-            self.service,
+        self.assertIs(
+            service.metadata_bus,
+            self.metadata_bus,
+        )
+        self.assertIs(
+            service.overlay,
+            self.overlay,
+        )
+        self.assertIs(
+            service.detection,
+            self.detection,
+        )
+        self.assertIs(
+            service.recording,
+            self.recording,
+        )
+        self.assertIs(
+            service.streamer,
+            self.streamer,
+        )
+        self.assertIs(
+            service.snapshot,
+            self.snapshot,
+        )
+        self.assertIs(
+            service.server,
+            self.server,
+        )
+        self.assertFalse(service._running)
+
+    def test_constructs_subsystems_from_config(self) -> None:
+        config = VisionServiceConfig(
+            host="127.0.0.1",
+            port=9000,
+            fps=15,
+        )
+
+        service = self.create_service(config)
+
+        self.assertIs(
+            service.config,
+            config,
+        )
+
+        self.mocks[0].assert_called_once_with(
+            fps=15,
+        )
+        self.mocks[1].assert_called_once_with()
+        self.mocks[2].assert_called_once_with()
+        self.mocks[3].assert_called_once_with(
+            self.metadata_bus,
+        )
+        self.mocks[4].assert_called_once_with(
+            fps=15,
+            metadata_bus=self.metadata_bus,
+            overlay=self.overlay,
+        )
+        self.mocks[5].assert_called_once_with(
+            fps=15,
+            metadata_bus=self.metadata_bus,
+            overlay=self.overlay,
+        )
+        self.mocks[6].assert_called_once_with(
+            self.frame_source,
+        )
+        self.mocks[7].assert_called_once_with(
+            service,
             host="127.0.0.1",
             port=9000,
         )
 
-    def test_registers_all_frame_consumers(self) -> None:
+    def test_registers_frame_consumers(self) -> None:
+        self.create_service()
+
         self.assertEqual(
             self.frame_source.register_consumer.call_args_list,
             [
@@ -156,499 +332,757 @@ class VisionServiceTests(unittest.TestCase):
             ],
         )
 
+
+class VisionServiceLifecycleTests(VisionServiceTestCase):
     def test_start_starts_pipeline(self) -> None:
-        self.service.start()
+        service = self.create_service()
+
+        service.start()
 
         self.frame_source.start.assert_called_once_with()
         self.streamer.start.assert_called_once_with()
-        self.assertTrue(self.service._running)
+        self.assertTrue(service._running)
 
     def test_start_is_idempotent(self) -> None:
-        self.service.start()
-        self.service.start()
+        service = self.create_service()
+
+        service.start()
+        service.start()
 
         self.frame_source.start.assert_called_once_with()
         self.streamer.start.assert_called_once_with()
 
-    def test_start_rolls_back_frame_source_when_streamer_fails(self) -> None:
-        self.streamer.start.side_effect = RuntimeError("streamer failed")
+    def test_start_rolls_back_frame_source_on_stream_error(
+        self,
+    ) -> None:
+        service = self.create_service()
+        failure = StreamError("stream startup failed")
+        self.streamer.start.side_effect = failure
 
         with self.assertRaisesRegex(
-            RuntimeError,
-            "streamer failed",
+            StreamError,
+            "stream startup failed",
         ):
-            self.service.start()
+            service.start()
 
         self.frame_source.start.assert_called_once_with()
         self.frame_source.stop.assert_called_once_with()
-        self.assertFalse(self.service._running)
+        self.assertFalse(service._running)
 
-    def test_run_starts_service_then_runs_server(self) -> None:
-        with patch.object(
-            self.service,
-            "start",
-        ) as start:
-            self.service.run()
+    def test_start_preserves_stream_error_when_rollback_fails(
+        self,
+    ) -> None:
+        service = self.create_service()
+        stream_failure = StreamError("stream startup failed")
 
-        start.assert_called_once_with()
+        self.streamer.start.side_effect = stream_failure
+        self.frame_source.stop.side_effect = FrameSourceError("camera rollback failed")
+
+        with self.assertRaisesRegex(
+            StreamError,
+            "stream startup failed",
+        ) as context:
+            service.start()
+
+        self.assertIs(
+            context.exception,
+            stream_failure,
+        )
+        self.assertFalse(service._running)
+
+    def test_run_starts_service_and_runs_server(
+        self,
+    ) -> None:
+        service = self.create_service()
+
+        service.run()
+
+        self.frame_source.start.assert_called_once_with()
+        self.streamer.start.assert_called_once_with()
         self.server.run.assert_called_once_with()
+        self.assertTrue(service._running)
 
-    def test_stop_stops_streamer_and_frame_source(self) -> None:
-        self.service._running = True
-        self.recording.is_recording.return_value = False
+    def test_stop_is_noop_when_not_running(self) -> None:
+        service = self.create_service()
 
-        self.service.stop()
-
-        self.streamer.stop.assert_called_once_with()
-        self.frame_source.stop.assert_called_once_with()
-        self.assertFalse(self.service._running)
-
-    def test_stop_is_idempotent(self) -> None:
-        self.service.stop()
+        service.stop()
 
         self.streamer.stop.assert_not_called()
+        self.recording.stop.assert_not_called()
         self.frame_source.stop.assert_not_called()
 
-    def test_stop_removes_unfinished_recording(self) -> None:
-        path = MagicMock(spec=Path)
+    def test_stop_stops_pipeline(self) -> None:
+        service = self.create_service()
+        service._running = True
 
-        recording = Recording(
-            path=path,
-            start_timestamp=1.0,
-            end_timestamp=2.0,
-            frame_count=20,
-            fps=20.0,
-        )
-
-        self.service._running = True
-        self.recording.is_recording.return_value = True
-        self.recording.stop.return_value = recording
-
-        self.service.stop()
-
-        self.recording.stop.assert_called_once_with()
-        path.unlink.assert_called_once_with()
-        self.frame_source.stop.assert_called_once_with()
-        self.assertFalse(self.service._running)
-
-    def test_stop_ignores_missing_recording_file(self) -> None:
-        path = MagicMock(spec=Path)
-        path.unlink.side_effect = FileNotFoundError
-
-        recording = Recording(
-            path=path,
-            start_timestamp=1.0,
-            end_timestamp=2.0,
-            frame_count=20,
-            fps=20.0,
-        )
-
-        self.service._running = True
-        self.recording.is_recording.return_value = True
-        self.recording.stop.return_value = recording
-
-        self.service.stop()
-
-        self.frame_source.stop.assert_called_once_with()
-        self.assertFalse(self.service._running)
-
-    def test_stop_still_stops_frame_source_when_recording_stop_fails(
-        self,
-    ) -> None:
-        self.service._running = True
-        self.recording.is_recording.return_value = True
-        self.recording.stop.side_effect = RuntimeError("recording failed")
-
-        with self.assertRaisesRegex(
-            RuntimeError,
-            "recording failed",
-        ):
-            self.service.stop()
+        service.stop()
 
         self.streamer.stop.assert_called_once_with()
+        self.recording.stop.assert_not_called()
         self.frame_source.stop.assert_called_once_with()
-        self.assertFalse(self.service._running)
+        self.assertFalse(service._running)
 
-    def test_stop_still_stops_frame_source_when_unlink_fails(
+    def test_stop_finishes_and_removes_active_recording(
         self,
     ) -> None:
-        path = MagicMock(spec=Path)
-        path.unlink.side_effect = OSError("unlink failed")
+        service = self.create_service()
+        service._running = True
+        self.recording.is_recording.return_value = True
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            path = Path(temp_dir) / "unfinished.mp4"
+            path.write_bytes(b"video")
+
+            recording = Recording(
+                path=path,
+                start_timestamp=10.0,
+                end_timestamp=12.0,
+                frame_count=40,
+                fps=20.0,
+            )
+            self.recording.stop.return_value = recording
+
+            service.stop()
+
+            self.assertFalse(path.exists())
+
+        self.recording.stop.assert_called_once_with()
+        self.frame_source.stop.assert_called_once_with()
+        self.assertFalse(service._running)
+
+    def test_stop_ignores_missing_recording_file(
+        self,
+    ) -> None:
+        service = self.create_service()
+        service._running = True
+        self.recording.is_recording.return_value = True
 
         recording = Recording(
-            path=path,
-            start_timestamp=1.0,
-            end_timestamp=2.0,
-            frame_count=20,
+            path=Path("/tmp/does-not-exist.mp4"),
+            start_timestamp=10.0,
+            end_timestamp=12.0,
+            frame_count=40,
             fps=20.0,
         )
-
-        self.service._running = True
-        self.recording.is_recording.return_value = True
         self.recording.stop.return_value = recording
 
-        with self.assertRaisesRegex(
-            OSError,
-            "unlink failed",
-        ):
-            self.service.stop()
+        service.stop()
 
         self.frame_source.stop.assert_called_once_with()
-        self.assertFalse(self.service._running)
+        self.assertFalse(service._running)
 
-    def test_capture_snapshot_without_overlay_delegates(self) -> None:
-        expected = MagicMock(spec=Snapshot)
-        self.snapshot.capture.return_value = expected
-
-        result = self.service.capture_snapshot(
-            filename="photo.jpg",
-        )
-
-        self.assertIs(result, expected)
-        self.snapshot.capture.assert_called_once_with(
-            filename="photo.jpg",
-        )
-        self.frame_source.latest_frame.assert_not_called()
-
-    def test_capture_snapshot_with_overlay_uses_selected_frame(
+    def test_stop_raises_recording_error_after_cleanup(
         self,
     ) -> None:
-        frame = Frame.create(object())
-        annotated = Frame.create(object())
-        metadata = Metadata.create(
-            "face",
-            timestamp=frame.timestamp,
+        service = self.create_service()
+        service._running = True
+        self.recording.is_recording.return_value = True
+
+        failure = RecordingError("recording failed")
+        self.recording.stop.side_effect = failure
+
+        with self.assertRaisesRegex(
+            RecordingError,
+            "recording failed",
+        ):
+            service.stop()
+
+        self.frame_source.stop.assert_called_once_with()
+        self.assertFalse(service._running)
+
+    def test_stop_raises_stream_error_after_cleanup(
+        self,
+    ) -> None:
+        service = self.create_service()
+        service._running = True
+
+        failure = StreamError("stream shutdown failed")
+        self.streamer.stop.side_effect = failure
+
+        with self.assertRaisesRegex(
+            StreamError,
+            "stream shutdown failed",
+        ):
+            service.stop()
+
+        self.frame_source.stop.assert_called_once_with()
+        self.assertFalse(service._running)
+
+    def test_stop_raises_frame_source_error(
+        self,
+    ) -> None:
+        service = self.create_service()
+        service._running = True
+
+        failure = FrameSourceError("camera shutdown failed")
+        self.frame_source.stop.side_effect = failure
+
+        with self.assertRaisesRegex(
+            FrameSourceError,
+            "camera shutdown failed",
+        ):
+            service.stop()
+
+        self.assertFalse(service._running)
+
+    def test_stop_preserves_first_shutdown_error(
+        self,
+    ) -> None:
+        service = self.create_service()
+        service._running = True
+        self.recording.is_recording.return_value = True
+
+        stream_failure = StreamError("stream failed")
+        recording_failure = RecordingError("recording failed")
+        frame_failure = FrameSourceError("camera failed")
+
+        self.streamer.stop.side_effect = stream_failure
+        self.recording.stop.side_effect = recording_failure
+        self.frame_source.stop.side_effect = frame_failure
+
+        with self.assertRaisesRegex(
+            StreamError,
+            "stream failed",
+        ) as context:
+            service.stop()
+
+        self.assertIs(
+            context.exception,
+            stream_failure,
         )
-        expected = MagicMock(spec=Snapshot)
+        self.recording.stop.assert_called_once_with()
+        self.frame_source.stop.assert_called_once_with()
+        self.assertFalse(service._running)
+
+    def test_close_delegates_to_stop(self) -> None:
+        service = self.create_service()
+
+        with patch.object(
+            service,
+            "stop",
+        ) as stop:
+            service.close()
+
+        stop.assert_called_once_with()
+
+
+class VisionServiceSnapshotTests(VisionServiceTestCase):
+    def test_capture_snapshot_without_overlay(self) -> None:
+        service = self.create_service()
+
+        expected = Snapshot(
+            path=Path("picture.png"),
+            timestamp=123.5,
+            format="png",
+        )
+        self.snapshot.capture.return_value = expected
+
+        result = service.capture_snapshot(
+            filename="picture.png",
+            directory="pictures",
+            image_format="png",
+        )
+
+        self.assertIs(
+            result,
+            expected,
+        )
+        self.snapshot.capture.assert_called_once_with(
+            filename="picture.png",
+            directory="pictures",
+            image_format="png",
+        )
+        self.frame_source.latest_frame.assert_not_called()
+        self.overlay.draw_metadata.assert_not_called()
+
+    def test_capture_snapshot_with_overlay(self) -> None:
+        service = self.create_service()
+
+        frame = Frame.create(
+            object(),
+            timestamp=123.5,
+        )
+        rendered = Frame.create(
+            object(),
+            timestamp=123.5,
+        )
+        metadata = Metadata.create(
+            "color",
+            timestamp=123.5,
+        )
+        expected = Snapshot(
+            path=Path("picture.jpg"),
+            timestamp=123.5,
+            format="jpg",
+        )
 
         self.frame_source.latest_frame.return_value = frame
         self.metadata_bus.latest.return_value = metadata
-        self.overlay.draw_metadata.return_value = annotated
+        self.overlay.draw_metadata.return_value = rendered
         self.snapshot.capture_frame.return_value = expected
 
-        result = self.service.capture_snapshot(
+        result = service.capture_snapshot(
+            filename="picture.jpg",
+            directory="pictures",
+            image_format="jpg",
             overlay=True,
-            source="face",
-            filename="photo.jpg",
+            source="color",
         )
 
-        self.assertIs(result, expected)
-        self.metadata_bus.latest.assert_called_once_with("face")
+        self.assertIs(
+            result,
+            expected,
+        )
+        self.metadata_bus.latest.assert_called_once_with("color")
         self.overlay.draw_metadata.assert_called_once_with(
             frame,
             metadata,
         )
         self.snapshot.capture_frame.assert_called_once_with(
-            annotated,
-            filename="photo.jpg",
+            rendered,
+            filename="picture.jpg",
+            directory="pictures",
+            image_format="jpg",
         )
 
-    def test_capture_snapshot_without_metadata_uses_same_frame(
+    def test_capture_snapshot_with_overlay_and_no_metadata(
         self,
     ) -> None:
-        frame = Frame.create(object())
-        expected = MagicMock(spec=Snapshot)
+        service = self.create_service()
+
+        frame = Frame.create(
+            object(),
+            timestamp=123.5,
+        )
+        expected = Snapshot(
+            path=Path("picture.jpg"),
+            timestamp=123.5,
+            format="jpg",
+        )
 
         self.frame_source.latest_frame.return_value = frame
         self.metadata_bus.latest.return_value = None
         self.snapshot.capture_frame.return_value = expected
 
-        result = self.service.capture_snapshot(
+        result = service.capture_snapshot(
             overlay=True,
-            source="face",
-            filename="photo.jpg",
+            source="color",
         )
 
-        self.assertIs(result, expected)
-        self.snapshot.capture.assert_not_called()
-        self.snapshot.capture_frame.assert_called_once_with(
-            frame,
-            filename="photo.jpg",
+        self.assertIs(
+            result,
+            expected,
         )
         self.overlay.draw_metadata.assert_not_called()
+        self.snapshot.capture_frame.assert_called_once_with(
+            frame,
+            filename=None,
+            directory=None,
+            image_format=None,
+        )
 
-    def test_capture_snapshot_data_without_overlay_delegates(
+    def test_capture_snapshot_data_without_overlay(
         self,
     ) -> None:
-        expected = MagicMock(spec=SnapshotData)
+        service = self.create_service()
+
+        expected = SnapshotData(
+            data=b"image",
+            timestamp=123.5,
+            format="png",
+        )
         self.snapshot.capture_data.return_value = expected
 
-        result = self.service.capture_snapshot_data(
+        result = service.capture_snapshot_data(
             image_format="png",
         )
 
-        self.assertIs(result, expected)
+        self.assertIs(
+            result,
+            expected,
+        )
         self.snapshot.capture_data.assert_called_once_with(
             image_format="png",
         )
 
-    def test_capture_snapshot_data_with_overlay(self) -> None:
-        frame = Frame.create(object())
-        annotated = Frame.create(object())
+    def test_capture_snapshot_data_with_overlay(
+        self,
+    ) -> None:
+        service = self.create_service()
+
+        frame = Frame.create(
+            object(),
+            timestamp=123.5,
+        )
+        rendered = Frame.create(
+            object(),
+            timestamp=123.5,
+        )
         metadata = Metadata.create(
             "face",
-            timestamp=frame.timestamp,
+            timestamp=123.5,
         )
-        expected = MagicMock(spec=SnapshotData)
+        expected = SnapshotData(
+            data=b"image",
+            timestamp=123.5,
+            format="jpg",
+        )
 
         self.frame_source.latest_frame.return_value = frame
         self.metadata_bus.latest.return_value = metadata
-        self.overlay.draw_metadata.return_value = annotated
+        self.overlay.draw_metadata.return_value = rendered
         self.snapshot.capture_frame_data.return_value = expected
 
-        result = self.service.capture_snapshot_data(
+        result = service.capture_snapshot_data(
             overlay=True,
             source="face",
-            image_format="jpg",
+            image_format="jpeg",
         )
 
-        self.assertIs(result, expected)
+        self.assertIs(
+            result,
+            expected,
+        )
         self.overlay.draw_metadata.assert_called_once_with(
             frame,
             metadata,
         )
         self.snapshot.capture_frame_data.assert_called_once_with(
-            annotated,
-            image_format="jpg",
+            rendered,
+            image_format="jpeg",
         )
 
-    def test_start_recording_enables_requested_overlay(self) -> None:
-        path = Path("/tmp/video.mp4")
-        self.recording.start.return_value = path
 
-        result = self.service.start_recording(
-            filename="video.mp4",
-            overlay=True,
-            source="face",
+class VisionServiceRecordingTests(VisionServiceTestCase):
+    def test_start_recording_without_overlay(self) -> None:
+        service = self.create_service()
+        expected = Path("lesson.mp4")
+        self.recording.start.return_value = expected
+
+        result = service.start_recording(
+            filename="lesson.mp4",
         )
-
-        self.assertEqual(result, path)
-        self.recording.enable_overlay.assert_called_once_with("face")
-        self.recording.disable_overlay.assert_not_called()
-        self.recording.start.assert_called_once_with(
-            filename="video.mp4",
-        )
-
-    def test_start_recording_disables_overlay_when_not_requested(
-        self,
-    ) -> None:
-        self.service.start_recording(
-            filename="video.mp4",
-            overlay=False,
-        )
-
-        self.recording.disable_overlay.assert_called_once_with()
-        self.recording.enable_overlay.assert_not_called()
-
-    def test_recording_stop_methods_delegate(self) -> None:
-        recording = MagicMock(spec=Recording)
-        recording_data = MagicMock(spec=RecordingData)
-
-        self.recording.stop.return_value = recording
-        self.recording.stop_data.return_value = recording_data
-
-        self.assertIs(
-            self.service.stop_recording(),
-            recording,
-        )
-        self.assertIs(
-            self.service.stop_recording_data(),
-            recording_data,
-        )
-
-    def test_detection_methods_delegate(self) -> None:
-        self.detection.names.return_value = [
-            "color",
-            "face",
-        ]
-        self.detection.is_enabled.side_effect = lambda name: name == "color"
-
-        self.service.enable_detection("face")
-        self.service.disable_detection("color")
 
         self.assertEqual(
-            self.service.detection_names(),
+            result,
+            expected,
+        )
+        self.recording.disable_overlay.assert_called_once_with()
+        self.recording.enable_overlay.assert_not_called()
+        self.recording.start.assert_called_once_with(
+            filename="lesson.mp4",
+        )
+
+    def test_start_recording_with_overlay(self) -> None:
+        service = self.create_service()
+        expected = Path("lesson.mp4")
+        self.recording.start.return_value = expected
+
+        result = service.start_recording(
+            filename="lesson.mp4",
+            overlay=True,
+            source="color",
+        )
+
+        self.assertEqual(
+            result,
+            expected,
+        )
+        self.recording.enable_overlay.assert_called_once_with("color")
+        self.recording.disable_overlay.assert_not_called()
+        self.recording.start.assert_called_once_with(
+            filename="lesson.mp4",
+        )
+
+    def test_stop_recording(self) -> None:
+        service = self.create_service()
+
+        expected = Recording(
+            path=Path("lesson.mp4"),
+            start_timestamp=10.0,
+            end_timestamp=12.0,
+            frame_count=40,
+            fps=20.0,
+        )
+        self.recording.stop.return_value = expected
+
+        self.assertIs(
+            service.stop_recording(),
+            expected,
+        )
+        self.recording.stop.assert_called_once_with()
+
+    def test_stop_recording_data(self) -> None:
+        service = self.create_service()
+
+        expected = RecordingData(
+            data=b"video",
+            format="mp4",
+            start_timestamp=10.0,
+            end_timestamp=12.0,
+            frame_count=40,
+            fps=20.0,
+        )
+        self.recording.stop_data.return_value = expected
+
+        self.assertIs(
+            service.stop_recording_data(),
+            expected,
+        )
+        self.recording.stop_data.assert_called_once_with()
+
+
+class VisionServiceDetectionTests(VisionServiceTestCase):
+    def test_enable_color_detection(self) -> None:
+        service = self.create_service()
+
+        custom_ranges = {
+            "team_marker": (
+                (
+                    (10, 100, 100),
+                    (20, 255, 255),
+                ),
+            ),
+        }
+
+        service.enable_color_detection(
+            [
+                "red",
+                "team_marker",
+            ],
+            custom_ranges=custom_ranges,
+            min_area=25,
+        )
+
+        self.detection.enable_color.assert_called_once_with(
+            [
+                "red",
+                "team_marker",
+            ],
+            custom_ranges=custom_ranges,
+            min_area=25,
+        )
+
+    def test_enable_detection(self) -> None:
+        service = self.create_service()
+
+        service.enable_detection("face")
+
+        self.detection.enable.assert_called_once_with("face")
+
+    def test_disable_detection(self) -> None:
+        service = self.create_service()
+
+        service.disable_detection("face")
+
+        self.detection.disable.assert_called_once_with("face")
+
+    def test_detection_names(self) -> None:
+        service = self.create_service()
+
+        self.assertEqual(
+            service.detection_names(),
             [
                 "color",
                 "face",
+                "objects",
             ],
         )
+
+    def test_detection_status(self) -> None:
+        service = self.create_service()
+
         self.assertEqual(
-            self.service.detection_status(),
+            service.detection_status(),
             {
                 "color": True,
                 "face": False,
+                "objects": False,
             },
         )
 
-        self.detection.enable.assert_called_once_with("face")
-        self.detection.disable.assert_called_once_with("color")
+    def test_latest_metadata(self) -> None:
+        service = self.create_service()
+        expected = Metadata.create("color")
+        self.metadata_bus.latest.return_value = expected
 
-    def test_stream_overlay_methods_delegate(self) -> None:
-        status = {
-            "enabled": True,
-            "source": "face",
-        }
-        self.streamer.overlay_status.return_value = status
+        result = service.latest_metadata("color")
 
-        self.service.enable_stream_overlay("face")
-        self.service.disable_stream_overlay()
-
-        self.assertEqual(
-            self.service.stream_overlay_status(),
-            status,
+        self.assertIs(
+            result,
+            expected,
         )
+        self.metadata_bus.latest.assert_called_once_with("color")
 
-        self.streamer.enable_overlay.assert_called_once_with("face")
+
+class VisionServiceOverlayTests(VisionServiceTestCase):
+    def test_enable_stream_overlay(self) -> None:
+        service = self.create_service()
+
+        service.enable_stream_overlay("color")
+
+        self.streamer.enable_overlay.assert_called_once_with("color")
+
+    def test_disable_stream_overlay(self) -> None:
+        service = self.create_service()
+
+        service.disable_stream_overlay()
+
         self.streamer.disable_overlay.assert_called_once_with()
 
-    def test_recording_overlay_methods_delegate(self) -> None:
-        status = {
+    def test_stream_overlay_status(self) -> None:
+        service = self.create_service()
+        expected = {
             "enabled": True,
             "source": "face",
         }
-        self.recording.overlay_status.return_value = status
+        self.streamer.overlay_status.return_value = expected
 
-        self.service.enable_recording_overlay("face")
-        self.service.disable_recording_overlay()
-
-        self.assertEqual(
-            self.service.recording_overlay_status(),
-            status,
+        self.assertIs(
+            service.stream_overlay_status(),
+            expected,
         )
 
-        self.recording.enable_overlay.assert_called_once_with("face")
+    def test_enable_recording_overlay(self) -> None:
+        service = self.create_service()
+
+        service.enable_recording_overlay("color")
+
+        self.recording.enable_overlay.assert_called_once_with("color")
+
+    def test_disable_recording_overlay(self) -> None:
+        service = self.create_service()
+
+        service.disable_recording_overlay()
+
         self.recording.disable_overlay.assert_called_once_with()
 
-    def test_enable_color_detection_delegates_configuration(
-        self,
-    ) -> None:
-        self.service.enable_color_detection(
-            ["red", "green", "blue"],
-            min_area=275,
-        )
-
-        self.detection.enable_color.assert_called_once_with(
-            ["red", "green", "blue"],
-            min_area=275,
-        )
-
-    def test_enable_color_detection_allows_current_configuration(
-        self,
-    ) -> None:
-        self.service.enable_color_detection()
-
-        self.detection.enable_color.assert_called_once_with(
-            None,
-            min_area=None,
-        )
-
-    def test_latest_metadata_delegates(self) -> None:
-        metadata = Metadata.create("face")
-        self.metadata_bus.latest.return_value = metadata
-
-        result = self.service.latest_metadata("face")
-
-        self.assertIs(result, metadata)
-        self.metadata_bus.latest.assert_called_once_with("face")
-
-    def test_statistics_composes_component_status(self) -> None:
-        self.service._running = True
-
-        self.frame_source.statistics.return_value = {
-            "running": True,
-            "fps": 15.0,
+    def test_recording_overlay_status(self) -> None:
+        service = self.create_service()
+        expected = {
+            "enabled": True,
+            "source": "color",
         }
-        self.streamer.statistics.return_value = {
+        self.recording.overlay_status.return_value = expected
+
+        self.assertIs(
+            service.recording_overlay_status(),
+            expected,
+        )
+
+
+class VisionServiceStatisticsTests(VisionServiceTestCase):
+    def test_statistics(self) -> None:
+        service = self.create_service()
+        service._running = True
+
+        camera_stats = {
+            "running": True,
+            "phase": "running",
+        }
+        stream_stats = {
             "running": True,
             "clients": 2,
             "overlay": {
-                "enabled": False,
-                "source": None,
+                "enabled": True,
+                "source": "color",
             },
+            "frames_received": 100,
+            "has_frame": True,
         }
-        self.streamer.overlay_status.return_value = {
-            "enabled": True,
-            "source": "face",
-        }
-        self.recording.is_recording.return_value = True
-        self.recording.overlay_status.return_value = {
+        recording_overlay = {
             "enabled": False,
             "source": None,
         }
-        self.detection.names.return_value = [
-            "color",
-            "face",
-        ]
-        self.detection.is_enabled.side_effect = lambda name: name == "face"
+
+        self.frame_source.statistics.return_value = camera_stats
+        self.streamer.statistics.return_value = stream_stats
+        self.recording.is_recording.return_value = True
+        self.recording.overlay_status.return_value = recording_overlay
         self.metadata_bus.all_latest.return_value = {
+            "color": Metadata.create("color"),
             "face": Metadata.create("face"),
         }
 
-        stats = self.service.statistics()
+        result = service.statistics()
 
-        self.assertEqual(stats["running"], True)
         self.assertEqual(
-            stats["camera"],
+            result,
             {
                 "running": True,
-                "fps": 15.0,
-            },
-        )
-        self.assertEqual(stats["streaming"]["clients"], 2)
-        self.assertEqual(
-            stats["streaming"]["overlay"],
-            {
-                "enabled": True,
-                "source": "face",
-            },
-        )
-        self.assertEqual(stats["recording"]["active"], True)
-        self.assertEqual(
-            stats["detection"],
-            {
-                "detectors": {
-                    "color": False,
-                    "face": True,
+                "camera": camera_stats,
+                "streaming": stream_stats,
+                "recording": {
+                    "active": True,
+                    "overlay": recording_overlay,
                 },
-                "metadata_sources": [
-                    "face",
-                ],
+                "detection": {
+                    "detectors": {
+                        "color": True,
+                        "face": False,
+                        "objects": False,
+                    },
+                    "metadata_sources": [
+                        "color",
+                        "face",
+                    ],
+                },
+                "server": {
+                    "host": "0.0.0.0",
+                    "port": 8080,
+                    "fps": 20,
+                },
             },
         )
-        self.assertEqual(
-            stats["server"],
-            {
-                "host": "127.0.0.1",
-                "port": 9000,
-                "fps": 15,
-            },
-        )
 
-    def test_close_delegates_to_stop(self) -> None:
-        with patch.object(
-            self.service,
-            "stop",
-        ) as stop:
-            self.service.close()
 
-        stop.assert_called_once_with()
+class VisionServiceContextManagerTests(VisionServiceTestCase):
+    def test_context_manager_starts_and_stops(
+        self,
+    ) -> None:
+        service = self.create_service()
 
-    def test_context_manager_starts_and_stops_service(self) -> None:
         with (
             patch.object(
-                self.service,
+                service,
                 "start",
             ) as start,
             patch.object(
-                self.service,
+                service,
                 "stop",
             ) as stop,
-            self.service as value,
+            service as entered,
         ):
-            self.assertIs(value, self.service)
+            self.assertIs(
+                entered,
+                service,
+            )
 
         start.assert_called_once_with()
+        stop.assert_called_once_with()
+
+    def test_context_manager_stops_after_exception(
+        self,
+    ) -> None:
+        service = self.create_service()
+
+        with (
+            patch.object(
+                service,
+                "start",
+            ),
+            patch.object(
+                service,
+                "stop",
+            ) as stop,
+            self.assertRaisesRegex(
+                RuntimeError,
+                "boom",
+            ),
+            service,
+        ):
+            raise RuntimeError("boom")
+
         stop.assert_called_once_with()
 
 

@@ -1,59 +1,162 @@
-#!/usr/bin/env python3
-"""
-Developer demo for face detection in the Betabox Vision subsystem.
-"""
+from __future__ import annotations
 
-from time import sleep
+import argparse
+import time
 
-from betabox_robotics.robots import BETABOX_CAR
-from betabox_robotics.vision import Vision
+from betabox_robotics.vision import (
+    ClientMetadata,
+    VisionClient,
+    VisionClientError,
+)
 
 
-def main() -> None:
-    print()
-    print("Betabox Vision Face Detection Demo")
-    print("==================================")
-    print()
+def print_metadata(
+    metadata: ClientMetadata | None,
+) -> None:
+    if metadata is None:
+        print("No face metadata available yet.")
+        return
 
-    with Vision.default(BETABOX_CAR) as vision:
-        vision.detection.face.enable()
+    count = metadata.data.get(
+        "count",
+        len(metadata.detections),
+    )
 
-        print("Starting Vision...")
-        vision.start()
+    print(f"Timestamp: {metadata.timestamp:.3f}")
+    print(f"Faces detected: {count}")
 
-        print("Looking for faces.")
-        print("Press Ctrl+C to stop.")
+    if not metadata.detections:
+        print("Faces: none")
+        return
+
+    print("Faces:")
+
+    for index, detection in enumerate(
+        metadata.detections,
+        start=1,
+    ):
+        details = [
+            f"{index}. {detection.label}",
+        ]
+
+        if detection.box is not None:
+            x, y, width, height = detection.box
+
+            details.append(f"box=({x}, {y}, {width}, {height})")
+
+        if detection.center is not None:
+            center_x, center_y = detection.center
+
+            details.append(f"center=({center_x}, {center_y})")
+
+        width = detection.data.get("width")
+        height = detection.data.get("height")
+
+        if (
+            isinstance(width, int)
+            and not isinstance(width, bool)
+            and isinstance(height, int)
+            and not isinstance(height, bool)
+        ):
+            details.append(f"size={width}x{height}")
+
+        print(" | ".join(details))
+
+
+def main(
+    argv: list[str] | None = None,
+) -> int:
+    parser = argparse.ArgumentParser(
+        description=(
+            "Enable face detection through the managed "
+            "Betabox Vision service and print live metadata."
+        )
+    )
+
+    parser.add_argument(
+        "--duration",
+        type=float,
+        default=10.0,
+        help=("How long to print detection results in seconds. Default: 10."),
+    )
+
+    parser.add_argument(
+        "--interval",
+        type=float,
+        default=0.5,
+        help=("Delay between metadata reads in seconds. Default: 0.5."),
+    )
+
+    parser.add_argument(
+        "--leave-enabled",
+        action="store_true",
+        help=("Leave face detection enabled after the demo exits."),
+    )
+
+    args = parser.parse_args(argv)
+
+    if args.duration <= 0:
+        parser.error("--duration must be greater than zero")
+
+    if args.interval <= 0:
+        parser.error("--interval must be greater than zero")
+
+    client = VisionClient()
+    enabled = False
+    exit_code = 0
+
+    try:
+        status = client.enable_detection("face")
+        enabled = True
+
+        print("Face detection enabled")
+        print("----------------------")
+        print(f"Detector enabled: {status.is_enabled('face')}")
+        print()
+        print(f"Reading metadata for {args.duration:.1f} seconds...")
         print()
 
-        try:
-            while True:
-                metadata = vision.metadata.latest("face")
+        started_at = time.monotonic()
+        sample_number = 0
 
-                if metadata is None:
-                    print("No metadata yet.")
-                else:
-                    print(f"Detections: {metadata.data.get('count', 0)}")
+        while time.monotonic() - started_at < args.duration:
+            sample_number += 1
 
-                    for index, detection in enumerate(metadata.detections, start=1):
-                        print(f"Face {index}")
-                        print(f"  Box: {detection.box}")
-                        print(f"  Center: {detection.center}")
-                        print(
-                            f"  Size: "
-                            f"{detection.data.get('width')} x "
-                            f"{detection.data.get('height')}"
-                        )
+            heading = f"Sample {sample_number}"
 
-                print()
-                sleep(1)
+            print(heading)
+            print("-" * len(heading))
 
-        except KeyboardInterrupt:
+            metadata = client.metadata("face")
+
+            print_metadata(metadata)
             print()
-            print("Stopping...")
 
-    print()
-    print("Vision face detection demo complete.")
+            time.sleep(args.interval)
+
+    except KeyboardInterrupt:
+        print()
+        print("Face detection demo interrupted.")
+
+    except (
+        TypeError,
+        ValueError,
+        VisionClientError,
+    ) as exc:
+        print(f"Unable to run face detection demo: {exc}")
+        exit_code = 1
+
+    finally:
+        if enabled and not args.leave_enabled:
+            try:
+                client.disable_detection("face")
+                print("Face detection disabled.")
+            except VisionClientError as exc:
+                print(f"Unable to disable face detection: {exc}")
+                exit_code = 1
+
+    return exit_code
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from time import time
-from typing import Any, TypeAlias
+from typing import Any, Self, TypeAlias
 
 Box: TypeAlias = tuple[int, int, int, int]
 Point: TypeAlias = tuple[int, int]
@@ -53,7 +53,7 @@ class Metadata:
         timestamp: float | None = None,
         detections: Sequence[Detection] | None = None,
         data: dict[str, Any] | None = None,
-    ) -> "Metadata":
+    ) -> Self:
         """
         Create metadata for a Vision source.
 

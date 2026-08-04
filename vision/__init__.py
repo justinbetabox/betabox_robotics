@@ -17,7 +17,7 @@ from .client import (
 )
 from .consumer import FrameConsumer
 from .detection import DetectionError, DetectionManager
-from .detector import Detector
+from .detector import Detector, DetectorError
 from .detectors import ColorDetector, FaceDetector, ObjectDetector
 from .frame import Frame
 from .frame_source import FrameSource, FrameSourceError
@@ -25,15 +25,19 @@ from .interfaces import FrameProvider
 from .metadata import Detection, Metadata
 from .metadata_bus import MetadataBus
 from .model_runtime import ModelDetection, ObjectDetectionModel
-from .overlay import OverlayRenderer, OverlayStyle
-from .recording import Recording, RecordingError, RecordingService
+from .overlay import (
+    OverlayError,
+    OverlayRenderer,
+    OverlayStyle,
+)
+from .recording import Recording, RecordingData, RecordingError, RecordingService
 from .service import VisionService, VisionServiceConfig
 from .signaling import WebRTCSignalingServer
 from .snapshot import Snapshot, SnapshotData, SnapshotError, SnapshotService
-from .stream import Streamer
+from .stream import Streamer, StreamError
 from .tflite_runtime import TFLiteObjectDetectionModel
 from .vision import Vision
-from .webrtc import WebRTCStreamer
+from .webrtc import VisionVideoTrack, WebRTCStreamer
 
 __all__ = [
     "CameraError",
@@ -44,6 +48,7 @@ __all__ = [
     "ClientDetectionStatus",
     "ClientMetadata",
     "ClientRecording",
+    "ClientRecordingStatus",
     "ClientSnapshot",
     "ClientStreamOverlayStatus",
     "ClientStreamingStatistics",
@@ -54,6 +59,7 @@ __all__ = [
     "DetectionError",
     "DetectionManager",
     "Detector",
+    "DetectorError",
     "FaceDetector",
     "Frame",
     "FrameConsumer",
@@ -65,15 +71,18 @@ __all__ = [
     "ModelDetection",
     "ObjectDetectionModel",
     "ObjectDetector",
+    "OverlayError",
     "OverlayRenderer",
     "OverlayStyle",
     "Recording",
+    "RecordingData",
     "RecordingError",
     "RecordingService",
     "Snapshot",
     "SnapshotData",
     "SnapshotError",
     "SnapshotService",
+    "StreamError",
     "Streamer",
     "TFLiteObjectDetectionModel",
     "Vision",
@@ -81,6 +90,7 @@ __all__ = [
     "VisionClientError",
     "VisionService",
     "VisionServiceConfig",
+    "VisionVideoTrack",
     "WebRTCSignalingServer",
     "WebRTCStreamer",
 ]

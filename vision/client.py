@@ -1,15 +1,67 @@
 from __future__ import annotations
 
 import json
+import math
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from time import strftime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 from urllib import error, parse, request
 
 if TYPE_CHECKING:
     from betabox_robotics.robots.config import VisionConfig
+
+ClientSnapshotFormat = Literal[
+    "jpg",
+    "png",
+]
+
+
+def _validate_base_url(
+    value: object,
+) -> str:
+    if not isinstance(value, str):
+        raise TypeError("base_url must be a string")
+
+    base_url = value.strip().rstrip("/")
+
+    if not base_url:
+        raise ValueError("base_url cannot be empty")
+
+    parsed = parse.urlparse(base_url)
+
+    if (
+        parsed.scheme
+        not in {
+            "http",
+            "https",
+        }
+        or not parsed.netloc
+    ):
+        raise ValueError("base_url must be a valid HTTP or HTTPS URL")
+
+    return base_url
+
+
+def _validate_timeout(
+    value: object,
+) -> float:
+    if isinstance(value, bool) or not isinstance(
+        value,
+        int | float,
+    ):
+        raise TypeError("timeout must be a number")
+
+    timeout = float(value)
+
+    if not math.isfinite(timeout):
+        raise ValueError("timeout must be finite")
+
+    if timeout <= 0:
+        raise ValueError("timeout must be greater than zero")
+
+    return timeout
 
 
 class VisionClientError(Exception):
@@ -20,7 +72,7 @@ class VisionClientError(Exception):
 class ClientSnapshot:
     path: Path
     timestamp: float
-    format: str
+    format: ClientSnapshotFormat
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,7 +121,7 @@ class ClientDetectionStatus:
         )
 
     def is_enabled(self, name: str) -> bool:
-        return bool(self.detectors.get(name, False))
+        return self.detectors.get(name, False)
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,35 +190,38 @@ class VisionClient:
         *,
         timeout: float = 10.0,
     ) -> None:
-        if not base_url:
-            raise VisionClientError("base_url cannot be empty")
-
-        if timeout <= 0:
-            raise VisionClientError("timeout must be greater than 0")
-
-        self.base_url = base_url.rstrip("/")
-        self.timeout = float(timeout)
+        self.base_url = _validate_base_url(base_url)
+        self.timeout = _validate_timeout(timeout)
         self._recording_filename: str | None = None
 
     @staticmethod
     def _snapshot_format(
         filename: str | None,
-    ) -> str:
+    ) -> ClientSnapshotFormat:
         if filename is None:
             return "jpg"
 
-        suffix = Path(filename).suffix.lower()
+        if not isinstance(filename, str):
+            raise TypeError("filename must be a string")
 
-        if suffix in (".jpg", ".jpeg"):
+        filename_value = filename.strip()
+
+        if not filename_value:
+            raise ValueError("filename cannot be empty")
+
+        suffix = Path(filename_value).suffix.casefold()
+
+        if suffix in {
+            ".jpg",
+            ".jpeg",
+            "",
+        }:
             return "jpg"
 
         if suffix == ".png":
             return "png"
 
-        if suffix:
-            raise VisionClientError("snapshot filename must use .jpg, .jpeg, or .png")
-
-        return "jpg"
+        raise ValueError("snapshot filename must use .jpg, .jpeg, or .png")
 
     def _request_bytes(
         self,
@@ -319,22 +374,17 @@ class VisionClient:
             path,
         )
 
-        returned_format = headers.get(
-            "X-Betabox-Format",
-            image_format,
-        ).lower()
-
-        timestamp_value = headers.get(
-            "X-Betabox-Timestamp",
-            "0",
+        returned_format = self._snapshot_format(
+            f"snapshot.{headers.get('X-Betabox-Format', image_format)}"
         )
 
-        try:
-            timestamp = float(timestamp_value)
-        except (TypeError, ValueError) as exc:
-            raise VisionClientError(
-                "Vision service returned an invalid snapshot timestamp"
-            ) from exc
+        timestamp = self._parse_float(
+            headers.get(
+                "X-Betabox-Timestamp",
+                "0",
+            ),
+            field="snapshot timestamp",
+        )
 
         output_path = self._media_output_path(
             directory=Path.home() / "media" / "pictures",
@@ -371,11 +421,13 @@ class VisionClient:
             },
         )
 
+        output_path = self._recording_output_path(filename)
+
         self._post(path)
 
         self._recording_filename = filename
 
-        return self._recording_output_path(filename)
+        return output_path
 
     def stop_recording(
         self,
@@ -397,30 +449,28 @@ class VisionClient:
             "mp4",
         ).lower()
 
+        if returned_format != "mp4":
+            raise VisionClientError("Vision service returned invalid recording format")
+
         try:
-            start_timestamp = float(
-                headers.get(
-                    "X-Betabox-Start-Timestamp",
-                    "0",
-                )
+            start_timestamp = self._parse_float(
+                headers.get("X-Betabox-Start-Timestamp", "0"),
+                field="recording start timestamp",
             )
-            end_timestamp = float(
-                headers.get(
-                    "X-Betabox-End-Timestamp",
-                    "0",
-                )
+
+            end_timestamp = self._parse_float(
+                headers.get("X-Betabox-End-Timestamp", "0"),
+                field="recording end timestamp",
             )
-            frame_count = int(
-                headers.get(
-                    "X-Betabox-Frame-Count",
-                    "0",
-                )
+
+            frame_count = self._parse_int(
+                headers.get("X-Betabox-Frame-Count", "0"),
+                field="recording frame count",
             )
-            fps = float(
-                headers.get(
-                    "X-Betabox-FPS",
-                    "0",
-                )
+
+            fps = self._parse_float(
+                headers.get("X-Betabox-FPS", "0"),
+                field="recording FPS",
             )
         except (TypeError, ValueError) as exc:
             raise VisionClientError(
@@ -484,7 +534,10 @@ class VisionClient:
             payload["colors"] = colors if isinstance(colors, str) else list(colors)
 
         if min_area is not None:
-            payload["min_area"] = float(min_area)
+            if isinstance(min_area, bool) or not isinstance(min_area, (int, float)):
+                raise TypeError("min_area must be a number")
+
+            payload["min_area"] = min_area
 
         data = self._post_json(
             "/detection/color/enable",
@@ -617,10 +670,18 @@ class VisionClient:
         *,
         field: str,
     ) -> float:
+        if isinstance(value, bool):
+            raise VisionClientError(f"Vision service returned invalid {field}")
+
         try:
-            return float(value)
+            result = float(value)
         except (TypeError, ValueError) as exc:
             raise VisionClientError(f"Vision service returned invalid {field}") from exc
+
+        if not math.isfinite(result):
+            raise VisionClientError(f"Vision service returned invalid {field}")
+
+        return result
 
     @staticmethod
     def _parse_int(
@@ -628,22 +689,61 @@ class VisionClient:
         *,
         field: str,
     ) -> int:
+        if isinstance(value, bool):
+            raise VisionClientError(f"Vision service returned invalid {field}")
+
+        if isinstance(value, float) and not value.is_integer():
+            raise VisionClientError(f"Vision service returned invalid {field}")
+
         try:
             return int(value)
         except (TypeError, ValueError) as exc:
             raise VisionClientError(f"Vision service returned invalid {field}") from exc
 
+    @staticmethod
+    def _parse_bool(value: Any, *, field: str) -> bool:
+        if not isinstance(value, bool):
+            raise VisionClientError(f"Vision service returned invalid {field}")
+
+        return value
+
+    @staticmethod
+    def _parse_string(
+        value: Any,
+        *,
+        field: str,
+        allow_empty: bool = False,
+    ) -> str:
+        if not isinstance(value, str):
+            raise VisionClientError(f"Vision service returned invalid {field}")
+
+        result = value.strip()
+
+        if not result and not allow_empty:
+            raise VisionClientError(f"Vision service returned invalid {field}")
+
+        return result
+
     def _parse_detection(
         self,
         data: dict[str, Any],
     ) -> ClientDetection:
+        label = self._parse_string(
+            data.get("label"),
+            field="detection label",
+        )
         box_data = data.get("box")
         center_data = data.get("center")
 
         box: tuple[int, int, int, int] | None = None
         center: tuple[int, int] | None = None
 
-        if isinstance(box_data, (list, tuple)) and len(box_data) == 4:
+        if box_data is not None:
+            if not isinstance(box_data, (list, tuple)) or len(box_data) != 4:
+                raise VisionClientError(
+                    "Vision service returned an invalid detection box"
+                )
+
             try:
                 box = (
                     int(box_data[0]),
@@ -656,7 +756,12 @@ class VisionClient:
                     "Vision service returned an invalid detection box"
                 ) from exc
 
-        if isinstance(center_data, (list, tuple)) and len(center_data) == 2:
+        if center_data is not None:
+            if not isinstance(center_data, (list, tuple)) or len(center_data) != 2:
+                raise VisionClientError(
+                    "Vision service returned an invalid detection center"
+                )
+
             try:
                 center = (
                     int(center_data[0]),
@@ -681,7 +786,7 @@ class VisionClient:
         extra_data = data.get("data", {})
 
         return ClientDetection(
-            label=str(data.get("label", "")),
+            label=label,
             confidence=confidence,
             box=box,
             center=center,
@@ -705,8 +810,13 @@ class VisionClient:
 
         extra_data = data.get("data", {})
 
+        source = self._parse_string(
+            data.get("source"),
+            field="metadata source",
+        )
+
         return ClientMetadata(
-            source=str(data.get("source", "")),
+            source=source,
             timestamp=self._parse_float(
                 data.get("timestamp", 0.0),
                 field="metadata timestamp",
@@ -728,7 +838,11 @@ class VisionClient:
         if isinstance(detectors_data, dict):
             # Enable/disable endpoints return the state map directly.
             detectors = {
-                str(name): bool(enabled) for name, enabled in detectors_data.items()
+                str(name): self._parse_bool(
+                    enabled,
+                    field=f"{name} detector state",
+                )
+                for name, enabled in detectors_data.items()
             }
 
         elif isinstance(detectors_data, list):
@@ -737,7 +851,11 @@ class VisionClient:
             state_map = enabled_data if isinstance(enabled_data, dict) else {}
 
             detectors = {
-                str(name): bool(state_map.get(name, False)) for name in detectors_data
+                str(name): self._parse_bool(
+                    state_map.get(name, False),
+                    field=f"{name} detector state",
+                )
+                for name in detectors_data
             }
 
         else:
@@ -762,8 +880,21 @@ class VisionClient:
         source = data.get("source")
 
         return ClientStreamOverlayStatus(
-            enabled=bool(data.get("enabled", False)),
-            source=str(source) if source is not None else None,
+            enabled=self._parse_bool(
+                data.get(
+                    "enabled",
+                    False,
+                ),
+                field="stream overlay enabled state",
+            ),
+            source=(
+                self._parse_string(
+                    source,
+                    field="stream overlay source",
+                )
+                if source is not None
+                else None
+            ),
         )
 
     def _parse_camera_statistics(
@@ -773,7 +904,13 @@ class VisionClient:
         last_error = data.get("last_error")
 
         return ClientCameraStatistics(
-            running=bool(data.get("running", False)),
+            running=self._parse_bool(
+                data.get(
+                    "running",
+                    False,
+                ),
+                field="camera running state",
+            ),
             fps=self._parse_float(
                 data.get("fps", 0.0),
                 field="camera FPS",
@@ -782,7 +919,13 @@ class VisionClient:
                 data.get("consumer_count", 0),
                 field="camera consumer count",
             ),
-            has_frame=bool(data.get("has_frame", False)),
+            has_frame=self._parse_bool(
+                data.get(
+                    "has_frame",
+                    False,
+                ),
+                field="camera frame state",
+            ),
             last_error=(str(last_error) if last_error is not None else None),
         )
 
@@ -796,7 +939,13 @@ class VisionClient:
             overlay_data = {}
 
         return ClientStreamingStatistics(
-            running=bool(data.get("running", False)),
+            running=self._parse_bool(
+                data.get(
+                    "running",
+                    False,
+                ),
+                field="streaming running state",
+            ),
             clients=self._parse_int(
                 data.get("clients", 0),
                 field="streaming client count",
@@ -805,7 +954,13 @@ class VisionClient:
                 data.get("frames_received", 0),
                 field="streaming frame count",
             ),
-            has_frame=bool(data.get("has_frame", False)),
+            has_frame=self._parse_bool(
+                data.get(
+                    "has_frame",
+                    False,
+                ),
+                field="streaming frame state",
+            ),
             overlay=self._parse_stream_overlay_status(overlay_data),
         )
 
@@ -819,7 +974,13 @@ class VisionClient:
             overlay_data = {}
 
         return ClientRecordingStatus(
-            active=bool(data.get("active", False)),
+            active=self._parse_bool(
+                data.get(
+                    "active",
+                    False,
+                ),
+                field="recording active state",
+            ),
             overlay=self._parse_stream_overlay_status(overlay_data),
         )
 
@@ -834,13 +995,23 @@ class VisionClient:
 
         if isinstance(detectors_data, dict):
             detectors = {
-                str(name): bool(enabled) for name, enabled in detectors_data.items()
+                str(name): self._parse_bool(
+                    enabled,
+                    field=f"{name} detector state",
+                )
+                for name, enabled in detectors_data.items()
             }
 
         metadata_sources: list[str] = []
 
         if isinstance(metadata_sources_data, list):
-            metadata_sources = [str(source) for source in metadata_sources_data]
+            metadata_sources = [
+                self._parse_string(
+                    source,
+                    field="metadata source",
+                )
+                for source in metadata_sources_data
+            ]
 
         return ClientDetectionStatistics(
             detectors=detectors,
@@ -852,7 +1023,10 @@ class VisionClient:
         data: dict[str, Any],
     ) -> ClientVisionServerStatistics:
         return ClientVisionServerStatistics(
-            host=str(data.get("host", "")),
+            host=self._parse_string(
+                data.get("host"),
+                field="server host",
+            ),
             port=self._parse_int(
                 data.get("port", 0),
                 field="server port",
@@ -889,7 +1063,13 @@ class VisionClient:
             server_data = {}
 
         return ClientVisionStatistics(
-            running=bool(data.get("running", False)),
+            running=self._parse_bool(
+                data.get(
+                    "running",
+                    False,
+                ),
+                field="Vision running state",
+            ),
             camera=self._parse_camera_statistics(camera_data),
             streaming=self._parse_streaming_statistics(streaming_data),
             recording=self._parse_recording_status(recording_data),

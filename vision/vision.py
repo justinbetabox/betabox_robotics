@@ -1,16 +1,25 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Self
 
 from betabox_robotics.vision.consumer import FrameConsumer
 from betabox_robotics.vision.detection import DetectionManager
+from betabox_robotics.vision.detectors.color import (
+    HSVRangeInput,
+)
 from betabox_robotics.vision.frame import Frame
-from betabox_robotics.vision.frame_source import FrameSource
+from betabox_robotics.vision.frame_source import (
+    FrameSource,
+    FrameSourceError,
+)
 from betabox_robotics.vision.metadata import Metadata
 from betabox_robotics.vision.metadata_bus import MetadataBus
 from betabox_robotics.vision.overlay import OverlayRenderer
-from betabox_robotics.vision.recording import RecordingService
+from betabox_robotics.vision.recording import (
+    RecordingError,
+    RecordingService,
+)
 from betabox_robotics.vision.snapshot import SnapshotService
 
 
@@ -30,7 +39,20 @@ class Vision:
         frame_source: FrameSource | None = None,
         metadata_bus: MetadataBus | None = None,
     ) -> None:
+        if frame_source is not None and not isinstance(
+            frame_source,
+            FrameSource,
+        ):
+            raise TypeError("frame_source must be a FrameSource")
+
+        if metadata_bus is not None and not isinstance(
+            metadata_bus,
+            MetadataBus,
+        ):
+            raise TypeError("metadata_bus must be a MetadataBus")
+
         self.frame_source = frame_source if frame_source is not None else FrameSource()
+
         self.metadata = metadata_bus if metadata_bus is not None else MetadataBus()
 
         self.overlay = OverlayRenderer()
@@ -48,7 +70,7 @@ class Vision:
     @classmethod
     def default(
         cls,
-        robot_config=None,
+        robot_config: object | None = None,
     ) -> Self:
         return cls()
 
@@ -56,19 +78,22 @@ class Vision:
         self.frame_source.start()
 
     def stop(self) -> None:
-        error: Exception | None = None
+        shutdown_error: RecordingError | FrameSourceError | None = None
 
         if self.recording.is_recording():
             try:
                 self.recording.stop()
-            except Exception as exc:
-                error = exc
+            except RecordingError as exc:
+                shutdown_error = exc
 
         try:
             self.frame_source.stop()
-        finally:
-            if error is not None:
-                raise error
+        except FrameSourceError as exc:
+            if shutdown_error is None:
+                shutdown_error = exc
+
+        if shutdown_error is not None:
+            raise shutdown_error
 
     def enable_detection(
         self,
@@ -86,10 +111,16 @@ class Vision:
         self,
         colors: str | Sequence[str] | None = None,
         *,
+        custom_ranges: Mapping[
+            str,
+            HSVRangeInput,
+        ]
+        | None = None,
         min_area: float | None = None,
     ) -> None:
         self.detection.enable_color(
             colors,
+            custom_ranges=custom_ranges,
             min_area=min_area,
         )
 
@@ -140,8 +171,8 @@ class Vision:
 
     def __exit__(
         self,
-        exc_type,
-        exc_value,
-        traceback,
+        exc_type: object,
+        exc_value: object,
+        traceback: object,
     ) -> None:
         self.close()

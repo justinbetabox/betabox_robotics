@@ -1,264 +1,432 @@
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from betabox_robotics.vision.detection import (
     DetectionError,
     DetectionManager,
+    _validate_detector_name,
 )
-from betabox_robotics.vision.detector import Detector
+from betabox_robotics.vision.detector import (
+    Detector,
+    DetectorError,
+)
 from betabox_robotics.vision.frame import Frame
 from betabox_robotics.vision.metadata import Metadata
 from betabox_robotics.vision.metadata_bus import MetadataBus
 
 
-class StubDetector(Detector):
+class FakeDetector(Detector):
     def __init__(
         self,
         name: str,
         *,
         enabled: bool = False,
-        result: Metadata | None = None,
-        error: Exception | None = None,
+        metadata: Metadata | None = None,
     ) -> None:
         super().__init__(
             name,
             enabled=enabled,
         )
-        self.result = result
-        self.error = error
+        self.metadata = metadata
         self.frames: list[Frame] = []
 
-    def detect(self, frame: Frame) -> Metadata | None:
+    def detect(
+        self,
+        frame: Frame,
+    ) -> Metadata | None:
         self.frames.append(frame)
+        return self.metadata
 
-        if self.error is not None:
-            raise self.error
 
-        return self.result
+class FailingDetector(Detector):
+    def __init__(
+        self,
+        name: str,
+        *,
+        enabled: bool = True,
+        message: str = "boom",
+    ) -> None:
+        super().__init__(
+            name,
+            enabled=enabled,
+        )
+        self.message = message
+        self.frames: list[Frame] = []
+
+    def detect(
+        self,
+        frame: Frame,
+    ) -> Metadata | None:
+        self.frames.append(frame)
+        raise DetectorError(self.message)
+
+
+class DetectionValidationTests(unittest.TestCase):
+    def test_validate_detector_name(self) -> None:
+        self.assertEqual(
+            _validate_detector_name("  color  "),
+            "color",
+        )
+
+    def test_validate_detector_name_rejects_non_string(self) -> None:
+        with self.assertRaisesRegex(
+            TypeError,
+            "detector name must be a string",
+        ):
+            _validate_detector_name(123)
+
+    def test_validate_detector_name_rejects_empty_name(self) -> None:
+        with self.assertRaisesRegex(
+            ValueError,
+            "detector name cannot be empty",
+        ):
+            _validate_detector_name(" ")
 
 
 class DetectionManagerTests(unittest.TestCase):
-    def setUp(self):
-        self.bus = MagicMock(spec=MetadataBus)
-        self.manager = DetectionManager(self.bus)
-        self.frame = Frame.create(object())
+    def _create_manager(
+        self,
+    ) -> tuple[
+        DetectionManager,
+        MagicMock,
+        MagicMock,
+        MagicMock,
+    ]:
+        color = MagicMock(spec=Detector)
+        color.name = "color"
+        color.enabled = False
 
-    def test_default_detectors_are_registered(self):
-        self.assertEqual(
-            self.manager.names(),
-            [
-                self.manager.color.name,
-                self.manager.face.name,
-                self.manager.objects.name,
-            ],
+        face = MagicMock(spec=Detector)
+        face.name = "face"
+        face.enabled = False
+
+        objects = MagicMock(spec=Detector)
+        objects.name = "objects"
+        objects.enabled = False
+
+        with (
+            patch(
+                "betabox_robotics.vision.detection.ColorDetector",
+                return_value=color,
+            ),
+            patch(
+                "betabox_robotics.vision.detection.FaceDetector",
+                return_value=face,
+            ),
+            patch(
+                "betabox_robotics.vision.detection.ObjectDetector",
+                return_value=objects,
+            ),
+        ):
+            manager = DetectionManager(MetadataBus())
+
+        return (
+            manager,
+            color,
+            face,
+            objects,
         )
 
-    def test_default_detectors_are_disabled(self):
-        for name in self.manager.names():
-            self.assertFalse(self.manager.is_enabled(name))
+    def test_requires_metadata_bus(self) -> None:
+        with self.assertRaisesRegex(
+            TypeError,
+            "metadata_bus must be a MetadataBus",
+        ):
+            DetectionManager(
+                object(),  # type: ignore[arg-type]
+            )
 
-    def test_register_detector(self):
-        detector = StubDetector("custom")
+    def test_registers_default_detectors(self) -> None:
+        manager, color, face, objects = self._create_manager()
 
-        self.manager.register(detector)
+        self.assertEqual(
+            manager.names(),
+            [
+                "color",
+                "face",
+                "objects",
+            ],
+        )
+        self.assertIs(
+            manager.color,
+            color,
+        )
+        self.assertIs(
+            manager.face,
+            face,
+        )
+        self.assertIs(
+            manager.objects,
+            objects,
+        )
+
+    def test_register_requires_detector(self) -> None:
+        manager, _, _, _ = self._create_manager()
+
+        with self.assertRaisesRegex(
+            TypeError,
+            "detector must be a Detector instance",
+        ):
+            manager.register(
+                object(),  # type: ignore[arg-type]
+            )
+
+    def test_register_adds_detector(self) -> None:
+        manager, _, _, _ = self._create_manager()
+        detector = FakeDetector("custom")
+
+        manager.register(detector)
 
         self.assertIn(
             "custom",
-            self.manager.names(),
+            manager.names(),
         )
 
-    def test_duplicate_registration_raises(self):
-        detector = StubDetector("custom")
-
-        self.manager.register(detector)
+    def test_register_rejects_duplicate_name(self) -> None:
+        manager, _, _, _ = self._create_manager()
 
         with self.assertRaisesRegex(
             DetectionError,
-            "detector already registered: custom",
+            "detector already registered: color",
         ):
-            self.manager.register(StubDetector("custom"))
+            manager.register(FakeDetector("color"))
 
-    def test_unregister_detector(self):
-        detector = StubDetector("custom")
-        self.manager.register(detector)
+    def test_unregister_removes_detector(self) -> None:
+        manager, _, _, _ = self._create_manager()
 
-        self.manager.unregister("custom")
-
-        self.assertNotIn(
-            "custom",
-            self.manager.names(),
-        )
-
-    def test_unregister_unknown_detector_is_noop(self):
-        self.manager.unregister("missing")
+        manager.unregister("face")
 
         self.assertNotIn(
-            "missing",
-            self.manager.names(),
+            "face",
+            manager.names(),
         )
 
-    def test_enable_detector(self):
-        detector = StubDetector("custom")
-        self.manager.register(detector)
+    def test_unregister_unknown_detector_does_not_raise(
+        self,
+    ) -> None:
+        manager, _, _, _ = self._create_manager()
 
-        self.manager.enable("custom")
+        manager.unregister("missing")
 
-        self.assertTrue(detector.enabled)
-        self.assertTrue(self.manager.is_enabled("custom"))
-
-    def test_disable_detector(self):
-        detector = StubDetector(
-            "custom",
-            enabled=True,
+        self.assertEqual(
+            manager.names(),
+            [
+                "color",
+                "face",
+                "objects",
+            ],
         )
-        self.manager.register(detector)
 
-        self.manager.disable("custom")
+    def test_enable_enables_named_detector(self) -> None:
+        manager, color, _, _ = self._create_manager()
 
-        self.assertFalse(detector.enabled)
-        self.assertFalse(self.manager.is_enabled("custom"))
+        manager.enable("color")
 
-    def test_unknown_detector_raises(self):
+        color.enable.assert_called_once_with()
+
+    def test_disable_disables_named_detector(self) -> None:
+        manager, color, _, _ = self._create_manager()
+
+        manager.disable("color")
+
+        color.disable.assert_called_once_with()
+
+    def test_is_enabled_returns_detector_state(self) -> None:
+        manager, color, _, _ = self._create_manager()
+        color.enabled = True
+
+        self.assertTrue(manager.is_enabled("color"))
+
+    def test_unknown_detector_raises(self) -> None:
+        manager, _, _, _ = self._create_manager()
+
         with self.assertRaisesRegex(
             DetectionError,
             "unknown detector: missing",
         ):
-            self.manager.enable("missing")
+            manager.enable("missing")
 
-    def test_disabled_detector_is_skipped(self):
-        detector = StubDetector("custom")
-        self.manager.register(detector)
+    def test_enable_color_forwards_configuration(self) -> None:
+        manager, color, _, _ = self._create_manager()
 
-        self.manager.on_frame(self.frame)
+        custom_ranges = {
+            "team_marker": (
+                (
+                    (10, 100, 100),
+                    (20, 255, 255),
+                ),
+            ),
+        }
 
-        self.assertEqual(detector.frames, [])
-        self.bus.publish.assert_not_called()
+        manager.enable_color(
+            [
+                "red",
+                "team_marker",
+            ],
+            custom_ranges=custom_ranges,
+            min_area=25,
+        )
 
-    def test_enabled_detector_receives_frame(self):
-        detector = StubDetector(
+        color.enable.assert_called_once_with(
+            [
+                "red",
+                "team_marker",
+            ],
+            custom_ranges=custom_ranges,
+            min_area=25,
+        )
+
+
+class DetectionManagerFrameTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.bus = MetadataBus()
+
+        with (
+            patch(
+                "betabox_robotics.vision.detection.ColorDetector",
+                return_value=FakeDetector("color"),
+            ),
+            patch(
+                "betabox_robotics.vision.detection.FaceDetector",
+                return_value=FakeDetector("face"),
+            ),
+            patch(
+                "betabox_robotics.vision.detection.ObjectDetector",
+                return_value=FakeDetector("objects"),
+            ),
+        ):
+            self.manager = DetectionManager(self.bus)
+
+    def test_on_frame_requires_frame(self) -> None:
+        with self.assertRaisesRegex(
+            TypeError,
+            "frame must be a Frame instance",
+        ):
+            self.manager.on_frame(
+                object(),  # type: ignore[arg-type]
+            )
+
+    def test_disabled_detectors_are_skipped(self) -> None:
+        frame = Frame.create(object())
+
+        self.manager.on_frame(frame)
+
+        self.assertEqual(
+            self.bus.history(),
+            (),
+        )
+
+        for detector in (
+            self.manager.color,
+            self.manager.face,
+            self.manager.objects,
+        ):
+            self.assertEqual(
+                detector.frames,
+                [],
+            )
+
+    def test_enabled_detector_metadata_is_published(
+        self,
+    ) -> None:
+        metadata = Metadata.create(
+            "color",
+            timestamp=123.5,
+        )
+        detector = FakeDetector(
             "custom",
             enabled=True,
+            metadata=metadata,
         )
         self.manager.register(detector)
 
-        self.manager.on_frame(self.frame)
+        frame = Frame.create(
+            object(),
+            timestamp=123.5,
+        )
+
+        self.manager.on_frame(frame)
 
         self.assertEqual(
             detector.frames,
-            [self.frame],
+            [frame],
+        )
+        self.assertIs(
+            self.bus.latest("color"),
+            metadata,
         )
 
-    def test_enable_color_configures_and_enables_detector(self) -> None:
-        self.manager.enable_color(
-            ["red", "blue"],
-            min_area=250,
+    def test_none_metadata_is_ignored(self) -> None:
+        detector = FakeDetector(
+            "custom",
+            enabled=True,
+            metadata=None,
         )
+        self.manager.register(detector)
 
-        self.assertTrue(self.manager.color.enabled)
+        self.manager.on_frame(Frame.create(object()))
+
         self.assertEqual(
-            self.manager.color.colors,
-            ["red", "blue"],
-        )
-        self.assertEqual(
-            self.manager.color.min_area,
-            250.0,
+            self.bus.history(),
+            (),
         )
 
-    def test_enable_color_preserves_configuration_when_omitted(
+    def test_failure_does_not_prevent_later_detector(
         self,
     ) -> None:
-        self.manager.color.configure(
-            ["green", "yellow"],
-            min_area=300,
+        failing = FailingDetector(
+            "failing",
+            message="first failure",
         )
-
-        self.manager.enable_color()
-
-        self.assertTrue(self.manager.color.enabled)
-        self.assertEqual(
-            self.manager.color.colors,
-            ["green", "yellow"],
-        )
-        self.assertEqual(
-            self.manager.color.min_area,
-            300.0,
-        )
-
-    def test_enable_color_accepts_single_color(self) -> None:
-        self.manager.enable_color("blue")
-
-        self.assertTrue(self.manager.color.enabled)
-        self.assertEqual(
-            self.manager.color.colors,
-            ["blue"],
-        )
-
-    def test_enable_color_rejects_unsupported_color(self) -> None:
-        with self.assertRaisesRegex(
-            ValueError,
-            "unsupported color",
-        ):
-            self.manager.enable_color("purple")
-
-    def test_metadata_is_published(self):
-        metadata = Metadata(
-            source="custom",
-            timestamp=self.frame.timestamp,
-        )
-
-        detector = StubDetector(
-            "custom",
+        metadata = Metadata.create("working")
+        working = FakeDetector(
+            "working",
             enabled=True,
-            result=metadata,
+            metadata=metadata,
         )
-        self.manager.register(detector)
 
-        self.manager.on_frame(self.frame)
+        self.manager.register(failing)
+        self.manager.register(working)
 
-        self.bus.publish.assert_called_once_with(metadata)
-
-    def test_none_metadata_is_not_published(self):
-        detector = StubDetector(
-            "custom",
-            enabled=True,
-            result=None,
-        )
-        self.manager.register(detector)
-
-        self.manager.on_frame(self.frame)
-
-        self.bus.publish.assert_not_called()
-
-    def test_detector_error_is_wrapped(self):
-        detector = StubDetector(
-            "custom",
-            enabled=True,
-            error=RuntimeError("boom"),
-        )
-        self.manager.register(detector)
+        frame = Frame.create(object())
 
         with self.assertRaisesRegex(
             DetectionError,
-            "custom detector failed: boom",
-        ):
-            self.manager.on_frame(self.frame)
+            ("failing detector failed: first failure"),
+        ) as context:
+            self.manager.on_frame(frame)
 
-    def test_later_detectors_run_after_earlier_failure(self):
-        first = StubDetector(
+        self.assertEqual(
+            failing.frames,
+            [frame],
+        )
+        self.assertEqual(
+            working.frames,
+            [frame],
+        )
+        self.assertIs(
+            self.bus.latest("working"),
+            metadata,
+        )
+        self.assertIsInstance(
+            context.exception.__cause__,
+            DetectorError,
+        )
+        self.assertEqual(
+            str(context.exception.__cause__),
+            "first failure",
+        )
+
+    def test_first_detector_failure_is_preserved(
+        self,
+    ) -> None:
+        first = FailingDetector(
             "first",
-            enabled=True,
-            error=RuntimeError("boom"),
+            message="failure one",
         )
-
-        metadata = Metadata(
-            source="second",
-            timestamp=self.frame.timestamp,
-        )
-
-        second = StubDetector(
+        second = FailingDetector(
             "second",
-            enabled=True,
-            result=metadata,
+            message="failure two",
         )
 
         self.manager.register(first)
@@ -266,294 +434,19 @@ class DetectionManagerTests(unittest.TestCase):
 
         with self.assertRaisesRegex(
             DetectionError,
-            "first detector failed: boom",
-        ):
-            self.manager.on_frame(self.frame)
+            "first detector failed: failure one",
+        ) as context:
+            self.manager.on_frame(Frame.create(object()))
 
+        self.assertIsInstance(
+            context.exception.__cause__,
+            DetectorError,
+        )
         self.assertEqual(
-            second.frames,
-            [self.frame],
-        )
-        self.bus.publish.assert_called_once_with(metadata)
-
-    def test_only_first_error_is_reported(self):
-        first = StubDetector(
-            "first",
-            enabled=True,
-            error=RuntimeError("first failure"),
-        )
-        second = StubDetector(
-            "second",
-            enabled=True,
-            error=RuntimeError("second failure"),
-        )
-
-        self.manager.register(first)
-        self.manager.register(second)
-
-        with self.assertRaisesRegex(
-            DetectionError,
-            "first detector failed: first failure",
-        ):
-            self.manager.on_frame(self.frame)
-
-        self.assertEqual(
-            second.frames,
-            [self.frame],
+            str(context.exception.__cause__),
+            "failure one",
         )
 
 
 if __name__ == "__main__":
     unittest.main()
-    import unittest
-    from unittest.mock import MagicMock
-
-    from betabox_robotics.vision.detection import (
-        DetectionError,
-        DetectionManager,
-    )
-    from betabox_robotics.vision.detector import Detector
-    from betabox_robotics.vision.frame import Frame
-    from betabox_robotics.vision.metadata import Metadata
-    from betabox_robotics.vision.metadata_bus import MetadataBus
-
-    class StubDetector(Detector):
-        def __init__(
-            self,
-            name: str,
-            *,
-            enabled: bool = False,
-            result: Metadata | None = None,
-            error: Exception | None = None,
-        ) -> None:
-            super().__init__(
-                name,
-                enabled=enabled,
-            )
-            self.result = result
-            self.error = error
-            self.frames: list[Frame] = []
-
-        def detect(self, frame: Frame) -> Metadata | None:
-            self.frames.append(frame)
-
-            if self.error is not None:
-                raise self.error
-
-            return self.result
-
-    class DetectionManagerTests(unittest.TestCase):
-        def setUp(self):
-            self.bus = MagicMock(spec=MetadataBus)
-            self.manager = DetectionManager(self.bus)
-            self.frame = Frame.create(object())
-
-        def test_default_detectors_are_registered(self):
-            self.assertEqual(
-                self.manager.names(),
-                [
-                    self.manager.color.name,
-                    self.manager.face.name,
-                    self.manager.objects.name,
-                ],
-            )
-
-        def test_default_detectors_are_disabled(self):
-            for name in self.manager.names():
-                self.assertFalse(self.manager.is_enabled(name))
-
-        def test_register_detector(self):
-            detector = StubDetector("custom")
-
-            self.manager.register(detector)
-
-            self.assertIn(
-                "custom",
-                self.manager.names(),
-            )
-
-        def test_duplicate_registration_raises(self):
-            detector = StubDetector("custom")
-
-            self.manager.register(detector)
-
-            with self.assertRaisesRegex(
-                DetectionError,
-                "detector already registered: custom",
-            ):
-                self.manager.register(StubDetector("custom"))
-
-        def test_unregister_detector(self):
-            detector = StubDetector("custom")
-            self.manager.register(detector)
-
-            self.manager.unregister("custom")
-
-            self.assertNotIn(
-                "custom",
-                self.manager.names(),
-            )
-
-        def test_unregister_unknown_detector_is_noop(self):
-            self.manager.unregister("missing")
-
-            self.assertNotIn(
-                "missing",
-                self.manager.names(),
-            )
-
-        def test_enable_detector(self):
-            detector = StubDetector("custom")
-            self.manager.register(detector)
-
-            self.manager.enable("custom")
-
-            self.assertTrue(detector.enabled)
-            self.assertTrue(self.manager.is_enabled("custom"))
-
-        def test_disable_detector(self):
-            detector = StubDetector(
-                "custom",
-                enabled=True,
-            )
-            self.manager.register(detector)
-
-            self.manager.disable("custom")
-
-            self.assertFalse(detector.enabled)
-            self.assertFalse(self.manager.is_enabled("custom"))
-
-        def test_unknown_detector_raises(self):
-            with self.assertRaisesRegex(
-                DetectionError,
-                "unknown detector: missing",
-            ):
-                self.manager.enable("missing")
-
-        def test_disabled_detector_is_skipped(self):
-            detector = StubDetector("custom")
-            self.manager.register(detector)
-
-            self.manager.on_frame(self.frame)
-
-            self.assertEqual(detector.frames, [])
-            self.bus.publish.assert_not_called()
-
-        def test_enabled_detector_receives_frame(self):
-            detector = StubDetector(
-                "custom",
-                enabled=True,
-            )
-            self.manager.register(detector)
-
-            self.manager.on_frame(self.frame)
-
-            self.assertEqual(
-                detector.frames,
-                [self.frame],
-            )
-
-        def test_metadata_is_published(self):
-            metadata = Metadata(
-                source="custom",
-                timestamp=self.frame.timestamp,
-            )
-
-            detector = StubDetector(
-                "custom",
-                enabled=True,
-                result=metadata,
-            )
-            self.manager.register(detector)
-
-            self.manager.on_frame(self.frame)
-
-            self.bus.publish.assert_called_once_with(metadata)
-
-        def test_none_metadata_is_not_published(self):
-            detector = StubDetector(
-                "custom",
-                enabled=True,
-                result=None,
-            )
-            self.manager.register(detector)
-
-            self.manager.on_frame(self.frame)
-
-            self.bus.publish.assert_not_called()
-
-        def test_detector_error_is_wrapped(self):
-            detector = StubDetector(
-                "custom",
-                enabled=True,
-                error=RuntimeError("boom"),
-            )
-            self.manager.register(detector)
-
-            with self.assertRaisesRegex(
-                DetectionError,
-                "custom detector failed: boom",
-            ):
-                self.manager.on_frame(self.frame)
-
-        def test_later_detectors_run_after_earlier_failure(self):
-            first = StubDetector(
-                "first",
-                enabled=True,
-                error=RuntimeError("boom"),
-            )
-
-            metadata = Metadata(
-                source="second",
-                timestamp=self.frame.timestamp,
-            )
-
-            second = StubDetector(
-                "second",
-                enabled=True,
-                result=metadata,
-            )
-
-            self.manager.register(first)
-            self.manager.register(second)
-
-            with self.assertRaisesRegex(
-                DetectionError,
-                "first detector failed: boom",
-            ):
-                self.manager.on_frame(self.frame)
-
-            self.assertEqual(
-                second.frames,
-                [self.frame],
-            )
-            self.bus.publish.assert_called_once_with(metadata)
-
-        def test_only_first_error_is_reported(self):
-            first = StubDetector(
-                "first",
-                enabled=True,
-                error=RuntimeError("first failure"),
-            )
-            second = StubDetector(
-                "second",
-                enabled=True,
-                error=RuntimeError("second failure"),
-            )
-
-            self.manager.register(first)
-            self.manager.register(second)
-
-            with self.assertRaisesRegex(
-                DetectionError,
-                "first detector failed: first failure",
-            ):
-                self.manager.on_frame(self.frame)
-
-            self.assertEqual(
-                second.frames,
-                [self.frame],
-            )
-
-    if __name__ == "__main__":
-        unittest.main()

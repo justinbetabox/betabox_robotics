@@ -1,259 +1,340 @@
-import json
+from __future__ import annotations
+
 import unittest
 from dataclasses import dataclass
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from aiohttp import web
-from aiohttp.test_utils import AioHTTPTestCase
+from aiohttp.test_utils import (
+    TestClient,
+    TestServer,
+)
 
-from betabox_robotics.vision.metadata import Detection, Metadata
-from betabox_robotics.vision.recording import RecordingData
+from betabox_robotics.vision.metadata import Metadata
+from betabox_robotics.vision.recording import (
+    RecordingData,
+    RecordingError,
+)
 from betabox_robotics.vision.signaling import (
     INDEX_HTML,
     WebRTCSignalingServer,
+    _validate_host,
+    _validate_port,
     fail,
-    json_object,
     ok,
-    query_bool,
     required_string,
     to_json,
 )
 from betabox_robotics.vision.snapshot import SnapshotData
+from betabox_robotics.vision.stream import StreamError
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ExampleData:
     path: Path
     values: tuple[int, ...]
 
 
-class SignalingHelperTests(unittest.IsolatedAsyncioTestCase):
-    def test_to_json_none(self) -> None:
-        self.assertIsNone(to_json(None))
-
-    def test_to_json_path(self) -> None:
+class SignalingValidationTests(unittest.TestCase):
+    def test_validate_host(self) -> None:
         self.assertEqual(
-            to_json(Path("/tmp/example.jpg")),
-            "/tmp/example.jpg",
+            _validate_host(" 127.0.0.1 "),
+            "127.0.0.1",
         )
 
-    def test_to_json_dataclass(self) -> None:
-        value = ExampleData(
-            path=Path("/tmp/example.jpg"),
-            values=(1, 2, 3),
-        )
+    def test_validate_host_rejects_invalid_type(
+        self,
+    ) -> None:
+        with self.assertRaisesRegex(
+            TypeError,
+            "host must be a string",
+        ):
+            _validate_host(123)
 
+    def test_validate_host_rejects_empty_value(
+        self,
+    ) -> None:
+        with self.assertRaisesRegex(
+            ValueError,
+            "host cannot be empty",
+        ):
+            _validate_host(" ")
+
+    def test_validate_port(self) -> None:
         self.assertEqual(
-            to_json(value),
-            {
-                "path": "/tmp/example.jpg",
-                "values": [1, 2, 3],
-            },
+            _validate_port(8080),
+            8080,
         )
 
-    def test_to_json_nested_collections(self) -> None:
-        value = {
-            "paths": (
-                Path("/tmp/one"),
-                Path("/tmp/two"),
-            ),
-            "values": {1, 2},
-        }
+    def test_validate_port_rejects_invalid_type(
+        self,
+    ) -> None:
+        for value in (
+            True,
+            8080.0,
+            "8080",
+        ):
+            with (
+                self.subTest(value=value),
+                self.assertRaisesRegex(
+                    TypeError,
+                    "port must be an integer",
+                ),
+            ):
+                _validate_port(value)
 
-        result = to_json(value)
+    def test_validate_port_rejects_out_of_range_value(
+        self,
+    ) -> None:
+        for value in (
+            0,
+            -1,
+            65536,
+        ):
+            with (
+                self.subTest(value=value),
+                self.assertRaisesRegex(
+                    ValueError,
+                    "port must be between 1 and 65535",
+                ),
+            ):
+                _validate_port(value)
 
-        self.assertEqual(
-            result["paths"],
-            [
-                "/tmp/one",
-                "/tmp/two",
-            ],
-        )
-        self.assertEqual(
-            set(result["values"]),
-            {1, 2},
-        )
-
-    def test_ok_response(self) -> None:
-        response = ok(
-            {
-                "path": Path("/tmp/example"),
-            }
-        )
-
-        self.assertEqual(response.status, 200)
-        self.assertEqual(
-            json.loads(response.body),
-            {
-                "success": True,
-                "data": {
-                    "path": "/tmp/example",
-                },
-            },
-        )
-
-    def test_ok_response_without_data(self) -> None:
-        response = ok()
-
-        self.assertEqual(
-            json.loads(response.body),
-            {
-                "success": True,
-                "data": {},
-            },
-        )
-
-    def test_fail_response(self) -> None:
-        response = fail(
-            "boom",
-            status=409,
-        )
-
-        self.assertEqual(response.status, 409)
-        self.assertEqual(
-            json.loads(response.body),
-            {
-                "success": False,
-                "error": "boom",
-            },
-        )
-
-    def test_required_string_strips_whitespace(self) -> None:
+    def test_required_string(self) -> None:
         self.assertEqual(
             required_string(
-                {"name": "  face  "},
+                {
+                    "name": " color ",
+                },
                 "name",
             ),
-            "face",
+            "color",
         )
 
-    def test_required_string_rejects_missing_value(self) -> None:
-        with self.assertRaisesRegex(
-            ValueError,
-            "name is required",
-        ):
-            required_string({}, "name")
-
-    def test_required_string_rejects_blank_value(self) -> None:
+    def test_required_string_rejects_missing_value(
+        self,
+    ) -> None:
         with self.assertRaisesRegex(
             ValueError,
             "name is required",
         ):
             required_string(
-                {"name": "   "},
+                {},
                 "name",
             )
 
-    async def test_json_object_returns_dictionary(self) -> None:
-        request = MagicMock(spec=web.Request)
-        request.json = AsyncMock(
-            return_value={
-                "name": "face",
-            }
-        )
+    def test_required_string_rejects_invalid_value(
+        self,
+    ) -> None:
+        for value in (
+            None,
+            123,
+            " ",
+        ):
+            with (
+                self.subTest(value=value),
+                self.assertRaisesRegex(
+                    ValueError,
+                    "name is required",
+                ),
+            ):
+                required_string(
+                    {
+                        "name": value,
+                    },
+                    "name",
+                )
 
-        result = await json_object(request)
+
+class SignalingSerializationTests(unittest.TestCase):
+    def test_to_json_handles_dataclass(self) -> None:
+        result = to_json(
+            ExampleData(
+                path=Path("example.txt"),
+                values=(
+                    1,
+                    2,
+                ),
+            )
+        )
 
         self.assertEqual(
             result,
             {
-                "name": "face",
+                "path": "example.txt",
+                "values": [
+                    1,
+                    2,
+                ],
             },
         )
 
-    async def test_json_object_wraps_invalid_json(self) -> None:
-        request = MagicMock(spec=web.Request)
-        request.json = AsyncMock(
-            side_effect=json.JSONDecodeError(
-                "bad JSON",
-                "",
-                0,
-            )
+    def test_to_json_handles_nested_values(self) -> None:
+        result = to_json(
+            {
+                1: {
+                    "paths": {
+                        Path("first"),
+                        Path("second"),
+                    },
+                },
+            }
         )
 
-        with self.assertRaisesRegex(
-            ValueError,
-            "request body must contain valid JSON",
-        ):
-            await json_object(request)
-
-    async def test_json_object_rejects_non_object(self) -> None:
-        request = MagicMock(spec=web.Request)
-        request.json = AsyncMock(
-            return_value=[
-                "face",
-            ]
-        )
-
-        with self.assertRaisesRegex(
-            ValueError,
-            "request JSON must be an object",
-        ):
-            await json_object(request)
-
-    def test_query_bool_default(self) -> None:
-        request = MagicMock(spec=web.Request)
-        request.query = {}
-
-        self.assertFalse(
-            query_bool(
-                request,
-                "overlay",
-            )
-        )
-        self.assertTrue(
-            query_bool(
-                request,
-                "overlay",
-                default=True,
-            )
-        )
-
-    def test_query_bool_true_values(self) -> None:
-        for value in (
+        self.assertIn(
             "1",
-            "true",
-            "TRUE",
-            "yes",
-            "YES",
+            result,
+        )
+        self.assertEqual(
+            set(result["1"]["paths"]),
+            {
+                "first",
+                "second",
+            },
+        )
+
+    def test_to_json_preserves_none(self) -> None:
+        self.assertIsNone(to_json(None))
+
+    def test_ok_response(self) -> None:
+        response = ok(
+            {
+                "value": 1,
+            }
+        )
+
+        self.assertEqual(
+            response.status,
+            200,
+        )
+
+    def test_fail_response(self) -> None:
+        response = fail(
+            "bad request",
+            status=422,
+        )
+
+        self.assertEqual(
+            response.status,
+            422,
+        )
+
+
+class SignalingServerConstructionTests(unittest.TestCase):
+    def test_requires_streamer(self) -> None:
+        with self.assertRaisesRegex(
+            TypeError,
+            "vision must provide a streamer",
         ):
-            with self.subTest(value=value):
-                request = MagicMock(spec=web.Request)
-                request.query = {
-                    "overlay": value,
-                }
+            WebRTCSignalingServer(
+                object(),  # type: ignore[arg-type]
+            )
 
-                self.assertTrue(
-                    query_bool(
-                        request,
-                        "overlay",
-                    )
-                )
+    def test_configuration(self) -> None:
+        vision = MagicMock()
+        vision.streamer = MagicMock()
 
-    def test_query_bool_false_values(self) -> None:
-        for value in (
-            "0",
-            "false",
-            "no",
-            "anything",
-        ):
-            with self.subTest(value=value):
-                request = MagicMock(spec=web.Request)
-                request.query = {
-                    "overlay": value,
-                }
+        server = WebRTCSignalingServer(
+            vision,
+            host=" 127.0.0.1 ",
+            port=9000,
+        )
 
-                self.assertFalse(
-                    query_bool(
-                        request,
-                        "overlay",
-                    )
-                )
+        self.assertIs(
+            server.vision,
+            vision,
+        )
+        self.assertIs(
+            server.streamer,
+            vision.streamer,
+        )
+        self.assertEqual(
+            server.host,
+            "127.0.0.1",
+        )
+        self.assertEqual(
+            server.port,
+            9000,
+        )
+        self.assertEqual(
+            len(server.app.middlewares),
+            1,
+        )
+
+    def test_registers_routes(self) -> None:
+        vision = MagicMock()
+        vision.streamer = MagicMock()
+
+        server = WebRTCSignalingServer(vision)
+
+        routes = {
+            (
+                route.method,
+                route.resource.canonical,
+            )
+            for route in server.app.router.routes()
+        }
+
+        expected = {
+            (
+                "GET",
+                "/",
+            ),
+            (
+                "POST",
+                "/offer",
+            ),
+            (
+                "GET",
+                "/stats",
+            ),
+            (
+                "POST",
+                "/snapshot",
+            ),
+            (
+                "POST",
+                "/recording/start",
+            ),
+            (
+                "POST",
+                "/recording/stop",
+            ),
+            (
+                "GET",
+                "/metadata",
+            ),
+            (
+                "GET",
+                "/detection",
+            ),
+            (
+                "POST",
+                "/detection/enable",
+            ),
+            (
+                "POST",
+                "/detection/disable",
+            ),
+            (
+                "POST",
+                "/detection/color/enable",
+            ),
+            (
+                "POST",
+                "/stream/overlay/enable",
+            ),
+            (
+                "POST",
+                "/stream/overlay/disable",
+            ),
+        }
+
+        self.assertTrue(expected.issubset(routes))
 
 
-class WebRTCSignalingServerTests(AioHTTPTestCase):
-    async def get_application(self) -> web.Application:
+class SignalingHTTPTests(unittest.IsolatedAsyncioTestCase):
+    async def asyncSetUp(self) -> None:
         self.vision = MagicMock()
         self.streamer = MagicMock()
 
@@ -261,64 +342,62 @@ class WebRTCSignalingServerTests(AioHTTPTestCase):
         self.streamer.close_peers = AsyncMock()
 
         self.vision.streamer = self.streamer
+        self.vision.statistics.return_value = {
+            "running": True,
+        }
+        self.vision.detection_names.return_value = [
+            "color",
+            "face",
+            "objects",
+        ]
+        self.vision.detection_status.return_value = {
+            "color": True,
+            "face": False,
+            "objects": False,
+        }
+        self.vision.stream_overlay_status.return_value = {
+            "enabled": False,
+            "source": None,
+        }
 
-        self.signaling_server = WebRTCSignalingServer(
+        self.signaling = WebRTCSignalingServer(
             self.vision,
             host="127.0.0.1",
             port=8080,
         )
 
-        return self.signaling_server.app
+        self.test_server = TestServer(self.signaling.app)
+        self.client = TestClient(self.test_server)
 
-    async def test_routes_are_registered(self) -> None:
-        routes = {
-            (
-                route.method,
-                route.resource.canonical,
-            )
-            for route in self.server.app.router.routes()
-        }
+        await self.client.start_server()
 
-        expected = {
-            ("GET", "/"),
-            ("POST", "/offer"),
-            ("GET", "/stats"),
-            ("POST", "/snapshot"),
-            ("POST", "/recording/start"),
-            ("POST", "/recording/stop"),
-            ("GET", "/metadata"),
-            ("GET", "/detection"),
-            ("POST", "/detection/enable"),
-            ("POST", "/detection/color/enable"),
-            ("POST", "/detection/disable"),
-            ("POST", "/stream/overlay/enable"),
-            ("POST", "/stream/overlay/disable"),
-        }
+    async def asyncTearDown(self) -> None:
+        await self.client.close()
 
-        self.assertTrue(expected.issubset(routes))
-
-    async def test_index_returns_html(self) -> None:
+    async def test_index(self) -> None:
         response = await self.client.get("/")
 
-        self.assertEqual(response.status, 200)
+        self.assertEqual(
+            response.status,
+            200,
+        )
         self.assertEqual(
             response.content_type,
             "text/html",
         )
 
-        text = await response.text()
+        body = await response.text()
 
-        self.assertEqual(text, INDEX_HTML)
         self.assertIn(
-            "WebRTC answer applied",
-            text,
+            "Betabox Vision",
+            body,
         )
-        self.assertIn(
-            "if (!response.ok)",
-            text,
+        self.assertEqual(
+            body,
+            INDEX_HTML,
         )
 
-    async def test_offer_success(self) -> None:
+    async def test_offer(self) -> None:
         self.streamer.offer.return_value = {
             "sdp": "answer-sdp",
             "type": "answer",
@@ -328,11 +407,14 @@ class WebRTCSignalingServerTests(AioHTTPTestCase):
             "/offer",
             json={
                 "sdp": " offer-sdp ",
-                "type": " offer ",
+                "type": " OFFER ",
             },
         )
 
-        self.assertEqual(response.status, 200)
+        self.assertEqual(
+            response.status,
+            200,
+        )
         self.assertEqual(
             await response.json(),
             {
@@ -340,32 +422,58 @@ class WebRTCSignalingServerTests(AioHTTPTestCase):
                 "type": "answer",
             },
         )
-
         self.streamer.offer.assert_awaited_once_with(
             sdp="offer-sdp",
-            type="offer",
+            offer_type="OFFER",
         )
 
-    async def test_offer_rejects_invalid_json(self) -> None:
+    async def test_offer_rejects_invalid_json(
+        self,
+    ) -> None:
         response = await self.client.post(
             "/offer",
-            data="{",
+            data="{invalid",
             headers={
-                "Content-Type": "application/json",
+                "Content-Type": ("application/json"),
             },
         )
 
-        self.assertEqual(response.status, 400)
-
-        data = await response.json()
-
-        self.assertFalse(data["success"])
         self.assertEqual(
-            data["error"],
-            "request body must contain valid JSON",
+            response.status,
+            400,
+        )
+        self.assertEqual(
+            await response.json(),
+            {
+                "success": False,
+                "error": ("request body must contain valid JSON"),
+            },
         )
 
-    async def test_offer_rejects_missing_sdp(self) -> None:
+    async def test_offer_rejects_non_object_json(
+        self,
+    ) -> None:
+        response = await self.client.post(
+            "/offer",
+            json=[
+                "not",
+                "an",
+                "object",
+            ],
+        )
+
+        self.assertEqual(
+            response.status,
+            400,
+        )
+        self.assertEqual(
+            (await response.json())["error"],
+            "request JSON must be an object",
+        )
+
+    async def test_offer_rejects_missing_sdp(
+        self,
+    ) -> None:
         response = await self.client.post(
             "/offer",
             json={
@@ -373,17 +481,19 @@ class WebRTCSignalingServerTests(AioHTTPTestCase):
             },
         )
 
-        self.assertEqual(response.status, 400)
         self.assertEqual(
-            await response.json(),
-            {
-                "success": False,
-                "error": "sdp is required",
-            },
+            response.status,
+            400,
+        )
+        self.assertEqual(
+            (await response.json())["error"],
+            "sdp is required",
         )
 
-    async def test_offer_wraps_streamer_failure(self) -> None:
-        self.streamer.offer.side_effect = RuntimeError("negotiation failed")
+    async def test_offer_handles_stream_error(
+        self,
+    ) -> None:
+        self.streamer.offer.side_effect = StreamError("negotiation failed")
 
         response = await self.client.post(
             "/offer",
@@ -393,85 +503,48 @@ class WebRTCSignalingServerTests(AioHTTPTestCase):
             },
         )
 
-        self.assertEqual(response.status, 400)
         self.assertEqual(
-            await response.json(),
-            {
-                "success": False,
-                "error": "negotiation failed",
-            },
+            response.status,
+            400,
+        )
+        self.assertEqual(
+            (await response.json())["error"],
+            "negotiation failed",
         )
 
-    async def test_stats_returns_service_statistics(self) -> None:
-        self.vision.statistics.return_value = {
-            "running": True,
-            "server": {
-                "port": 8080,
-            },
-        }
-
+    async def test_stats(self) -> None:
         response = await self.client.get("/stats")
 
-        self.assertEqual(response.status, 200)
+        self.assertEqual(
+            response.status,
+            200,
+        )
         self.assertEqual(
             await response.json(),
             {
                 "success": True,
                 "data": {
                     "running": True,
-                    "server": {
-                        "port": 8080,
-                    },
                 },
             },
         )
+        self.vision.statistics.assert_called_once_with()
 
-    async def test_snapshot_returns_jpeg(self) -> None:
-        snapshot = SnapshotData(
-            data=b"jpeg-data",
-            timestamp=123.5,
-            format="jpg",
-        )
-
-        self.vision.capture_snapshot_data.return_value = snapshot
-
-        response = await self.client.post(
-            "/snapshot?overlay=true&source=face&format=jpg"
-        )
-
-        self.assertEqual(response.status, 200)
-        self.assertEqual(
-            response.content_type,
-            "image/jpeg",
-        )
-        self.assertEqual(
-            await response.read(),
-            b"jpeg-data",
-        )
-        self.assertEqual(
-            response.headers["X-Betabox-Timestamp"],
-            "123.5",
-        )
-        self.assertEqual(
-            response.headers["X-Betabox-Format"],
-            "jpg",
-        )
-
-        self.vision.capture_snapshot_data.assert_called_once_with(
-            overlay=True,
-            source="face",
-            image_format="jpg",
-        )
-
-    async def test_snapshot_returns_png(self) -> None:
+    async def test_snapshot_png(self) -> None:
         self.vision.capture_snapshot_data.return_value = SnapshotData(
             data=b"png-data",
-            timestamp=10.0,
+            timestamp=123.5,
             format="png",
         )
 
-        response = await self.client.post("/snapshot?format=png")
+        response = await self.client.post(
+            "/snapshot?overlay=true&source=color&format=png"
+        )
 
+        self.assertEqual(
+            response.status,
+            200,
+        )
         self.assertEqual(
             response.content_type,
             "image/png",
@@ -480,19 +553,71 @@ class WebRTCSignalingServerTests(AioHTTPTestCase):
             await response.read(),
             b"png-data",
         )
+        self.assertEqual(
+            response.headers["X-Betabox-Timestamp"],
+            "123.5",
+        )
+        self.assertEqual(
+            response.headers["X-Betabox-Format"],
+            "png",
+        )
+        self.vision.capture_snapshot_data.assert_called_once_with(
+            overlay=True,
+            source="color",
+            image_format="png",
+        )
 
-    async def test_snapshot_failure_returns_error(self) -> None:
-        self.vision.capture_snapshot_data.side_effect = RuntimeError("snapshot failed")
+    async def test_snapshot_defaults_to_jpeg(
+        self,
+    ) -> None:
+        self.vision.capture_snapshot_data.return_value = SnapshotData(
+            data=b"jpeg-data",
+            timestamp=10.0,
+            format="jpg",
+        )
 
         response = await self.client.post("/snapshot")
 
-        self.assertEqual(response.status, 400)
         self.assertEqual(
-            await response.json(),
-            {
-                "success": False,
-                "error": "snapshot failed",
-            },
+            response.status,
+            200,
+        )
+        self.assertEqual(
+            response.content_type,
+            "image/jpeg",
+        )
+        self.vision.capture_snapshot_data.assert_called_once_with(
+            overlay=False,
+            source=None,
+            image_format="jpg",
+        )
+
+    async def test_snapshot_rejects_invalid_boolean(
+        self,
+    ) -> None:
+        response = await self.client.post("/snapshot?overlay=maybe")
+
+        self.assertEqual(
+            response.status,
+            400,
+        )
+        self.assertEqual(
+            (await response.json())["error"],
+            "overlay must be a boolean",
+        )
+
+    async def test_snapshot_rejects_invalid_format(
+        self,
+    ) -> None:
+        response = await self.client.post("/snapshot?format=gif")
+
+        self.assertEqual(
+            response.status,
+            400,
+        )
+        self.assertEqual(
+            (await response.json())["error"],
+            "unsupported snapshot format: gif",
         )
 
     async def test_recording_start(self) -> None:
@@ -500,7 +625,10 @@ class WebRTCSignalingServerTests(AioHTTPTestCase):
             "/recording/start?filename=lesson.mp4&overlay=yes&source=face"
         )
 
-        self.assertEqual(response.status, 200)
+        self.assertEqual(
+            response.status,
+            200,
+        )
         self.assertEqual(
             await response.json(),
             {
@@ -510,39 +638,44 @@ class WebRTCSignalingServerTests(AioHTTPTestCase):
                 },
             },
         )
-
         self.vision.start_recording.assert_called_once_with(
             filename="lesson.mp4",
             overlay=True,
             source="face",
         )
 
-    async def test_recording_start_failure(self) -> None:
-        self.vision.start_recording.side_effect = RuntimeError(
-            "recording already active"
-        )
+    async def test_recording_start_handles_error(
+        self,
+    ) -> None:
+        self.vision.start_recording.side_effect = RecordingError("recording failed")
 
         response = await self.client.post("/recording/start")
 
-        self.assertEqual(response.status, 400)
+        self.assertEqual(
+            response.status,
+            400,
+        )
         self.assertEqual(
             (await response.json())["error"],
-            "recording already active",
+            "recording failed",
         )
 
-    async def test_recording_stop_returns_video(self) -> None:
+    async def test_recording_stop(self) -> None:
         self.vision.stop_recording_data.return_value = RecordingData(
             data=b"video-data",
             format="mp4",
-            start_timestamp=1.0,
-            end_timestamp=2.5,
-            frame_count=30,
+            start_timestamp=10.0,
+            end_timestamp=12.0,
+            frame_count=40,
             fps=20.0,
         )
 
         response = await self.client.post("/recording/stop")
 
-        self.assertEqual(response.status, 200)
+        self.assertEqual(
+            response.status,
+            200,
+        )
         self.assertEqual(
             response.content_type,
             "video/mp4",
@@ -557,57 +690,54 @@ class WebRTCSignalingServerTests(AioHTTPTestCase):
         )
         self.assertEqual(
             response.headers["X-Betabox-Start-Timestamp"],
-            "1.0",
+            "10.0",
         )
         self.assertEqual(
             response.headers["X-Betabox-End-Timestamp"],
-            "2.5",
+            "12.0",
         )
         self.assertEqual(
             response.headers["X-Betabox-Frame-Count"],
-            "30",
+            "40",
         )
         self.assertEqual(
             response.headers["X-Betabox-FPS"],
             "20.0",
         )
 
-    async def test_metadata_returns_serialized_metadata(self) -> None:
+    async def test_metadata(self) -> None:
         metadata = Metadata.create(
-            "face",
-            detections=(
-                Detection(
-                    label="face",
-                    box=(1, 2, 3, 4),
-                    center=(2, 4),
-                ),
-            ),
+            "color",
+            timestamp=123.5,
             data={
                 "count": 1,
             },
         )
-
         self.vision.latest_metadata.return_value = metadata
 
-        response = await self.client.get("/metadata?source=face")
+        response = await self.client.get("/metadata?source=color")
 
-        self.assertEqual(response.status, 200)
-
-        data = await response.json()
-
-        self.assertTrue(data["success"])
         self.assertEqual(
-            data["data"]["source"],
-            "face",
-        )
-        self.assertEqual(
-            data["data"]["detections"][0]["box"],
-            [1, 2, 3, 4],
+            response.status,
+            200,
         )
 
-        self.vision.latest_metadata.assert_called_once_with("face")
+        body = await response.json()
 
-    async def test_metadata_returns_empty_object_when_missing(self) -> None:
+        self.assertTrue(body["success"])
+        self.assertEqual(
+            body["data"]["source"],
+            "color",
+        )
+        self.assertEqual(
+            body["data"]["timestamp"],
+            123.5,
+        )
+        self.vision.latest_metadata.assert_called_once_with("color")
+
+    async def test_metadata_without_result(
+        self,
+    ) -> None:
         self.vision.latest_metadata.return_value = None
 
         response = await self.client.get("/metadata")
@@ -621,17 +751,12 @@ class WebRTCSignalingServerTests(AioHTTPTestCase):
         )
 
     async def test_detection_status(self) -> None:
-        self.vision.detection_names.return_value = [
-            "color",
-            "face",
-        ]
-        self.vision.detection_status.return_value = {
-            "color": True,
-            "face": False,
-        }
-
         response = await self.client.get("/detection")
 
+        self.assertEqual(
+            response.status,
+            200,
+        )
         self.assertEqual(
             await response.json(),
             {
@@ -640,89 +765,92 @@ class WebRTCSignalingServerTests(AioHTTPTestCase):
                     "detectors": [
                         "color",
                         "face",
+                        "objects",
                     ],
                     "enabled": {
                         "color": True,
                         "face": False,
+                        "objects": False,
                     },
                 },
             },
         )
 
     async def test_detection_enable(self) -> None:
-        self.vision.detection_status.return_value = {
-            "face": True,
-        }
-
         response = await self.client.post(
             "/detection/enable",
             json={
-                "name": "  face  ",
+                "name": " face ",
             },
         )
-
-        self.assertEqual(response.status, 200)
-        self.vision.enable_detection.assert_called_once_with("face")
 
         self.assertEqual(
-            await response.json(),
-            {
-                "success": True,
-                "data": {
-                    "enabled": "face",
-                    "detectors": {
-                        "face": True,
-                    },
-                },
-            },
+            response.status,
+            200,
+        )
+        self.vision.enable_detection.assert_called_once_with("face")
+
+        body = await response.json()
+
+        self.assertEqual(
+            body["data"]["enabled"],
+            "face",
         )
 
-    async def test_detection_enable_requires_name(self) -> None:
+    async def test_detection_enable_requires_name(
+        self,
+    ) -> None:
         response = await self.client.post(
             "/detection/enable",
             json={},
         )
 
-        self.assertEqual(response.status, 400)
+        self.assertEqual(
+            response.status,
+            400,
+        )
         self.assertEqual(
             (await response.json())["error"],
             "name is required",
         )
 
     async def test_detection_disable(self) -> None:
-        self.vision.detection_status.return_value = {
-            "face": False,
-        }
-
         response = await self.client.post(
             "/detection/disable",
             json={
-                "name": "face",
+                "name": "color",
             },
         )
-
-        self.assertEqual(response.status, 200)
-        self.vision.disable_detection.assert_called_once_with("face")
 
         self.assertEqual(
-            await response.json(),
-            {
-                "success": True,
-                "data": {
-                    "disabled": "face",
-                    "detectors": {
-                        "face": False,
-                    },
-                },
-            },
+            response.status,
+            200,
+        )
+        self.vision.disable_detection.assert_called_once_with("color")
+
+        body = await response.json()
+
+        self.assertEqual(
+            body["data"]["disabled"],
+            "color",
         )
 
-    async def test_color_detection_enable_with_multiple_colors(
-        self,
-    ) -> None:
-        self.vision.detection_status.return_value = {
-            "color": True,
-            "face": False,
+    async def test_color_detection_enable(self) -> None:
+        custom_ranges = {
+            "team_marker": [
+                [
+                    [
+                        10,
+                        100,
+                        100,
+                    ],
+                    [
+                        20,
+                        255,
+                        255,
+                    ],
+                ],
+            ],
         }
 
         response = await self.client.post(
@@ -730,197 +858,86 @@ class WebRTCSignalingServerTests(AioHTTPTestCase):
             json={
                 "colors": [
                     "red",
-                    "green",
-                    "blue",
+                    "team_marker",
                 ],
-                "min_area": 250,
+                "custom_ranges": (custom_ranges),
+                "min_area": 25,
             },
         )
 
-        self.assertEqual(response.status, 200)
-
+        self.assertEqual(
+            response.status,
+            200,
+        )
         self.vision.enable_color_detection.assert_called_once_with(
             [
                 "red",
-                "green",
-                "blue",
+                "team_marker",
             ],
-            min_area=250.0,
+            custom_ranges=custom_ranges,
+            min_area=25,
         )
+
+        body = await response.json()
 
         self.assertEqual(
-            await response.json(),
-            {
-                "success": True,
-                "data": {
-                    "enabled": "color",
-                    "detectors": {
-                        "color": True,
-                        "face": False,
-                    },
-                },
-            },
+            body["data"]["enabled"],
+            "color",
         )
 
-    async def test_color_detection_enable_with_single_color(
-        self,
-    ) -> None:
-        self.vision.detection_status.return_value = {
-            "color": True,
-        }
-
-        response = await self.client.post(
-            "/detection/color/enable",
-            json={
-                "colors": "blue",
-            },
-        )
-
-        self.assertEqual(response.status, 200)
-
-        self.vision.enable_color_detection.assert_called_once_with(
-            "blue",
-            min_area=None,
-        )
-
-    async def test_color_detection_enable_with_empty_payload(
-        self,
-    ) -> None:
-        self.vision.detection_status.return_value = {
-            "color": True,
-        }
-
-        response = await self.client.post(
-            "/detection/color/enable",
-            json={},
-        )
-
-        self.assertEqual(response.status, 200)
-
-        self.vision.enable_color_detection.assert_called_once_with(
-            None,
-            min_area=None,
-        )
-
-    async def test_color_detection_enable_rejects_invalid_colors_type(
-        self,
-    ) -> None:
-        response = await self.client.post(
-            "/detection/color/enable",
-            json={
-                "colors": 123,
-            },
-        )
-
-        self.assertEqual(response.status, 400)
-        self.assertEqual(
-            (await response.json())["error"],
-            "colors must be a string or list of strings",
-        )
-
-        self.vision.enable_color_detection.assert_not_called()
-
-    async def test_color_detection_enable_rejects_non_string_list_item(
-        self,
-    ) -> None:
-        response = await self.client.post(
-            "/detection/color/enable",
-            json={
-                "colors": [
-                    "red",
-                    123,
-                ],
-            },
-        )
-
-        self.assertEqual(response.status, 400)
-        self.assertEqual(
-            (await response.json())["error"],
-            "colors must contain only strings",
-        )
-
-    async def test_color_detection_enable_rejects_invalid_min_area(
-        self,
-    ) -> None:
-        response = await self.client.post(
-            "/detection/color/enable",
-            json={
-                "colors": "red",
-                "min_area": "large",
-            },
-        )
-
-        self.assertEqual(response.status, 400)
-        self.assertEqual(
-            (await response.json())["error"],
-            "min_area must be a number",
-        )
-
-    async def test_color_detection_enable_rejects_negative_min_area(
-        self,
-    ) -> None:
-        response = await self.client.post(
-            "/detection/color/enable",
-            json={
-                "colors": "red",
-                "min_area": -1,
-            },
-        )
-
-        self.assertEqual(response.status, 400)
-        self.assertEqual(
-            (await response.json())["error"],
-            "min_area cannot be negative",
-        )
-
-    async def test_color_detection_enable_wraps_service_failure(
+    async def test_color_detection_error_uses_middleware(
         self,
     ) -> None:
         self.vision.enable_color_detection.side_effect = ValueError(
-            "unsupported color(s): purple"
+            "unsupported color(s): invisible"
         )
 
         response = await self.client.post(
             "/detection/color/enable",
             json={
-                "colors": "purple",
+                "colors": "invisible",
             },
         )
 
-        self.assertEqual(response.status, 400)
+        self.assertEqual(
+            response.status,
+            400,
+        )
         self.assertEqual(
             (await response.json())["error"],
-            "unsupported color(s): purple",
+            "unsupported color(s): invisible",
         )
 
     async def test_stream_overlay_enable(self) -> None:
         self.vision.stream_overlay_status.return_value = {
             "enabled": True,
-            "source": "face",
+            "source": "color",
         }
 
         response = await self.client.post(
             "/stream/overlay/enable",
             json={
-                "source": "face",
+                "source": "color",
             },
         )
 
-        self.assertEqual(response.status, 200)
-        self.vision.enable_stream_overlay.assert_called_once_with("face")
-
+        self.assertEqual(
+            response.status,
+            200,
+        )
+        self.vision.enable_stream_overlay.assert_called_once_with("color")
         self.assertEqual(
             await response.json(),
             {
                 "success": True,
                 "data": {
                     "enabled": True,
-                    "source": "face",
+                    "source": "color",
                 },
             },
         )
 
-    async def test_stream_overlay_enable_rejects_non_string_source(
+    async def test_stream_overlay_enable_rejects_invalid_source(
         self,
     ) -> None:
         response = await self.client.post(
@@ -930,13 +947,18 @@ class WebRTCSignalingServerTests(AioHTTPTestCase):
             },
         )
 
-        self.assertEqual(response.status, 400)
+        self.assertEqual(
+            response.status,
+            400,
+        )
         self.assertEqual(
             (await response.json())["error"],
             "source must be a string",
         )
 
-    async def test_stream_overlay_disable(self) -> None:
+    async def test_stream_overlay_disable(
+        self,
+    ) -> None:
         self.vision.stream_overlay_status.return_value = {
             "enabled": False,
             "source": None,
@@ -944,9 +966,11 @@ class WebRTCSignalingServerTests(AioHTTPTestCase):
 
         response = await self.client.post("/stream/overlay/disable")
 
-        self.assertEqual(response.status, 200)
+        self.assertEqual(
+            response.status,
+            200,
+        )
         self.vision.disable_stream_overlay.assert_called_once_with()
-
         self.assertEqual(
             await response.json(),
             {
@@ -959,18 +983,29 @@ class WebRTCSignalingServerTests(AioHTTPTestCase):
         )
 
     async def test_shutdown_closes_peers(self) -> None:
-        await self.signaling_server.on_shutdown(self.signaling_server.app)
+        await self.signaling.on_shutdown(self.signaling.app)
 
         self.streamer.close_peers.assert_awaited_once_with()
 
-    async def test_run_uses_configured_server_values(self) -> None:
+
+class SignalingRunTests(unittest.TestCase):
+    def test_run(self) -> None:
+        vision = MagicMock()
+        vision.streamer = MagicMock()
+
+        server = WebRTCSignalingServer(
+            vision,
+            host="127.0.0.1",
+            port=9000,
+        )
+
         with patch("betabox_robotics.vision.signaling.web.run_app") as run_app:
-            self.signaling_server.run(handle_signals=False)
+            server.run(handle_signals=False)
 
         run_app.assert_called_once_with(
-            self.signaling_server.app,
+            server.app,
             host="127.0.0.1",
-            port=8080,
+            port=9000,
             handle_signals=False,
         )
 

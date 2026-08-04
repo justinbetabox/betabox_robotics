@@ -1,12 +1,45 @@
-from betabox_robotics.vision.detector import Detector
+from __future__ import annotations
+
+import math
+
+from betabox_robotics.vision.detector import (
+    Detector,
+    DetectorError,
+)
 from betabox_robotics.vision.frame import Frame
-from betabox_robotics.vision.metadata import Detection, Metadata
-from betabox_robotics.vision.model_runtime import ObjectDetectionModel
+from betabox_robotics.vision.metadata import (
+    Detection,
+    Metadata,
+)
+from betabox_robotics.vision.model_runtime import (
+    ModelDetection,
+    ObjectDetectionModel,
+)
+
+
+def _validate_min_confidence(
+    value: object,
+) -> float:
+    if isinstance(value, bool) or not isinstance(
+        value,
+        int | float,
+    ):
+        raise TypeError("min_confidence must be a number")
+
+    confidence = float(value)
+
+    if not math.isfinite(confidence):
+        raise ValueError("min_confidence must be finite")
+
+    if not 0.0 <= confidence <= 1.0:
+        raise ValueError("min_confidence must be between 0.0 and 1.0")
+
+    return confidence
 
 
 class ObjectDetector(Detector):
     """
-    Detects objects using a pluggable object detection model.
+    Detect objects using a pluggable object detection model.
 
     The model owns backend-specific inference details. ObjectDetector
     adapts model results into Betabox Vision metadata.
@@ -19,9 +52,13 @@ class ObjectDetector(Detector):
         enabled: bool = False,
         min_confidence: float = 0.5,
     ) -> None:
-        super().__init__("objects", enabled=enabled)
+        super().__init__(
+            "objects",
+            enabled=enabled,
+        )
+
         self.model = model
-        self.min_confidence = float(min_confidence)
+        self.min_confidence = _validate_min_confidence(min_confidence)
 
     def configure(
         self,
@@ -33,7 +70,7 @@ class ObjectDetector(Detector):
             self.model = model
 
         if min_confidence is not None:
-            self.min_confidence = float(min_confidence)
+            self.min_confidence = _validate_min_confidence(min_confidence)
 
     def enable(
         self,
@@ -41,45 +78,71 @@ class ObjectDetector(Detector):
         model: ObjectDetectionModel | None = None,
         min_confidence: float | None = None,
     ) -> None:
-        self.configure(model=model, min_confidence=min_confidence)
-        self.enabled = True
+        self.configure(
+            model=model,
+            min_confidence=min_confidence,
+        )
+        super().enable()
 
-    def detect(self, frame: Frame) -> Metadata:
+    def detect(
+        self,
+        frame: Frame,
+    ) -> Metadata:
+        if not isinstance(frame, Frame):
+            raise TypeError("frame must be a Frame instance")
+
         if self.model is None:
             return Metadata.create(
                 self.name,
+                timestamp=frame.timestamp,
                 data={
                     "count": 0,
-                    "error": "object detection model is not configured",
+                    "error": ("object detection model is not configured"),
                 },
             )
 
-        model_detections = self.model.detect(frame)
+        try:
+            model_detections = self.model.detect(frame)
+        except (
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ) as exc:
+            raise DetectorError(f"object detection failed: {exc}") from exc
 
         detections: list[Detection] = []
 
         for result in model_detections:
+            if not isinstance(
+                result,
+                ModelDetection,
+            ):
+                raise DetectorError("object detection model returned an invalid result")
+
             if result.confidence < self.min_confidence:
                 continue
 
             x, y, width, height = result.box
-            center = (x + width // 2, y + height // 2)
 
             detections.append(
                 Detection(
                     label=result.label,
                     confidence=result.confidence,
                     box=result.box,
-                    center=center,
-                    data=result.data,
+                    center=(
+                        x + width // 2,
+                        y + height // 2,
+                    ),
+                    data=dict(result.data),
                 )
             )
 
         return Metadata.create(
             self.name,
+            timestamp=frame.timestamp,
             detections=detections,
             data={
                 "count": len(detections),
-                "min_confidence": self.min_confidence,
+                "min_confidence": (self.min_confidence),
             },
         )

@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from time import time
-from typing import Any
+from typing import Any, Self
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,7 +20,7 @@ class Frame:
     timestamp: float
 
     @classmethod
-    def create(cls, image: Any, *, timestamp: float | None = None) -> "Frame":
+    def create(cls, image: Any, *, timestamp: float | None = None) -> Self:
         """
         Create a frame.
 

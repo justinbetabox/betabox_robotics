@@ -2,21 +2,31 @@ from __future__ import annotations
 
 import json
 import os
-
+import tempfile
 from pathlib import Path
 from typing import Any
 
 from .models import RobotCalibration
 
 
-class CalibrationStorageError(
-    RuntimeError
-):
+class CalibrationStorageError(RuntimeError):
     """Calibration data could not be loaded or saved."""
 
 
+def _validate_path(
+    value: object,
+) -> Path:
+    if isinstance(value, bool) or not isinstance(
+        value,
+        str | Path,
+    ):
+        raise TypeError("path must be a string or Path")
+
+    return Path(value).expanduser()
+
+
 def load_calibration(
-    path: Path,
+    path: str | Path,
 ) -> RobotCalibration:
     """
     Load saved calibration.
@@ -26,44 +36,36 @@ def load_calibration(
     are returned.
     """
 
-    calibration_path = Path(
-        path
-    ).expanduser()
+    calibration_path = _validate_path(path)
 
     try:
         with calibration_path.open(
             "r",
             encoding="utf-8",
         ) as file:
-            value: Any = json.load(
-                file
-            )
+            value: Any = json.load(file)
+
     except FileNotFoundError:
         return RobotCalibration.default()
+
     except json.JSONDecodeError as exc:
-        raise CalibrationStorageError(
-            "calibration file contains invalid JSON"
-        ) from exc
+        raise CalibrationStorageError("calibration file contains invalid JSON") from exc
+
     except OSError as exc:
-        raise CalibrationStorageError(
-            "calibration file could not be read"
-        ) from exc
+        raise CalibrationStorageError("calibration file could not be read") from exc
 
     try:
-        return RobotCalibration.from_dict(
-            value
-        )
+        return RobotCalibration.from_dict(value)
+
     except (
         TypeError,
         ValueError,
     ) as exc:
-        raise CalibrationStorageError(
-            "calibration file contains invalid data"
-        ) from exc
+        raise CalibrationStorageError("calibration file contains invalid data") from exc
 
 
 def save_calibration(
-    path: Path,
+    path: str | Path,
     calibration: RobotCalibration,
 ) -> None:
     """
@@ -73,16 +75,16 @@ def save_calibration(
     temporary file before replacing the current file.
     """
 
-    calibration_path = Path(
-        path
-    ).expanduser()
+    calibration_path = _validate_path(path)
+
+    if not isinstance(
+        calibration,
+        RobotCalibration,
+    ):
+        raise TypeError("calibration must be a RobotCalibration")
 
     parent = calibration_path.parent
-
-    temporary_path = (
-        parent
-        / f".{calibration_path.name}.tmp"
-    )
+    temporary_path: Path | None = None
 
     try:
         parent.mkdir(
@@ -90,10 +92,16 @@ def save_calibration(
             exist_ok=True,
         )
 
-        with temporary_path.open(
-            "w",
+        with tempfile.NamedTemporaryFile(
+            mode="w",
             encoding="utf-8",
+            dir=parent,
+            prefix=f".{calibration_path.name}.",
+            suffix=".tmp",
+            delete=False,
         ) as file:
+            temporary_path = Path(file.name)
+
             json.dump(
                 calibration.to_dict(),
                 file,
@@ -103,28 +111,26 @@ def save_calibration(
 
             file.write("\n")
             file.flush()
-            os.fsync(
-                file.fileno()
-            )
+            os.fsync(file.fileno())
 
-        temporary_path.replace(
-            calibration_path
-        )
-    except OSError as exc:
-        try:
-            temporary_path.unlink(
-                missing_ok=True
-            )
-        except OSError:
-            pass
+        temporary_path.replace(calibration_path)
 
-        raise CalibrationStorageError(
-            "calibration file could not be saved"
-        ) from exc
+    except (
+        OSError,
+        TypeError,
+        ValueError,
+    ) as exc:
+        if temporary_path is not None:
+            try:
+                temporary_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+
+        raise CalibrationStorageError("calibration file could not be saved") from exc
 
 
 def reset_calibration(
-    path: Path,
+    path: str | Path,
 ) -> bool:
     """
     Remove saved calibration.
@@ -133,17 +139,15 @@ def reset_calibration(
     when no saved calibration existed.
     """
 
-    calibration_path = Path(
-        path
-    ).expanduser()
+    calibration_path = _validate_path(path)
 
     try:
         calibration_path.unlink()
+
     except FileNotFoundError:
         return False
+
     except OSError as exc:
-        raise CalibrationStorageError(
-            "calibration file could not be reset"
-        ) from exc
+        raise CalibrationStorageError("calibration file could not be reset") from exc
 
     return True

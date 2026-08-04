@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import socket
 import subprocess
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Self
 
@@ -10,11 +12,67 @@ if TYPE_CHECKING:
     from betabox_robotics.robots.config import SystemConfig
 
 
-@dataclass(frozen=True)
+def _validate_path(
+    value: object,
+    *,
+    name: str,
+) -> Path:
+    if isinstance(value, bool) or not isinstance(
+        value,
+        str | Path,
+    ):
+        raise TypeError(f"{name} must be a string or Path")
+
+    return Path(value).expanduser()
+
+
+def _validate_string(
+    value: object,
+    *,
+    name: str,
+) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"{name} must be a string")
+
+    result = value.strip()
+
+    if not result:
+        raise ValueError(f"{name} cannot be empty")
+
+    return result
+
+
+@dataclass(frozen=True, slots=True)
 class MediaPaths:
     pictures: Path
     videos: Path
     sounds: Path
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "pictures",
+            _validate_path(
+                self.pictures,
+                name="pictures",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "videos",
+            _validate_path(
+                self.videos,
+                name="videos",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "sounds",
+            _validate_path(
+                self.sounds,
+                name="sounds",
+            ),
+        )
 
     @property
     def all(self) -> tuple[Path, Path, Path]:
@@ -35,12 +93,54 @@ class MediaPaths:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SystemStatus:
     version: str
     hostname: str
-    ip_addresses: list[str]
+    ip_addresses: tuple[str, ...]
     media: MediaPaths
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "version",
+            _validate_string(
+                self.version,
+                name="version",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "hostname",
+            _validate_string(
+                self.hostname,
+                name="hostname",
+            ),
+        )
+
+        if not isinstance(
+            self.ip_addresses,
+            tuple,
+        ):
+            raise TypeError("ip_addresses must be a tuple")
+
+        object.__setattr__(
+            self,
+            "ip_addresses",
+            tuple(
+                _validate_string(
+                    address,
+                    name="IP address",
+                )
+                for address in self.ip_addresses
+            ),
+        )
+
+        if not isinstance(
+            self.media,
+            MediaPaths,
+        ):
+            raise TypeError("media must be a MediaPaths")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -51,13 +151,38 @@ class SystemStatus:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SystemHealth:
     ok: bool
-    messages: list[str]
+    messages: tuple[str, ...]
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.ok, bool):
+            raise TypeError("ok must be a boolean")
+
+        if not isinstance(
+            self.messages,
+            tuple,
+        ):
+            raise TypeError("messages must be a tuple")
+
+        object.__setattr__(
+            self,
+            "messages",
+            tuple(
+                _validate_string(
+                    message,
+                    name="health message",
+                )
+                for message in self.messages
+            ),
+        )
 
     def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+        return {
+            "ok": self.ok,
+            "messages": list(self.messages),
+        }
 
 
 class SystemError(Exception):
@@ -75,16 +200,18 @@ class System:
         media_root: str | Path | None = None,
     ) -> None:
         self._media_root = (
-            Path(media_root).expanduser()
-            if media_root is not None
-            else Path.home() / "media"
+            Path.home() / "media"
+            if media_root is None
+            else _validate_path(
+                media_root,
+                name="media_root",
+            )
         )
         self._closed = False
 
     def __enter__(self) -> Self:
         self._require_open()
         return self
-
 
     def __exit__(
         self,
@@ -105,17 +232,37 @@ class System:
     @classmethod
     def default(
         cls,
-        config: "SystemConfig",
-    ) -> "System":
+        config: SystemConfig,
+    ) -> Self:
+        try:
+            media_root = config.media_root
+        except AttributeError as exc:
+            raise TypeError("config must provide media_root") from exc
+
         return cls(
-            media_root=config.media_root,
+            media_root=media_root,
         )
 
     def hostname(self) -> str:
         self._require_open()
-        return socket.gethostname()
 
-    def ip_addresses(self) -> list[str]:
+        try:
+            hostname = socket.gethostname()
+        except OSError as exc:
+            raise SystemError(f"failed to read hostname: {exc}") from exc
+
+        try:
+            return _validate_string(
+                hostname,
+                name="hostname",
+            )
+        except (
+            TypeError,
+            ValueError,
+        ) as exc:
+            raise SystemError("system returned an invalid hostname") from exc
+
+    def ip_addresses(self) -> tuple[str, ...]:
         self._require_open()
 
         try:
@@ -126,22 +273,30 @@ class System:
                 timeout=3,
                 check=False,
             )
-        except Exception:
-            return []
+        except (
+            OSError,
+            subprocess.SubprocessError,
+        ):
+            return ()
 
         if result.returncode != 0:
-            return []
+            return ()
 
         addresses: list[str] = []
 
         for address in result.stdout.split():
-            if address.startswith("127."):
+            normalized = address.strip()
+
+            if (
+                not normalized
+                or normalized.startswith("127.")
+                or normalized in addresses
+            ):
                 continue
 
-            if address not in addresses:
-                addresses.append(address)
+            addresses.append(normalized)
 
-        return addresses
+        return tuple(addresses)
 
     def media_paths(self) -> MediaPaths:
         self._require_open()
@@ -156,9 +311,14 @@ class System:
         self._require_open()
         paths = self.media_paths()
 
-        paths.pictures.mkdir(parents=True, exist_ok=True)
-        paths.videos.mkdir(parents=True, exist_ok=True)
-        paths.sounds.mkdir(parents=True, exist_ok=True)
+        try:
+            for path in paths.all:
+                path.mkdir(
+                    parents=True,
+                    exist_ok=True,
+                )
+        except OSError as exc:
+            raise SystemError(f"failed to create media directories: {exc}") from exc
 
         return paths
 
@@ -184,11 +344,11 @@ class System:
 
         media = self.media_paths()
 
-        messages = [
+        messages = tuple(
             f"missing media directory: {path}"
             for path in media.all
             if not path.exists()
-        ]
+        )
 
         return SystemHealth(
             ok=not messages,
@@ -200,7 +360,6 @@ class System:
             return
 
         self._closed = True
-
 
     def deinit(self) -> None:
         self.close()

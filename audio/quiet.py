@@ -1,16 +1,17 @@
 import os
 import sys
+from collections.abc import Generator
 from contextlib import contextmanager
 
 
 @contextmanager
-def suppress_stderr():
+def suppress_stderr() -> Generator[None, None, None]:
     """
     Suppress C-level stderr noise from ALSA, PyAudio, and ONNX Runtime.
     """
     try:
         sys.stderr.flush()
-    except Exception:
+    except (OSError, RuntimeError):
         pass
 
     saved_fd = os.dup(2)

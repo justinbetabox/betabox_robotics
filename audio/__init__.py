@@ -1,11 +1,14 @@
 from .audio import Audio, AudioStatus
+from .exceptions import AmplifierError, AudioError, PlaybackError, SpeechError
 from .tones import MelodyNote, NoteValue
-from .exceptions import AudioError
 
 __all__ = [
+    "AmplifierError",
     "Audio",
     "AudioError",
+    "AudioStatus",
     "MelodyNote",
     "NoteValue",
-    "AudioStatus",
+    "PlaybackError",
+    "SpeechError",
 ]

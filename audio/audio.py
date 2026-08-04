@@ -1,17 +1,28 @@
+from __future__ import annotations
+
+import math
 import os
 import shutil
 import subprocess
 import tempfile
 import wave
+from collections.abc import Generator
 from contextlib import contextmanager
+from dataclasses import asdict, dataclass
 from pathlib import Path
-from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Final, Self
 
 import pyaudio
 
-from betabox_robotics.audio.amplifier import disable_speaker, enable_speaker
-from betabox_robotics.audio.exceptions import AudioError
+from betabox_robotics.audio.amplifier import (
+    disable_speaker,
+    enable_speaker,
+)
+from betabox_robotics.audio.exceptions import (
+    AmplifierError,
+    AudioError,
+    PlaybackError,
+)
 from betabox_robotics.audio.pronunciation import prepare_speech_text
 from betabox_robotics.audio.quiet import suppress_stderr
 from betabox_robotics.audio.speech import (
@@ -30,7 +41,20 @@ from betabox_robotics.audio.tones import (
 if TYPE_CHECKING:
     from betabox_robotics.robots.config import AudioConfig
 
-@dataclass(frozen=True)
+
+DEFAULT_OUTPUT_DEVICE: Final[str] = "snd_rpi_hifiberry_dac"
+DEFAULT_SAMPLE_RATE: Final[int] = 44_100
+DEFAULT_SPEECH_VOLUME: Final[float] = 1.0
+MAX_PLAYBACK_VOLUME: Final[float] = 3.0
+PLAYBACK_CHUNK_FRAMES: Final[int] = 2_048
+AUDIO_CONVERSION_TIMEOUT_SECONDS: Final[float] = 30.0
+SPEECH_POSTPROCESS_TIMEOUT_SECONDS: Final[float] = 30.0
+
+
+@dataclass(
+    frozen=True,
+    slots=True,
+)
 class AudioStatus:
     backend: str
     available_backends: list[str]
@@ -40,6 +64,91 @@ class AudioStatus:
     keep_amp_enabled: bool
     playing: bool
     closed: bool
+
+    def to_dict(
+        self,
+    ) -> dict[str, Any]:
+        return asdict(self)
+
+
+def _require_nonempty_string(
+    value: object,
+    *,
+    name: str,
+) -> str:
+    if not isinstance(
+        value,
+        str,
+    ):
+        raise TypeError(f"{name} must be a string")
+
+    normalized = value.strip()
+
+    if not normalized:
+        raise ValueError(f"{name} cannot be empty")
+
+    return normalized
+
+
+def _require_positive_integer(
+    value: object,
+    *,
+    name: str,
+) -> int:
+    if isinstance(value, bool) or not isinstance(
+        value,
+        int,
+    ):
+        raise TypeError(f"{name} must be an integer")
+
+    if value <= 0:
+        raise ValueError(f"{name} must be greater than 0")
+
+    return value
+
+
+def _require_finite_number(
+    value: object,
+    *,
+    name: str,
+) -> float:
+    if isinstance(value, bool) or not isinstance(
+        value,
+        int | float,
+    ):
+        raise TypeError(f"{name} must be a number")
+
+    result = float(value)
+
+    if not math.isfinite(result):
+        raise ValueError(f"{name} must be finite")
+
+    return result
+
+
+def _require_volume(
+    value: object,
+    *,
+    name: str,
+) -> float:
+    volume = _require_finite_number(
+        value,
+        name=name,
+    )
+
+    if not 0.0 <= volume <= MAX_PLAYBACK_VOLUME:
+        raise ValueError(f"{name} must be between 0.0 and {MAX_PLAYBACK_VOLUME:.1f}")
+
+    return volume
+
+
+def _unlink_quietly(
+    path: Path,
+) -> None:
+    try:
+        path.unlink()
+    except OSError:
+        pass
 
 
 class Audio:
@@ -57,12 +166,47 @@ class Audio:
         speech_language: str = "en-US",
         piper_model: str | Path | None = None,
         piper_voice: str = "en_US-amy-low",
-        preferred_output_device: str = "snd_rpi_hifiberry_dac",
-        sample_rate: int = 44100,
+        preferred_output_device: str = DEFAULT_OUTPUT_DEVICE,
+        sample_rate: int = DEFAULT_SAMPLE_RATE,
         auto_amp: bool = True,
         keep_amp_enabled: bool = False,
-        speech_volume: float = 1.0,
+        speech_volume: float = DEFAULT_SPEECH_VOLUME,
     ) -> None:
+        if not isinstance(
+            auto_amp,
+            bool,
+        ):
+            raise TypeError("auto_amp must be a boolean")
+
+        if not isinstance(
+            keep_amp_enabled,
+            bool,
+        ):
+            raise TypeError("keep_amp_enabled must be a boolean")
+
+        if not isinstance(
+            preferred_output_device,
+            str,
+        ):
+            raise TypeError("preferred_output_device must be a string")
+
+        output_device = preferred_output_device.strip()
+
+        self.sample_rate = _require_positive_integer(
+            sample_rate,
+            name="sample_rate",
+        )
+        self.speech_volume = _require_volume(
+            speech_volume,
+            name="speech_volume",
+        )
+        self.auto_amp = auto_amp
+        self.keep_amp_enabled = keep_amp_enabled
+        self.preferred_output_device = os.getenv(
+            "BETABOX_AUDIO_DEVICE",
+            output_device,
+        ).strip()
+
         self.speech_backend = speech_backend or create_backend(
             speech_engine=speech_engine,
             speech_language=speech_language,
@@ -70,35 +214,48 @@ class Audio:
             piper_voice=piper_voice,
         )
 
-        self.preferred_output_device = os.getenv(
-            "BETABOX_AUDIO_DEVICE", preferred_output_device
-        )
-        self.sample_rate = int(sample_rate)
-        self.auto_amp = auto_amp
-        self.keep_amp_enabled = keep_amp_enabled
-        self.speech_volume = float(speech_volume)
-
-        with suppress_stderr():
-            self._pyaudio = pyaudio.PyAudio()
-        self._device_index = self._find_device()
-        if self.keep_amp_enabled:
-            enable_speaker()
-
         self._closed = False
+        self._playing = False
 
-    @property
-    def closed(self) -> bool:
-        return self._closed
+        try:
+            with suppress_stderr():
+                self._pyaudio = pyaudio.PyAudio()
 
-    def _require_open(self) -> None:
-        if self._closed:
-            raise AudioError("audio subsystem is closed")
+        except (
+            OSError,
+            RuntimeError,
+        ) as exc:
+            raise PlaybackError(f"failed to initialize audio output: {exc}") from exc
+
+        try:
+            self._device_index = self._find_device()
+
+            if self.keep_amp_enabled:
+                enable_speaker()
+
+        except (
+            AmplifierError,
+            OSError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ):
+            try:
+                self._pyaudio.terminate()
+            except (
+                OSError,
+                RuntimeError,
+            ):
+                pass
+
+            self._closed = True
+            raise
 
     @classmethod
     def default(
         cls,
-        config: "AudioConfig",
-    ) -> "Audio":
+        config: AudioConfig,
+    ) -> Self:
         return cls(
             speech_engine=config.speech_engine,
             speech_language=config.speech_language,
@@ -111,86 +268,149 @@ class Audio:
             speech_volume=config.speech_volume,
         )
 
-    def say(self, text: str) -> None:
+    @property
+    def closed(self) -> bool:
+        return self._closed
+
+    @property
+    def speech_backend_name(self) -> str:
+        return getattr(
+            self.speech_backend,
+            "name",
+            type(self.speech_backend).__name__,
+        )
+
+    def available_speech_backends(
+        self,
+    ) -> list[str]:
+        return available_backends()
+
+    def say(
+        self,
+        text: str,
+    ) -> None:
         self._require_open()
 
-        if not text:
-            raise AudioError("speech text cannot be empty")
+        speech_text = _require_nonempty_string(
+            text,
+            name="text",
+        )
 
-        fd, wav_path = tempfile.mkstemp(prefix="betabox_tts_", suffix=".wav")
+        fd, temporary_name = tempfile.mkstemp(
+            prefix="betabox_tts_",
+            suffix=".wav",
+        )
         os.close(fd)
 
+        synthesized_path = Path(temporary_name)
+        processed_path = synthesized_path
+
         try:
-            spoken_text = prepare_speech_text(text)
-            self.speech_backend.synthesize(spoken_text, wav_path)
-            processed_path = self._postprocess_speech(Path(wav_path))
+            self.speech_backend.synthesize(
+                prepare_speech_text(speech_text),
+                synthesized_path,
+            )
 
-            try:
-                self.play_wav(processed_path)
-            finally:
-                if processed_path != Path(wav_path):
-                    try:
-                        processed_path.unlink()
-                    except OSError:
-                        pass
+            processed_path = self._postprocess_speech(
+                synthesized_path,
+            )
+
+            self.play_wav(processed_path)
+
         finally:
-            try:
-                os.remove(wav_path)
-            except OSError:
-                pass
+            if processed_path != synthesized_path:
+                _unlink_quietly(processed_path)
 
-    def play(self, sound: str | Path) -> None:
-        self._require_open()
+            _unlink_quietly(synthesized_path)
 
+    def play(
+        self,
+        sound: str | Path,
+    ) -> None:
         self.play_sound(sound)
 
-    def play_sound(self, sound: str | Path) -> None:
+    def play_sound(
+        self,
+        sound: str | Path,
+    ) -> None:
         self._require_open()
 
         path = self._resolve_sound_path(sound)
-        wav_path, is_temp = self._to_pcm16_wav(path)
+        wav_path, temporary = self._to_pcm16_wav(path)
 
         try:
             self.play_wav(wav_path)
-        finally:
-            if is_temp:
-                try:
-                    wav_path.unlink()
-                except OSError:
-                    pass
 
-    def play_wav(self, sound: str | Path, *, volume: float = 1.0) -> None:
+        finally:
+            if temporary:
+                _unlink_quietly(wav_path)
+
+    def play_wav(
+        self,
+        sound: str | Path,
+        *,
+        volume: float = 1.0,
+    ) -> None:
         self._require_open()
 
-        path = Path(sound)
+        path = self._require_existing_file(
+            sound,
+            name="sound",
+        )
 
-        if not path.exists():
-            raise AudioError(f"sound file does not exist: {path}")
+        playback_volume = _require_volume(
+            volume,
+            name="volume",
+        )
 
-        with wave.open(str(path), "rb") as wav:
-            sample_width = wav.getsampwidth()
-            channels = wav.getnchannels()
-            rate = wav.getframerate()
+        try:
+            with wave.open(
+                str(path),
+                "rb",
+            ) as wav:
+                sample_width = wav.getsampwidth()
+                compression = wav.getcomptype()
+                channels = wav.getnchannels()
+                sample_rate = wav.getframerate()
 
-            if sample_width != 2:
-                raise AudioError(
-                    f"only 16-bit PCM WAV files are supported; got sample_width={sample_width}"
-                )
+                if sample_width != 2 or compression != "NONE":
+                    raise PlaybackError(
+                        "only uncompressed 16-bit PCM WAV files are supported"
+                    )
 
-            with self._playback_session():
-                with self._output_stream(
-                    channels=channels,
-                    sample_rate=rate,
-                ) as stream:
+                with (
+                    self._playback_session(),
+                    self._output_stream(
+                        channels=channels,
+                        sample_rate=sample_rate,
+                    ) as stream,
+                ):
                     while True:
-                        data = wav.readframes(2048)
+                        data = wav.readframes(PLAYBACK_CHUNK_FRAMES)
 
                         if not data:
                             break
 
-                        if volume != 1.0:
-                            data = self._scale_pcm16(data, volume)
-                        stream.write(data)
+                        if playback_volume != 1.0:
+                            data = self._scale_pcm16(
+                                data,
+                                playback_volume,
+                            )
+
+                        self._write_stream(
+                            stream,
+                            data,
+                        )
+
+        except PlaybackError:
+            raise
+
+        except (
+            EOFError,
+            OSError,
+            wave.Error,
+        ) as exc:
+            raise PlaybackError(f"failed to play WAV file {path}: {exc}") from exc
 
     def play_note(
         self,
@@ -199,17 +419,19 @@ class Audio:
     ) -> None:
         self._require_open()
 
-        if duration <= 0:
-            raise AudioError("note duration must be greater than 0")
+        duration_value = _require_finite_number(
+            duration,
+            name="duration",
+        )
+
+        if duration_value <= 0:
+            raise ValueError("duration must be greater than 0")
 
         frequency = note_frequency(note_or_frequency)
 
-        if frequency <= 0:
-            raise AudioError("frequency must be greater than 0")
-
         data = generate_tone(
             frequency,
-            duration,
+            duration_value,
             sample_rate=self.sample_rate,
         )
 
@@ -227,46 +449,79 @@ class Audio:
     ) -> None:
         self._require_open()
 
-        if gap < 0:
-            raise AudioError("melody gap cannot be negative")
+        if not isinstance(
+            notes,
+            list,
+        ):
+            raise TypeError("notes must be a list")
+
+        gap_value = _require_finite_number(
+            gap,
+            name="gap",
+        )
+
+        if gap_value < 0:
+            raise ValueError("gap cannot be negative")
+
+        prepared_notes: list[bytes] = []
 
         for note_or_frequency, duration in notes:
-            if duration <= 0:
-                raise AudioError("melody note duration must be greater than 0")
+            duration_value = _require_finite_number(
+                duration,
+                name="duration",
+            )
 
-        if not notes:
+            if duration_value <= 0:
+                raise ValueError("melody note duration must be greater than 0")
+
+            frequency = note_frequency(note_or_frequency)
+
+            tone = generate_tone(
+                frequency,
+                duration_value,
+                sample_rate=self.sample_rate,
+            )
+
+            prepared_notes.append(tone)
+
+        if not prepared_notes:
             return
 
-        with self._playback_session():
-            with self._output_stream(
+        silence = (
+            generate_silence(
+                gap_value,
+                sample_rate=self.sample_rate,
+            )
+            if gap_value > 0
+            else b""
+        )
+
+        with (
+            self._playback_session(),
+            self._output_stream(
                 channels=1,
                 sample_rate=self.sample_rate,
-            ) as stream:
-                for note_or_frequency, duration in notes:
-                    frequency = note_frequency(note_or_frequency)
+            ) as stream,
+        ):
+            for data in prepared_notes:
+                self._write_stream(
+                    stream,
+                    data,
+                )
 
-                    data = generate_tone(
-                        frequency,
-                        duration,
-                        sample_rate=self.sample_rate,
+                if silence:
+                    self._write_stream(
+                        stream,
+                        silence,
                     )
-
-                    stream.write(data)
-
-                    if gap > 0:
-                        silence = generate_silence(
-                            gap,
-                            sample_rate=self.sample_rate,
-                        )
-                        stream.write(silence)
 
     def stop(self) -> None:
         """
         Disable the speaker amplifier.
 
-        Playback is currently synchronous, so this method cannot interrupt
-        an active playback operation. It is reserved for future asynchronous
-        playback support.
+        Playback is synchronous, so this cannot interrupt a playback call
+        running in the same thread. The method remains part of the public API
+        for amplifier shutdown and future interruptible playback support.
         """
         self._require_open()
 
@@ -274,143 +529,288 @@ class Audio:
             disable_speaker()
 
     def is_playing(self) -> bool:
-        """
-        Return whether asynchronous playback is active.
-
-        Playback is currently synchronous, so this always returns False.
-        """
         self._require_open()
-        return False
+        return self._playing
 
-    @property
-    def speech_backend_name(self) -> str:
-        return getattr(
-            self.speech_backend,
-            "name",
-            type(self.speech_backend).__name__,
+    def status(self) -> AudioStatus:
+        return AudioStatus(
+            backend=self.speech_backend_name,
+            available_backends=(self.available_speech_backends()),
+            output_device_index=self._device_index,
+            sample_rate=self.sample_rate,
+            auto_amp=self.auto_amp,
+            keep_amp_enabled=self.keep_amp_enabled,
+            playing=self._playing,
+            closed=self.closed,
         )
-
-    def available_speech_backends(self) -> list[str]:
-        return available_backends()
 
     def close(self) -> None:
         if self._closed:
             return
 
-        try:
-            self.stop()
+        first_error: AmplifierError | OSError | RuntimeError | None = None
 
-            if self.keep_amp_enabled:
-                disable_speaker()
+        try:
+            if self.auto_amp or self.keep_amp_enabled:
+                try:
+                    disable_speaker()
+
+                except (
+                    AmplifierError,
+                    OSError,
+                    RuntimeError,
+                ) as exc:
+                    first_error = exc
+
+            try:
+                self._pyaudio.terminate()
+
+            except (
+                OSError,
+                RuntimeError,
+            ) as exc:
+                if first_error is None:
+                    first_error = exc
+
         finally:
-            self._pyaudio.terminate()
             self._closed = True
+            self._playing = False
+
+        if first_error is not None:
+            raise first_error
 
     def deinit(self) -> None:
         self.close()
 
+    def _require_open(self) -> None:
+        if self._closed:
+            raise AudioError("audio subsystem is closed")
+
+    @staticmethod
+    def _require_existing_file(
+        value: str | Path,
+        *,
+        name: str,
+    ) -> Path:
+        if isinstance(value, bool) or not isinstance(
+            value,
+            str | Path,
+        ):
+            raise TypeError(f"{name} must be a string or Path")
+
+        path = Path(value).expanduser()
+
+        if not path.is_file():
+            raise PlaybackError(f"sound file does not exist: {path}")
+
+        return path
+
     def _find_device(self) -> int | None:
-        device_name = (self.preferred_output_device or "").lower()
+        requested_name = self.preferred_output_device.lower()
 
-        for index in range(self._pyaudio.get_device_count()):
-            info = self._pyaudio.get_device_info_by_index(index)
-            name = str(info.get("name", "")).lower()
+        try:
+            device_count = self._pyaudio.get_device_count()
 
-            if device_name and device_name in name:
+        except (
+            OSError,
+            RuntimeError,
+        ):
+            device_count = 0
+
+        for index in range(device_count):
+            try:
+                info = self._pyaudio.get_device_info_by_index(index)
+
+            except (
+                OSError,
+                RuntimeError,
+            ):
+                continue
+
+            try:
+                name = str(
+                    info.get(
+                        "name",
+                        "",
+                    )
+                ).lower()
+
+                output_channels = int(
+                    info.get(
+                        "maxOutputChannels",
+                        0,
+                    )
+                    or 0
+                )
+
+            except (
+                TypeError,
+                ValueError,
+            ):
+                continue
+
+            if requested_name and requested_name in name and output_channels > 0:
                 return index
 
         try:
-            return int(self._pyaudio.get_default_output_device_info()["index"])
-        except Exception:
+            info = self._pyaudio.get_default_output_device_info()
+
+            return int(info["index"])
+
+        except (
+            KeyError,
+            OSError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ):
             return None
 
-    def _resolve_sound_path(self, sound: str | Path) -> Path:
+    def _resolve_sound_path(
+        self,
+        sound: str | Path,
+    ) -> Path:
+        if isinstance(sound, bool) or not isinstance(
+            sound,
+            str | Path,
+        ):
+            raise TypeError("sound must be a string or Path")
+
         raw_path = Path(sound).expanduser()
-
-        search_dirs = [
-            Path.cwd(),
-            Path.home() / "media" / "sounds",
-            Path(__file__).resolve().parent / "sounds",
-        ]
-
         candidate_names = [raw_path]
 
-        if raw_path.suffix == "":
+        if not raw_path.suffix:
             candidate_names.extend(
-                [
-                    Path(f"{raw_path}.wav"),
-                    Path(f"{raw_path}.mp3"),
-                    Path(f"{raw_path}.ogg"),
-                    Path(f"{raw_path}.m4a"),
-                    Path(f"{raw_path}.flac"),
-                ]
+                Path(f"{raw_path}{suffix}")
+                for suffix in (
+                    ".wav",
+                    ".mp3",
+                    ".ogg",
+                    ".m4a",
+                    ".flac",
+                )
             )
 
         if raw_path.is_absolute():
             for candidate in candidate_names:
-                if candidate.exists():
+                if candidate.is_file():
                     return candidate
 
-            raise AudioError(f"sound file does not exist: {sound}")
+            raise PlaybackError(f"sound file does not exist: {sound}")
 
         for candidate in candidate_names:
-            if candidate.exists():
+            if candidate.is_file():
                 return candidate
 
-        for directory in search_dirs:
+        search_directories = (
+            Path.cwd(),
+            Path.home() / "media" / "sounds",
+            (Path(__file__).resolve().parent / "sounds"),
+        )
+
+        for directory in search_directories:
             for candidate in candidate_names:
                 path = directory / candidate.name
 
-                if path.exists():
+                if path.is_file():
                     return path
 
-        raise AudioError(f"sound file does not exist: {sound}")
+        raise PlaybackError(f"sound file does not exist: {sound}")
 
-    def _to_pcm16_wav(self, path: Path) -> tuple[Path, bool]:
+    def _to_pcm16_wav(
+        self,
+        path: Path,
+    ) -> tuple[Path, bool]:
         try:
-            with wave.open(str(path), "rb") as wav:
+            with wave.open(
+                str(path),
+                "rb",
+            ) as wav:
                 if wav.getsampwidth() == 2 and wav.getcomptype() == "NONE":
                     return path, False
-        except wave.Error:
+
+        except (
+            EOFError,
+            OSError,
+            wave.Error,
+        ):
             pass
 
-        fd, temp_path = tempfile.mkstemp(prefix="betabox_audio_", suffix=".wav")
+        fd, temporary_name = tempfile.mkstemp(
+            prefix="betabox_audio_",
+            suffix=".wav",
+        )
         os.close(fd)
 
-        temp = Path(temp_path)
+        output_path = Path(temporary_name)
 
+        try:
+            command = self._audio_conversion_command(
+                source_path=path,
+                output_path=output_path,
+            )
+
+            self._run_audio_command(
+                command,
+                operation="audio conversion",
+                timeout=(AUDIO_CONVERSION_TIMEOUT_SECONDS),
+            )
+
+        except PlaybackError:
+            _unlink_quietly(output_path)
+            raise
+
+        return output_path, True
+
+    def _audio_conversion_command(
+        self,
+        *,
+        source_path: Path,
+        output_path: Path,
+    ) -> list[str]:
         ffmpeg = shutil.which("ffmpeg")
-        sox = shutil.which("sox")
 
-        if ffmpeg:
-            command = [
+        if ffmpeg is not None:
+            return [
                 ffmpeg,
                 "-y",
                 "-i",
-                str(path),
+                str(source_path),
                 "-ac",
                 "1",
                 "-ar",
-                "44100",
-                "-sample_fmt",
-                "s16",
-                str(temp),
+                str(self.sample_rate),
+                "-c:a",
+                "pcm_s16le",
+                str(output_path),
             ]
-        elif sox:
-            command = [
+
+        sox = shutil.which("sox")
+
+        if sox is not None:
+            return [
                 sox,
-                str(path),
+                str(source_path),
                 "-b",
                 "16",
                 "-c",
                 "1",
                 "-r",
-                "44100",
-                str(temp),
+                str(self.sample_rate),
+                str(output_path),
             ]
-        else:
-            raise AudioError("install ffmpeg or sox to play non-WAV audio files")
 
+        raise PlaybackError(
+            "install ffmpeg or sox to play compressed or non-WAV audio files"
+        )
+
+    @staticmethod
+    def _run_audio_command(
+        command: list[str],
+        *,
+        operation: str,
+        timeout: float,
+    ) -> None:
         try:
             subprocess.run(
                 command,
@@ -418,16 +818,25 @@ class Audio:
                 stderr=subprocess.PIPE,
                 text=True,
                 check=True,
+                timeout=timeout,
             )
+
+        except subprocess.TimeoutExpired as exc:
+            raise PlaybackError(
+                f"{operation} timed out after {timeout:g} seconds"
+            ) from exc
+
         except subprocess.CalledProcessError as exc:
-            try:
-                temp.unlink()
-            except OSError:
-                pass
+            details = exc.stderr.strip() if exc.stderr else ""
 
-            raise AudioError(f"audio conversion failed: {exc.stderr}") from exc
+            message = (
+                f"{operation} failed: {details}" if details else f"{operation} failed"
+            )
 
-        return temp, True
+            raise PlaybackError(message) from exc
+
+        except OSError as exc:
+            raise PlaybackError(f"failed to start {operation}: {exc}") from exc
 
     def _enable_amp_for_playback(self) -> None:
         if self.auto_amp and not self.keep_amp_enabled:
@@ -438,12 +847,17 @@ class Audio:
             disable_speaker()
 
     @contextmanager
-    def _playback_session(self):
+    def _playback_session(
+        self,
+    ) -> Generator[None, None, None]:
         self._enable_amp_for_playback()
+        self._playing = True
 
         try:
             yield
+
         finally:
+            self._playing = False
             self._disable_amp_after_playback()
 
     @contextmanager
@@ -452,8 +866,8 @@ class Audio:
         *,
         channels: int,
         sample_rate: int,
-    ):
-        stream_kwargs = {
+    ) -> Generator[Any, None, None]:
+        stream_kwargs: dict[str, Any] = {
             "format": pyaudio.paInt16,
             "channels": channels,
             "rate": sample_rate,
@@ -463,14 +877,61 @@ class Audio:
         if self._device_index is not None:
             stream_kwargs["output_device_index"] = self._device_index
 
-        with suppress_stderr():
-            stream = self._pyaudio.open(**stream_kwargs)
+        try:
+            with suppress_stderr():
+                stream = self._pyaudio.open(**stream_kwargs)
+
+        except (
+            OSError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ) as exc:
+            raise PlaybackError(f"failed to open audio output: {exc}") from exc
 
         try:
             yield stream
+
         finally:
-            stream.stop_stream()
-            stream.close()
+            first_error: OSError | RuntimeError | None = None
+
+            try:
+                stream.stop_stream()
+
+            except (
+                OSError,
+                RuntimeError,
+            ) as exc:
+                first_error = exc
+
+            try:
+                stream.close()
+
+            except (
+                OSError,
+                RuntimeError,
+            ) as exc:
+                if first_error is None:
+                    first_error = exc
+
+            if first_error is not None:
+                raise PlaybackError(
+                    f"failed to close audio output stream: {first_error}"
+                ) from first_error
+
+    @staticmethod
+    def _write_stream(
+        stream: Any,
+        data: bytes,
+    ) -> None:
+        try:
+            stream.write(data)
+
+        except (
+            OSError,
+            RuntimeError,
+        ) as exc:
+            raise PlaybackError(f"audio playback failed: {exc}") from exc
 
     def _play_pcm(
         self,
@@ -479,26 +940,54 @@ class Audio:
         channels: int,
         sample_rate: int,
     ) -> None:
-        with self._playback_session():
-            with self._output_stream(
+        with (
+            self._playback_session(),
+            self._output_stream(
                 channels=channels,
                 sample_rate=sample_rate,
-            ) as stream:
-                stream.write(data)
+            ) as stream,
+        ):
+            self._write_stream(
+                stream,
+                data,
+            )
 
-    def _scale_pcm16(self, data: bytes, volume: float) -> bytes:
-        scale = max(0.0, min(3.0, float(volume)))
-
-        if scale == 1.0:
+    @staticmethod
+    def _scale_pcm16(
+        data: bytes,
+        volume: float,
+    ) -> bytes:
+        if volume == 1.0:
             return data
 
         output = bytearray(len(data))
 
-        for index in range(0, len(data), 2):
-            sample = int.from_bytes(data[index : index + 2], "little", signed=True)
-            sample = int(sample * scale)
-            sample = max(-32768, min(32767, sample))
-            output[index : index + 2] = sample.to_bytes(2, "little", signed=True)
+        for index in range(
+            0,
+            len(data),
+            2,
+        ):
+            sample = int.from_bytes(
+                data[index : index + 2],
+                "little",
+                signed=True,
+            )
+
+            scaled_sample = int(sample * volume)
+
+            clamped_sample = max(
+                -32_768,
+                min(
+                    32_767,
+                    scaled_sample,
+                ),
+            )
+
+            output[index : index + 2] = clamped_sample.to_bytes(
+                2,
+                "little",
+                signed=True,
+            )
 
         return bytes(output)
 
@@ -509,72 +998,60 @@ class Audio:
         if self.speech_volume == 1.0:
             return wav_path
 
-        return self._apply_wav_volume(wav_path, self.speech_volume)
+        return self._apply_wav_volume(
+            wav_path,
+            self.speech_volume,
+        )
 
     def _apply_wav_volume(
         self,
         wav_path: Path,
         volume: float,
     ) -> Path:
-        scale = max(0.0, min(3.0, float(volume)))
-
         ffmpeg = shutil.which("ffmpeg")
 
         if ffmpeg is None:
             return wav_path
 
-        fd, temp_path = tempfile.mkstemp(
+        fd, temporary_name = tempfile.mkstemp(
             prefix="betabox_speech_",
             suffix=".wav",
         )
         os.close(fd)
 
-        output_path = Path(temp_path)
-
-        command = [
-            ffmpeg,
-            "-y",
-            "-i",
-            str(wav_path),
-            "-filter:a",
-            f"volume={scale}",
-            str(output_path),
-        ]
+        output_path = Path(temporary_name)
 
         try:
-            subprocess.run(
-                command,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.PIPE,
-                text=True,
-                check=True,
+            self._run_audio_command(
+                [
+                    ffmpeg,
+                    "-y",
+                    "-i",
+                    str(wav_path),
+                    "-filter:a",
+                    f"volume={volume}",
+                    "-c:a",
+                    "pcm_s16le",
+                    str(output_path),
+                ],
+                operation="speech volume processing",
+                timeout=(SPEECH_POSTPROCESS_TIMEOUT_SECONDS),
             )
-        except subprocess.CalledProcessError as exc:
-            try:
-                output_path.unlink()
-            except OSError:
-                pass
 
-            raise AudioError(
-                f"speech volume processing failed: {exc.stderr}"
-            ) from exc
+        except PlaybackError:
+            _unlink_quietly(output_path)
+            raise
 
         return output_path
 
-    def __enter__(self):
+    def __enter__(self) -> Self:
+        self._require_open()
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(
+        self,
+        exc_type: object,
+        exc_value: object,
+        traceback: object,
+    ) -> None:
         self.close()
-
-    def status(self) -> AudioStatus:
-        return AudioStatus(
-            backend=self.speech_backend_name,
-            available_backends=available_backends(),
-            output_device_index=self._device_index,
-            sample_rate=self.sample_rate,
-            auto_amp=self.auto_amp,
-            keep_amp_enabled=self.keep_amp_enabled,
-            playing=False,
-            closed=self.closed,
-        )

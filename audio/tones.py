@@ -1,11 +1,20 @@
+from __future__ import annotations
+
 import math
 import struct
-from typing import TypeAlias
+from collections.abc import Mapping
+from types import MappingProxyType
+from typing import Final, TypeAlias
 
 NoteValue: TypeAlias = str | float | int
 MelodyNote: TypeAlias = tuple[NoteValue, float]
 
-NOTE_FREQUENCIES = {
+DEFAULT_SAMPLE_RATE: Final[int] = 44_100
+MAX_PCM_AMPLITUDE: Final[int] = 32_767
+BYTES_PER_SAMPLE: Final[int] = 2
+
+
+_NOTE_FREQUENCIES: dict[str, float] = {
     "C0": 16.35,
     "C#0": 17.32,
     "D0": 18.35,
@@ -116,30 +125,93 @@ NOTE_FREQUENCIES = {
     "B8": 7902.13,
 }
 
-FLAT_ALIASES = {
-    "DB": "C#",
-    "EB": "D#",
-    "GB": "F#",
-    "AB": "G#",
-    "BB": "A#",
-}
+NOTE_FREQUENCIES: Mapping[str, float] = MappingProxyType(_NOTE_FREQUENCIES)
+
+FLAT_ALIASES: Mapping[str, str] = MappingProxyType(
+    {
+        "DB": "C#",
+        "EB": "D#",
+        "GB": "F#",
+        "AB": "G#",
+        "BB": "A#",
+    }
+)
 
 
-def note_frequency(note_or_frequency: NoteValue) -> float:
-    if isinstance(note_or_frequency, (float, int)):
-        return float(note_or_frequency)
+def _require_finite_number(
+    value: object,
+    *,
+    name: str,
+) -> float:
+    if isinstance(value, bool) or not isinstance(
+        value,
+        int | float,
+    ):
+        raise TypeError(f"{name} must be a number")
 
-    note = note_or_frequency.strip().upper()
+    result = float(value)
 
-    if len(note) >= 3 and note[1] == "B":
-        pitch = note[:2]
-        octave = note[2:]
-        note = f"{FLAT_ALIASES.get(pitch, pitch)}{octave}"
+    if not math.isfinite(result):
+        raise ValueError(f"{name} must be finite")
 
-    frequency = NOTE_FREQUENCIES.get(note)
+    return result
 
-    if frequency is None:
-        raise ValueError(f"unknown note: {note_or_frequency}")
+
+def _require_sample_rate(
+    sample_rate: object,
+) -> int:
+    if isinstance(sample_rate, bool) or not isinstance(
+        sample_rate,
+        int,
+    ):
+        raise TypeError("sample_rate must be an integer")
+
+    if sample_rate <= 0:
+        raise ValueError("sample_rate must be greater than 0")
+
+    return sample_rate
+
+
+def _normalize_note_name(
+    note: str,
+) -> str:
+    normalized = note.strip().upper()
+
+    if not normalized:
+        raise ValueError("note cannot be empty")
+
+    if len(normalized) >= 3 and normalized[1] == "B":
+        pitch = normalized[:2]
+        octave = normalized[2:]
+
+        alias = FLAT_ALIASES.get(pitch)
+
+        if alias is not None:
+            normalized = f"{alias}{octave}"
+
+    return normalized
+
+
+def note_frequency(
+    note_or_frequency: NoteValue,
+) -> float:
+    if isinstance(note_or_frequency, str):
+        note = _normalize_note_name(note_or_frequency)
+
+        frequency = NOTE_FREQUENCIES.get(note)
+
+        if frequency is None:
+            raise ValueError(f"unknown note: {note_or_frequency}")
+
+        return frequency
+
+    frequency = _require_finite_number(
+        note_or_frequency,
+        name="frequency",
+    )
+
+    if frequency <= 0:
+        raise ValueError("frequency must be greater than 0")
 
     return frequency
 
@@ -148,25 +220,47 @@ def generate_tone(
     frequency: float,
     duration: float,
     *,
-    sample_rate: int = 44100,
+    sample_rate: int = DEFAULT_SAMPLE_RATE,
     volume: float = 1.0,
 ) -> bytes:
-    if frequency <= 0:
+    frequency_value = _require_finite_number(
+        frequency,
+        name="frequency",
+    )
+    duration_value = _require_finite_number(
+        duration,
+        name="duration",
+    )
+    volume_value = _require_finite_number(
+        volume,
+        name="volume",
+    )
+    sample_rate_value = _require_sample_rate(sample_rate)
+
+    if frequency_value <= 0:
         raise ValueError("frequency must be greater than 0")
 
-    if duration < 0:
+    if duration_value < 0:
         raise ValueError("duration cannot be negative")
 
-    if sample_rate <= 0:
-        raise ValueError("sample_rate must be greater than 0")
-    frames = int(sample_rate * duration)
-    scale = max(0.0, min(1.0, float(volume)))
-    data = bytearray(frames * 2)
+    if not 0.0 <= volume_value <= 1.0:
+        raise ValueError("volume must be between 0.0 and 1.0")
+
+    frames = int(sample_rate_value * duration_value)
+
+    data = bytearray(frames * BYTES_PER_SAMPLE)
 
     for index in range(frames):
-        value = math.sin(2.0 * math.pi * frequency * index / sample_rate)
-        sample = int(32767 * scale * value)
-        data[index * 2 : index * 2 + 2] = struct.pack("<h", sample)
+        value = math.sin(2.0 * math.pi * frequency_value * index / sample_rate_value)
+
+        sample = int(MAX_PCM_AMPLITUDE * volume_value * value)
+
+        struct.pack_into(
+            "<h",
+            data,
+            index * BYTES_PER_SAMPLE,
+            sample,
+        )
 
     return bytes(data)
 
@@ -174,12 +268,17 @@ def generate_tone(
 def generate_silence(
     duration: float,
     *,
-    sample_rate: int = 44100,
+    sample_rate: int = DEFAULT_SAMPLE_RATE,
 ) -> bytes:
-    if duration < 0:
+    duration_value = _require_finite_number(
+        duration,
+        name="duration",
+    )
+    sample_rate_value = _require_sample_rate(sample_rate)
+
+    if duration_value < 0:
         raise ValueError("duration cannot be negative")
 
-    if sample_rate <= 0:
-        raise ValueError("sample_rate must be greater than 0")
-    frames = int(sample_rate * duration)
-    return bytes(frames * 2)
+    frames = int(sample_rate_value * duration_value)
+
+    return bytes(frames * BYTES_PER_SAMPLE)

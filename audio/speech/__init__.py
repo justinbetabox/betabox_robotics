@@ -5,10 +5,10 @@ from .pico import PicoSpeech
 from .piper import PiperSpeech
 
 __all__ = [
-    "SpeechBackend",
     "EspeakNgSpeech",
     "PicoSpeech",
     "PiperSpeech",
+    "SpeechBackend",
     "available_backends",
     "create_backend",
 ]

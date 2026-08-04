@@ -1,39 +1,79 @@
-import shutil
-import subprocess
-from pathlib import Path
+from __future__ import annotations
 
-from betabox_robotics.audio.exceptions import AudioError
-from betabox_robotics.audio.speech.base import SpeechBackend
+import shutil
+from typing import ClassVar
+
+from betabox_robotics.audio.exceptions import SpeechError
+from betabox_robotics.audio.speech.base import (
+    SpeechBackend,
+    SpeechOutputPath,
+)
+from betabox_robotics.audio.speech.utils import (
+    run_speech_command,
+    validate_speech_request,
+    verify_speech_output,
+)
 
 
 class PicoSpeech(SpeechBackend):
     """pico2wave speech backend."""
 
-    def __init__(self, *, language: str = "en-US") -> None:
-        self.language = language
-        self.name = "pico"
+    name: ClassVar[str] = "pico"
+    executable_name: ClassVar[str] = "pico2wave"
+
+    def __init__(
+        self,
+        *,
+        language: str = "en-US",
+    ) -> None:
+        if not isinstance(language, str):
+            raise TypeError("language must be a string")
+
+        if not language.strip():
+            raise ValueError("language cannot be empty")
+
+        self.language = language.strip()
 
     @classmethod
-    def available(cls) -> bool:
-        return shutil.which("pico2wave") is not None
+    def executable(
+        cls,
+    ) -> str | None:
+        return shutil.which(cls.executable_name)
 
-    def synthesize(self, text: str, output_path: str | Path) -> None:
-        command = [
-            "pico2wave",
-            "-l",
-            self.language,
-            "-w",
-            str(output_path),
+    @classmethod
+    def available(
+        cls,
+    ) -> bool:
+        return cls.executable() is not None
+
+    def synthesize(
+        self,
+        text: str,
+        output_path: SpeechOutputPath,
+    ) -> None:
+        speech_text, path = validate_speech_request(
             text,
-        ]
+            output_path,
+        )
 
-        try:
-            subprocess.run(
-                command,
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-        except subprocess.CalledProcessError as exc:
-            raise AudioError(f"pico2wave speech failed: {exc.stderr}") from exc
+        executable = self.executable()
+
+        if executable is None:
+            raise SpeechError("pico2wave executable not found")
+
+        run_speech_command(
+            [
+                executable,
+                "-l",
+                self.language,
+                "-w",
+                str(path),
+                speech_text,
+            ],
+            backend_name="pico2wave",
+        )
+
+        verify_speech_output(
+            path,
+            backend_name="pico2wave",
+        )

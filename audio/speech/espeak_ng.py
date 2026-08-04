@@ -1,41 +1,79 @@
-import shutil
-import subprocess
-from pathlib import Path
+from __future__ import annotations
 
-from betabox_robotics.audio.exceptions import AudioError
-from betabox_robotics.audio.speech.base import SpeechBackend
+import shutil
+from typing import ClassVar
+
+from betabox_robotics.audio.exceptions import SpeechError
+from betabox_robotics.audio.speech.base import (
+    SpeechBackend,
+    SpeechOutputPath,
+)
+from betabox_robotics.audio.speech.utils import (
+    run_speech_command,
+    validate_speech_request,
+    verify_speech_output,
+)
 
 
 class EspeakNgSpeech(SpeechBackend):
     """espeak-ng speech backend."""
 
-    name = "espeak-ng"
+    name: ClassVar[str] = "espeak-ng"
+    executable_name: ClassVar[str] = "espeak-ng"
 
-    def __init__(self, *, voice: str = "en-us") -> None:
-        self.voice = voice
-        self.name = "espeak-ng"
+    def __init__(
+        self,
+        *,
+        voice: str = "en-us",
+    ) -> None:
+        if not isinstance(voice, str):
+            raise TypeError("voice must be a string")
+
+        if not voice.strip():
+            raise ValueError("voice cannot be empty")
+
+        self.voice = voice.strip()
 
     @classmethod
-    def available(cls) -> bool:
-        return shutil.which("espeak-ng") is not None
+    def executable(
+        cls,
+    ) -> str | None:
+        return shutil.which(cls.executable_name)
 
-    def synthesize(self, text: str, output_path: str | Path) -> None:
-        command = [
-            "espeak-ng",
-            "-v",
-            self.voice,
-            "-w",
-            str(output_path),
+    @classmethod
+    def available(
+        cls,
+    ) -> bool:
+        return cls.executable() is not None
+
+    def synthesize(
+        self,
+        text: str,
+        output_path: SpeechOutputPath,
+    ) -> None:
+        speech_text, path = validate_speech_request(
             text,
-        ]
+            output_path,
+        )
 
-        try:
-            subprocess.run(
-                command,
-                check=True,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-        except subprocess.CalledProcessError as exc:
-            raise AudioError(f"espeak-ng speech failed: {exc.stderr}") from exc
+        executable = self.executable()
+
+        if executable is None:
+            raise SpeechError("espeak-ng executable not found")
+
+        run_speech_command(
+            [
+                executable,
+                "-v",
+                self.voice,
+                "-w",
+                str(path),
+                speech_text,
+            ],
+            backend_name=self.name,
+        )
+
+        verify_speech_output(
+            path,
+            backend_name=self.name,
+        )

@@ -1,27 +1,29 @@
-from gpiozero.exc import GPIOPinInUse
-import lgpio
+from __future__ import annotations
 
-from betabox_robotics.exceptions import (
-    RobotBusyError,
-)
+import logging
+
+import lgpio
+from gpiozero.exc import GPIOPinInUse
 
 from betabox_robotics.audio import Audio
-from betabox_robotics.drive import Drive
-from betabox_robotics.sensors import Sensors
-from betabox_robotics.system import System
-from betabox_robotics.vision import VisionClient
+from betabox_robotics.calibration import (
+    RobotCalibration,
+)
 from betabox_robotics.camera import (
     CameraMount,
+)
+from betabox_robotics.drive import Drive
+from betabox_robotics.exceptions import (
+    RobotBusyError,
 )
 from betabox_robotics.hardware import (
     Pins,
     RobotOwnership,
     close_gpio_factory,
 )
-
-from betabox_robotics.calibration import (
-    RobotCalibration,
-)
+from betabox_robotics.sensors import Sensors
+from betabox_robotics.system import System
+from betabox_robotics.vision import VisionClient
 
 from .car import CarRobot
 from .config import (
@@ -39,6 +41,7 @@ from .config import (
     VisionConfig,
 )
 
+logger = logging.getLogger(__name__)
 
 BETABOX_CAR = RobotConfig(
     drive=DriveConfig(
@@ -111,48 +114,41 @@ class BetaboxCar(CarRobot):
     ) -> None:
         super().__init__()
 
+        if not isinstance(
+            config,
+            RobotConfig,
+        ):
+            raise TypeError("config must be a RobotConfig")
+
+        if calibration is not None and not isinstance(
+            calibration,
+            RobotCalibration,
+        ):
+            raise TypeError("calibration must be a RobotCalibration")
+
         self.config = config
-
         self.calibration = (
-            RobotCalibration.default()
-            if calibration is None
-            else calibration
+            RobotCalibration.default() if calibration is None else calibration
         )
 
-        self.drive = None
-        self.sensors = None
-        self.camera_mount = None
-        self.vision = None
-        self.audio = None
-        self.system = None
+        self._ownership = RobotOwnership(owner=owner)
 
-        self._ownership = RobotOwnership(
-            owner=owner
-        )
-
+        # Acquisition intentionally remains outside the cleanup block.
+        # A failed acquisition must not close GPIO resources owned by
+        # another process.
         self._ownership.acquire()
 
         try:
             self.drive = Drive.default(
                 config.drive,
-                left_trim=(
-                    self.calibration.motors.left_trim
-                ),
-                right_trim=(
-                    self.calibration.motors.right_trim
-                ),
-                steering_offset=(
-                    self.calibration.steering.offset
-                ),
+                left_trim=(self.calibration.motors.left_trim),
+                right_trim=(self.calibration.motors.right_trim),
+                steering_offset=(self.calibration.steering.offset),
             )
 
-            self.sensors = Sensors.default(
-                config.sensors
-            )
+            self.sensors = Sensors.default(config.sensors)
 
-            grayscale_calibration = (
-                self.calibration.grayscale
-            )
+            grayscale_calibration = self.calibration.grayscale
 
             if grayscale_calibration.calibrated:
                 floor = grayscale_calibration.floor
@@ -160,8 +156,7 @@ class BetaboxCar(CarRobot):
 
                 if floor is None or line is None:
                     raise ValueError(
-                        "calibrated grayscale data must "
-                        "contain floor and line values"
+                        "calibrated grayscale data must contain floor and line values"
                     )
 
                 self.sensors.grayscale.set_calibration(
@@ -171,29 +166,13 @@ class BetaboxCar(CarRobot):
 
             self.camera_mount = CameraMount.default(
                 config.camera_mount,
-                pan_offset=(
-                    self.calibration
-                    .camera_mount
-                    .pan_offset
-                ),
-                tilt_offset=(
-                    self.calibration
-                    .camera_mount
-                    .tilt_offset
-                ),
+                pan_offset=(self.calibration.camera_mount.pan_offset),
+                tilt_offset=(self.calibration.camera_mount.tilt_offset),
             )
 
-            self.vision = VisionClient.default(
-                config.vision
-            )
-
-            self.audio = Audio.default(
-                config.audio
-            )
-
-            self.system = System.default(
-                config.system
-            )
+            self.vision = VisionClient.default(config.vision)
+            self.audio = Audio.default(config.audio)
+            self.system = System.default(config.system)
 
             self.start()
 
@@ -207,7 +186,7 @@ class BetaboxCar(CarRobot):
             raise RobotBusyError(
                 "The robot hardware could not be acquired. "
                 "Another process may be using it."
-            ) from None
+            ) from exc
 
         except Exception:
             self._close_constructed_subsystems()
@@ -223,23 +202,33 @@ class BetaboxCar(CarRobot):
         finally:
             try:
                 self._close_constructed_subsystems()
-                close_gpio_factory()
             finally:
-                self._ownership.release()
-                self._started = False
-                self._closed = True
-
+                try:
+                    close_gpio_factory()
+                finally:
+                    self._ownership.release()
+                    self._started = False
+                    self._closed = True
 
     def _close_constructed_subsystems(
         self,
     ) -> None:
-        for subsystem in (
-            self.audio,
-            self.camera_mount,
-            self.drive,
-            self.sensors,
-            self.system,
-        ):
+        subsystem_names = (
+            "vision",
+            "audio",
+            "camera_mount",
+            "drive",
+            "sensors",
+            "system",
+        )
+
+        for name in subsystem_names:
+            subsystem = getattr(
+                self,
+                name,
+                None,
+            )
+
             if subsystem is None:
                 continue
 
@@ -249,8 +238,13 @@ class BetaboxCar(CarRobot):
                 None,
             )
 
-            if callable(close):
-                try:
-                    close()
-                except Exception:
-                    pass
+            if not callable(close):
+                continue
+
+            try:
+                close()
+            except Exception:
+                logger.exception(
+                    "Failed to close %s subsystem.",
+                    name,
+                )

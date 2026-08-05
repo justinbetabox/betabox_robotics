@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -36,6 +37,49 @@ from .capabilities import RobotCapability
 from .health import HealthCheck, RobotHealth
 from .robot import Robot
 
+logger = logging.getLogger(__name__)
+
+
+def _validate_name(
+    value: object,
+    *,
+    name: str,
+) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"{name} must be a string")
+
+    normalized = value.strip()
+
+    if not normalized:
+        raise ValueError(f"{name} cannot be empty")
+
+    return normalized
+
+
+def _detection_area(
+    detection: ClientDetection,
+) -> float:
+    value = detection.data.get(
+        "area",
+        0.0,
+    )
+
+    if isinstance(value, bool):
+        return 0.0
+
+    try:
+        area = float(value)
+    except (
+        TypeError,
+        ValueError,
+    ):
+        return 0.0
+
+    return max(
+        area,
+        0.0,
+    )
+
 
 class CarRobot(Robot):
     """
@@ -48,13 +92,15 @@ class CarRobot(Robot):
     delegate to the underlying subsystem APIs.
     """
 
-    capabilities = {
-        RobotCapability.DRIVE,
-        RobotCapability.SENSORS,
-        RobotCapability.VISION,
-        RobotCapability.AUDIO,
-        RobotCapability.SYSTEM,
-    }
+    capabilities = frozenset(
+        {
+            RobotCapability.DRIVE,
+            RobotCapability.SENSORS,
+            RobotCapability.VISION,
+            RobotCapability.AUDIO,
+            RobotCapability.SYSTEM,
+        }
+    )
 
     drive: Drive
     sensors: Sensors
@@ -165,7 +211,7 @@ class CarRobot(Robot):
         self._require_ready()
         self.audio.play_note(note_or_frequency, duration)
 
-    def play_melody(self, notes: list[MelodyNote], *, gap: float = 0.0) -> None:
+    def play_melody(self, notes: Sequence[MelodyNote], *, gap: float = 0.0) -> None:
         self._require_ready()
         self.audio.play_melody(notes, gap=gap)
 
@@ -315,7 +361,12 @@ class CarRobot(Robot):
         *,
         label: str | None = None,
     ) -> list[ClientDetection]:
-        metadata = self.metadata(source)
+        source_value = _validate_name(
+            source,
+            name="source",
+        )
+
+        metadata = self.metadata(source_value)
 
         if metadata is None:
             return []
@@ -325,12 +376,15 @@ class CarRobot(Robot):
         if label is None:
             return list(detections)
 
-        normalized = label.strip().casefold()
+        normalized_label = _validate_name(
+            label,
+            name="label",
+        ).casefold()
 
         return [
             detection
             for detection in detections
-            if detection.label.casefold() == normalized
+            if (detection.label.casefold() == normalized_label)
         ]
 
     def enable_detection(self, name: str) -> ClientDetectionStatus:
@@ -402,7 +456,7 @@ class CarRobot(Robot):
 
         return max(
             detections,
-            key=lambda detection: float(detection.data.get("area", 0.0)),
+            key=_detection_area,
         )
 
     def color_center(
@@ -425,7 +479,7 @@ class CarRobot(Robot):
         if detection is None:
             return None
 
-        return float(detection.data.get("area", 0.0))
+        return _detection_area(detection)
 
     def sees_face(self) -> bool:
         return bool(self._detections("face"))
@@ -489,7 +543,9 @@ class CarRobot(Robot):
         self._require_ready()
         return self.system.hostname()
 
-    def ip_addresses(self) -> list[str]:
+    def ip_addresses(
+        self,
+    ) -> tuple[str, ...]:
         self._require_ready()
         return self.system.ip_addresses()
 
@@ -538,7 +594,7 @@ class CarRobot(Robot):
 
         return RobotHealth(
             ok=all(check.ok for check in checks),
-            checks=checks,
+            checks=tuple(checks),
         )
 
     def system_health(self) -> SystemHealth:
@@ -556,29 +612,33 @@ class CarRobot(Robot):
             try:
                 self.vision.stop_recording()
             except Exception:
-                pass
+                logger.exception("Failed to stop robot-started recording.")
             finally:
                 self._recording_started_by_robot = False
 
         try:
             self.drive.stop()
         except Exception:
-            pass
+            logger.exception("Failed to stop drive subsystem.")
 
         try:
             self.audio.stop()
         except Exception:
-            pass
+            logger.exception("Failed to stop audio subsystem.")
 
-        system_stop_all = getattr(self.system, "stop_all", None)
+        system_stop_all = getattr(
+            self.system,
+            "stop_all",
+            None,
+        )
 
         if callable(system_stop_all):
             try:
                 system_stop_all()
             except Exception:
-                pass
+                logger.exception("Failed to stop system subsystem.")
 
-        self._started = False
+        super().stop_all()
 
     def _require_ready(self) -> None:
         self.require_started()

@@ -5,6 +5,7 @@ from .car import CarRobot
 from .config import (
     AudioConfig,
     BatteryConfig,
+    CameraMountConfig,
     DriveConfig,
     GrayscaleConfig,
     MotorConfig,
@@ -15,29 +16,34 @@ from .config import (
     UltrasonicConfig,
     VisionConfig,
 )
-from .robot import Robot
+from .exceptions import (
+    RobotError,
+    RobotLifecycleError,
+)
 from .health import HealthCheck, RobotHealth
-from .exceptions import RobotLifecycleError
+from .robot import Robot
 
 __all__ = [
-    "RobotBase",
-    "Robot",
-    "CarRobot",
-    "BetaboxCar",
     "BETABOX_CAR",
+    "AudioConfig",
+    "BatteryConfig",
+    "BetaboxCar",
+    "CameraMountConfig",
+    "CarRobot",
+    "DriveConfig",
+    "GrayscaleConfig",
+    "HealthCheck",
+    "MotorConfig",
+    "Robot",
+    "RobotBase",
     "RobotCapability",
     "RobotConfig",
-    "DriveConfig",
-    "MotorConfig",
-    "SteeringConfig",
-    "SensorsConfig",
-    "UltrasonicConfig",
-    "GrayscaleConfig",
-    "BatteryConfig",
-    "VisionConfig",
-    "AudioConfig",
-    "SystemConfig",
-    "HealthCheck",
+    "RobotError",
     "RobotHealth",
     "RobotLifecycleError",
+    "SensorsConfig",
+    "SteeringConfig",
+    "SystemConfig",
+    "UltrasonicConfig",
+    "VisionConfig",
 ]

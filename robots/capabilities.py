@@ -1,7 +1,7 @@
-from enum import Enum
+from enum import StrEnum
 
 
-class RobotCapability(str, Enum):
+class RobotCapability(StrEnum):
     DRIVE = "drive"
     SENSORS = "sensors"
     VISION = "vision"

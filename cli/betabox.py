@@ -1,167 +1,221 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Callable
 
 from betabox_robotics.launchpad.app import (
     main as launchpad_main,
 )
-from betabox_robotics.services.backup import main as backup_main
-from betabox_robotics.services.boot_announce import main as boot_announce_main
-from betabox_robotics.services.doctor import main as doctor_main
-from betabox_robotics.services.events import main as events_main
+from betabox_robotics.services.backup import (
+    main as backup_main,
+)
+from betabox_robotics.services.boot_announce import (
+    main as boot_announce_main,
+)
+from betabox_robotics.services.doctor import (
+    main as doctor_main,
+)
+from betabox_robotics.services.events import (
+    main as events_main,
+)
 from betabox_robotics.services.guest import (
     main as guest_main,
 )
-from betabox_robotics.services.hostname import main as hostname_main
-from betabox_robotics.services.install_check import main as install_check_main
-from betabox_robotics.services.logs import main as logs_main
-from betabox_robotics.services.monitor import main as monitor_main
-from betabox_robotics.services.reset import main as reset_main
-from betabox_robotics.services.restore import main as restore_main
-from betabox_robotics.services.services import main as services_main
-from betabox_robotics.services.snapshot import main as snapshot_main
-from betabox_robotics.services.status import main as status_main
-from betabox_robotics.services.verify import main as verify_main
-from betabox_robotics.services.video import main as video_main
-from betabox_robotics.services.wifi_fallback import main as wifi_fallback_main
+from betabox_robotics.services.hostname import (
+    main as hostname_main,
+)
+from betabox_robotics.services.install_check import (
+    main as install_check_main,
+)
+from betabox_robotics.services.logs import (
+    main as logs_main,
+)
+from betabox_robotics.services.monitor import (
+    main as monitor_main,
+)
+from betabox_robotics.services.reset import (
+    main as reset_main,
+)
+from betabox_robotics.services.restore import (
+    main as restore_main,
+)
+from betabox_robotics.services.services import (
+    main as services_main,
+)
+from betabox_robotics.services.snapshot import (
+    main as snapshot_main,
+)
+from betabox_robotics.services.status import (
+    main as status_main,
+)
+from betabox_robotics.services.verify import (
+    main as verify_main,
+)
+from betabox_robotics.services.video import (
+    main as video_main,
+)
+from betabox_robotics.services.wifi_fallback import (
+    main as wifi_fallback_main,
+)
+
+CommandHandler = Callable[
+    [list[str] | None],
+    int,
+]
 
 
-def main() -> int:
+def _without_args(
+    handler: Callable[[], int],
+) -> CommandHandler:
+    def wrapped(
+        argv: list[str] | None = None,
+    ) -> int:
+        if argv:
+            raise ValueError("command does not accept arguments")
+
+        return handler()
+
+    return wrapped
+
+
+COMMANDS: dict[
+    str,
+    tuple[
+        str,
+        CommandHandler,
+    ],
+] = {
+    "install-check": (
+        "Run installation checks that do not require rebooted hardware",
+        install_check_main,
+    ),
+    "verify": (
+        "Run full Betabox hardware verification checks",
+        _without_args(verify_main),
+    ),
+    "status": (
+        "Show current Betabox platform status",
+        status_main,
+    ),
+    "boot-announce": (
+        "Run the Betabox boot announcement readiness check",
+        _without_args(boot_announce_main),
+    ),
+    "monitor": (
+        "Run the Betabox platform monitor",
+        monitor_main,
+    ),
+    "services": (
+        "Show managed Betabox systemd services",
+        services_main,
+    ),
+    "events": (
+        "Show Betabox event logs",
+        events_main,
+    ),
+    "logs": (
+        "Show Betabox service logs",
+        logs_main,
+    ),
+    "doctor": (
+        "Diagnose Betabox platform issues and suggest fixes",
+        doctor_main,
+    ),
+    "backup": (
+        "Create or list Betabox backups",
+        backup_main,
+    ),
+    "snapshot": (
+        "Create or list Betabox diagnostic snapshots",
+        snapshot_main,
+    ),
+    "restore": (
+        "Restore user data from a Betabox backup",
+        restore_main,
+    ),
+    "reset": (
+        "Reset generated Betabox media and recreate expected folders",
+        reset_main,
+    ),
+    "guest": (
+        "Manage the Betabox Guest workspace",
+        guest_main,
+    ),
+    "set-hostname": (
+        "Set hostname from Raspberry Pi serial number",
+        hostname_main,
+    ),
+    "wifi-fallback": (
+        "Start fallback AP if Ethernet and Wi-Fi are unavailable",
+        wifi_fallback_main,
+    ),
+    "video": (
+        "Run the Betabox video streaming service",
+        video_main,
+    ),
+    "launchpad": (
+        "Run the Betabox Launchpad web interface",
+        launchpad_main,
+    ),
+}
+
+
+def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="betabox")
+
     subparsers = parser.add_subparsers(dest="command")
 
-    subparsers.add_parser(
-        "install-check",
-        help="Run installation checks that do not require rebooted hardware",
-    )
-    subparsers.add_parser(
-        "verify",
-        help="Run full Betabox hardware verification checks",
-    )
-    subparsers.add_parser(
-        "status",
-        help="Show current Betabox platform status",
-    )
-    subparsers.add_parser(
-        "boot-announce",
-        help="Run the Betabox boot announcement readiness check",
-    )
-    subparsers.add_parser(
-        "monitor",
-        help="Run the Betabox platform monitor",
-    )
-    subparsers.add_parser(
-        "services",
-        help="Show managed Betabox systemd services",
-    )
-    subparsers.add_parser(
-        "events",
-        help="Show Betabox event logs",
-    )
-    subparsers.add_parser(
-        "logs",
-        help="Show Betabox service logs",
-    )
-    subparsers.add_parser(
-        "doctor",
-        help="Diagnose Betabox platform issues and suggest fixes",
-    )
-    subparsers.add_parser(
-        "backup",
-        help="Create or list Betabox backups",
-    )
-    subparsers.add_parser(
-        "snapshot",
-        help="Create or list Betabox diagnostic snapshots",
-    )
-    subparsers.add_parser(
-        "restore",
-        help="Restore user data from a Betabox backup",
-    )
-    subparsers.add_parser(
-        "reset",
-        help="Reset generated Betabox media and recreate expected folders",
-    )
-    subparsers.add_parser(
-        "guest",
-        help="Manage the Betabox Guest workspace",
-    )
-    subparsers.add_parser(
-        "set-hostname",
-        help="Set hostname from Raspberry Pi serial number",
-    )
-    subparsers.add_parser(
-        "wifi-fallback",
-        help="Start fallback AP if Ethernet and Wi-Fi are unavailable",
-    )
-    subparsers.add_parser(
-        "video",
-        help="Run the Betabox video streaming service",
-    )
-    subparsers.add_parser(
-        "launchpad",
-        help="Run the Betabox Launchpad web interface",
-    )
+    for name, (
+        help_text,
+        _,
+    ) in COMMANDS.items():
+        subparsers.add_parser(
+            name,
+            help=help_text,
+            add_help=False,
+        )
 
-    args, extra = parser.parse_known_args()
+    return parser
 
-    if args.command == "install-check":
-        return install_check_main(extra)
 
-    if args.command == "verify":
-        return verify_main()
+def parse_args(
+    argv: list[str] | None = None,
+) -> tuple[
+    argparse.Namespace,
+    list[str],
+]:
+    return _build_parser().parse_known_args(argv)
 
-    if args.command == "status":
-        return status_main(extra)
 
-    if args.command == "boot-announce":
-        return boot_announce_main()
+def main(
+    argv: list[str] | None = None,
+) -> int:
+    parser = _build_parser()
+    args, extra = parser.parse_known_args(argv)
 
-    if args.command == "monitor":
-        return monitor_main(extra)
+    if args.command is None:
+        parser.print_help()
+        return 1
 
-    if args.command == "services":
-        return services_main(extra)
+    command = COMMANDS.get(args.command)
 
-    if args.command == "events":
-        return events_main(extra)
+    if command is None:
+        parser.print_help()
+        return 1
 
-    if args.command == "logs":
-        return logs_main(extra)
+    _, handler = command
 
-    if args.command == "doctor":
-        return doctor_main(extra)
-
-    if args.command == "backup":
-        return backup_main(extra)
-
-    if args.command == "snapshot":
-        return snapshot_main(extra)
-
-    if args.command == "restore":
-        return restore_main(extra)
-
-    if args.command == "reset":
-        return reset_main(extra)
-
-    if args.command == "set-hostname":
-        return hostname_main(extra)
-
-    if args.command == "guest":
-        return guest_main(extra)
-
-    if args.command == "wifi-fallback":
-        return wifi_fallback_main(extra)
-
-    if args.command == "video":
-        return video_main(extra)
-
-    if args.command == "launchpad":
-        return launchpad_main(extra)
-
-    parser.print_help()
-    return 1
+    try:
+        return handler(extra)
+    except (
+        TypeError,
+        ValueError,
+    ) as exc:
+        print(f"betabox {args.command} failed: {exc}")
+        return 1
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    import sys
+
+    raise SystemExit(main(sys.argv[1:]))

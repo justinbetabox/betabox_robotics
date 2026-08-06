@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import argparse
 import json
-import shutil
 import subprocess
 import unittest
 from dataclasses import FrozenInstanceError
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock, call, mock_open, patch
+from unittest.mock import call, patch
 
 from betabox_robotics.config import DEFAULT_PLATFORM_CONFIG
 from betabox_robotics.services.snapshot import (
@@ -39,7 +38,6 @@ from betabox_robotics.services.snapshot import (
     write_text,
 )
 from betabox_robotics.version import __version__
-
 
 MODULE = "betabox_robotics.services.snapshot"
 
@@ -318,18 +316,14 @@ class SnapshotReportTests(unittest.TestCase):
             ValueError,
             "name cannot be empty",
         ):
-            make_report(
-                name=" "
-            )
+            make_report(name=" ")
 
     def test_rejects_invalid_path(self) -> None:
         with self.assertRaisesRegex(
             ValueError,
             "path cannot be empty",
         ):
-            make_report(
-                path=" "
-            )
+            make_report(path=" ")
 
     def test_is_frozen_and_slotted(self) -> None:
         report = make_report()
@@ -341,9 +335,7 @@ class SnapshotReportTests(unittest.TestCase):
             )
         )
 
-        with self.assertRaises(
-            FrozenInstanceError
-        ):
+        with self.assertRaises(FrozenInstanceError):
             report.name = "changed"  # type: ignore[misc]
 
 
@@ -355,9 +347,7 @@ class TimestampTests(unittest.TestCase):
         ) as strftime:
             result = timestamp()
 
-        strftime.assert_called_once_with(
-            "%Y%m%d-%H%M%S"
-        )
+        strftime.assert_called_once_with("%Y%m%d-%H%M%S")
         self.assertEqual(
             result,
             "20260806-000000",
@@ -424,9 +414,7 @@ class WriteTextTests(unittest.TestCase):
         mkdir.assert_not_called()
 
     def test_filesystem_error_propagates(self) -> None:
-        error = OSError(
-            "permission denied"
-        )
+        error = OSError("permission denied")
 
         with (
             patch.object(
@@ -434,9 +422,7 @@ class WriteTextTests(unittest.TestCase):
                 "mkdir",
                 side_effect=error,
             ),
-            self.assertRaises(
-                OSError
-            ) as context,
+            self.assertRaises(OSError) as context,
         ):
             write_text(
                 "/tmp/output.txt",
@@ -642,9 +628,7 @@ class CopyIfExistsTests(unittest.TestCase):
                 "exists",
                 return_value=False,
             ),
-            patch(
-                f"{MODULE}.shutil.copy2"
-            ) as copy,
+            patch(f"{MODULE}.shutil.copy2") as copy,
         ):
             result = copy_if_exists(
                 "/tmp/source",
@@ -670,9 +654,7 @@ class CopyIfExistsTests(unittest.TestCase):
                 "is_dir",
                 return_value=False,
             ),
-            patch(
-                f"{MODULE}.shutil.copy2"
-            ) as copy,
+            patch(f"{MODULE}.shutil.copy2") as copy,
         ):
             result = copy_if_exists(
                 "/tmp/source.log",
@@ -705,9 +687,7 @@ class CopyIfExistsTests(unittest.TestCase):
                 "is_dir",
                 return_value=True,
             ),
-            patch(
-                f"{MODULE}.shutil.copytree"
-            ) as copy,
+            patch(f"{MODULE}.shutil.copytree") as copy,
         ):
             result = copy_if_exists(
                 "/tmp/source",
@@ -725,9 +705,7 @@ class CopyIfExistsTests(unittest.TestCase):
         with patch.object(
             Path,
             "exists",
-            side_effect=OSError(
-                "unavailable"
-            ),
+            side_effect=OSError("unavailable"),
         ):
             self.assertFalse(
                 copy_if_exists(
@@ -763,10 +741,7 @@ class BuildSnapshotReportTests(unittest.TestCase):
         self.assertEqual(
             result.path,
             str(
-                DEFAULT_PLATFORM_CONFIG
-                .paths
-                .snapshot_root
-                / "snapshot-20260806-000000"
+                DEFAULT_PLATFORM_CONFIG.paths.snapshot_root / "snapshot-20260806-000000"
             ),
         )
         self.assertEqual(
@@ -784,9 +759,7 @@ class BuildSnapshotReportTests(unittest.TestCase):
 
     def test_uses_selected_name_without_timestamp(self) -> None:
         with (
-            patch(
-                f"{MODULE}.timestamp"
-            ) as timestamp_call,
+            patch(f"{MODULE}.timestamp") as timestamp_call,
             patch(
                 f"{MODULE}.time.strftime",
                 return_value="2026-08-06 00:00:00",
@@ -796,9 +769,7 @@ class BuildSnapshotReportTests(unittest.TestCase):
                 return_value="Betabox-7eea",
             ),
         ):
-            result = build_snapshot_report(
-                " classroom "
-            )
+            result = build_snapshot_report(" classroom ")
 
         timestamp_call.assert_not_called()
         self.assertEqual(
@@ -808,9 +779,7 @@ class BuildSnapshotReportTests(unittest.TestCase):
 
     def test_rejects_invalid_config_before_collection(self) -> None:
         with (
-            patch(
-                f"{MODULE}.timestamp"
-            ) as timestamp_call,
+            patch(f"{MODULE}.timestamp") as timestamp_call,
             self.assertRaisesRegex(
                 TypeError,
                 "config must be a PlatformConfig",
@@ -848,9 +817,7 @@ class WriteManifestTests(unittest.TestCase):
     def test_writes_manifest(self) -> None:
         report = make_report()
 
-        with patch(
-            f"{MODULE}.write_json"
-        ) as write:
+        with patch(f"{MODULE}.write_json") as write:
             write_manifest(report)
 
         write.assert_called_once_with(
@@ -866,9 +833,7 @@ class WriteManifestTests(unittest.TestCase):
 
     def test_rejects_invalid_report_before_write(self) -> None:
         with (
-            patch(
-                f"{MODULE}.write_json"
-            ) as write,
+            patch(f"{MODULE}.write_json") as write,
             self.assertRaisesRegex(
                 TypeError,
                 "report must be a SnapshotReport",
@@ -888,67 +853,39 @@ class WriteSystemReportsTests(unittest.TestCase):
         with (
             patch(
                 f"{MODULE}.command_output",
-                side_effect=lambda command: (
-                    " ".join(command)
-                ),
+                side_effect=lambda command: " ".join(command),
             ) as output,
-            patch(
-                f"{MODULE}.write_text"
-            ) as write,
+            patch(f"{MODULE}.write_text") as write,
         ):
-            write_system_reports(
-                snapshot_dir
-            )
+            write_system_reports(snapshot_dir)
 
-        expected_commands = [
-            list(command)
-            for _, command in SYSTEM_COMMANDS
-        ]
+        expected_commands = [list(command) for _, command in SYSTEM_COMMANDS]
         expected_commands.append(
             [
                 "i2cdetect",
                 "-y",
-                str(
-                    DEFAULT_PLATFORM_CONFIG
-                    .verification
-                    .i2c_bus
-                ),
+                str(DEFAULT_PLATFORM_CONFIG.verification.i2c_bus),
             ]
         )
 
         self.assertEqual(
             output.call_args_list,
-            [
-                call(command)
-                for command in expected_commands
-            ],
+            [call(command) for command in expected_commands],
         )
 
         expected_paths = [
-            snapshot_dir
-            / "system"
-            / filename
-            for filename, _ in SYSTEM_COMMANDS
+            snapshot_dir / "system" / filename for filename, _ in SYSTEM_COMMANDS
         ]
-        expected_paths.append(
-            snapshot_dir
-            / "system"
-            / "i2cdetect.txt"
-        )
+        expected_paths.append(snapshot_dir / "system" / "i2cdetect.txt")
 
         self.assertEqual(
-            [
-                item.args[0]
-                for item in write.call_args_list
-            ],
+            [item.args[0] for item in write.call_args_list],
             expected_paths,
         )
 
     def test_rejects_invalid_config_before_commands(self) -> None:
         with (
-            patch(
-                f"{MODULE}.command_output"
-            ) as output,
+            patch(f"{MODULE}.command_output") as output,
             self.assertRaisesRegex(
                 TypeError,
                 "config must be a PlatformConfig",
@@ -968,9 +905,7 @@ class WriteLogReportsTests(unittest.TestCase):
         config = DEFAULT_PLATFORM_CONFIG
 
         with (
-            patch(
-                f"{MODULE}.copy_if_exists"
-            ) as copy,
+            patch(f"{MODULE}.copy_if_exists") as copy,
             patch(
                 f"{MODULE}.command_output",
                 side_effect=(
@@ -978,13 +913,9 @@ class WriteLogReportsTests(unittest.TestCase):
                     "boot journal",
                 ),
             ) as output,
-            patch(
-                f"{MODULE}.write_text"
-            ) as write,
+            patch(f"{MODULE}.write_text") as write,
         ):
-            write_log_reports(
-                snapshot_dir
-            )
+            write_log_reports(snapshot_dir)
 
         logs_dir = snapshot_dir / "logs"
 
@@ -1030,13 +961,11 @@ class WriteLogReportsTests(unittest.TestCase):
             write.call_args_list,
             [
                 call(
-                    logs_dir
-                    / "journal-betabox-monitor.txt",
+                    logs_dir / "journal-betabox-monitor.txt",
                     "monitor journal",
                 ),
                 call(
-                    logs_dir
-                    / "journal-boot-announce.txt",
+                    logs_dir / "journal-boot-announce.txt",
                     "boot journal",
                 ),
             ],
@@ -1074,26 +1003,14 @@ class WritePlatformReportsTests(unittest.TestCase):
                     "value": value.value,
                 },
             ),
-            patch(
-                f"{MODULE}.write_json"
-            ) as write,
+            patch(f"{MODULE}.write_json") as write,
         ):
-            write_platform_reports(
-                snapshot_dir
-            )
+            write_platform_reports(snapshot_dir)
 
-        collect_status.assert_called_once_with(
-            DEFAULT_PLATFORM_CONFIG
-        )
-        collect_services.assert_called_once_with(
-            DEFAULT_PLATFORM_CONFIG
-        )
-        collect_checks.assert_called_once_with(
-            config=DEFAULT_PLATFORM_CONFIG
-        )
-        collect_diagnoses.assert_called_once_with(
-            DEFAULT_PLATFORM_CONFIG
-        )
+        collect_status.assert_called_once_with(DEFAULT_PLATFORM_CONFIG)
+        collect_services.assert_called_once_with(DEFAULT_PLATFORM_CONFIG)
+        collect_checks.assert_called_once_with(config=DEFAULT_PLATFORM_CONFIG)
+        collect_diagnoses.assert_called_once_with(DEFAULT_PLATFORM_CONFIG)
         self.assertEqual(
             write.call_args_list,
             [
@@ -1145,22 +1062,12 @@ class CreateSnapshotTests(unittest.TestCase):
                 "exists",
                 return_value=False,
             ),
-            patch(
-                f"{MODULE}.write_manifest"
-            ) as manifest,
-            patch(
-                f"{MODULE}.write_platform_reports"
-            ) as platform,
-            patch(
-                f"{MODULE}.write_system_reports"
-            ) as system,
-            patch(
-                f"{MODULE}.write_log_reports"
-            ) as logs,
+            patch(f"{MODULE}.write_manifest") as manifest,
+            patch(f"{MODULE}.write_platform_reports") as platform,
+            patch(f"{MODULE}.write_system_reports") as system,
+            patch(f"{MODULE}.write_log_reports") as logs,
         ):
-            result = create_snapshot(
-                " classroom "
-            )
+            result = create_snapshot(" classroom ")
 
         self.assertIs(
             result,
@@ -1171,9 +1078,7 @@ class CreateSnapshotTests(unittest.TestCase):
             config=DEFAULT_PLATFORM_CONFIG,
         )
         snapshot_dir = Path(report.path)
-        manifest.assert_called_once_with(
-            report
-        )
+        manifest.assert_called_once_with(report)
         platform.assert_called_once_with(
             snapshot_dir,
             config=DEFAULT_PLATFORM_CONFIG,
@@ -1200,25 +1105,19 @@ class CreateSnapshotTests(unittest.TestCase):
                 "exists",
                 return_value=True,
             ),
-            patch(
-                f"{MODULE}.write_manifest"
-            ) as manifest,
+            patch(f"{MODULE}.write_manifest") as manifest,
             self.assertRaisesRegex(
                 FileExistsError,
                 report.path,
             ),
         ):
-            create_snapshot(
-                report.name
-            )
+            create_snapshot(report.name)
 
         manifest.assert_not_called()
 
     def test_rejects_invalid_config_before_build(self) -> None:
         with (
-            patch(
-                f"{MODULE}.build_snapshot_report"
-            ) as build,
+            patch(f"{MODULE}.build_snapshot_report") as build,
             self.assertRaisesRegex(
                 TypeError,
                 "config must be a PlatformConfig",
@@ -1247,9 +1146,7 @@ class ListSnapshotsTests(unittest.TestCase):
         with patch.object(
             Path,
             "exists",
-            side_effect=OSError(
-                "permission denied"
-            ),
+            side_effect=OSError("permission denied"),
         ):
             self.assertEqual(
                 list_snapshots(),
@@ -1302,35 +1199,25 @@ class PrintReportTests(unittest.TestCase):
     def test_prints_report(self) -> None:
         report = make_report()
 
-        with patch(
-            "builtins.print"
-        ) as print_message:
+        with patch("builtins.print") as print_message:
             print_report(report)
 
         self.assertIn(
-            call(
-                f"Name:    {report.name}"
-            ),
+            call(f"Name:    {report.name}"),
             print_message.call_args_list,
         )
         self.assertIn(
-            call(
-                f"Path:    {report.path}"
-            ),
+            call(f"Path:    {report.path}"),
             print_message.call_args_list,
         )
         self.assertIn(
-            call(
-                f"SDK:     {report.sdk_version}"
-            ),
+            call(f"SDK:     {report.sdk_version}"),
             print_message.call_args_list,
         )
 
     def test_rejects_invalid_report_before_print(self) -> None:
         with (
-            patch(
-                "builtins.print"
-            ) as print_message,
+            patch("builtins.print") as print_message,
             self.assertRaisesRegex(
                 TypeError,
                 "report must be a SnapshotReport",
@@ -1345,9 +1232,7 @@ class PrintReportTests(unittest.TestCase):
 
 class PrintSnapshotsTests(unittest.TestCase):
     def test_prints_no_snapshots(self) -> None:
-        with patch(
-            "builtins.print"
-        ) as print_message:
+        with patch("builtins.print") as print_message:
             print_snapshots(())
 
         self.assertIn(
@@ -1361,9 +1246,7 @@ class PrintSnapshotsTests(unittest.TestCase):
             Path("/snapshots/snapshot-one"),
         )
 
-        with patch(
-            "builtins.print"
-        ) as print_message:
+        with patch("builtins.print") as print_message:
             print_snapshots(snapshots)
 
         self.assertIn(
@@ -1377,9 +1260,7 @@ class PrintSnapshotsTests(unittest.TestCase):
 
     def test_rejects_invalid_collection_before_print(self) -> None:
         with (
-            patch(
-                "builtins.print"
-            ) as print_message,
+            patch("builtins.print") as print_message,
             self.assertRaisesRegex(
                 TypeError,
                 "snapshots must be a tuple",
@@ -1436,9 +1317,7 @@ class ParserTests(unittest.TestCase):
     def test_rejects_unknown_argument(self) -> None:
         with (
             patch("sys.stderr"),
-            self.assertRaises(
-                SystemExit
-            ),
+            self.assertRaises(SystemExit),
         ):
             parse_args(
                 [
@@ -1449,9 +1328,7 @@ class ParserTests(unittest.TestCase):
 
 class MainTests(unittest.TestCase):
     def test_lists_snapshots(self) -> None:
-        snapshots = (
-            Path("/snapshots/one"),
-        )
+        snapshots = (Path("/snapshots/one"),)
 
         with (
             patch(
@@ -1465,12 +1342,8 @@ class MainTests(unittest.TestCase):
                 f"{MODULE}.list_snapshots",
                 return_value=snapshots,
             ) as list_call,
-            patch(
-                f"{MODULE}.print_snapshots"
-            ) as print_call,
-            patch(
-                f"{MODULE}.create_snapshot"
-            ) as create,
+            patch(f"{MODULE}.print_snapshots") as print_call,
+            patch(f"{MODULE}.create_snapshot") as create,
         ):
             result = main(
                 [
@@ -1485,15 +1358,11 @@ class MainTests(unittest.TestCase):
             ]
         )
         list_call.assert_called_once_with()
-        print_call.assert_called_once_with(
-            snapshots
-        )
+        print_call.assert_called_once_with(snapshots)
         create.assert_not_called()
 
     def test_creates_named_snapshot(self) -> None:
-        report = make_report(
-            name="classroom"
-        )
+        report = make_report(name="classroom")
 
         with (
             patch(
@@ -1507,9 +1376,7 @@ class MainTests(unittest.TestCase):
                 f"{MODULE}.create_snapshot",
                 return_value=report,
             ) as create,
-            patch(
-                f"{MODULE}.print_report"
-            ) as print_call,
+            patch(f"{MODULE}.print_report") as print_call,
         ):
             result = main(
                 [
@@ -1519,12 +1386,8 @@ class MainTests(unittest.TestCase):
             )
 
         self.assertEqual(result, 0)
-        create.assert_called_once_with(
-            "classroom"
-        )
-        print_call.assert_called_once_with(
-            report
-        )
+        create.assert_called_once_with("classroom")
+        print_call.assert_called_once_with(report)
 
     def test_existing_snapshot_returns_error(self) -> None:
         with (
@@ -1537,20 +1400,14 @@ class MainTests(unittest.TestCase):
             ),
             patch(
                 f"{MODULE}.create_snapshot",
-                side_effect=FileExistsError(
-                    "exists"
-                ),
+                side_effect=FileExistsError("exists"),
             ),
-            patch(
-                "builtins.print"
-            ) as print_message,
+            patch("builtins.print") as print_message,
         ):
             result = main([])
 
         self.assertEqual(result, 1)
-        print_message.assert_called_once_with(
-            "Snapshot already exists: classroom"
-        )
+        print_message.assert_called_once_with("Snapshot already exists: classroom")
 
 
 if __name__ == "__main__":

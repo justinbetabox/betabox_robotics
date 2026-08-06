@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import time
-
 from dataclasses import dataclass
 from math import isfinite
 from typing import TYPE_CHECKING
@@ -10,12 +9,111 @@ from typing import TYPE_CHECKING
 from betabox_robotics.calibration import (
     CalibrationManager,
 )
+from betabox_robotics.exceptions import BetaboxError
 
 if TYPE_CHECKING:
     from betabox_robotics import BetaboxCar
 
 
-@dataclass(frozen=True)
+def _validate_axis(
+    value: object,
+    *,
+    name: str,
+) -> float:
+    result = _validate_number(
+        value,
+        name=name,
+    )
+
+    if not -1.0 <= result <= 1.0:
+        raise ValueError(f"{name} must be between -1.0 and 1.0")
+
+    return result
+
+
+def _validate_flag(
+    value: object,
+    *,
+    name: str,
+) -> bool:
+    if not isinstance(
+        value,
+        bool,
+    ):
+        raise TypeError(f"{name} must be a boolean")
+
+    return value
+
+
+def _validate_number(
+    value: object,
+    *,
+    name: str,
+) -> float:
+    if isinstance(value, bool) or not isinstance(
+        value,
+        int | float,
+    ):
+        raise TypeError(f"{name} must be a number")
+
+    result = float(value)
+
+    if not isfinite(result):
+        raise ValueError(f"{name} must be finite")
+
+    return result
+
+
+def _validate_generation(
+    value: object,
+) -> int:
+    if isinstance(value, bool) or not isinstance(
+        value,
+        int,
+    ):
+        raise TypeError("generation must be an integer")
+
+    if value < 0:
+        raise ValueError("generation cannot be negative")
+
+    return value
+
+
+def _validate_positive_number(
+    value: object,
+    *,
+    name: str,
+) -> float:
+    result = _validate_number(
+        value,
+        name=name,
+    )
+
+    if result <= 0:
+        raise ValueError(f"{name} must be greater than 0")
+
+    return result
+
+
+def _validate_maximum_speed(
+    value: object,
+) -> int:
+    if isinstance(value, bool) or not isinstance(
+        value,
+        int,
+    ):
+        raise TypeError("maximum_speed must be an integer")
+
+    if not 1 <= value <= 100:
+        raise ValueError("maximum_speed must be between 1 and 100")
+
+    return value
+
+
+@dataclass(
+    frozen=True,
+    slots=True,
+)
 class ControlState:
     """
     Complete desired state for browser-based robot control.
@@ -45,22 +143,72 @@ class ControlState:
     headlights: bool = False
     horn: bool = False
 
-    def __post_init__(self) -> None:
-        for name, value in (
-            ("throttle", self.throttle),
-            ("steering", self.steering),
-            ("camera_pan", self.camera_pan),
-            ("camera_tilt", self.camera_tilt),
+    def __post_init__(
+        self,
+    ) -> None:
+        for name in (
+            "throttle",
+            "steering",
+            "camera_pan",
+            "camera_tilt",
         ):
-            if not isfinite(value):
-                raise ValueError(
-                    f"{name} must be finite"
-                )
+            object.__setattr__(
+                self,
+                name,
+                _validate_axis(
+                    getattr(
+                        self,
+                        name,
+                    ),
+                    name=name,
+                ),
+            )
 
-            if not -1.0 <= value <= 1.0:
-                raise ValueError(
-                    f"{name} must be between -1.0 and 1.0"
-                )
+        object.__setattr__(
+            self,
+            "headlights",
+            _validate_flag(
+                self.headlights,
+                name="headlights",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "horn",
+            _validate_flag(
+                self.horn,
+                name="horn",
+            ),
+        )
+
+
+def _validate_client_id(
+    value: object,
+) -> str:
+    if not isinstance(
+        value,
+        str,
+    ):
+        raise TypeError("client_id must be a string")
+
+    result = value.strip()
+
+    if not result:
+        raise ValueError("client_id cannot be empty")
+
+    return result
+
+
+def _validate_state(
+    value: object,
+) -> ControlState:
+    if not isinstance(
+        value,
+        ControlState,
+    ):
+        raise TypeError("state must be a ControlState")
+
+    return value
 
 
 class DriveControlError(RuntimeError):
@@ -89,60 +237,31 @@ class ManualDriveController:
             calibration_manager,
             CalibrationManager,
         ):
-            raise TypeError(
-                "calibration_manager must be a "
-                "CalibrationManager"
-            )
+            raise TypeError("calibration_manager must be a CalibrationManager")
 
-        self.calibration_manager = (
-            calibration_manager
+        self.calibration_manager = calibration_manager
+
+        self.heartbeat_timeout = _validate_positive_number(
+            heartbeat_timeout,
+            name="heartbeat_timeout",
+        )
+        self.update_hz = _validate_positive_number(
+            update_hz,
+            name="update_hz",
+        )
+        self.maximum_speed = _validate_maximum_speed(maximum_speed)
+        self.steering_angle = _validate_positive_number(
+            steering_angle,
+            name="steering_angle",
         )
 
-        if heartbeat_timeout <= 0:
-            raise ValueError(
-                "heartbeat_timeout must be greater than 0"
-            )
-
-        if update_hz <= 0:
-            raise ValueError(
-                "update_hz must be greater than 0"
-            )
-
-        if not 1 <= maximum_speed <= 100:
-            raise ValueError(
-                "maximum_speed must be between 1 and 100"
-            )
-
-        if steering_angle <= 0:
-            raise ValueError(
-                "steering_angle must be greater than 0"
-            )
-
-        self.heartbeat_timeout = float(
-            heartbeat_timeout
-        )
-
-        self.update_hz = float(
-            update_hz
-        )
-
-        self.update_interval = (
-            1.0 / self.update_hz
-        )
-
-        self.maximum_speed = int(
-            maximum_speed
-        )
-
-        self.steering_angle = float(
-            steering_angle
-        )
+        self.update_interval = 1.0 / self.update_hz
 
         self._desired_state = ControlState()
         self._last_applied_state: ControlState | None = None
         self._state_generation = 0
 
-        self._robot = None
+        self._robot: BetaboxCar | None = None
         self._owner: str | None = None
         self._claiming: str | None = None
         self._last_heartbeat = 0.0
@@ -153,41 +272,24 @@ class ManualDriveController:
         self._watchdog_task: asyncio.Task[None] | None = None
         self._closed = False
 
-    # ------------------------------------------------------------------
-    # Properties
-    # ------------------------------------------------------------------
-
     @property
     def owner(self) -> str | None:
         return self._owner
 
     @property
     def available(self) -> bool:
-        return (
-            not self._closed
-            and self._owner is None
-        )
-
-    # ------------------------------------------------------------------
-    # Lifecycle
-    # ------------------------------------------------------------------
+        return not self._closed and self._owner is None
 
     async def start(self) -> None:
         self._require_open()
 
-        if (
-            self._watchdog_task is None
-            or self._watchdog_task.done()
-        ):
+        if self._watchdog_task is None or self._watchdog_task.done():
             self._watchdog_task = asyncio.create_task(
                 self._watchdog_loop(),
                 name="LaunchpadDriveWatchdog",
             )
 
-        if (
-            self._control_task is None
-            or self._control_task.done()
-        ):
+        if self._control_task is None or self._control_task.done():
             self._control_task = asyncio.create_task(
                 self._control_loop(),
                 name="LaunchpadControlState",
@@ -231,22 +333,21 @@ class ManualDriveController:
             robot = self._robot
             self._robot = None
 
-        await self._stop_center_close(
-            robot
-        )
-
-    # ------------------------------------------------------------------
-    # Ownership
-    # ------------------------------------------------------------------
+        try:
+            await self._stop_center_close(robot)
+        except DriveControlError:
+            pass
 
     async def owns(
         self,
         client_id: str,
     ) -> bool:
+        client_id_value = _validate_client_id(client_id)
+
         async with self._lock:
             return (
                 not self._closed
-                and self._owner == client_id
+                and self._owner == client_id_value
                 and self._robot is not None
             )
 
@@ -254,16 +355,15 @@ class ManualDriveController:
         self,
         client_id: str,
     ) -> bool:
+        client_id_value = _validate_client_id(client_id)
+
         async with self._lock:
             self._require_open()
 
-            if (
-                self._owner is not None
-                or self._claiming is not None
-            ):
+            if self._owner is not None or self._claiming is not None:
                 return False
 
-            self._claiming = client_id
+            self._claiming = client_id_value
 
         claim_succeeded = False
 
@@ -274,7 +374,7 @@ class ManualDriveController:
             async with self._lock:
                 self._require_open()
 
-                self._owner = client_id
+                self._owner = client_id_value
                 self._last_heartbeat = time.monotonic()
                 self._desired_state = ControlState()
                 self._last_applied_state = None
@@ -288,11 +388,11 @@ class ManualDriveController:
             robot = None
 
             async with self._lock:
-                if self._claiming == client_id:
+                if self._claiming == client_id_value:
                     self._claiming = None
 
                 if not claim_succeeded:
-                    if self._owner == client_id:
+                    if self._owner == client_id_value:
                         self._owner = None
 
                     self._last_heartbeat = 0.0
@@ -304,16 +404,19 @@ class ManualDriveController:
                     self._robot = None
 
             if robot is not None:
-                await self._stop_center_close(
-                    robot
-                )
+                try:
+                    await self._stop_center_close(robot)
+                except DriveControlError:
+                    pass
 
     async def release(
         self,
         client_id: str,
     ) -> None:
+        client_id_value = _validate_client_id(client_id)
+
         async with self._lock:
-            if self._owner != client_id:
+            if self._owner != client_id_value:
                 return
 
             self._owner = None
@@ -325,16 +428,19 @@ class ManualDriveController:
             robot = self._robot
             self._robot = None
 
-        await self._stop_center_close(
-            robot
-        )
+        try:
+            await self._stop_center_close(robot)
+        except DriveControlError:
+            pass
 
     async def heartbeat(
         self,
         client_id: str,
     ) -> None:
+        client_id_value = _validate_client_id(client_id)
+
         async with self._lock:
-            self._require_owner(client_id)
+            self._require_owner(client_id_value)
             self._last_heartbeat = time.monotonic()
 
     async def update_state(
@@ -342,10 +448,13 @@ class ManualDriveController:
         client_id: str,
         state: ControlState,
     ) -> None:
-        async with self._lock:
-            self._require_owner(client_id)
+        client_id_value = _validate_client_id(client_id)
+        state_value = _validate_state(state)
 
-            self._desired_state = state
+        async with self._lock:
+            self._require_owner(client_id_value)
+
+            self._desired_state = state_value
             self._state_generation += 1
             self._last_heartbeat = time.monotonic()
 
@@ -353,11 +462,13 @@ class ManualDriveController:
         self,
         client_id: str | None = None,
     ) -> None:
+        if client_id is None:
+            client_id_value = None
+        else:
+            client_id_value = _validate_client_id(client_id)
+
         async with self._lock:
-            if (
-                client_id is not None
-                and self._owner != client_id
-            ):
+            if client_id_value is not None and self._owner != client_id_value:
                 return
 
             current = self._desired_state
@@ -376,10 +487,6 @@ class ManualDriveController:
 
         await self._safe_neutralize()
 
-    # ------------------------------------------------------------------
-    # Robot Management
-    # ------------------------------------------------------------------
-
     async def _ensure_robot(self) -> None:
         if self._robot is not None:
             return
@@ -389,21 +496,27 @@ class ManualDriveController:
             owner="Manual Drive",
         )
 
+        if robot is None:
+            raise DriveControlError("failed to create robot")
+
         self._robot = robot
 
     async def _stop_center_close(
         self,
-        robot,
+        robot: BetaboxCar | None,
     ) -> None:
         if robot is None:
             return
 
         async with self._hardware_lock:
-            await asyncio.to_thread(
-                robot.close
-            )
+            try:
+                await asyncio.to_thread(robot.close)
+            except Exception as exc:
+                raise DriveControlError(f"failed to close robot: {exc}") from exc
 
-    async def _safe_neutralize(self) -> None:
+    async def _safe_neutralize(
+        self,
+    ) -> None:
         async with self._hardware_lock:
             robot = self._robot
 
@@ -411,286 +524,261 @@ class ManualDriveController:
                 return
 
             try:
-                await asyncio.to_thread(
-                    robot.stop
-                )
-            finally:
+                await asyncio.to_thread(robot.stop)
+            except BetaboxError as exc:
+                raise DriveControlError(f"failed to stop robot: {exc}") from exc
+
+            try:
+                await asyncio.to_thread(robot.center)
+            except BetaboxError:
+                pass
+
+    async def _control_loop(
+        self,
+    ) -> None:
+        while True:
+            started = time.monotonic()
+
+            async with self._lock:
+                owner = self._owner
+                robot_ready = self._robot is not None
+                state = self._desired_state
+                generation = self._state_generation
+                last_applied = self._last_applied_state
+
+            if owner is not None and robot_ready and state != last_applied:
                 try:
-                    await asyncio.to_thread(
-                        robot.center
+                    await self._apply_state(
+                        state,
+                        generation,
                     )
-                except Exception:
-                    pass
+                except DriveControlError:
+                    await self.emergency_stop()
 
-    # ------------------------------------------------------------------
-    # Background Tasks
-    # ------------------------------------------------------------------
+            elapsed = time.monotonic() - started
 
-    async def _control_loop(self) -> None:
-        try:
-            while True:
-                started = time.monotonic()
+            delay = max(
+                0.0,
+                self.update_interval - elapsed,
+            )
 
-                async with self._lock:
-                    owner = self._owner
-                    robot_ready = self._robot is not None
-                    state = self._desired_state
-                    generation = self._state_generation
-                    last_applied = self._last_applied_state
+            await asyncio.sleep(delay)
 
-                if (
-                    owner is not None
-                    and robot_ready
-                    and state != last_applied
-                ):
-                    try:
-                        await self._apply_state(
-                            state,
-                            generation,
-                        )
-                    except DriveControlError:
-                        # Ownership may have been released
-                        # while this iteration was pending.
-                        pass
+    async def _watchdog_loop(
+        self,
+    ) -> None:
+        while True:
+            await asyncio.sleep(0.1)
 
-                elapsed = (
-                    time.monotonic()
-                    - started
-                )
+            robot = None
 
-                delay = max(
-                    0.0,
-                    self.update_interval - elapsed,
-                )
+            async with self._lock:
+                if self._owner is None:
+                    continue
 
-                await asyncio.sleep(delay)
+                elapsed = time.monotonic() - self._last_heartbeat
 
-        except asyncio.CancelledError:
-            raise
+                if elapsed <= self.heartbeat_timeout:
+                    continue
 
-    async def _watchdog_loop(self) -> None:
-        try:
-            while True:
-                await asyncio.sleep(0.1)
+                self._owner = None
+                self._last_heartbeat = 0.0
+                self._desired_state = ControlState()
+                self._last_applied_state = None
+                self._state_generation += 1
 
-                robot = None
+                robot = self._robot
+                self._robot = None
 
-                async with self._lock:
-                    if self._owner is None:
-                        continue
-
-                    elapsed = (
-                        time.monotonic()
-                        - self._last_heartbeat
-                    )
-
-                    if elapsed <= self.heartbeat_timeout:
-                        continue
-
-                    self._owner = None
-                    self._last_heartbeat = 0.0
-                    self._desired_state = ControlState()
-                    self._last_applied_state = None
-                    self._state_generation += 1
-
-                    robot = self._robot
-                    self._robot = None
-
-                await self._stop_center_close(
-                    robot
-                )
-
-        except asyncio.CancelledError:
-            raise
-
-    # ------------------------------------------------------------------
-    # State Application
-    # ------------------------------------------------------------------
+            try:
+                await self._stop_center_close(robot)
+            except DriveControlError:
+                pass
 
     async def _apply_state(
         self,
         state: ControlState,
         generation: int,
     ) -> None:
+        state_value = _validate_state(state)
+        generation_value = _validate_generation(generation)
+
         async with self._hardware_lock:
             async with self._lock:
                 if (
                     self._owner is None
                     or self._robot is None
-                    or generation
-                    != self._state_generation
+                    or generation_value != self._state_generation
                 ):
                     return
 
-                previous = (
-                    self._last_applied_state
-                )
+                previous = self._last_applied_state
 
             steering_changed = (
-                previous is None
-                or state.steering
-                != previous.steering
+                previous is None or state_value.steering != previous.steering
             )
-
             throttle_changed = (
-                previous is None
-                or state.throttle
-                != previous.throttle
+                previous is None or state_value.throttle != previous.throttle
             )
-
             camera_changed = (
                 previous is None
-                or state.camera_pan
-                != previous.camera_pan
-                or state.camera_tilt
-                != previous.camera_tilt
+                or state_value.camera_pan != previous.camera_pan
+                or state_value.camera_tilt != previous.camera_tilt
             )
 
             if steering_changed:
-                await self._apply_steering_axis(
-                    state.steering
-                )
+                await self._apply_steering_axis(state_value.steering)
 
-            if not await self._generation_is_current(
-                generation
-            ):
+            if not await self._generation_is_current(generation_value):
                 return
 
             if throttle_changed:
-                await self._apply_throttle(
-                    state.throttle
-                )
+                await self._apply_throttle(state_value.throttle)
 
-            if not await self._generation_is_current(
-                generation
-            ):
+            if not await self._generation_is_current(generation_value):
                 return
 
             if camera_changed:
                 await self._apply_camera_axes(
-                    state.camera_pan,
-                    state.camera_tilt,
+                    state_value.camera_pan,
+                    state_value.camera_tilt,
                 )
 
             async with self._lock:
                 if (
                     self._owner is not None
-                    and generation
-                    == self._state_generation
+                    and generation_value == self._state_generation
                 ):
-                    self._last_applied_state = (
-                        state
-                    )
+                    self._last_applied_state = state_value
 
     async def _generation_is_current(
         self,
         generation: int,
     ) -> bool:
+        generation_value = _validate_generation(generation)
+
         async with self._lock:
-            return (
-                generation
-                == self._state_generation
-            )
+            return generation_value == self._state_generation
 
     async def _apply_throttle(
         self,
         throttle: float,
     ) -> None:
+        throttle_value = _validate_axis(
+            throttle,
+            name="throttle",
+        )
         robot = self._require_robot()
 
-        speed = round(
-            abs(throttle)
-            * self.maximum_speed
-        )
+        speed = round(abs(throttle_value) * self.maximum_speed)
 
-        if throttle > 0:
-            await asyncio.to_thread(
-                robot.forward,
-                speed,
-            )
-            return
+        try:
+            if throttle_value > 0:
+                await asyncio.to_thread(
+                    robot.forward,
+                    speed,
+                )
+                return
 
-        if throttle < 0:
-            await asyncio.to_thread(
-                robot.backward,
-                speed,
-            )
-            return
+            if throttle_value < 0:
+                await asyncio.to_thread(
+                    robot.backward,
+                    speed,
+                )
+                return
 
-        await self._stop_motion()
+            await self._stop_motion()
 
-    async def _stop_motion(self) -> None:
+        except DriveControlError:
+            raise
+        except Exception as exc:
+            raise DriveControlError(f"failed to apply throttle: {exc}") from exc
+
+    async def _stop_motion(
+        self,
+    ) -> None:
         """
         Stop motor movement without changing steering.
-
-        This is used when the joystick throttle returns to zero while the
-        user still owns manual control.
         """
 
-        if self._robot is None:
-            return
+        robot = self._require_robot()
 
-        await asyncio.to_thread(
-            self._robot.stop
-        )
+        try:
+            await asyncio.to_thread(robot.stop)
+        except Exception as exc:
+            raise DriveControlError(f"failed to stop robot motion: {exc}") from exc
 
     async def _apply_steering_axis(
         self,
         steering: float,
     ) -> None:
+        steering_value = _validate_axis(
+            steering,
+            name="steering",
+        )
         robot = self._require_robot()
 
-        angle = (
-            steering
-            * self.steering_angle
-        )
+        angle = steering_value * self.steering_angle
 
-        if angle < 0:
-            await asyncio.to_thread(
-                robot.left,
-                abs(angle),
-            )
-            return
+        try:
+            if angle < 0:
+                await asyncio.to_thread(
+                    robot.left,
+                    abs(angle),
+                )
+                return
 
-        if angle > 0:
-            await asyncio.to_thread(
-                robot.right,
-                angle,
-            )
-            return
+            if angle > 0:
+                await asyncio.to_thread(
+                    robot.right,
+                    angle,
+                )
+                return
 
-        await asyncio.to_thread(
-            robot.center
-        )
+            await asyncio.to_thread(robot.center)
+
+        except Exception as exc:
+            raise DriveControlError(f"failed to apply steering: {exc}") from exc
 
     async def _apply_camera_axes(
         self,
         pan: float,
         tilt: float,
     ) -> None:
+        pan_value = _validate_axis(
+            pan,
+            name="camera_pan",
+        )
+        tilt_value = _validate_axis(
+            tilt,
+            name="camera_tilt",
+        )
+
         robot = self._require_robot()
         config = robot.config.camera_mount
 
         pan_angle = self._camera_axis_to_angle(
-            pan,
+            pan_value,
             minimum=config.pan_min_angle,
             center=config.pan_center,
             maximum=config.pan_max_angle,
         )
-
         tilt_angle = self._camera_axis_to_angle(
-            tilt,
+            tilt_value,
             minimum=config.tilt_min_angle,
             center=config.tilt_center,
             maximum=config.tilt_max_angle,
         )
 
-        await asyncio.to_thread(
-            robot.look,
-            pan=pan_angle,
-            tilt=tilt_angle,
-            smooth=False,
-        )
+        try:
+            await asyncio.to_thread(
+                robot.look,
+                pan=pan_angle,
+                tilt=tilt_angle,
+                smooth=False,
+            )
+        except Exception as exc:
+            raise DriveControlError(f"failed to apply camera position: {exc}") from exc
 
     def _camera_axis_to_angle(
         self,
@@ -701,47 +789,55 @@ class ManualDriveController:
         maximum: float,
     ) -> float:
         """
-        Convert a normalized -1.0..1.0 axis into an asymmetric angle range.
+        Convert a normalized axis into an asymmetric angle range.
         """
 
-        if value < 0:
-            return center + (
-                abs(value)
-                * (minimum - center)
-            )
-
-        return center + (
-            value
-            * (maximum - center)
+        value_value = _validate_axis(
+            value,
+            name="camera axis",
+        )
+        minimum_value = _validate_number(
+            minimum,
+            name="minimum",
+        )
+        center_value = _validate_number(
+            center,
+            name="center",
+        )
+        maximum_value = _validate_number(
+            maximum,
+            name="maximum",
         )
 
-    # ------------------------------------------------------------------
-    # Validation
-    # ------------------------------------------------------------------
+        if not (minimum_value <= center_value <= maximum_value):
+            raise ValueError("camera angles must satisfy minimum <= center <= maximum")
+
+        if value_value < 0:
+            return center_value + (abs(value_value) * (minimum_value - center_value))
+
+        return center_value + (value_value * (maximum_value - center_value))
 
     def _require_open(self) -> None:
         if self._closed:
-            raise DriveControlError(
-                "manual drive controller is closed"
-            )
+            raise DriveControlError("manual drive controller is closed")
 
     def _require_owner(
         self,
         client_id: str,
     ) -> None:
+        client_id_value = _validate_client_id(client_id)
+
         self._require_open()
 
-        if self._owner != client_id:
-            raise DriveControlError(
-                "manual drive control is not owned by this client"
-            )
+        if self._owner != client_id_value:
+            raise DriveControlError("manual drive control is not owned by this client")
 
     def _require_robot(
         self,
-    ) -> "BetaboxCar":
-        if self._robot is None:
-            raise DriveControlError(
-                "robot is not started"
-            )
+    ) -> BetaboxCar:
+        robot = self._robot
 
-        return self._robot
+        if robot is None:
+            raise DriveControlError("robot is not started")
+
+        return robot

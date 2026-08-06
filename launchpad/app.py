@@ -11,6 +11,9 @@ from aiohttp import web
 from betabox_robotics.calibration import (
     CalibrationManager,
 )
+from betabox_robotics.calibration.hardware import (
+    CalibrationHardware,
+)
 from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
     PlatformConfig,
@@ -109,11 +112,14 @@ def create_app(
 
     calibration_service = CalibrationService(calibration_manager)
 
+    calibration_hardware = CalibrationHardware()
+
     status_cache = StatusCache(ttl_seconds=3.0)
 
     launchpad_services = LaunchpadServices(
         calibration_manager=calibration_manager,
         calibration_service=calibration_service,
+        calibration_hardware=calibration_hardware,
         status_cache=status_cache,
     )
 

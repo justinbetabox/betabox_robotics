@@ -45,9 +45,9 @@ STANDARD_PERMISSIONS: frozenset[Permission] = frozenset(
     }
 )
 
-GUEST_PERMISSIONS = STANDARD_PERMISSIONS
-STUDENT_PERMISSIONS = STANDARD_PERMISSIONS
-TEACHER_PERMISSIONS = STANDARD_PERMISSIONS
+GUEST_PERMISSIONS: frozenset[Permission] = STANDARD_PERMISSIONS
+STUDENT_PERMISSIONS: frozenset[Permission] = STANDARD_PERMISSIONS
+TEACHER_PERMISSIONS: frozenset[Permission] = STANDARD_PERMISSIONS
 
 
 ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
@@ -57,11 +57,58 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
 }
 
 
-@dataclass(slots=True, frozen=True)
+def _validate_permission(
+    value: object,
+    *,
+    name: str = "permission",
+) -> Permission:
+    if not isinstance(
+        value,
+        Permission,
+    ):
+        raise TypeError(f"{name} must be a Permission")
+
+    return value
+
+
+def _validate_permissions(
+    value: object,
+) -> frozenset[Permission]:
+    if not isinstance(
+        value,
+        frozenset,
+    ):
+        raise TypeError("granted must be a frozenset")
+
+    if not all(
+        isinstance(
+            permission,
+            Permission,
+        )
+        for permission in value
+    ):
+        raise TypeError("granted must contain only Permission values")
+
+    return value
+
+
+@dataclass(
+    slots=True,
+    frozen=True,
+)
 class Permissions:
     """Permissions granted to the current Launchpad user."""
 
     granted: frozenset[Permission]
+
+    def __post_init__(
+        self,
+    ) -> None:
+        object.__setattr__(
+            self,
+            "granted",
+            _validate_permissions(self.granted),
+        )
 
     @classmethod
     def for_role(
@@ -70,12 +117,13 @@ class Permissions:
     ) -> Permissions:
         """Build the standard permissions for a Launchpad role."""
 
-        return cls(
-            granted=ROLE_PERMISSIONS.get(
-                role,
-                frozenset(),
-            )
-        )
+        if not isinstance(
+            role,
+            Role,
+        ):
+            raise TypeError("role must be a Role")
+
+        return cls(granted=ROLE_PERMISSIONS[role])
 
     @classmethod
     def from_iterable(
@@ -84,7 +132,27 @@ class Permissions:
     ) -> Permissions:
         """Build permissions from an explicit collection."""
 
-        return cls(granted=frozenset(permissions))
+        if isinstance(
+            permissions,
+            str | bytes,
+        ) or not isinstance(
+            permissions,
+            Iterable,
+        ):
+            raise TypeError("permissions must be an iterable")
+
+        values = frozenset(permissions)
+
+        if not all(
+            isinstance(
+                permission,
+                Permission,
+            )
+            for permission in values
+        ):
+            raise TypeError("permissions must contain only Permission values")
+
+        return cls(granted=values)
 
     def allows(
         self,
@@ -92,7 +160,9 @@ class Permissions:
     ) -> bool:
         """Return whether a permission is granted."""
 
-        return permission in self.granted
+        permission_value = _validate_permission(permission)
+
+        return permission_value in self.granted
 
     def require(
         self,
@@ -100,11 +170,19 @@ class Permissions:
     ) -> None:
         """Raise PermissionError when a permission is not granted."""
 
-        if not self.allows(permission):
-            raise PermissionError(f"Permission required: {permission.value}")
+        permission_value = _validate_permission(permission)
+
+        if permission_value not in self.granted:
+            raise PermissionError(f"Permission required: {permission_value.value}")
 
     def __contains__(
         self,
         permission: object,
     ) -> bool:
-        return permission in self.granted
+        return (
+            isinstance(
+                permission,
+                Permission,
+            )
+            and permission in self.granted
+        )

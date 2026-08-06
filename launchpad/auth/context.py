@@ -7,12 +7,15 @@ from betabox_robotics.launchpad.services import (
     LaunchpadServices,
 )
 
-from .identity import Identity, Role
+from .identity import Identity
 from .permissions import Permission, Permissions
 from .workspace import Workspace
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(
+    slots=True,
+    frozen=True,
+)
 class LaunchpadContext:
     """Current Launchpad execution context."""
 
@@ -21,6 +24,39 @@ class LaunchpadContext:
     identity: Identity
     workspace: Workspace
     permissions: Permissions
+
+    def __post_init__(
+        self,
+    ) -> None:
+        if not isinstance(
+            self.platform,
+            PlatformConfig,
+        ):
+            raise TypeError("platform must be a PlatformConfig")
+
+        if not isinstance(
+            self.services,
+            LaunchpadServices,
+        ):
+            raise TypeError("services must be LaunchpadServices")
+
+        if not isinstance(
+            self.identity,
+            Identity,
+        ):
+            raise TypeError("identity must be an Identity")
+
+        if not isinstance(
+            self.workspace,
+            Workspace,
+        ):
+            raise TypeError("workspace must be a Workspace")
+
+        if not isinstance(
+            self.permissions,
+            Permissions,
+        ):
+            raise TypeError("permissions must be Permissions")
 
     def can(
         self,
@@ -39,31 +75,41 @@ class LaunchpadContext:
         self.permissions.require(permission)
 
     @property
-    def guest(self) -> bool:
+    def guest(
+        self,
+    ) -> bool:
         """Whether the current user has the guest role."""
 
-        return self.identity.role is Role.GUEST
+        return self.identity.guest
 
     @property
-    def student(self) -> bool:
+    def student(
+        self,
+    ) -> bool:
         """Whether the current user has the student role."""
 
-        return self.identity.role is Role.STUDENT
+        return self.identity.student
 
     @property
-    def teacher(self) -> bool:
+    def teacher(
+        self,
+    ) -> bool:
         """Whether the current user has the teacher role."""
 
-        return self.identity.role is Role.TEACHER
+        return self.identity.teacher
 
     @property
-    def authenticated(self) -> bool:
+    def authenticated(
+        self,
+    ) -> bool:
         """Whether the current identity is authenticated."""
 
         return self.identity.authenticated
 
     @property
-    def persistent_workspace(self) -> bool:
+    def persistent_workspace(
+        self,
+    ) -> bool:
         """Whether the current workspace persists between sessions."""
 
         return self.workspace.persistent

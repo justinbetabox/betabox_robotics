@@ -5,21 +5,55 @@ from aiohttp import web
 from betabox_robotics.config import PlatformConfig
 from betabox_robotics.launchpad.services import (
     LAUNCHPAD_SERVICES_KEY,
+    LaunchpadServices,
 )
 
 from .context import LaunchpadContext
 from .factory import build_account_context
-from .session_manager import SESSION_MANAGER_KEY
+from .session_manager import (
+    SESSION_MANAGER_KEY,
+    SessionManager,
+)
+
+
+def _validate_platform(
+    value: object,
+) -> PlatformConfig:
+    if not isinstance(
+        value,
+        PlatformConfig,
+    ):
+        raise TypeError("platform must be a PlatformConfig")
+
+    return value
+
+
+def _validate_request(
+    value: object,
+) -> web.Request:
+    if not isinstance(
+        value,
+        web.Request,
+    ):
+        raise TypeError("request must be a web.Request")
+
+    return value
 
 
 class LaunchpadContextProvider:
-    """Creates Launchpad contexts for incoming requests."""
+    """Create Launchpad contexts for incoming requests."""
 
     def __init__(
         self,
         platform: PlatformConfig,
     ) -> None:
-        self._platform = platform
+        self._platform = _validate_platform(platform)
+
+    @property
+    def platform(
+        self,
+    ) -> PlatformConfig:
+        return self._platform
 
     def context(
         self,
@@ -27,11 +61,24 @@ class LaunchpadContextProvider:
     ) -> LaunchpadContext:
         """Return the Launchpad context for this request."""
 
-        services = request.app[LAUNCHPAD_SERVICES_KEY]
+        request_value = _validate_request(request)
 
-        session_manager = request.app[SESSION_MANAGER_KEY]
+        services = request_value.app[LAUNCHPAD_SERVICES_KEY]
+        session_manager = request_value.app[SESSION_MANAGER_KEY]
 
-        session = session_manager.resolve(request)
+        if not isinstance(
+            services,
+            LaunchpadServices,
+        ):
+            raise TypeError("Launchpad services are invalid")
+
+        if not isinstance(
+            session_manager,
+            SessionManager,
+        ):
+            raise TypeError("Session manager is invalid")
+
+        session = session_manager.resolve(request_value)
 
         return build_account_context(
             self._platform,
@@ -59,6 +106,12 @@ async def launchpad_context_middleware(
     """Attach the current Launchpad context to the request."""
 
     provider = request.app[LAUNCHPAD_CONTEXT_PROVIDER_KEY]
+
+    if not isinstance(
+        provider,
+        LaunchpadContextProvider,
+    ):
+        raise TypeError("Launchpad context provider is invalid")
 
     request[LAUNCHPAD_CONTEXT_KEY] = provider.context(request)
 

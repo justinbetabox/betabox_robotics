@@ -4,11 +4,56 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-@dataclass(slots=True, frozen=True)
+def _validate_path(
+    value: object,
+    *,
+    name: str,
+) -> Path:
+    if not isinstance(
+        value,
+        Path,
+    ):
+        raise TypeError(f"{name} must be a Path")
+
+    return value
+
+
+@dataclass(
+    slots=True,
+    frozen=True,
+)
 class MediaWorkspace:
     pictures: Path
     videos: Path
     sounds: Path
+
+    def __post_init__(
+        self,
+    ) -> None:
+        object.__setattr__(
+            self,
+            "pictures",
+            _validate_path(
+                self.pictures,
+                name="pictures",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "videos",
+            _validate_path(
+                self.videos,
+                name="videos",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "sounds",
+            _validate_path(
+                self.sounds,
+                name="sounds",
+            ),
+        )
 
     def directories(self) -> tuple[Path, ...]:
         return (
@@ -27,6 +72,48 @@ class Workspace:
     media: MediaWorkspace
     preferences: Path
     persistent: bool
+
+    def __post_init__(
+        self,
+    ) -> None:
+        object.__setattr__(
+            self,
+            "root",
+            _validate_path(
+                self.root,
+                name="root",
+            ),
+        )
+
+        object.__setattr__(
+            self,
+            "curriculum",
+            _validate_path(
+                self.curriculum,
+                name="curriculum",
+            ),
+        )
+
+        if not isinstance(
+            self.media,
+            MediaWorkspace,
+        ):
+            raise TypeError("media must be a MediaWorkspace")
+
+        object.__setattr__(
+            self,
+            "preferences",
+            _validate_path(
+                self.preferences,
+                name="preferences",
+            ),
+        )
+
+        if not isinstance(
+            self.persistent,
+            bool,
+        ):
+            raise TypeError("persistent must be a boolean")
 
     def directories(self) -> tuple[Path, ...]:
         """Return every directory owned by this workspace."""
@@ -55,14 +142,25 @@ def build_workspace(
 ) -> Workspace:
     """Build a Launchpad workspace rooted at the given directory."""
 
+    root_value = _validate_path(
+        root,
+        name="root",
+    )
+
+    if not isinstance(
+        persistent,
+        bool,
+    ):
+        raise TypeError("persistent must be a boolean")
+
     return Workspace(
-        root=root,
-        curriculum=root / "curriculum",
+        root=root_value,
+        curriculum=root_value / "curriculum",
         media=MediaWorkspace(
-            pictures=root / "media" / "pictures",
-            videos=root / "media" / "videos",
-            sounds=root / "media" / "sounds",
+            pictures=root_value / "media" / "pictures",
+            videos=root_value / "media" / "videos",
+            sounds=root_value / "media" / "sounds",
         ),
-        preferences=root / "preferences",
+        preferences=root_value / "preferences",
         persistent=persistent,
     )

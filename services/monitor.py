@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import json
 import time
 from dataclasses import asdict, dataclass
@@ -12,10 +13,79 @@ from betabox_robotics.config import (
 from betabox_robotics.services.status import collect_status
 from betabox_robotics.services.system_health import collect_system_health
 
-
 Severity = Literal["info", "warning", "error", "critical"]
 
-@dataclass(frozen=True)
+SEVERITIES: frozenset[str] = frozenset(
+    {
+        "info",
+        "warning",
+        "error",
+        "critical",
+    }
+)
+
+
+def _validate_config(
+    value: object,
+) -> PlatformConfig:
+    if not isinstance(
+        value,
+        PlatformConfig,
+    ):
+        raise TypeError("config must be a PlatformConfig")
+
+    return value
+
+
+def _validate_string(
+    value: object,
+    *,
+    name: str,
+) -> str:
+    if not isinstance(
+        value,
+        str,
+    ):
+        raise TypeError(f"{name} must be a string")
+
+    result = value.strip()
+
+    if not result:
+        raise ValueError(f"{name} cannot be empty")
+
+    return result
+
+
+def _validate_interval(
+    value: object,
+) -> int:
+    if isinstance(value, bool) or not isinstance(
+        value,
+        int,
+    ):
+        raise TypeError("interval_seconds must be an integer")
+
+    if value <= 0:
+        raise ValueError("interval_seconds must be greater than 0")
+
+    return value
+
+
+def _validate_mapping(
+    value: object,
+    *,
+    name: str,
+) -> dict:
+    if not isinstance(
+        value,
+        dict,
+    ):
+        raise TypeError(f"{name} must be a dictionary")
+
+    return value
+
+
+@dataclass(frozen=True, slots=True)
 class MonitorEvent:
     timestamp: str
     severity: Severity
@@ -25,19 +95,88 @@ class MonitorEvent:
     current: object
     message: str
 
+    def __post_init__(
+        self,
+    ) -> None:
+        object.__setattr__(
+            self,
+            "timestamp",
+            _validate_string(
+                self.timestamp,
+                name="timestamp",
+            ),
+        )
+
+        if not isinstance(
+            self.severity,
+            str,
+        ):
+            raise TypeError("severity must be a string")
+
+        severity = self.severity.strip().lower()
+
+        if severity not in SEVERITIES:
+            raise ValueError("severity must be one of: critical, error, info, warning")
+
+        object.__setattr__(
+            self,
+            "severity",
+            severity,
+        )
+
+        object.__setattr__(
+            self,
+            "component",
+            _validate_string(
+                self.component,
+                name="component",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "event",
+            _validate_string(
+                self.event,
+                name="event",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "message",
+            _validate_string(
+                self.message,
+                name="message",
+            ),
+        )
+
+
 def timestamp() -> str:
-    return time.strftime("%Y-%m-%d %H:%M:%S")
+    value = time.strftime("%Y-%m-%d %H:%M:%S")
+
+    return _validate_string(
+        value,
+        name="timestamp",
+    )
+
 
 def write_event(
     event: MonitorEvent,
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> None:
-    config.paths.state_dir.mkdir(
+    if not isinstance(
+        event,
+        MonitorEvent,
+    ):
+        raise TypeError("event must be a MonitorEvent")
+
+    config_value = _validate_config(config)
+
+    config_value.paths.state_dir.mkdir(
         parents=True,
         exist_ok=True,
     )
 
-    with config.paths.events_file.open(
+    with config_value.paths.events_file.open(
         "a",
         encoding="utf-8",
     ) as file:
@@ -50,17 +189,22 @@ def write_event(
         )
 
     log(
-        f"[{event.severity.upper()}] "
-        f"{event.component}: {event.message}",
-        config=config,
+        (f"[{event.severity.upper()}] {event.component}: {event.message}"),
+        config=config_value,
     )
+
 
 def severity_for_change(
     path: str,
     previous: object,
     current: object,
 ) -> Severity:
-    if path.endswith("battery_state"):
+    path_value = _validate_string(
+        path,
+        name="path",
+    )
+
+    if path_value.endswith("battery_state"):
         if current == "critical":
             return "error"
 
@@ -69,7 +213,7 @@ def severity_for_change(
 
         return "info"
 
-    if path.endswith(
+    if path_value.endswith(
         (
             "robot_available",
             "i2c_available",
@@ -82,13 +226,19 @@ def severity_for_change(
     ):
         return "info" if current is True else "error"
 
-    if path.endswith("grayscale_available"):
+    if path_value.endswith("grayscale_available"):
         return "info" if current is True else "warning"
 
-    if path.startswith("services."):
+    if path_value.startswith("services."):
         return "info" if current == "active" else "error"
 
-    if path.endswith("temperature_state"):
+    if path_value.endswith(
+        (
+            "temperature_state",
+            "memory_state",
+            "disk_state",
+        )
+    ):
         if current == "critical":
             return "critical"
 
@@ -97,31 +247,13 @@ def severity_for_change(
 
         return "info"
 
-    if path.endswith("memory_state"):
-        if current == "critical":
-            return "critical"
-
-        if current == "high":
-            return "warning"
-
-        return "info"
-
-    if path.endswith("disk_state"):
-        if current == "critical":
-            return "critical"
-
-        if current == "high":
-            return "warning"
-
-        return "info"
-
-    if path.endswith("undervoltage_now"):
+    if path_value.endswith("undervoltage_now"):
         return "critical" if current is True else "info"
 
-    if path.endswith("throttled_now"):
+    if path_value.endswith("throttled_now"):
         return "error" if current is True else "info"
 
-    if path.endswith(
+    if path_value.endswith(
         (
             "undervoltage_occurred",
             "throttled_occurred",
@@ -129,7 +261,7 @@ def severity_for_change(
     ):
         return "warning" if current is True else "info"
 
-    if path.endswith(
+    if path_value.endswith(
         (
             "ethernet_connected",
             "wifi_connected",
@@ -139,11 +271,17 @@ def severity_for_change(
 
     return "info"
 
+
 def message_for_change(
     path: str,
     previous: object,
     current: object,
 ) -> str:
+    path_value = _validate_string(
+        path,
+        name="path",
+    )
+
     labels = {
         "hardware.robot_available": "Robot hardware",
         "hardware.i2c_available": "I²C bus",
@@ -165,12 +303,23 @@ def message_for_change(
         "system.wifi_connected": "Wi-Fi",
     }
 
-    label = labels.get(path, path)
+    label = labels.get(
+        path_value,
+        path_value,
+    )
 
-    if isinstance(current, bool):
-        if path.endswith("_connected"):
+    if isinstance(
+        current,
+        bool,
+    ):
+        if path_value.endswith("_connected"):
             state = "connected" if current else "disconnected"
-        elif path.endswith("_now") or path.endswith("_occurred"):
+        elif path_value.endswith(
+            (
+                "_now",
+                "_occurred",
+            )
+        ):
             state = "detected" if current else "cleared"
         else:
             state = "available" if current else "unavailable"
@@ -179,28 +328,36 @@ def message_for_change(
 
     return f"{label} changed from {previous!r} to {current!r}"
 
+
 def log(
     message: str,
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> None:
-    config.paths.state_dir.mkdir(
+    message_value = _validate_string(
+        message,
+        name="message",
+    )
+    config_value = _validate_config(config)
+
+    config_value.paths.state_dir.mkdir(
         parents=True,
         exist_ok=True,
     )
 
-    with config.paths.monitor_log.open(
+    with config_value.paths.monitor_log.open(
         "a",
         encoding="utf-8",
     ) as file:
-        file.write(
-            f"{time.strftime('%Y-%m-%d %H:%M:%S')} "
-            f"{message}\n"
-        )
+        file.write(f"{timestamp()} {message_value}\n")
 
 
-def collect_snapshot() -> dict:
-    status = collect_status()
-    system_health = collect_system_health()
+def collect_snapshot(
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> dict[str, object]:
+    config_value = _validate_config(config)
+
+    status = collect_status(config_value)
+    system_health = collect_system_health(config_value)
 
     snapshot = asdict(status)
     snapshot["system_health"] = system_health.to_dict()
@@ -208,47 +365,142 @@ def collect_snapshot() -> dict:
     return snapshot
 
 
-def summarize(snapshot: dict) -> dict:
-    hardware = snapshot.get("hardware", {})
-    system_health = snapshot.get("system_health", {})
+def summarize(
+    snapshot: dict,
+) -> dict[str, object]:
+    snapshot_value = _validate_mapping(
+        snapshot,
+        name="snapshot",
+    )
 
-    battery = hardware.get("battery", {})
-    audio = hardware.get("audio", {})
-    vision = hardware.get("vision", {})
-    sensors = hardware.get("sensors", {})
-    i2c = hardware.get("i2c", {})
+    hardware = snapshot_value.get(
+        "hardware",
+        {},
+    )
+    system_health = snapshot_value.get(
+        "system_health",
+        {},
+    )
 
-    temperature = system_health.get("temperature", {})
-    throttling = system_health.get("throttling", {})
-    memory = system_health.get("memory", {})
-    disk = system_health.get("disk", {})
-    ethernet = system_health.get("ethernet", {})
-    wifi = system_health.get("wifi", {})
+    if not isinstance(
+        hardware,
+        dict,
+    ):
+        raise TypeError("snapshot hardware must be a dictionary")
+
+    if not isinstance(
+        system_health,
+        dict,
+    ):
+        raise TypeError("snapshot system_health must be a dictionary")
+
+    battery = hardware.get(
+        "battery",
+        {},
+    )
+    audio = hardware.get(
+        "audio",
+        {},
+    )
+    vision = hardware.get(
+        "vision",
+        {},
+    )
+    sensors = hardware.get(
+        "sensors",
+        {},
+    )
+    i2c = hardware.get(
+        "i2c",
+        {},
+    )
+
+    temperature = system_health.get(
+        "temperature",
+        {},
+    )
+    throttling = system_health.get(
+        "throttling",
+        {},
+    )
+    memory = system_health.get(
+        "memory",
+        {},
+    )
+    disk = system_health.get(
+        "disk",
+        {},
+    )
+    ethernet = system_health.get(
+        "ethernet",
+        {},
+    )
+    wifi = system_health.get(
+        "wifi",
+        {},
+    )
+
+    nested = {
+        "battery": battery,
+        "audio": audio,
+        "vision": vision,
+        "sensors": sensors,
+        "i2c": i2c,
+        "temperature": temperature,
+        "throttling": throttling,
+        "memory": memory,
+        "disk": disk,
+        "ethernet": ethernet,
+        "wifi": wifi,
+    }
+
+    for name, value in nested.items():
+        if not isinstance(
+            value,
+            dict,
+        ):
+            raise TypeError(f"{name} must be a dictionary")
+
+    services = snapshot_value.get(
+        "services",
+        {},
+    )
+
+    if not isinstance(
+        services,
+        dict,
+    ):
+        raise TypeError("snapshot services must be a dictionary")
 
     return {
-        "services": snapshot.get("services", {}),
+        "services": dict(services),
         "hardware": {
-            "robot_available": hardware.get("robot_available"),
-            "i2c_available": i2c.get("available"),
-            "i2c_devices": i2c.get("devices", []),
-            "battery_state": battery.get("state"),
-            "grayscale_available": sensors.get("grayscale_available"),
-            "audio_available": audio.get("available"),
-            "vision_service_available": vision.get("service_available"),
-            "vision_running": vision.get("running"),
-            "camera_running": vision.get("camera_running"),
-            "camera_has_frame": vision.get("camera_has_frame"),
+            "robot_available": hardware.get("passive_hardware_available"),
+            "i2c_available": (i2c.get("available")),
+            "i2c_devices": (
+                i2c.get(
+                    "devices",
+                    [],
+                )
+            ),
+            "battery_state": (battery.get("state")),
+            "grayscale_available": (sensors.get("grayscale_available")),
+            "audio_available": (audio.get("available")),
+            "vision_service_available": (vision.get("service_available")),
+            "vision_running": (vision.get("running")),
+            "camera_running": (vision.get("camera_running")),
+            "camera_has_frame": (vision.get("camera_has_frame")),
         },
         "system": {
-            "temperature_state": temperature.get("state"),
-            "undervoltage_now": throttling.get("undervoltage_now"),
-            "undervoltage_occurred": throttling.get("undervoltage_occurred"),
-            "throttled_now": throttling.get("throttled_now"),
-            "throttled_occurred": throttling.get("throttled_occurred"),
-            "memory_state": memory.get("state"),
-            "disk_state": disk.get("state"),
-            "ethernet_connected": ethernet.get("connected"),
-            "wifi_connected": wifi.get("connected"),
+            "temperature_state": (temperature.get("state")),
+            "undervoltage_now": (throttling.get("undervoltage_now")),
+            "undervoltage_occurred": (throttling.get("undervoltage_occurred")),
+            "throttled_now": (throttling.get("throttled_now")),
+            "throttled_occurred": (throttling.get("throttled_occurred")),
+            "memory_state": (memory.get("state")),
+            "disk_state": (disk.get("state")),
+            "ethernet_connected": (ethernet.get("connected")),
+            "wifi_connected": (wifi.get("connected")),
         },
     }
 
@@ -257,24 +509,39 @@ def run_once(
     previous_summary: dict | None = None,
     *,
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
-) -> dict:
-    snapshot = collect_snapshot()
+) -> dict[str, object]:
+    config_value = _validate_config(config)
+
+    if previous_summary is not None:
+        previous_value = _validate_mapping(
+            previous_summary,
+            name="previous_summary",
+        )
+    else:
+        previous_value = None
+
+    snapshot = collect_snapshot(config_value)
     summary = summarize(snapshot)
 
-    if previous_summary is None:
+    if previous_value is None:
         log(
             "monitor started",
-            config=config,
+            config=config_value,
         )
         log(
-            "initial status: "
-            + json.dumps(summary, sort_keys=True),
-            config=config,
+            (
+                "initial status: "
+                + json.dumps(
+                    summary,
+                    sort_keys=True,
+                )
+            ),
+            config=config_value,
         )
         return summary
 
     for path, previous, current in find_changes(
-        previous_summary,
+        previous_value,
         summary,
     ):
         event = MonitorEvent(
@@ -284,7 +551,10 @@ def run_once(
                 previous,
                 current,
             ),
-            component=path.split(".")[0],
+            component=path.split(
+                ".",
+                maxsplit=1,
+            )[0],
             event=path,
             previous=previous,
             current=current,
@@ -297,7 +567,7 @@ def run_once(
 
         write_event(
             event,
-            config=config,
+            config=config_value,
         )
 
     return summary
@@ -308,91 +578,174 @@ def run_forever(
     *,
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> int:
+    config_value = _validate_config(config)
+
     selected_interval = (
-        config.monitoring.interval_seconds
+        config_value.monitoring.interval_seconds
         if interval_seconds is None
         else interval_seconds
     )
+    interval_value = _validate_interval(selected_interval)
 
-    if selected_interval <= 0:
-        raise ValueError(
-            "interval_seconds must be greater than 0"
-        )
-
-    previous_summary: dict | None = None
+    previous_summary: dict[str, object] | None = None
 
     log(
-        (
-            "monitor loop starting "
-            f"interval={selected_interval}s"
-        ),
-        config=config,
+        (f"monitor loop starting interval={interval_value}s"),
+        config=config_value,
     )
 
     while True:
         try:
             previous_summary = run_once(
                 previous_summary,
-                config=config,
+                config=config_value,
             )
-        except Exception as exc:
-            log(
-                f"monitor error: {exc}",
-                config=config,
-            )
+        except (
+            OSError,
+            TypeError,
+            ValueError,
+            RuntimeError,
+        ) as exc:
+            try:
+                log(
+                    f"monitor error: {exc}",
+                    config=config_value,
+                )
+            except OSError:
+                pass
 
-        time.sleep(selected_interval)
+        time.sleep(interval_value)
+
 
 def find_changes(
     previous: dict,
     current: dict,
     prefix: str = "",
-) -> list[tuple[str, object, object]]:
-    changes: list[tuple[str, object, object]] = []
+) -> list[
+    tuple[
+        str,
+        object,
+        object,
+    ]
+]:
+    previous_value = _validate_mapping(
+        previous,
+        name="previous",
+    )
+    current_value = _validate_mapping(
+        current,
+        name="current",
+    )
 
-    keys = set(previous) | set(current)
+    if not isinstance(
+        prefix,
+        str,
+    ):
+        raise TypeError("prefix must be a string")
 
-    for key in sorted(keys):
-        path = f"{prefix}.{key}" if prefix else key
-        old = previous.get(key)
-        new = current.get(key)
+    prefix_value = prefix.strip()
+
+    changes: list[
+        tuple[
+            str,
+            object,
+            object,
+        ]
+    ] = []
+
+    keys = set(previous_value) | set(current_value)
+
+    for key in sorted(
+        keys,
+        key=str,
+    ):
+        if not isinstance(
+            key,
+            str,
+        ):
+            raise TypeError("summary keys must be strings")
+
+        path = f"{prefix_value}.{key}" if prefix_value else key
+        old = previous_value.get(key)
+        new = current_value.get(key)
 
         if isinstance(old, dict) and isinstance(new, dict):
-            changes.extend(find_changes(old, new, path))
+            changes.extend(
+                find_changes(
+                    old,
+                    new,
+                    path,
+                )
+            )
         elif old != new:
-            changes.append((path, old, new))
+            changes.append(
+                (
+                    path,
+                    old,
+                    new,
+                )
+            )
 
     return changes
 
 
-def main(argv: list[str] | None = None) -> int:
-    config = DEFAULT_PLATFORM_CONFIG
-    interval = config.monitoring.interval_seconds
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="betabox monitor",
+    )
 
-    if argv:
-        if "--once" in argv:
-            run_once(config=config)
+    parser.add_argument(
+        "--once",
+        action="store_true",
+        help="Run one monitoring pass and exit",
+    )
+    parser.add_argument(
+        "--interval",
+        type=int,
+        help="Monitoring interval in seconds",
+    )
+
+    return parser
+
+
+def parse_args(
+    argv: list[str] | None = None,
+) -> argparse.Namespace:
+    return _build_parser().parse_args(argv)
+
+
+def main(
+    argv: list[str] | None = None,
+) -> int:
+    config = DEFAULT_PLATFORM_CONFIG
+    args = parse_args(argv)
+
+    try:
+        if args.once:
+            run_once(
+                config=config,
+            )
             return 0
 
-        if "--interval" in argv:
-            index = argv.index("--interval")
+        interval = (
+            config.monitoring.interval_seconds
+            if args.interval is None
+            else args.interval
+        )
 
-            try:
-                interval = int(argv[index + 1])
-            except Exception:
-                print("Invalid --interval value")
-                return 1
+        return run_forever(
+            interval,
+            config=config,
+        )
 
-            if interval <= 0:
-                print(
-                    "--interval must be greater than 0"
-                )
-                return 1
-
-    return run_forever(
-        interval,
-        config=config,
-    )
+    except (
+        TypeError,
+        ValueError,
+        OSError,
+        RuntimeError,
+    ) as exc:
+        print(f"monitor failed: {exc}")
+        return 1
 
 
 if __name__ == "__main__":

@@ -23,7 +23,27 @@ from betabox_robotics.services.workspace import (
 DEFAULT_REPOSITORY_ROOT = Path(__file__).resolve().parent.parent
 
 
-@dataclass(frozen=True)
+def _validate_path(
+    value: object,
+    *,
+    name: str,
+) -> Path:
+    if isinstance(value, bool) or not isinstance(
+        value,
+        str | Path,
+    ):
+        raise TypeError(f"{name} must be a string or Path")
+
+    if isinstance(value, str):
+        value = value.strip()
+
+        if not value:
+            raise ValueError(f"{name} cannot be empty")
+
+    return Path(value).expanduser()
+
+
+@dataclass(frozen=True, slots=True)
 class GuestWorkspaceStatus:
     """Current state of the Guest workspace."""
 
@@ -32,6 +52,22 @@ class GuestWorkspaceStatus:
     curriculum_exists: bool
     media_exists: bool
     preferences_exist: bool
+
+    def __post_init__(
+        self,
+    ) -> None:
+        for name in (
+            "account_exists",
+            "home_exists",
+            "curriculum_exists",
+            "media_exists",
+            "preferences_exist",
+        ):
+            if not isinstance(
+                getattr(self, name),
+                bool,
+            ):
+                raise TypeError(f"{name} must be a boolean")
 
     @property
     def ok(self) -> bool:
@@ -61,9 +97,12 @@ def require_root() -> None:
 
 def provision_guest(
     *,
-    repository_root: Path = DEFAULT_REPOSITORY_ROOT,
+    repository_root: str | Path = DEFAULT_REPOSITORY_ROOT,
 ) -> None:
-    """Create and populate the Guest workspace."""
+    repository_root_value = _validate_path(
+        repository_root,
+        name="repository_root",
+    )
 
     require_root()
 
@@ -73,17 +112,20 @@ def provision_guest(
 
     if account.install_media:
         populate_media(
-            repository_root,
+            repository_root_value,
             accounts=(account,),
         )
 
 
 def reset_guest(
     *,
-    repository_root: Path = DEFAULT_REPOSITORY_ROOT,
+    repository_root: str | Path = DEFAULT_REPOSITORY_ROOT,
 ) -> None:
     """Reset the temporary Guest workspace."""
-
+    repository_root_value = _validate_path(
+        repository_root,
+        name="repository_root",
+    )
     require_root()
 
     account = guest_account()
@@ -99,6 +141,9 @@ def reset_guest(
     if not account.home.is_dir():
         raise RuntimeError(f"Guest home directory does not exist: {account.home}")
 
+    if account.home.is_symlink():
+        raise RuntimeError("Refusing to reset a symlinked Guest home.")
+
     for child in account.home.iterdir():
         if child.is_dir() and not child.is_symlink():
             shutil.rmtree(child)
@@ -106,18 +151,28 @@ def reset_guest(
             child.unlink()
 
     provision_guest(
-        repository_root=repository_root,
+        repository_root=repository_root_value,
     )
 
 
 def guest_status() -> GuestWorkspaceStatus:
-    """Inspect the Guest account and workspace."""
-
     try:
         account = guest_account()
         account_ids(account.username)
-        account_exists = True
-    except (LookupError, RuntimeError):
+
+        return GuestWorkspaceStatus(
+            account_exists=True,
+            home_exists=(account.home.is_dir()),
+            curriculum_exists=(account.home / "curriculum").is_dir(),
+            media_exists=(account.home / "media").is_dir(),
+            preferences_exist=(account.home / "preferences").is_dir(),
+        )
+
+    except (
+        LookupError,
+        RuntimeError,
+        OSError,
+    ):
         return GuestWorkspaceStatus(
             account_exists=False,
             home_exists=False,
@@ -126,18 +181,24 @@ def guest_status() -> GuestWorkspaceStatus:
             preferences_exist=False,
         )
 
-    return GuestWorkspaceStatus(
-        account_exists=account_exists,
-        home_exists=account.home.is_dir(),
-        curriculum_exists=(account.home / "curriculum").is_dir(),
-        media_exists=(account.home / "media").is_dir(),
-        preferences_exist=(account.home / "preferences").is_dir(),
-    )
+
+def print_status(
+    status: GuestWorkspaceStatus,
+) -> None:
+    if not isinstance(
+        status,
+        GuestWorkspaceStatus,
+    ):
+        raise TypeError("status must be a GuestWorkspaceStatus")
+
+    print(f"Account:      {'OK' if status.account_exists else 'Missing'}")
+    print(f"Home:         {'OK' if status.home_exists else 'Missing'}")
+    print(f"Curriculum:   {'OK' if status.curriculum_exists else 'Missing'}")
+    print(f"Media:        {'OK' if status.media_exists else 'Missing'}")
+    print(f"Preferences:  {'OK' if status.preferences_exist else 'Missing'}")
 
 
-def main(
-    argv: list[str] | None = None,
-) -> int:
+def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="betabox guest",
     )
@@ -150,54 +211,66 @@ def main(
         "status",
         help="Show Guest workspace status",
     )
-
     subparsers.add_parser(
         "provision",
         help="Create the Guest workspace",
     )
-
     subparsers.add_parser(
         "reset",
         help="Reset the Guest workspace",
     )
 
+    return parser
+
+
+def parse_args(
+    argv: list[str] | None = None,
+) -> argparse.Namespace:
+    return _build_parser().parse_args(argv)
+
+
+def main(
+    argv: list[str] | None = None,
+) -> int:
+    parser = _build_parser()
     args = parser.parse_args(argv)
 
     try:
         if args.command == "status":
             status = guest_status()
-
-            print(f"Account:      {'OK' if status.account_exists else 'Missing'}")
-            print(f"Home:         {'OK' if status.home_exists else 'Missing'}")
-            print(f"Curriculum:   {'OK' if status.curriculum_exists else 'Missing'}")
-            print(f"Media:        {'OK' if status.media_exists else 'Missing'}")
-            print(f"Preferences:  {'OK' if status.preferences_exist else 'Missing'}")
-
+            print_status(status)
             return 0 if status.ok else 1
 
         if args.command == "provision":
             require_root_or_elevate(
-                ["guest", "provision"],
+                [
+                    "guest",
+                    "provision",
+                ]
             )
-
             provision_guest()
-
             print("Guest workspace provisioned.")
-
             return 0
 
         if args.command == "reset":
             require_root_or_elevate(
-                ["guest", "reset"],
+                [
+                    "guest",
+                    "reset",
+                ]
             )
-
             reset_guest()
-
             print("Guest workspace reset.")
-
             return 0
 
-    except Exception as exc:
+    except (
+        LookupError,
+        PermissionError,
+        RuntimeError,
+        OSError,
+        TypeError,
+        ValueError,
+    ) as exc:
         print(
             f"Guest workspace operation failed: {exc}",
             file=sys.stderr,
@@ -206,3 +279,7 @@ def main(
 
     parser.print_help()
     return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

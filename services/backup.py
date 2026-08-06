@@ -1,35 +1,27 @@
 from __future__ import annotations
 
 import argparse
-import json
-import shutil
 import socket
+import sys
 import time
-from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from betabox_robotics.version import __version__
 from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
     PlatformConfig,
 )
-
-@dataclass(frozen=True)
-class BackupItem:
-    source: str
-    destination: str
-    copied: bool
-    message: str = ""
-
-
-@dataclass(frozen=True)
-class BackupReport:
-    name: str
-    path: str
-    created_at: str
-    hostname: str
-    sdk_version: str
-    items: list[BackupItem]
+from betabox_robotics.services.backup_checks import (
+    BackupReport,
+    copy_item,
+    list_backup_directories,
+    write_manifest,
+)
+from betabox_robotics.services.backup_checks.validation import (
+    validate_backup_name,
+    validate_config,
+    validate_path,
+)
+from betabox_robotics.version import __version__
 
 
 def timestamp() -> str:
@@ -38,50 +30,16 @@ def timestamp() -> str:
 
 def source_paths(
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
-) -> list[Path]:
-    return list(config.paths.backup_sources)
+) -> tuple[Path, ...]:
+    config_value = validate_config(config)
 
-
-def copy_item(source: Path, backup_dir: Path) -> BackupItem:
-    destination = backup_dir / source.as_posix().lstrip("/")
-
-    if not source.exists():
-        return BackupItem(
-            source=str(source),
-            destination=str(destination),
-            copied=False,
-            message="source missing",
+    return tuple(
+        validate_path(
+            path,
+            name="backup source",
         )
-
-    try:
-        destination.parent.mkdir(parents=True, exist_ok=True)
-
-        if source.is_dir():
-            shutil.copytree(source, destination, dirs_exist_ok=True)
-        else:
-            shutil.copy2(source, destination)
-
-        return BackupItem(
-            source=str(source),
-            destination=str(destination),
-            copied=True,
-            message="copied",
-        )
-
-    except Exception as exc:
-        return BackupItem(
-            source=str(source),
-            destination=str(destination),
-            copied=False,
-            message=str(exc),
-        )
-
-
-def write_manifest(report: BackupReport, backup_dir: Path) -> None:
-    manifest = backup_dir / "manifest.json"
-
-    with manifest.open("w") as file:
-        json.dump(asdict(report), file, indent=2)
+        for path in config_value.paths.backup_sources
+    )
 
 
 def create_backup(
@@ -89,14 +47,28 @@ def create_backup(
     *,
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> BackupReport:
-    backup_name = name or timestamp()
-    backup_dir = config.paths.backup_root / backup_name
-    backup_dir.mkdir(parents=True, exist_ok=False)
+    config_value = validate_config(config)
 
-    items = [
-        copy_item(source, backup_dir)
-        for source in source_paths(config)
-    ]
+    backup_name = validate_backup_name(timestamp() if name is None else name)
+
+    backup_root = validate_path(
+        config_value.paths.backup_root,
+        name="backup_root",
+    )
+    backup_dir = backup_root / backup_name
+
+    backup_dir.mkdir(
+        parents=True,
+        exist_ok=False,
+    )
+
+    items = tuple(
+        copy_item(
+            source,
+            backup_dir,
+        )
+        for source in source_paths(config_value)
+    )
 
     report = BackupReport(
         name=backup_name,
@@ -107,29 +79,31 @@ def create_backup(
         items=items,
     )
 
-    write_manifest(report, backup_dir)
+    write_manifest(
+        report,
+        backup_dir,
+    )
+
     return report
 
 
 def list_backups(
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
-) -> list[Path]:
-    backup_root = config.paths.backup_root
+) -> tuple[Path, ...]:
+    config_value = validate_config(config)
 
-    if not backup_root.exists():
-        return []
-
-    return sorted(
-        [
-            path
-            for path in backup_root.iterdir()
-            if path.is_dir()
-        ],
-        reverse=True,
-    )
+    return list_backup_directories(config_value.paths.backup_root)
 
 
-def print_report(report: BackupReport) -> None:
+def print_report(
+    report: BackupReport,
+) -> None:
+    if not isinstance(
+        report,
+        BackupReport,
+    ):
+        raise TypeError("report must be a BackupReport")
+
     print()
     print("Betabox Backup")
     print("==============")
@@ -145,15 +119,25 @@ def print_report(report: BackupReport) -> None:
 
     for item in report.items:
         status = "COPIED" if item.copied else "SKIPPED"
+
         print(f"[{status}] {item.source}")
         print(f"        -> {item.destination}")
+
         if item.message:
             print(f"        {item.message}")
 
     print()
 
 
-def print_backups(backups: list[Path]) -> None:
+def print_backups(
+    backups: tuple[Path, ...],
+) -> None:
+    if not isinstance(
+        backups,
+        tuple,
+    ):
+        raise TypeError("backups must be a tuple")
+
     print()
     print("Betabox Backups")
     print("===============")
@@ -170,10 +154,19 @@ def print_backups(backups: list[Path]) -> None:
     print()
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(
+    argv: list[str] | None = None,
+) -> int:
     parser = argparse.ArgumentParser(prog="betabox backup")
-    parser.add_argument("--list", action="store_true", help="List existing backups")
-    parser.add_argument("--name", help="Optional backup name")
+    parser.add_argument(
+        "--list",
+        action="store_true",
+        help="List existing backups",
+    )
+    parser.add_argument(
+        "--name",
+        help="Optional backup name",
+    )
 
     args = parser.parse_args(argv)
 
@@ -183,15 +176,25 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         report = create_backup(args.name)
+    except (
+        TypeError,
+        ValueError,
+    ) as exc:
+        print(str(exc))
+        return 1
     except FileExistsError:
-        print(f"Backup already exists: {args.name}")
+        backup_name = args.name if args.name is not None else "generated timestamp"
+
+        print(f"Backup already exists: {backup_name}")
+        return 1
+    except OSError as exc:
+        print(f"Unable to create backup: {exc}")
         return 1
 
     print_report(report)
+
     return 0
 
 
 if __name__ == "__main__":
-    import sys
-
     raise SystemExit(main(sys.argv[1:]))

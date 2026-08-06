@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import argparse
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -9,34 +8,146 @@ from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
     PlatformConfig,
 )
+from betabox_robotics.services.command import run
 from betabox_robotics.services.managed import managed_services
 
 
-@dataclass(frozen=True)
+def _validate_config(
+    value: object,
+) -> PlatformConfig:
+    if not isinstance(
+        value,
+        PlatformConfig,
+    ):
+        raise TypeError("config must be a PlatformConfig")
+
+    return value
+
+
+def _validate_string(
+    value: object,
+    *,
+    name: str,
+) -> str:
+    if not isinstance(
+        value,
+        str,
+    ):
+        raise TypeError(f"{name} must be a string")
+
+    result = value.strip()
+
+    if not result:
+        raise ValueError(f"{name} cannot be empty")
+
+    return result
+
+
+def _validate_path(
+    value: object,
+    *,
+    name: str,
+) -> Path:
+    if isinstance(value, bool) or not isinstance(
+        value,
+        str | Path,
+    ):
+        raise TypeError(f"{name} must be a string or Path")
+
+    return Path(value).expanduser()
+
+
+def _validate_lines(
+    value: object,
+) -> int:
+    if isinstance(value, bool) or not isinstance(
+        value,
+        int,
+    ):
+        raise TypeError("lines must be an integer")
+
+    if value <= 0:
+        raise ValueError("lines must be greater than 0")
+
+    return value
+
+
+def _validate_flag(
+    value: object,
+    *,
+    name: str,
+) -> bool:
+    if not isinstance(
+        value,
+        bool,
+    ):
+        raise TypeError(f"{name} must be a boolean")
+
+    return value
+
+
+@dataclass(frozen=True, slots=True)
 class LogTarget:
     name: str
     title: str
     unit: str | None
     file: Path | None
 
-
-def run(command: list[str], timeout: int = 10) -> subprocess.CompletedProcess | None:
-    try:
-        return subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
+    def __post_init__(
+        self,
+    ) -> None:
+        object.__setattr__(
+            self,
+            "name",
+            _validate_string(
+                self.name,
+                name="name",
+            ),
         )
-    except Exception:
-        return None
+        object.__setattr__(
+            self,
+            "title",
+            _validate_string(
+                self.title,
+                name="title",
+            ),
+        )
+
+        if self.unit is not None:
+            object.__setattr__(
+                self,
+                "unit",
+                _validate_string(
+                    self.unit,
+                    name="unit",
+                ),
+            )
+
+        if self.file is not None:
+            object.__setattr__(
+                self,
+                "file",
+                _validate_path(
+                    self.file,
+                    name="file",
+                ),
+            )
+
+        if self.unit is None and self.file is None:
+            raise ValueError("target must define a unit or file")
 
 
 def get_target(
     name: str,
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> LogTarget | None:
-    managed = managed_services(config).get(name)
+    name_value = _validate_string(
+        name,
+        name="name",
+    )
+    config_value = _validate_config(config)
+
+    managed = managed_services(config_value).get(name_value)
 
     if managed is None:
         return None
@@ -49,146 +160,280 @@ def get_target(
     )
 
 
-def tail_file(path: Path, lines: int) -> str:
-    if not path.exists():
-        return f"Log file not found: {path}"
+def tail_file(
+    path: str | Path,
+    lines: int,
+) -> str:
+    path_value = _validate_path(
+        path,
+        name="path",
+    )
+    lines_value = _validate_lines(lines)
 
-    result = run(["tail", "-n", str(lines), str(path)])
+    try:
+        exists = path_value.exists()
+    except OSError as exc:
+        return f"Could not read log file: {path_value}: {exc}"
+
+    if not exists:
+        return f"Log file not found: {path_value}"
+
+    result = run(
+        [
+            "tail",
+            "-n",
+            str(lines_value),
+            str(path_value),
+        ],
+        timeout=10,
+    )
 
     if result is None:
-        return f"Could not read log file: {path}"
+        return f"Could not read log file: {path_value}"
+
+    if result.returncode != 0:
+        return (
+            result.stderr.strip()
+            or result.stdout.strip()
+            or (f"Could not read log file: {path_value}")
+        )
 
     return result.stdout.strip() or "(empty)"
 
 
-def journal_logs(unit: str, lines: int) -> str:
+def journal_logs(
+    unit: str,
+    lines: int,
+) -> str:
+    unit_value = _validate_string(
+        unit,
+        name="unit",
+    )
+    lines_value = _validate_lines(lines)
+
     result = run(
         [
             "journalctl",
             "-u",
-            unit,
+            unit_value,
             "-n",
-            str(lines),
+            str(lines_value),
             "--no-pager",
         ],
         timeout=10,
     )
 
     if result is None:
-        return f"Could not read journal for {unit}"
+        return f"Could not read journal for {unit_value}"
 
     output = result.stdout.strip() or result.stderr.strip()
+
+    if result.returncode != 0:
+        return output or (f"Could not read journal for {unit_value}")
+
     return output or "(no journal entries)"
 
 
 def print_target_logs(
-    target: LogTarget, *, lines: int, journal: bool, file: bool
+    target: LogTarget,
+    *,
+    lines: int,
+    journal: bool,
+    file: bool,
 ) -> None:
+    if not isinstance(
+        target,
+        LogTarget,
+    ):
+        raise TypeError("target must be a LogTarget")
+
+    lines_value = _validate_lines(lines)
+    journal_value = _validate_flag(
+        journal,
+        name="journal",
+    )
+    file_value = _validate_flag(
+        file,
+        name="file",
+    )
+
+    if not journal_value and not file_value:
+        raise ValueError("journal or file output must be enabled")
+
     print()
     print(f"Betabox Logs: {target.title}")
     print("=" * (14 + len(target.title)))
     print()
 
-    if file and target.file is not None:
+    if file_value and target.file is not None:
         print("File Log")
         print("--------")
-        print(tail_file(target.file, lines))
+        print(
+            tail_file(
+                target.file,
+                lines_value,
+            )
+        )
         print()
 
-    if journal and target.unit is not None:
+    if journal_value and target.unit is not None:
         print("Systemd Journal")
         print("---------------")
-        print(journal_logs(target.unit, lines))
+        print(
+            journal_logs(
+                target.unit,
+                lines_value,
+            )
+        )
         print()
 
 
-def list_targets(
+def log_targets(
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> tuple[LogTarget, ...]:
+    config_value = _validate_config(config)
+
+    return tuple(
+        LogTarget(
+            name=managed.name,
+            title=managed.title,
+            unit=managed.unit,
+            file=managed.log_file,
+        )
+        for managed in managed_services(config_value).values()
+    )
+
+
+def print_targets(
+    targets: tuple[LogTarget, ...],
 ) -> None:
+    if not isinstance(
+        targets,
+        tuple,
+    ):
+        raise TypeError("targets must be a tuple")
+
+    if not all(isinstance(target, LogTarget) for target in targets):
+        raise TypeError("targets must contain only LogTarget values")
+
     print()
     print("Available log targets")
     print("=====================")
     print()
 
-    for name, managed in managed_services(config).items():
-        print(f"{name:14} {managed.title}")
+    for target in targets:
+        print(f"{target.name:14} {target.title}")
 
     print()
 
 
-def main(
+def parse_args(
     argv: list[str] | None = None,
-) -> int:
-    config = DEFAULT_PLATFORM_CONFIG
+    *,
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> argparse.Namespace:
+    config_value = _validate_config(config)
 
-    parser = argparse.ArgumentParser(
-        prog="betabox logs"
-    )
+    parser = argparse.ArgumentParser(prog="betabox logs")
 
     parser.add_argument(
         "target",
         nargs="?",
         help="Log target name",
     )
-
     parser.add_argument(
         "-n",
         "--lines",
         type=int,
-        default=config.monitoring.default_log_lines,
+        default=(config_value.monitoring.default_log_lines),
         help="Number of lines",
     )
-
     parser.add_argument(
         "--journal-only",
         action="store_true",
         help="Only show journal logs",
     )
-
     parser.add_argument(
         "--file-only",
         action="store_true",
         help="Only show file logs",
     )
-
     parser.add_argument(
         "--list",
         action="store_true",
         help="List available log targets",
     )
 
-    args = parser.parse_args(argv)
+    return parser.parse_args(argv)
 
-    if args.lines <= 0:
-        print("--lines must be greater than 0")
+
+def main(
+    argv: list[str] | None = None,
+) -> int:
+    config = DEFAULT_PLATFORM_CONFIG
+    args = parse_args(
+        argv,
+        config=config,
+    )
+
+    try:
+        lines = _validate_lines(args.lines)
+    except (
+        TypeError,
+        ValueError,
+    ) as exc:
+        print(str(exc))
+        return 1
+
+    if args.journal_only and args.file_only:
+        print("--journal-only and --file-only cannot be used together")
+        return 1
+
+    try:
+        targets = log_targets(config)
+    except (
+        TypeError,
+        ValueError,
+        OSError,
+    ) as exc:
+        print(str(exc))
         return 1
 
     if args.list or not args.target:
-        list_targets(config)
+        print_targets(targets)
         return 0
 
-    target = get_target(
-        args.target,
-        config,
-    )
-
-    if target is None:
-        print(
-            f"Unknown log target: "
-            f"{args.target}"
+    try:
+        target = get_target(
+            args.target,
+            config,
         )
-        list_targets(config)
+    except (
+        TypeError,
+        ValueError,
+    ) as exc:
+        print(str(exc))
         return 1
 
-    show_journal = not args.file_only
-    show_file = not args.journal_only
+    if target is None:
+        print(f"Unknown log target: {args.target}")
+        print_targets(targets)
+        return 1
 
-    print_target_logs(
-        target,
-        lines=args.lines,
-        journal=show_journal,
-        file=show_file,
-    )
+    try:
+        print_target_logs(
+            target,
+            lines=lines,
+            journal=not args.file_only,
+            file=not args.journal_only,
+        )
+    except (
+        TypeError,
+        ValueError,
+        OSError,
+    ) as exc:
+        print(str(exc))
+        return 1
 
     return 0
 

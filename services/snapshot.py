@@ -4,23 +4,141 @@ import argparse
 import json
 import shutil
 import socket
-import subprocess
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from betabox_robotics.config import (
+    DEFAULT_PLATFORM_CONFIG,
+    PlatformConfig,
+)
+from betabox_robotics.services.command import run
 from betabox_robotics.services.doctor import collect_diagnoses
 from betabox_robotics.services.services import collect_services
 from betabox_robotics.services.status import collect_status
 from betabox_robotics.services.verify import collect_checks
 from betabox_robotics.version import __version__
-from betabox_robotics.config import (
-    DEFAULT_PLATFORM_CONFIG,
-    PlatformConfig,
+
+SYSTEM_COMMANDS: tuple[
+    tuple[str, tuple[str, ...]],
+    ...,
+] = (
+    ("uname.txt", ("uname", "-a")),
+    ("os-release.txt", ("cat", "/etc/os-release")),
+    ("hostname.txt", ("hostname",)),
+    ("ip-addresses.txt", ("hostname", "-I")),
+    ("disk.txt", ("df", "-h")),
+    ("memory.txt", ("free", "-h")),
+    ("aplay.txt", ("aplay", "-l")),
 )
 
 
-@dataclass(frozen=True)
+def _validate_config(
+    value: object,
+) -> PlatformConfig:
+    if not isinstance(
+        value,
+        PlatformConfig,
+    ):
+        raise TypeError("config must be a PlatformConfig")
+
+    return value
+
+
+def _validate_string(
+    value: object,
+    *,
+    name: str,
+) -> str:
+    if not isinstance(
+        value,
+        str,
+    ):
+        raise TypeError(f"{name} must be a string")
+
+    result = value.strip()
+
+    if not result:
+        raise ValueError(f"{name} cannot be empty")
+
+    return result
+
+
+def _validate_path(
+    value: object,
+    *,
+    name: str,
+) -> Path:
+    if isinstance(value, bool) or not isinstance(
+        value,
+        str | Path,
+    ):
+        raise TypeError(f"{name} must be a string or Path")
+
+    if isinstance(value, str):
+        value = value.strip()
+
+        if not value:
+            raise ValueError(f"{name} cannot be empty")
+
+    return Path(value).expanduser()
+
+
+def _validate_command(
+    value: object,
+) -> list[str]:
+    if not isinstance(
+        value,
+        list,
+    ):
+        raise TypeError("command must be a list")
+
+    if not value:
+        raise ValueError("command cannot be empty")
+
+    return [
+        _validate_string(
+            item,
+            name="command item",
+        )
+        for item in value
+    ]
+
+
+def _validate_report(
+    value: object,
+) -> SnapshotReport:
+    if not isinstance(
+        value,
+        SnapshotReport,
+    ):
+        raise TypeError(
+            "report must be a SnapshotReport",
+        )
+
+    return value
+
+
+def _validate_snapshot_list(
+    value: object,
+) -> tuple[Path, ...]:
+    if not isinstance(
+        value,
+        tuple,
+    ):
+        raise TypeError(
+            "snapshots must be a tuple",
+        )
+
+    if not all(isinstance(item, Path) for item in value):
+        raise TypeError(
+            "snapshots must contain only Path values",
+        )
+
+    return value
+
+
+@dataclass(frozen=True, slots=True)
 class SnapshotReport:
     name: str
     path: str
@@ -28,52 +146,339 @@ class SnapshotReport:
     hostname: str
     sdk_version: str
 
-
-def run(command: list[str], timeout: int = 10) -> subprocess.CompletedProcess | None:
-    try:
-        return subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
+    def __post_init__(
+        self,
+    ) -> None:
+        object.__setattr__(
+            self,
+            "name",
+            _validate_string(
+                self.name,
+                name="name",
+            ),
         )
-    except Exception:
-        return None
+        object.__setattr__(
+            self,
+            "path",
+            str(
+                _validate_path(
+                    self.path,
+                    name="path",
+                )
+            ),
+        )
+        object.__setattr__(
+            self,
+            "created_at",
+            _validate_string(
+                self.created_at,
+                name="created_at",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "hostname",
+            _validate_string(
+                self.hostname,
+                name="hostname",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "sdk_version",
+            _validate_string(
+                self.sdk_version,
+                name="sdk_version",
+            ),
+        )
 
 
 def timestamp() -> str:
-    return time.strftime("%Y%m%d-%H%M%S")
+    value = time.strftime("%Y%m%d-%H%M%S")
+
+    return _validate_string(
+        value,
+        name="timestamp",
+    )
 
 
-def write_text(path: Path, content: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
+def write_text(
+    path: str | Path,
+    content: str,
+) -> None:
+    path_value = _validate_path(
+        path,
+        name="path",
+    )
+    content_value = _validate_string(
+        content,
+        name="content",
+    )
+
+    path_value.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    path_value.write_text(
+        content_value,
+        encoding="utf-8",
+    )
 
 
-def write_json(path: Path, data: object) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(data, indent=2, default=str), encoding="utf-8")
+def write_json(
+    path: str | Path,
+    data: object,
+) -> None:
+    path_value = _validate_path(
+        path,
+        name="path",
+    )
+
+    if data is None:
+        raise ValueError("data cannot be None")
+
+    content = json.dumps(
+        data,
+        indent=2,
+        default=str,
+    )
+
+    path_value.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    path_value.write_text(
+        content,
+        encoding="utf-8",
+    )
 
 
-def command_output(command: list[str]) -> str:
-    result = run(command)
+def command_output(
+    command: list[str],
+) -> str:
+    command_value = _validate_command(command)
+
+    result = run(command_value)
 
     if result is None:
         return "command failed to run"
 
-    return (result.stdout + result.stderr).strip()
+    stdout = result.stdout.strip()
+    stderr = result.stderr.strip()
+
+    if result.returncode != 0:
+        return stderr or stdout or (f"command exited with status {result.returncode}")
+
+    return stdout or stderr or "(no output)"
 
 
-def copy_if_exists(source: Path, destination: Path) -> None:
-    if not source.exists():
-        return
+def copy_if_exists(
+    source: str | Path,
+    destination: str | Path,
+) -> bool:
+    source_value = _validate_path(
+        source,
+        name="source",
+    )
+    destination_value = _validate_path(
+        destination,
+        name="destination",
+    )
 
-    destination.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        if not source_value.exists():
+            return False
 
-    if source.is_dir():
-        shutil.copytree(source, destination, dirs_exist_ok=True)
+        destination_value.parent.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        if source_value.is_dir():
+            shutil.copytree(
+                source_value,
+                destination_value,
+                dirs_exist_ok=True,
+            )
+        else:
+            shutil.copy2(
+                source_value,
+                destination_value,
+            )
+
+    except OSError:
+        return False
+
+    return True
+
+
+def build_snapshot_report(
+    name: str | None = None,
+    *,
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> SnapshotReport:
+    config_value = _validate_config(config)
+
+    if name is None:
+        snapshot_name = f"snapshot-{timestamp()}"
     else:
-        shutil.copy2(source, destination)
+        snapshot_name = _validate_string(
+            name,
+            name="name",
+        )
+
+    snapshot_dir = config_value.paths.snapshot_root / snapshot_name
+
+    created_at = _validate_string(
+        time.strftime("%Y-%m-%d %H:%M:%S"),
+        name="created_at",
+    )
+    hostname_value = _validate_string(
+        socket.gethostname(),
+        name="hostname",
+    )
+
+    return SnapshotReport(
+        name=snapshot_name,
+        path=str(snapshot_dir),
+        created_at=created_at,
+        hostname=hostname_value,
+        sdk_version=_validate_string(
+            __version__,
+            name="sdk_version",
+        ),
+    )
+
+
+def write_manifest(
+    report: SnapshotReport,
+) -> None:
+    report = _validate_report(
+        report,
+    )
+
+    snapshot_dir = Path(report.path)
+
+    write_json(
+        snapshot_dir / "manifest.json",
+        asdict(report),
+    )
+
+
+def write_system_reports(
+    snapshot_dir: str | Path,
+    *,
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> None:
+    snapshot_dir_value = _validate_path(
+        snapshot_dir,
+        name="snapshot_dir",
+    )
+    config_value = _validate_config(
+        config,
+    )
+
+    system_dir = snapshot_dir_value / "system"
+
+    for filename, command in SYSTEM_COMMANDS:
+        write_text(
+            system_dir / filename,
+            command_output(
+                list(command),
+            ),
+        )
+
+    write_text(
+        system_dir / "i2cdetect.txt",
+        command_output(
+            [
+                "i2cdetect",
+                "-y",
+                str(config_value.verification.i2c_bus),
+            ],
+        ),
+    )
+
+
+def write_log_reports(
+    snapshot_dir: str | Path,
+    *,
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> None:
+    snapshot_dir_value = _validate_path(
+        snapshot_dir,
+        name="snapshot_dir",
+    )
+    config_value = _validate_config(
+        config,
+    )
+
+    logs_dir = snapshot_dir_value / "logs"
+
+    copy_if_exists(
+        config_value.paths.monitor_log,
+        logs_dir / "monitor.log",
+    )
+
+    copy_if_exists(
+        config_value.paths.boot_announce_log,
+        logs_dir / "boot_announce.log",
+    )
+
+    journal_targets = (
+        (
+            "journal-betabox-monitor.txt",
+            config_value.services.monitor.unit,
+        ),
+        (
+            "journal-boot-announce.txt",
+            config_value.services.boot_announce.unit,
+        ),
+    )
+
+    for filename, unit in journal_targets:
+        write_text(
+            logs_dir / filename,
+            command_output(
+                [
+                    "journalctl",
+                    "-u",
+                    unit,
+                    "-n",
+                    "100",
+                    "--no-pager",
+                ],
+            ),
+        )
+
+
+def write_platform_reports(
+    snapshot_dir: str | Path,
+    *,
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> None:
+    snapshot_dir_value = _validate_path(
+        snapshot_dir,
+        name="snapshot_dir",
+    )
+    config_value = _validate_config(config)
+
+    write_json(
+        snapshot_dir_value / "status.json",
+        asdict(collect_status(config_value)),
+    )
+    write_json(
+        snapshot_dir_value / "services.json",
+        [asdict(item) for item in collect_services(config_value)],
+    )
+    write_json(
+        snapshot_dir_value / "verify.json",
+        [asdict(item) for item in collect_checks(config=config_value)],
+    )
+    write_json(
+        snapshot_dir_value / "doctor.json",
+        [asdict(item) for item in collect_diagnoses(config_value)],
+    )
 
 
 def create_snapshot(
@@ -81,75 +486,41 @@ def create_snapshot(
     *,
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> SnapshotReport:
-    snapshot_name = name or f"snapshot-{timestamp()}"
-    snapshot_dir = config.paths.snapshot_root / snapshot_name
-    report = SnapshotReport(
-        name=snapshot_name,
-        path=str(snapshot_dir),
-        created_at=time.strftime("%Y-%m-%d %H:%M:%S"),
-        hostname=socket.gethostname(),
-        sdk_version=__version__,
+    config_value = _validate_config(
+        config,
     )
 
-    write_json(snapshot_dir / "manifest.json", asdict(report))
-
-    write_json(snapshot_dir / "status.json", asdict(collect_status()))
-    write_json(
-        snapshot_dir / "services.json", [asdict(item) for item in collect_services()]
-    )
-    write_json(
-        snapshot_dir / "verify.json", [asdict(item) for item in collect_checks()]
-    )
-    write_json(
-        snapshot_dir / "doctor.json", [asdict(item) for item in collect_diagnoses()]
+    report = build_snapshot_report(
+        name,
+        config=config_value,
     )
 
-    write_text(snapshot_dir / "system" / "uname.txt", command_output(["uname", "-a"]))
-    write_text(
-        snapshot_dir / "system" / "os-release.txt",
-        command_output(["cat", "/etc/os-release"]),
-    )
-    write_text(snapshot_dir / "system" / "hostname.txt", command_output(["hostname"]))
-    write_text(
-        snapshot_dir / "system" / "ip-addresses.txt", command_output(["hostname", "-I"])
-    )
-    write_text(snapshot_dir / "system" / "disk.txt", command_output(["df", "-h"]))
-    write_text(snapshot_dir / "system" / "memory.txt", command_output(["free", "-h"]))
-    write_text(snapshot_dir / "system" / "aplay.txt", command_output(["aplay", "-l"]))
-    write_text(
-        snapshot_dir / "system" / "i2cdetect.txt",
-        command_output(["i2cdetect", "-y", "1"]),
+    snapshot_dir = Path(
+        report.path,
     )
 
-    logs_dir = snapshot_dir / "logs"
-    copy_if_exists(config.paths.monitor_log, logs_dir / "monitor.log")
-    copy_if_exists(config.paths.boot_announce_log, logs_dir / "boot_announce.log")
+    if snapshot_dir.exists():
+        raise FileExistsError(
+            str(snapshot_dir),
+        )
 
-    write_text(
-        logs_dir / "journal-betabox-monitor.txt",
-        command_output(
-            [
-                "journalctl",
-                "-u",
-                config.services.monitor.unit,
-                "-n",
-                "100",
-                "--no-pager",
-            ]
-        ),
+    write_manifest(
+        report,
     )
-    write_text(
-        logs_dir / "journal-boot-announce.txt",
-        command_output(
-            [
-                "journalctl",
-                "-u",
-                "betabox-boot-announce.service",
-                "-n",
-                "100",
-                "--no-pager",
-            ]
-        ),
+
+    write_platform_reports(
+        snapshot_dir,
+        config=config_value,
+    )
+
+    write_system_reports(
+        snapshot_dir,
+        config=config_value,
+    )
+
+    write_log_reports(
+        snapshot_dir,
+        config=config_value,
     )
 
     return report
@@ -157,23 +528,34 @@ def create_snapshot(
 
 def list_snapshots(
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
-) -> list[Path]:
-    snapshot_root = config.paths.snapshot_root
+) -> tuple[Path, ...]:
+    config_value = _validate_config(
+        config,
+    )
 
-    if not snapshot_root.exists():
-        return []
+    snapshot_root = config_value.paths.snapshot_root
 
-    return sorted(
-        [
-            path
-            for path in snapshot_root.iterdir()
-            if path.is_dir()
-        ],
-        reverse=True,
+    try:
+        if not snapshot_root.exists():
+            return ()
+    except OSError:
+        return ()
+
+    return tuple(
+        sorted(
+            (path for path in snapshot_root.iterdir() if path.is_dir()),
+            reverse=True,
+        )
     )
 
 
-def print_report(report: SnapshotReport) -> None:
+def print_report(
+    report: SnapshotReport,
+) -> None:
+    report = _validate_report(
+        report,
+    )
+
     print()
     print("Betabox Snapshot")
     print("================")
@@ -186,7 +568,13 @@ def print_report(report: SnapshotReport) -> None:
     print()
 
 
-def print_snapshots(snapshots: list[Path]) -> None:
+def print_snapshots(
+    snapshots: tuple[Path, ...],
+) -> None:
+    snapshots = _validate_snapshot_list(
+        snapshots,
+    )
+
     print()
     print("Betabox Snapshots")
     print("=================")
@@ -197,30 +585,65 @@ def print_snapshots(snapshots: list[Path]) -> None:
         print()
         return
 
-    for path in snapshots:
-        print(path.name)
+    for snapshot in snapshots:
+        print(snapshot.name)
 
     print()
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(prog="betabox snapshot")
-    parser.add_argument("--list", action="store_true", help="List existing snapshots")
-    parser.add_argument("--name", help="Optional snapshot name")
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="betabox snapshot",
+    )
 
-    args = parser.parse_args(argv)
+    parser.add_argument(
+        "--list",
+        action="store_true",
+        help="List existing snapshots",
+    )
+
+    parser.add_argument(
+        "--name",
+        help="Optional snapshot name",
+    )
+
+    return parser
+
+
+def parse_args(
+    argv: list[str] | None = None,
+) -> argparse.Namespace:
+    return _build_parser().parse_args(
+        argv,
+    )
+
+
+def main(
+    argv: list[str] | None = None,
+) -> int:
+    args = parse_args(
+        argv,
+    )
 
     if args.list:
-        print_snapshots(list_snapshots())
+        print_snapshots(
+            list_snapshots(),
+        )
         return 0
 
     try:
-        report = create_snapshot(args.name)
+        report = create_snapshot(
+            args.name,
+        )
     except FileExistsError:
-        print(f"Snapshot already exists: {args.name}")
+        print(
+            f"Snapshot already exists: {args.name}",
+        )
         return 1
 
-    print_report(report)
+    print_report(
+        report,
+    )
     return 0
 
 

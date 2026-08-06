@@ -1,18 +1,49 @@
 from __future__ import annotations
 
 import os
-import sys
 from pathlib import Path
 from typing import NoReturn
 
+BETABOX_EXECUTABLE = Path("/opt/betabox/venv/bin/betabox")
 
-BETABOX_EXECUTABLE = Path(
-    "/opt/betabox/venv/bin/betabox"
-)
+SUDO_EXECUTABLE = Path("/usr/bin/sudo")
 
-SUDO_EXECUTABLE = Path(
-    "/usr/bin/sudo"
-)
+
+def _validate_arguments(
+    value: object,
+) -> list[str]:
+    if not isinstance(value, list):
+        raise TypeError("arguments must be a list of strings")
+
+    result: list[str] = []
+
+    for argument in value:
+        if not isinstance(argument, str):
+            raise TypeError("arguments must contain only strings")
+
+        argument = argument.strip()
+
+        if not argument:
+            raise ValueError("arguments cannot contain empty strings")
+
+        result.append(argument)
+
+    return result
+
+
+def _require_executable(
+    path: Path,
+    *,
+    name: str,
+) -> None:
+    if not path.is_file():
+        raise RuntimeError(f"{name} is missing: {path}")
+
+    if not os.access(
+        path,
+        os.X_OK,
+    ):
+        raise RuntimeError(f"{name} is not executable: {path}")
 
 
 def running_as_root() -> bool:
@@ -30,17 +61,16 @@ def elevate_betabox(
     The installer must authorize the exact command through sudoers.
     ``sudo -n`` prevents interactive password prompts.
     """
+    arguments = _validate_arguments(arguments)
 
-    if not BETABOX_EXECUTABLE.is_file():
-        raise RuntimeError(
-            "Betabox executable is missing: "
-            f"{BETABOX_EXECUTABLE}"
-        )
-
-    if not SUDO_EXECUTABLE.is_file():
-        raise RuntimeError(
-            "sudo is not installed."
-        )
+    _require_executable(
+        BETABOX_EXECUTABLE,
+        name="Betabox executable",
+    )
+    _require_executable(
+        SUDO_EXECUTABLE,
+        name="sudo",
+    )
 
     command = [
         str(SUDO_EXECUTABLE),
@@ -55,9 +85,7 @@ def elevate_betabox(
             command,
         )
     except OSError as exc:
-        raise RuntimeError(
-            f"Unable to elevate Betabox command: {exc}"
-        ) from exc
+        raise RuntimeError("Unable to elevate Betabox command.") from exc
 
 
 def require_root_or_elevate(
@@ -70,6 +98,4 @@ def require_root_or_elevate(
     if running_as_root():
         return
 
-    elevate_betabox(
-        arguments
-    )
+    elevate_betabox(arguments)

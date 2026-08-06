@@ -1,300 +1,65 @@
 from __future__ import annotations
 
 import argparse
-import importlib
 import os
 import pwd
-import shutil
-import subprocess
 import sys
-from dataclasses import dataclass
 from pathlib import Path
 
 from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
     PlatformConfig,
 )
-from betabox_robotics.services.accounts import BETABOX_ACCOUNTS
-
-AVAHI_OVERRIDE_PATH = Path("/etc/systemd/system/avahi-daemon.service.d/override.conf")
-
-AVAHI_OVERRIDE_REQUIRED_LINES = (
-    "After=set-hostname-from-serial.service",
-    "After=NetworkManager.service",
-    "After=NetworkManager-wait-online.service",
-    "Wants=set-hostname-from-serial.service",
-    "Wants=NetworkManager-wait-online.service",
+from betabox_robotics.services.accounts import (
+    BETABOX_ACCOUNTS,
 )
-
-
-@dataclass(frozen=True)
-class CheckResult:
-    name: str
-    ok: bool
-    message: str = ""
-
-
-def run(
-    command: list[str],
-    timeout: int = 5,
-) -> subprocess.CompletedProcess | None:
-    try:
-        return subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
-    except Exception:
-        return None
+from betabox_robotics.services.install_checks import (
+    CheckResult,
+    check_account_workspace,
+    check_avahi_override,
+    check_command,
+    check_config_line,
+    check_executable,
+    check_import,
+    check_runtime_media,
+    check_service_enabled,
+    check_service_installed,
+)
+from betabox_robotics.services.install_checks.validation import (
+    validate_checks,
+    validate_config,
+    validate_optional_string,
+    validate_string,
+)
 
 
 def resolve_service_user(
     requested_user: str | None = None,
 ) -> str:
-    if requested_user:
-        return requested_user
+    requested_user_value = validate_optional_string(
+        requested_user,
+        name="requested_user",
+    )
+
+    if requested_user_value is not None:
+        return requested_user_value
 
     sudo_user = os.environ.get("SUDO_USER")
 
-    if sudo_user:
-        return sudo_user
+    if sudo_user is not None:
+        sudo_user_value = sudo_user.strip()
 
-    return pwd.getpwuid(os.getuid()).pw_name
+        if sudo_user_value:
+            return validate_string(
+                sudo_user_value,
+                name="SUDO_USER",
+            )
 
+    user = pwd.getpwuid(os.getuid())
 
-def check_import(module: str) -> CheckResult:
-    try:
-        imported = importlib.import_module(module)
-        version = getattr(imported, "__version__", "")
-        return CheckResult(f"import:{module}", True, version or "import ok")
-    except Exception as exc:
-        return CheckResult(f"import:{module}", False, str(exc))
-
-
-def check_command(
-    command: list[str],
-    name: str,
-    *,
-    timeout: int = 5,
-) -> CheckResult:
-    result = run(
-        command,
-        timeout=timeout,
-    )
-
-    if result is None:
-        return CheckResult(
-            name,
-            False,
-            "command failed to run",
-        )
-
-    return CheckResult(
-        name,
-        result.returncode == 0,
-        (result.stdout.strip() or result.stderr.strip()),
-    )
-
-
-def check_config_line(
-    line: str,
-    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
-) -> CheckResult:
-    config_file = config.verification.boot_config_file
-
-    if not config_file.exists():
-        return CheckResult(
-            f"config:{line}",
-            False,
-            f"{config_file} missing",
-        )
-
-    try:
-        text = config_file.read_text(
-            encoding="utf-8",
-            errors="ignore",
-        )
-    except Exception as exc:
-        return CheckResult(
-            f"config:{line}",
-            False,
-            str(exc),
-        )
-
-    present = line in text
-
-    return CheckResult(
-        f"config:{line}",
-        present,
-        "present" if present else "missing",
-    )
-
-
-def check_executable(command: str) -> CheckResult:
-    path = shutil.which(command)
-
-    return CheckResult(
-        f"command:{command}",
-        path is not None,
-        path if path else "not found",
-    )
-
-
-def check_service_installed(
-    unit: str,
-) -> CheckResult:
-    path = Path("/etc/systemd/system") / unit
-
-    return CheckResult(
-        f"service-installed:{unit}",
-        path.is_file(),
-        "installed" if path.is_file() else "unit file missing",
-    )
-
-
-def check_service_enabled(
-    unit: str,
-    *,
-    timeout: int = 5,
-) -> CheckResult:
-    result = run(
-        [
-            "systemctl",
-            "is-enabled",
-            unit,
-        ],
-        timeout=timeout,
-    )
-
-    if result is None:
-        return CheckResult(
-            f"service-enabled:{unit}",
-            False,
-            "systemctl command failed",
-        )
-
-    output = result.stdout.strip() or result.stderr.strip() or "unknown"
-
-    return CheckResult(
-        f"service-enabled:{unit}",
-        result.returncode == 0,
-        output,
-    )
-
-
-def check_avahi_override(
-    path: Path = AVAHI_OVERRIDE_PATH,
-) -> CheckResult:
-    """Verify the Avahi systemd startup-ordering override."""
-
-    if not path.is_file():
-        return CheckResult(
-            "systemd-override:avahi-daemon",
-            False,
-            f"{path} missing",
-        )
-
-    try:
-        text = path.read_text(
-            encoding="utf-8",
-            errors="ignore",
-        )
-    except OSError as exc:
-        return CheckResult(
-            "systemd-override:avahi-daemon",
-            False,
-            str(exc),
-        )
-
-    missing_lines = [line for line in AVAHI_OVERRIDE_REQUIRED_LINES if line not in text]
-
-    if missing_lines:
-        return CheckResult(
-            "systemd-override:avahi-daemon",
-            False,
-            "missing: " + ", ".join(missing_lines),
-        )
-
-    return CheckResult(
-        "systemd-override:avahi-daemon",
-        True,
-        str(path),
-    )
-
-
-def check_media_root(
-    name: str,
-    media_root: Path,
-    *,
-    success_message: str | None = None,
-) -> CheckResult:
-    """Verify that a Betabox media directory contains all required paths."""
-
-    required_paths = (
-        media_root / "pictures",
-        media_root / "videos",
-        media_root / "sounds",
-        media_root / "sounds" / "car-honk.mp3",
-    )
-
-    problems: list[str] = []
-
-    for path in required_paths:
-        try:
-            if not path.exists():
-                problems.append(f"{path}: missing")
-        except PermissionError:
-            problems.append(f"{path}: permission denied")
-        except OSError as exc:
-            problems.append(f"{path}: {exc}")
-
-    if problems:
-        return CheckResult(
-            name,
-            False,
-            "; ".join(problems),
-        )
-
-    return CheckResult(
-        name,
-        True,
-        success_message or str(media_root),
-    )
-
-
-def check_runtime_media(
-    username: str,
-) -> CheckResult:
-    """Verify the runtime media tree for the Betabox service account."""
-
-    try:
-        user = pwd.getpwnam(username)
-    except KeyError:
-        return CheckResult(
-            f"runtime-media:{username}",
-            False,
-            "service user does not exist",
-        )
-
-    media_root = Path(user.pw_dir) / "media"
-
-    return check_media_root(
-        f"runtime-media:{username}",
-        media_root,
-    )
-
-
-def check_account_workspace(
-    username: str,
-    home: Path,
-) -> CheckResult:
-    """Verify the media tree within a managed account workspace."""
-
-    return check_media_root(
-        f"workspace:{username}",
-        home / "media",
-        success_message=str(home),
+    return validate_string(
+        user.pw_name,
+        name="service user",
     )
 
 
@@ -302,20 +67,29 @@ def collect_checks(
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
     *,
     service_user: str,
-) -> list[CheckResult]:
+) -> tuple[CheckResult, ...]:
+    config_value = validate_config(config)
+    service_user_value = validate_string(
+        service_user,
+        name="service_user",
+    )
+
     betabox_command = str(Path(sys.executable).parent / "betabox")
 
     checks: list[CheckResult] = []
-    verification = config.verification
+    verification = config_value.verification
 
     for module in verification.required_python_modules:
         checks.append(check_import(module))
 
     checks.append(
         check_command(
-            [betabox_command, "--help"],
+            [
+                betabox_command,
+                "--help",
+            ],
             "cli:betabox",
-            timeout=verification.command_timeout_seconds,
+            timeout=(verification.command_timeout_seconds),
         )
     )
 
@@ -327,7 +101,7 @@ def collect_checks(
                 "--help",
             ],
             "cli:betabox-launchpad",
-            timeout=verification.command_timeout_seconds,
+            timeout=(verification.command_timeout_seconds),
         )
     )
 
@@ -335,7 +109,7 @@ def collect_checks(
         checks.append(
             check_config_line(
                 line,
-                config,
+                config_value,
             )
         )
 
@@ -347,14 +121,13 @@ def collect_checks(
             )
         )
 
-    checks.append(check_runtime_media(service_user))
+    checks.append(check_runtime_media(service_user_value))
 
     for executable in verification.required_executables:
         checks.append(check_executable(executable))
 
-    for unit in config.services.all_units:
+    for unit in config_value.services.all_units:
         checks.append(check_service_installed(unit))
-
         checks.append(
             check_service_enabled(
                 unit,
@@ -364,10 +137,14 @@ def collect_checks(
 
     checks.append(check_avahi_override())
 
-    return checks
+    return tuple(checks)
 
 
-def print_results(checks: list[CheckResult]) -> bool:
+def print_results(
+    checks: tuple[CheckResult, ...],
+) -> bool:
+    checks_value = validate_checks(checks)
+
     print()
     print("Betabox Install Check")
     print("=====================")
@@ -375,8 +152,9 @@ def print_results(checks: list[CheckResult]) -> bool:
 
     all_ok = True
 
-    for check in checks:
+    for check in checks_value:
         status = "OK" if check.ok else "FAIL"
+
         print(f"[{status}] {check.name}")
 
         if check.message:
@@ -406,14 +184,15 @@ def parse_args(
     argv: list[str] | None = None,
 ) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Verify the Betabox software installation.",
+        description=("Verify the Betabox software installation."),
     )
 
     parser.add_argument(
         "--service-user",
         help=(
-            "Linux account used by Betabox services. "
-            "Defaults to SUDO_USER when run through sudo."
+            "Linux account used by Betabox "
+            "services. Defaults to SUDO_USER "
+            "when run through sudo."
         ),
     )
 
@@ -424,14 +203,21 @@ def main(
     argv: list[str] | None = None,
 ) -> int:
     args = parse_args(argv)
-    config = DEFAULT_PLATFORM_CONFIG
 
-    service_user = resolve_service_user(args.service_user)
-
-    checks = collect_checks(
-        config,
-        service_user=service_user,
-    )
+    try:
+        service_user = resolve_service_user(args.service_user)
+        checks = collect_checks(
+            DEFAULT_PLATFORM_CONFIG,
+            service_user=service_user,
+        )
+    except (
+        TypeError,
+        ValueError,
+        KeyError,
+        OSError,
+    ) as exc:
+        print(str(exc))
+        return 1
 
     return 0 if print_results(checks) else 1
 

@@ -1,44 +1,91 @@
 from __future__ import annotations
 
+import argparse
 import json
 import shutil
 import socket
-import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from betabox_robotics.services.hardware_status import (
-    RobotHardwareStatus,
-    collect_hardware_status,
-)
-from betabox_robotics.services.system_health import (
-    SystemHealthStatus,
-    collect_system_health,
-)
 from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
     PlatformConfig,
 )
-
 from betabox_robotics.hardware.ownership import (
     RobotOwnershipStatus,
     probe_robot_ownership,
 )
-
-from betabox_robotics.services.managed import managed_services
-from betabox_robotics.version import __version__
+from betabox_robotics.services.command import run
 from betabox_robotics.services.guest import (
     GuestWorkspaceStatus,
     guest_status,
 )
+from betabox_robotics.services.guest import (
+    print_status as print_guest_status,
+)
+from betabox_robotics.services.hardware_status import (
+    RobotHardwareStatus,
+    collect_hardware_status,
+)
+from betabox_robotics.services.managed import managed_services
+from betabox_robotics.services.system_health import (
+    SystemHealthStatus,
+    collect_system_health,
+)
+from betabox_robotics.version import __version__
 
 
-@dataclass(frozen=True)
+def _validate_config(
+    value: object,
+) -> PlatformConfig:
+    if not isinstance(
+        value,
+        PlatformConfig,
+    ):
+        raise TypeError("config must be a PlatformConfig")
+
+    return value
+
+
+def _validate_string(
+    value: object,
+    *,
+    name: str,
+) -> str:
+    if not isinstance(
+        value,
+        str,
+    ):
+        raise TypeError(f"{name} must be a string")
+
+    result = value.strip()
+
+    if not result:
+        raise ValueError(f"{name} cannot be empty")
+
+    return result
+
+
+def _validate_flag(
+    value: object,
+    *,
+    name: str,
+) -> bool:
+    if not isinstance(
+        value,
+        bool,
+    ):
+        raise TypeError(f"{name} must be a boolean")
+
+    return value
+
+
+@dataclass(frozen=True, slots=True)
 class StatusReport:
     version: str
     hostname: str
-    ip_addresses: list[str]
+    ip_addresses: tuple[str, ...]
     media_paths: dict[str, str]
     services: dict[str, str]
     jupyterhub_proxy_available: bool
@@ -47,103 +94,235 @@ class StatusReport:
     system_health: SystemHealthStatus
     guest: GuestWorkspaceStatus
 
-    def to_dict(self) -> dict[str, Any]:
+    def __post_init__(
+        self,
+    ) -> None:
+        object.__setattr__(
+            self,
+            "version",
+            _validate_string(
+                self.version,
+                name="version",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "hostname",
+            _validate_string(
+                self.hostname,
+                name="hostname",
+            ),
+        )
+
+        if not isinstance(
+            self.ip_addresses,
+            tuple,
+        ):
+            raise TypeError("ip_addresses must be a tuple")
+
+        object.__setattr__(
+            self,
+            "ip_addresses",
+            tuple(
+                _validate_string(
+                    address,
+                    name="ip address",
+                )
+                for address in self.ip_addresses
+            ),
+        )
+
+        for name in (
+            "media_paths",
+            "services",
+        ):
+            value = getattr(
+                self,
+                name,
+            )
+
+            if not isinstance(
+                value,
+                dict,
+            ):
+                raise TypeError(f"{name} must be a dictionary")
+
+            normalized = {
+                _validate_string(
+                    key,
+                    name=f"{name} key",
+                ): _validate_string(
+                    item,
+                    name=f"{name} value",
+                )
+                for key, item in value.items()
+            }
+
+            object.__setattr__(
+                self,
+                name,
+                normalized,
+            )
+
+        _validate_flag(
+            self.jupyterhub_proxy_available,
+            name="jupyterhub_proxy_available",
+        )
+
+        if not isinstance(
+            self.control,
+            RobotOwnershipStatus,
+        ):
+            raise TypeError("control must be a RobotOwnershipStatus")
+
+        if not isinstance(
+            self.hardware,
+            RobotHardwareStatus,
+        ):
+            raise TypeError("hardware must be a RobotHardwareStatus")
+
+        if not isinstance(
+            self.system_health,
+            SystemHealthStatus,
+        ):
+            raise TypeError("system_health must be a SystemHealthStatus")
+
+        if not isinstance(
+            self.guest,
+            GuestWorkspaceStatus,
+        ):
+            raise TypeError("guest must be a GuestWorkspaceStatus")
+
+    def to_dict(
+        self,
+    ) -> dict[str, Any]:
         return asdict(self)
 
 
-def run(command: list[str], timeout: int = 5) -> subprocess.CompletedProcess | None:
-    try:
-        return subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-        )
-    except Exception:
-        return None
-
-
 def hostname() -> str:
-    return socket.gethostname()
+    value = socket.gethostname()
+
+    return _validate_string(
+        value,
+        name="hostname",
+    )
 
 
-def ip_addresses() -> list[str]:
-    result = run(["hostname", "-I"], timeout=3)
+def ip_addresses() -> tuple[str, ...]:
+    result = run(
+        [
+            "hostname",
+            "-I",
+        ],
+        timeout=3,
+    )
 
     if result is None or result.returncode != 0:
-        return []
+        return ()
 
     addresses: list[str] = []
 
     for address in result.stdout.split():
-        address = address.strip()
+        value = address.strip()
 
-        if not address:
+        if not value:
             continue
 
-        if address.startswith("127."):
+        if (
+            value.startswith("127.")
+            or value == "0.0.0.0"
+            or value == "::"
+            or value == "::1"
+        ):
             continue
 
-        if address not in addresses:
-            addresses.append(address)
+        if value not in addresses:
+            addresses.append(value)
 
-    return addresses
+    return tuple(addresses)
 
 
-def service_status(service: str) -> str:
-    result = run(["systemctl", "is-active", service], timeout=3)
+def service_status(
+    service: str,
+) -> str:
+    service_value = _validate_string(
+        service,
+        name="service",
+    )
+
+    result = run(
+        [
+            "systemctl",
+            "is-active",
+            service_value,
+        ],
+        timeout=3,
+    )
 
     if result is None:
         return "unknown"
 
-    return result.stdout.strip() or "unknown"
+    output = result.stdout.strip() or result.stderr.strip()
+
+    return output or "unknown"
 
 
 def executable_available(
     command: str,
 ) -> bool:
-    return (
-        shutil.which(command)
-        is not None
+    command_value = _validate_string(
+        command,
+        name="command",
     )
+
+    return shutil.which(command_value) is not None
 
 
 def collect_status(
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> StatusReport:
-    managed = managed_services(config)
+    config_value = _validate_config(config)
+    managed = managed_services(config_value)
 
     services = {
-        service.unit: service_status(service.unit)
-        for service in managed.values()
+        service.unit: service_status(service.unit) for service in managed.values()
     }
-
-    hardware = collect_hardware_status(config)
-    system_health = collect_system_health(config)
 
     return StatusReport(
         version=__version__,
         hostname=hostname(),
         ip_addresses=ip_addresses(),
         media_paths={
-            "pictures": str(config.paths.pictures_dir),
-            "videos": str(config.paths.videos_dir),
-            "sounds": str(config.paths.sounds_dir),
+            "pictures": str(config_value.paths.pictures_dir),
+            "videos": str(config_value.paths.videos_dir),
+            "sounds": str(config_value.paths.sounds_dir),
         },
         services=services,
-        jupyterhub_proxy_available=executable_available("configurable-http-proxy"),
+        jupyterhub_proxy_available=(executable_available("configurable-http-proxy")),
         control=probe_robot_ownership(),
-        hardware=hardware,
-        system_health=system_health,
+        hardware=collect_hardware_status(config_value),
+        system_health=collect_system_health(config_value),
         guest=guest_status(),
     )
 
 
-def format_boolean(value: bool) -> str:
-    return "available" if value else "missing"
+def format_boolean(
+    value: bool,
+) -> str:
+    value_value = _validate_flag(
+        value,
+        name="value",
+    )
+
+    return "available" if value_value else "missing"
 
 
 def print_system_health(system_health: SystemHealthStatus) -> None:
+    if not isinstance(
+        system_health,
+        SystemHealthStatus,
+    ):
+        raise TypeError("system_health must be a SystemHealthStatus")
     print()
     print("System Health")
     print("-------------")
@@ -151,41 +330,26 @@ def print_system_health(system_health: SystemHealthStatus) -> None:
     temperature = system_health.temperature
 
     if temperature.celsius is not None:
-        print(
-            f"CPU Temp:     {temperature.celsius:.1f} °C "
-            f"— {temperature.state}"
-        )
+        print(f"CPU Temp:     {temperature.celsius:.1f} °C — {temperature.state}")
     else:
         print("CPU Temp:     unavailable")
 
     throttling = system_health.throttling
 
-    print(
-        "Undervoltage: "
-        + ("detected" if throttling.undervoltage_now else "no")
-    )
-    print(
-        "Throttling:   "
-        + ("active" if throttling.throttled_now else "no")
-    )
+    print("Undervoltage: " + ("detected" if throttling.undervoltage_now else "no"))
+    print("Throttling:   " + ("active" if throttling.throttled_now else "no"))
 
     memory = system_health.memory
 
     if memory.used_percent is not None:
-        print(
-            f"Memory:       {memory.used_percent:.1f}% "
-            f"— {memory.state}"
-        )
+        print(f"Memory:       {memory.used_percent:.1f}% — {memory.state}")
     else:
         print("Memory:       unavailable")
 
     disk = system_health.disk
 
     if disk.used_percent is not None:
-        print(
-            f"Disk:         {disk.used_percent:.1f}% "
-            f"— {disk.state}"
-        )
+        print(f"Disk:         {disk.used_percent:.1f}% — {disk.state}")
     else:
         print("Disk:         unavailable")
 
@@ -200,6 +364,11 @@ def print_system_health(system_health: SystemHealthStatus) -> None:
 
 
 def print_hardware_status(hardware: RobotHardwareStatus) -> None:
+    if not isinstance(
+        hardware,
+        RobotHardwareStatus,
+    ):
+        raise TypeError("hardware must be a RobotHardwareStatus")
     print()
     print("Robot Hardware")
     print("--------------")
@@ -218,8 +387,7 @@ def print_hardware_status(hardware: RobotHardwareStatus) -> None:
 
     if hardware.battery.available and hardware.battery.voltage is not None:
         print(
-            f"Battery:     {hardware.battery.voltage:.2f} V "
-            f"— {hardware.battery.state}"
+            f"Battery:     {hardware.battery.voltage:.2f} V — {hardware.battery.state}"
         )
     else:
         print("Battery:     unavailable")
@@ -233,11 +401,7 @@ def print_hardware_status(hardware: RobotHardwareStatus) -> None:
 
     print(
         "Ultrasonic:  "
-        + (
-            "configured"
-            if hardware.sensors.ultrasonic_configured
-            else "not configured"
-        )
+        + ("configured" if hardware.sensors.ultrasonic_configured else "not configured")
     )
 
     if hardware.audio.available:
@@ -264,6 +428,13 @@ def print_human(
     report: StatusReport,
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> None:
+    if not isinstance(
+        report,
+        StatusReport,
+    ):
+        raise TypeError("report must be a StatusReport")
+
+    config_value = _validate_config(config)
     print()
     print("Betabox Status")
     print("==============")
@@ -282,22 +453,10 @@ def print_human(
     print()
     print("Platform")
     print("--------")
-    print(
-        "I2C:       "
-        + (
-            "available"
-            if report.hardware.i2c.available
-            else "missing"
-        )
-    )
+    print("I2C:       " + ("available" if report.hardware.i2c.available else "missing"))
 
     print(
-        "HifiBerry: "
-        + (
-            "available"
-            if report.hardware.audio.available
-            else "missing"
-        )
+        "HifiBerry: " + ("available" if report.hardware.audio.available else "missing")
     )
 
     print_hardware_status(report.hardware)
@@ -307,7 +466,7 @@ def print_human(
     print("Media")
     print("-----")
     for name, path in report.media_paths.items():
-        exists = Path(path).exists()
+        exists = path_available(path)
         print(f"{name.title():8} {path} {'OK' if exists else 'MISSING'}")
 
     print()
@@ -315,88 +474,123 @@ def print_human(
     print("Guest Workspace")
     print("----------------")
 
-    guest = report.guest
-
-    print(
-        f"Account:      {'OK' if guest.account_exists else 'Missing'}"
-    )
-    print(
-        f"Home:         {'OK' if guest.home_exists else 'Missing'}"
-    )
-    print(
-        f"Curriculum:   {'OK' if guest.curriculum_exists else 'Missing'}"
-    )
-    print(
-        f"Media:        {'OK' if guest.media_exists else 'Missing'}"
-    )
-    print(
-        f"Preferences:  {'OK' if guest.preferences_exist else 'Missing'}"
-    )
+    print_guest_status(report.guest)
 
     print()
 
     print("Services")
     print("--------")
-    managed = managed_services(config)
+    managed = managed_services(config_value)
     for service in managed.values():
         state = report.services.get(
             service.unit,
             "unknown",
         )
 
-        print(
-            f"{service.title:16} "
-            f"{service.unit:34} "
-            f"{state}"
-        )
+        print(f"{service.title:16} {service.unit:34} {state}")
 
     print()
     print("JupyterHub")
     print("----------")
     print(
-        f"Service:  "
-        f"{report.services.get(config.services.jupyterhub.unit, 'unknown')}"
+        f"Service:  {report.services.get(config_value.services.jupyterhub.unit, 'unknown')}"
     )
     print(
-        f"Proxy:    "
-        f"{'available' if report.jupyterhub_proxy_available else 'missing'}"
+        f"Proxy:    {'available' if report.jupyterhub_proxy_available else 'missing'}"
     )
-    print(f"Port:     {config.network.jupyterhub_port}")
+    print(f"Port:     {config_value.network.jupyterhub_port}")
 
     print()
 
     print("Launchpad")
     print("---------")
     print(
-        "Service:  "
-        f"{report.services.get(config.services.launchpad.unit, 'unknown')}"
+        f"Service:  {report.services.get(config_value.services.launchpad.unit, 'unknown')}"
     )
-    print(f"Port:     {config.network.launchpad_port}")
-    print(
-        f"Endpoint: {config.network.launchpad_health_url}"
-    )
+    print(f"Port:     {config_value.network.launchpad_port}")
+    print(f"Endpoint: {config_value.network.launchpad_health_url}")
 
     print()
+
+
+def path_available(
+    path: str | Path,
+) -> bool:
+    if isinstance(path, bool) or not isinstance(
+        path,
+        str | Path,
+    ):
+        raise TypeError("path must be a string or Path")
+
+    if isinstance(path, str):
+        path = path.strip()
+
+        if not path:
+            raise ValueError("path cannot be empty")
+
+    path_value = Path(path).expanduser()
+
+    try:
+        return path_value.exists()
+    except OSError:
+        return False
+
+
+def parse_args(
+    argv: list[str] | None = None,
+) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(prog="betabox status")
+
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Print status as JSON",
+    )
+
+    return parser.parse_args(argv)
+
+
+def print_json(
+    report: StatusReport,
+) -> None:
+    if not isinstance(
+        report,
+        StatusReport,
+    ):
+        raise TypeError("report must be a StatusReport")
+
+    print(
+        json.dumps(
+            report.to_dict(),
+            indent=2,
+        )
+    )
 
 
 def main(
     argv: list[str] | None = None,
 ) -> int:
     config = DEFAULT_PLATFORM_CONFIG
-    report = collect_status(config)
+    args = parse_args(argv)
 
-    if argv and "--json" in argv:
-        print(
-            json.dumps(
-                report.to_dict(),
-                indent=2,
+    try:
+        report = collect_status(config)
+
+        if args.json:
+            print_json(report)
+        else:
+            print_human(
+                report,
+                config,
             )
-        )
-    else:
-        print_human(
-            report,
-            config,
-        )
+
+    except (
+        TypeError,
+        ValueError,
+        OSError,
+    ) as exc:
+        print(f"status failed: {exc}")
+        return 1
 
     return 0
 

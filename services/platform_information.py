@@ -16,7 +16,87 @@ from betabox_robotics.services.platform_summary import (
 from betabox_robotics.version import __version__
 
 
-@dataclass(frozen=True)
+def _validate_config(
+    value: object,
+) -> PlatformConfig:
+    if not isinstance(
+        value,
+        PlatformConfig,
+    ):
+        raise TypeError("config must be a PlatformConfig")
+
+    return value
+
+
+def _validate_string(
+    value: object,
+    *,
+    name: str,
+) -> str:
+    if not isinstance(
+        value,
+        str,
+    ):
+        raise TypeError(f"{name} must be a string")
+
+    result = value.strip()
+
+    if not result:
+        raise ValueError(f"{name} cannot be empty")
+
+    return result
+
+
+def _validate_path(
+    value: object,
+    *,
+    name: str,
+) -> Path:
+    if isinstance(value, bool) or not isinstance(
+        value,
+        str | Path,
+    ):
+        raise TypeError(f"{name} must be a string or Path")
+
+    if isinstance(value, str):
+        value = value.strip()
+
+        if not value:
+            raise ValueError(f"{name} cannot be empty")
+
+    return Path(value).expanduser()
+
+
+def _validate_port(
+    value: object,
+) -> int:
+    if isinstance(value, bool) or not isinstance(
+        value,
+        int,
+    ):
+        raise TypeError("port must be an integer")
+
+    if not 1 <= value <= 65535:
+        raise ValueError("port must be between 1 and 65535")
+
+    return value
+
+
+def _validate_flag(
+    value: object,
+    *,
+    name: str,
+) -> bool:
+    if not isinstance(
+        value,
+        bool,
+    ):
+        raise TypeError(f"{name} must be a boolean")
+
+    return value
+
+
+@dataclass(frozen=True, slots=True)
 class RobotInformation:
     """
     Safe, student-facing identity information.
@@ -27,24 +107,95 @@ class RobotInformation:
     identifier: str | None
     control_available: bool
 
+    def __post_init__(
+        self,
+    ) -> None:
+        object.__setattr__(
+            self,
+            "model",
+            _validate_string(
+                self.model,
+                name="model",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "hostname",
+            _validate_string(
+                self.hostname,
+                name="hostname",
+            ),
+        )
 
-@dataclass(frozen=True)
+        if self.identifier is not None:
+            object.__setattr__(
+                self,
+                "identifier",
+                _validate_string(
+                    self.identifier,
+                    name="identifier",
+                ),
+            )
+
+        _validate_flag(
+            self.control_available,
+            name="control_available",
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class NetworkInformation:
-    """
-    Student-facing network endpoints.
-
-    This intentionally excludes credentials, connection profiles,
-    interfaces, and other administrative network configuration.
-    """
-
     hostname: str
-    ip_addresses: list[str]
-    launchpad_urls: list[str]
-    jupyterhub_urls: list[str]
-    vision_urls: list[str]
+    ip_addresses: tuple[str, ...]
+    launchpad_urls: tuple[str, ...]
+    jupyterhub_urls: tuple[str, ...]
+    vision_urls: tuple[str, ...]
+
+    def __post_init__(
+        self,
+    ) -> None:
+        object.__setattr__(
+            self,
+            "hostname",
+            _validate_string(
+                self.hostname,
+                name="hostname",
+            ),
+        )
+
+        for name in (
+            "ip_addresses",
+            "launchpad_urls",
+            "jupyterhub_urls",
+            "vision_urls",
+        ):
+            value = getattr(
+                self,
+                name,
+            )
+
+            if not isinstance(
+                value,
+                tuple,
+            ):
+                raise TypeError(f"{name} must be a tuple")
+
+            normalized = tuple(
+                _validate_string(
+                    item,
+                    name=f"{name} item",
+                )
+                for item in value
+            )
+
+            object.__setattr__(
+                self,
+                name,
+                normalized,
+            )
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SoftwareInformation:
     """
     Installed software information useful for troubleshooting.
@@ -55,8 +206,24 @@ class SoftwareInformation:
     operating_system: str
     architecture: str
 
+    def __post_init__(self) -> None:
+        for name in (
+            "betabox_robotics_version",
+            "python_version",
+            "operating_system",
+            "architecture",
+        ):
+            object.__setattr__(
+                self,
+                name,
+                _validate_string(
+                    getattr(self, name),
+                    name=name,
+                ),
+            )
 
-@dataclass(frozen=True)
+
+@dataclass(frozen=True, slots=True)
 class StorageInformation:
     """
     Filesystem capacity for the primary platform disk.
@@ -67,8 +234,50 @@ class StorageInformation:
     available_bytes: int
     used_percent: float
 
+    def __post_init__(
+        self,
+    ) -> None:
+        for name in (
+            "total_bytes",
+            "used_bytes",
+            "available_bytes",
+        ):
+            value = getattr(
+                self,
+                name,
+            )
 
-@dataclass(frozen=True)
+            if isinstance(value, bool) or not isinstance(
+                value,
+                int,
+            ):
+                raise TypeError(f"{name} must be an integer")
+
+            if value < 0:
+                raise ValueError(f"{name} cannot be negative")
+
+        if isinstance(
+            self.used_percent,
+            bool,
+        ) or not isinstance(
+            self.used_percent,
+            int | float,
+        ):
+            raise TypeError("used_percent must be a number")
+
+        used_percent = float(self.used_percent)
+
+        if not 0.0 <= used_percent <= 100.0:
+            raise ValueError("used_percent must be between 0.0 and 100.0")
+
+        object.__setattr__(
+            self,
+            "used_percent",
+            used_percent,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class MediaLocationInformation:
     """
     Availability of student media locations.
@@ -81,8 +290,19 @@ class MediaLocationInformation:
     videos_available: bool
     sounds_available: bool
 
+    def __post_init__(self) -> None:
+        for name in (
+            "pictures_available",
+            "videos_available",
+            "sounds_available",
+        ):
+            _validate_flag(
+                getattr(self, name),
+                name=name,
+            )
 
-@dataclass(frozen=True)
+
+@dataclass(frozen=True, slots=True)
 class FeatureInformation:
     """
     High-level platform feature availability.
@@ -92,8 +312,19 @@ class FeatureInformation:
     camera_ready: bool
     jupyterhub_available: bool
 
+    def __post_init__(self) -> None:
+        for name in (
+            "vision_service_available",
+            "camera_ready",
+            "jupyterhub_available",
+        ):
+            _validate_flag(
+                getattr(self, name),
+                name=name,
+            )
 
-@dataclass(frozen=True)
+
+@dataclass(frozen=True, slots=True)
 class PlatformInformationReport:
     """
     Safe information report shared by Launchpad consumers.
@@ -106,6 +337,43 @@ class PlatformInformationReport:
     media: MediaLocationInformation
     features: FeatureInformation
 
+    def __post_init__(self) -> None:
+        if not isinstance(
+            self.robot,
+            RobotInformation,
+        ):
+            raise TypeError("robot must be a RobotInformation")
+
+        if not isinstance(
+            self.network,
+            NetworkInformation,
+        ):
+            raise TypeError("network must be a NetworkInformation")
+
+        if not isinstance(
+            self.software,
+            SoftwareInformation,
+        ):
+            raise TypeError("software must be a SoftwareInformation")
+
+        if not isinstance(
+            self.storage,
+            StorageInformation,
+        ):
+            raise TypeError("storage must be a StorageInformation")
+
+        if not isinstance(
+            self.media,
+            MediaLocationInformation,
+        ):
+            raise TypeError("media must be a MediaLocationInformation")
+
+        if not isinstance(
+            self.features,
+            FeatureInformation,
+        ):
+            raise TypeError("features must be a FeatureInformation")
+
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
@@ -115,24 +383,21 @@ def robot_identifier(
     *,
     prefix: str,
 ) -> str | None:
-    """
-    Extract the short robot identifier from a generated hostname.
+    hostname_value = _validate_string(
+        hostname,
+        name="hostname",
+    )
+    prefix_value = _validate_string(
+        prefix,
+        name="prefix",
+    )
 
-    Example:
+    expected_prefix = f"{prefix_value}-"
 
-        Betabox-7eea -> 7eea
-    """
-
-    expected_prefix = f"{prefix}-"
-
-    if not hostname.lower().startswith(
-        expected_prefix.lower()
-    ):
+    if not hostname_value.lower().startswith(expected_prefix.lower()):
         return None
 
-    identifier = hostname[
-        len(expected_prefix):
-    ].strip()
+    identifier = hostname_value[len(expected_prefix) :].strip()
 
     return identifier or None
 
@@ -140,42 +405,68 @@ def robot_identifier(
 def public_urls(
     *,
     hostname: str,
-    ip_addresses: list[str],
+    ip_addresses: list[str] | tuple[str, ...],
     port: int,
-) -> list[str]:
-    """
-    Build browser-accessible URLs for a platform endpoint.
+) -> tuple[str, ...]:
+    hostname_value = _validate_string(
+        hostname,
+        name="hostname",
+    )
+    port_value = _validate_port(port)
 
-    Localhost and bind addresses are not returned because they are not
-    useful from another classroom computer.
-    """
+    if not isinstance(
+        ip_addresses,
+        list | tuple,
+    ):
+        raise TypeError("ip_addresses must be a list or tuple")
 
     hosts: list[str] = []
 
-    local_hostname = f"{hostname}.local"
+    local_hostname = (
+        hostname_value
+        if hostname_value.lower().endswith(".local")
+        else f"{hostname_value}.local"
+    )
 
-    if local_hostname not in hosts:
-        hosts.append(local_hostname)
+    hosts.append(local_hostname)
 
     for address in ip_addresses:
-        if address not in hosts:
-            hosts.append(address)
+        address_value = _validate_string(
+            address,
+            name="ip address",
+        )
 
-    return [
-        f"http://{host}:{port}"
+        if address_value in (
+            "0.0.0.0",
+            "127.0.0.1",
+            "::",
+            "::1",
+        ):
+            continue
+
+        if address_value not in hosts:
+            hosts.append(address_value)
+
+    return tuple(
+        (
+            f"http://[{host}]:{port_value}"
+            if ":" in host
+            else f"http://{host}:{port_value}"
+        )
         for host in hosts
-    ]
+    )
 
 
 def collect_storage_information(
-    path: Path,
+    path: str | Path,
 ) -> StorageInformation:
-    """
-    Collect disk capacity for the filesystem containing ``path``.
-    """
+    path_value = _validate_path(
+        path,
+        name="path",
+    )
 
     try:
-        usage = shutil.disk_usage(path)
+        usage = shutil.disk_usage(path_value)
     except OSError:
         return StorageInformation(
             total_bytes=0,
@@ -184,11 +475,7 @@ def collect_storage_information(
             used_percent=0.0,
         )
 
-    used_percent = (
-        usage.used / usage.total * 100.0
-        if usage.total > 0
-        else 0.0
-    )
+    used_percent = usage.used / usage.total * 100.0 if usage.total > 0 else 0.0
 
     return StorageInformation(
         total_bytes=usage.total,
@@ -202,28 +489,22 @@ def collect_storage_information(
 
 
 def directory_available(
-    path: Path,
+    path: str | Path,
 ) -> bool:
-    """
-    Return whether a configured media directory is usable.
-    """
+    path_value = _validate_path(
+        path,
+        name="path",
+    )
 
     try:
-        return (
-            path.exists()
-            and path.is_dir()
-        )
+        return path_value.exists() and path_value.is_dir()
     except OSError:
         return False
 
 
 def operating_system_name() -> str:
-    """
-    Return a friendly operating-system description.
-    """
-
-    system = platform.system()
-    release = platform.release()
+    system = platform.system().strip()
+    release = platform.release().strip()
 
     if system and release:
         return f"{system} {release}"
@@ -234,33 +515,33 @@ def operating_system_name() -> str:
 def collect_platform_information(
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> PlatformInformationReport:
-    """
-    Collect safe, student-facing platform information.
+    config_value = _validate_config(config)
 
-    The complete PlatformConfig is deliberately not serialized.
-    """
+    summary = collect_platform_summary(config_value)
 
-    summary = collect_platform_summary(
-        config
+    hostname = _validate_string(
+        summary.hostname,
+        name="hostname",
     )
 
-    hostname = summary.hostname
-    addresses = [
-        address
-        for address in summary.ip_addresses
-        if ":" not in address
-    ]
+    addresses = tuple(
+        dict.fromkeys(
+            address.strip()
+            for address in summary.ip_addresses
+            if (
+                isinstance(address, str)
+                and address.strip()
+                and ":" not in address
+                and not address.startswith("127.")
+                and address != "0.0.0.0"
+            )
+        )
+    )
 
     vision = summary.hardware.vision
 
     camera_ready = (
-        vision.service_available
-        and vision.camera_running
-        and vision.camera_has_frame
-    )
-
-    robot_control_available = (
-        summary.control.available
+        vision.service_available and vision.camera_running and vision.camera_has_frame
     )
 
     return PlatformInformationReport(
@@ -269,14 +550,9 @@ def collect_platform_information(
             hostname=hostname,
             identifier=robot_identifier(
                 hostname,
-                prefix=(
-                    config.network
-                    .identity_prefix
-                ),
+                prefix=(config_value.network.identity_prefix),
             ),
-            control_available=(
-                robot_control_available
-            ),
+            control_available=(summary.control.available),
         ),
         network=NetworkInformation(
             hostname=hostname,
@@ -284,73 +560,34 @@ def collect_platform_information(
             launchpad_urls=public_urls(
                 hostname=hostname,
                 ip_addresses=addresses,
-                port=(
-                    config.network
-                    .launchpad_port
-                ),
+                port=(config_value.network.launchpad_port),
             ),
             jupyterhub_urls=public_urls(
                 hostname=hostname,
                 ip_addresses=addresses,
-                port=(
-                    config.network
-                    .jupyterhub_port
-                ),
+                port=(config_value.network.jupyterhub_port),
             ),
             vision_urls=public_urls(
                 hostname=hostname,
                 ip_addresses=addresses,
-                port=(
-                    config.network
-                    .vision_port
-                ),
+                port=(config_value.network.vision_port),
             ),
         ),
         software=SoftwareInformation(
-            betabox_robotics_version=(
-                __version__
-            ),
-            python_version=(
-                platform.python_version()
-            ),
-            operating_system=(
-                operating_system_name()
-            ),
-            architecture=(
-                platform.machine()
-                or "Unknown"
-            ),
+            betabox_robotics_version=(__version__),
+            python_version=(platform.python_version()),
+            operating_system=(operating_system_name()),
+            architecture=(platform.machine().strip() or "Unknown"),
         ),
-        storage=collect_storage_information(
-            config.health.disk_path
-        ),
+        storage=collect_storage_information(config_value.health.disk_path),
         media=MediaLocationInformation(
-            pictures_available=(
-                directory_available(
-                    config.paths.pictures_dir
-                )
-            ),
-            videos_available=(
-                directory_available(
-                    config.paths.videos_dir
-                )
-            ),
-            sounds_available=(
-                directory_available(
-                    config.paths.sounds_dir
-                )
-            ),
+            pictures_available=(directory_available(config_value.paths.pictures_dir)),
+            videos_available=(directory_available(config_value.paths.videos_dir)),
+            sounds_available=(directory_available(config_value.paths.sounds_dir)),
         ),
         features=FeatureInformation(
-            vision_service_available=(
-                vision.service_available
-            ),
-            camera_ready=(
-                camera_ready
-            ),
-            jupyterhub_available=(
-                summary
-                .jupyterhub_proxy_available
-            ),
+            vision_service_available=(vision.service_available),
+            camera_ready=camera_ready,
+            jupyterhub_available=(summary.jupyterhub_proxy_available),
         ),
     )

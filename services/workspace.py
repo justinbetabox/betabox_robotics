@@ -16,17 +16,72 @@ from betabox_robotics.services.accounts import (
 WORKSPACE_MODE = 0o2770
 
 
+def _validate_string(
+    value: object,
+    *,
+    name: str,
+) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"{name} must be a string")
+
+    result = value.strip()
+
+    if not result:
+        raise ValueError(f"{name} cannot be empty")
+
+    return result
+
+
+def _validate_path(
+    value: object,
+    *,
+    name: str,
+) -> Path:
+    if isinstance(value, bool) or not isinstance(
+        value,
+        str | Path,
+    ):
+        raise TypeError(f"{name} must be a string or Path")
+
+    return Path(value).expanduser()
+
+
+def _validate_id(
+    value: object,
+    *,
+    name: str,
+) -> int:
+    if isinstance(value, bool) or not isinstance(
+        value,
+        int,
+    ):
+        raise TypeError(f"{name} must be an integer")
+
+    if value < 0:
+        raise ValueError(f"{name} cannot be negative")
+
+    return value
+
+
 def account_ids(
     username: str,
 ) -> tuple[int, int]:
     """Return the UID and primary GID for an account."""
 
-    try:
-        account = pwd.getpwnam(username)
-    except KeyError as exc:
-        raise RuntimeError(f"Linux account does not exist: {username}") from exc
+    username_value = _validate_string(
+        username,
+        name="username",
+    )
 
-    return account.pw_uid, account.pw_gid
+    try:
+        account = pwd.getpwnam(username_value)
+    except KeyError as exc:
+        raise RuntimeError(f"Linux account does not exist: {username_value}") from exc
+
+    return (
+        account.pw_uid,
+        account.pw_gid,
+    )
 
 
 def group_id(
@@ -34,10 +89,15 @@ def group_id(
 ) -> int:
     """Return the GID for a Linux group."""
 
+    group_value = _validate_string(
+        group_name,
+        name="group_name",
+    )
+
     try:
-        group = grp.getgrnam(group_name)
+        group = grp.getgrnam(group_value)
     except KeyError as exc:
-        raise RuntimeError(f"Linux group does not exist: {group_name}") from exc
+        raise RuntimeError(f"Linux group does not exist: {group_value}") from exc
 
     return group.gr_gid
 
@@ -46,6 +106,11 @@ def workspace_directories(
     account: ProvisionedAccount,
 ) -> tuple[Path, ...]:
     """Return all directories in an account workspace."""
+    if not isinstance(
+        account,
+        ProvisionedAccount,
+    ):
+        raise TypeError("account must be a ProvisionedAccount")
 
     media = account.home / "media"
 
@@ -60,37 +125,63 @@ def workspace_directories(
 
 
 def ensure_directory(
-    directory: Path,
+    directory: str | Path,
     *,
     uid: int,
     gid: int,
 ) -> None:
     """Create and configure one workspace directory."""
 
-    directory.mkdir(
+    directory_path = _validate_path(
+        directory,
+        name="directory",
+    )
+    uid_value = _validate_id(
+        uid,
+        name="uid",
+    )
+    gid_value = _validate_id(
+        gid,
+        name="gid",
+    )
+
+    directory_path.mkdir(
         parents=True,
         exist_ok=True,
     )
 
-    os.chown(
-        directory,
-        uid,
-        gid,
-    )
+    if not directory_path.is_dir():
+        raise NotADirectoryError(f"Workspace path is not a directory: {directory_path}")
 
-    directory.chmod(WORKSPACE_MODE)
+    _set_ownership(
+        directory_path,
+        uid=uid_value,
+        gid=gid_value,
+    )
+    directory_path.chmod(WORKSPACE_MODE)
 
 
 def create_runtime_media(
     service_user: str,
-    repository_root: Path,
+    repository_root: str | Path,
 ) -> None:
     """Create the runtime media tree for the Betabox service account."""
 
+    service_user_value = _validate_string(
+        service_user,
+        name="service_user",
+    )
+    repository_path = _validate_path(
+        repository_root,
+        name="repository_root",
+    )
+
     try:
-        account = pwd.getpwnam(service_user)
+        account = pwd.getpwnam(service_user_value)
     except KeyError as exc:
-        raise RuntimeError(f"Linux account does not exist: {service_user}") from exc
+        raise RuntimeError(
+            f"Linux account does not exist: {service_user_value}"
+        ) from exc
 
     home = Path(account.pw_dir)
     media = home / "media"
@@ -108,7 +199,7 @@ def create_runtime_media(
             gid=account.pw_gid,
         )
 
-    assets = repository_root / "deployment" / "assets" / "sounds"
+    assets = repository_path / "deployment" / "assets" / "sounds"
 
     install_directory(
         assets,
@@ -122,6 +213,11 @@ def create_workspace(
     account: ProvisionedAccount,
 ) -> None:
     """Create the workspace for a managed account."""
+    if not isinstance(
+        account,
+        ProvisionedAccount,
+    ):
+        raise TypeError("account must be a ProvisionedAccount")
 
     if not account.home.is_dir():
         raise RuntimeError(f"Account home directory does not exist: {account.home}")
@@ -137,62 +233,117 @@ def create_workspace(
         )
 
 
-def set_ownership_recursive(
+def _set_ownership(
     path: Path,
+    *,
+    uid: int,
+    gid: int,
+) -> None:
+    os.chown(
+        path,
+        uid,
+        gid,
+        follow_symlinks=False,
+    )
+
+
+def set_ownership_recursive(
+    path: str | Path,
     *,
     uid: int,
     gid: int,
 ) -> None:
     """Set ownership on a path and its contents."""
 
-    os.chown(
+    target = _validate_path(
         path,
+        name="path",
+    )
+    uid_value = _validate_id(
         uid,
+        name="uid",
+    )
+    gid_value = _validate_id(
         gid,
+        name="gid",
     )
 
-    if not path.is_dir():
+    if not target.exists() and not target.is_symlink():
+        raise FileNotFoundError(f"Ownership target does not exist: {target}")
+
+    _set_ownership(
+        target,
+        uid=uid_value,
+        gid=gid_value,
+    )
+
+    if not target.is_dir() or target.is_symlink():
         return
 
-    for child in path.rglob("*"):
-        os.chown(
+    for child in target.rglob("*"):
+        _set_ownership(
             child,
-            uid,
-            gid,
+            uid=uid_value,
+            gid=gid_value,
         )
 
 
 def install_directory(
-    source: Path,
-    destination: Path,
+    source: str | Path,
+    destination: str | Path,
     *,
     uid: int,
     gid: int,
 ) -> None:
     """Copy assets without overwriting existing files."""
 
-    if not source.exists():
-        raise FileNotFoundError(f"Asset source does not exist: {source}")
+    source_path = _validate_path(
+        source,
+        name="source",
+    )
+    destination_path = _validate_path(
+        destination,
+        name="destination",
+    )
+    uid_value = _validate_id(
+        uid,
+        name="uid",
+    )
+    gid_value = _validate_id(
+        gid,
+        name="gid",
+    )
 
-    destination.mkdir(
+    if not source_path.is_dir():
+        raise FileNotFoundError(f"Asset source directory does not exist: {source_path}")
+
+    destination_path.mkdir(
         parents=True,
         exist_ok=True,
     )
 
-    os.chown(
-        destination,
-        uid,
-        gid,
+    if not destination_path.is_dir():
+        raise NotADirectoryError(
+            f"Asset destination is not a directory: {destination_path}"
+        )
+
+    _set_ownership(
+        destination_path,
+        uid=uid_value,
+        gid=gid_value,
     )
 
-    for item in source.iterdir():
-        target = destination / item.name
+    for item in source_path.iterdir():
+        if item.is_symlink():
+            raise ValueError(f"Asset source contains a symbolic link: {item}")
 
-        if target.exists():
+        target = destination_path / item.name
+
+        if target.exists() or target.is_symlink():
             set_ownership_recursive(
                 target,
-                uid=uid,
-                gid=gid,
+                uid=uid_value,
+                gid=gid_value,
             )
             continue
 
@@ -201,30 +352,49 @@ def install_directory(
                 item,
                 target,
             )
-        else:
+        elif item.is_file():
             shutil.copy2(
                 item,
                 target,
             )
+        else:
+            raise ValueError(f"Unsupported asset type: {item}")
 
         set_ownership_recursive(
             target,
-            uid=uid,
-            gid=gid,
+            uid=uid_value,
+            gid=gid_value,
         )
 
 
 def populate_media(
-    repository_root: Path,
+    repository_root: str | Path,
     *,
     accounts: Iterable[ProvisionedAccount] = BETABOX_ACCOUNTS,
 ) -> None:
     """Install starter media for managed accounts."""
 
-    assets = repository_root / "deployment" / "assets" / "sounds"
+    repository_path = _validate_path(
+        repository_root,
+        name="repository_root",
+    )
+
+    try:
+        account_values = tuple(accounts)
+    except TypeError as exc:
+        raise TypeError("accounts must be iterable") from exc
+
+    for account in account_values:
+        if not isinstance(
+            account,
+            ProvisionedAccount,
+        ):
+            raise TypeError("accounts must contain only ProvisionedAccount instances")
+
+    assets = repository_path / "deployment" / "assets" / "sounds"
     gid = group_id(BETABOX_SHARED_GROUP)
 
-    for account in accounts:
+    for account in account_values:
         if not account.install_media:
             continue
 

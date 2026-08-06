@@ -5,80 +5,226 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
-from betabox_robotics.services.backup import create_backup
 from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
     PlatformConfig,
 )
+from betabox_robotics.services.backup import create_backup
 
 
-@dataclass(frozen=True)
+def _validate_config(
+    value: object,
+) -> PlatformConfig:
+    if not isinstance(
+        value,
+        PlatformConfig,
+    ):
+        raise TypeError("config must be a PlatformConfig")
+
+    return value
+
+
+def _validate_path(
+    value: object,
+    *,
+    name: str,
+) -> Path:
+    if isinstance(value, bool) or not isinstance(
+        value,
+        str | Path,
+    ):
+        raise TypeError(f"{name} must be a string or Path")
+
+    if isinstance(value, str):
+        value = value.strip()
+
+        if not value:
+            raise ValueError(f"{name} cannot be empty")
+
+    return Path(value).expanduser()
+
+
+def _validate_flag(
+    value: object,
+    *,
+    name: str,
+) -> bool:
+    if not isinstance(
+        value,
+        bool,
+    ):
+        raise TypeError(f"{name} must be a boolean")
+
+    return value
+
+
+@dataclass(frozen=True, slots=True)
 class ResetItem:
     path: str
     action: str
     ok: bool
     message: str = ""
 
+    def __post_init__(
+        self,
+    ) -> None:
+        object.__setattr__(
+            self,
+            "path",
+            str(
+                _validate_path(
+                    self.path,
+                    name="path",
+                )
+            ),
+        )
 
-def remove_path(path: Path, *, dry_run: bool) -> ResetItem:
-    if not path.exists():
+        for name in (
+            "action",
+            "message",
+        ):
+            value = getattr(
+                self,
+                name,
+            )
+
+            if not isinstance(
+                value,
+                str,
+            ):
+                raise TypeError(f"{name} must be a string")
+
+            result = value.strip()
+
+            if name == "action" and not result:
+                raise ValueError("action cannot be empty")
+
+            object.__setattr__(
+                self,
+                name,
+                result,
+            )
+
+        if not isinstance(
+            self.ok,
+            bool,
+        ):
+            raise TypeError("ok must be a boolean")
+
+
+def _validate_items(
+    value: object,
+) -> tuple[ResetItem, ...]:
+    if not isinstance(
+        value,
+        tuple,
+    ):
+        raise TypeError("items must be a tuple")
+
+    if not all(isinstance(item, ResetItem) for item in value):
+        raise TypeError("items must contain only ResetItem values")
+
+    return value
+
+
+def remove_path(
+    path: str | Path,
+    *,
+    dry_run: bool,
+) -> ResetItem:
+    path_value = _validate_path(
+        path,
+        name="path",
+    )
+    dry_run_value = _validate_flag(
+        dry_run,
+        name="dry_run",
+    )
+
+    try:
+        exists = path_value.exists()
+    except OSError as exc:
         return ResetItem(
-            path=str(path),
+            path=str(path_value),
+            action="remove failed",
+            ok=False,
+            message=str(exc),
+        )
+
+    if not exists:
+        return ResetItem(
+            path=str(path_value),
             action="skip",
             ok=True,
             message="missing",
         )
 
-    if dry_run:
+    if dry_run_value:
         return ResetItem(
-            path=str(path),
+            path=str(path_value),
             action="would remove",
             ok=True,
             message="dry run",
         )
 
     try:
-        if path.is_dir():
-            shutil.rmtree(path)
+        if path_value.is_dir():
+            shutil.rmtree(path_value)
         else:
-            path.unlink()
+            path_value.unlink()
 
         return ResetItem(
-            path=str(path),
+            path=str(path_value),
             action="removed",
             ok=True,
-            message="",
         )
 
-    except Exception as exc:
+    except OSError as exc:
         return ResetItem(
-            path=str(path),
+            path=str(path_value),
             action="remove failed",
             ok=False,
             message=str(exc),
         )
 
 
-def recreate_path(path: Path, *, dry_run: bool) -> ResetItem:
-    if dry_run:
+def recreate_path(
+    path: str | Path,
+    *,
+    dry_run: bool,
+) -> ResetItem:
+    path_value = _validate_path(
+        path,
+        name="path",
+    )
+    dry_run_value = _validate_flag(
+        dry_run,
+        name="dry_run",
+    )
+
+    if dry_run_value:
         return ResetItem(
-            path=str(path),
+            path=str(path_value),
             action="would recreate",
             ok=True,
             message="dry run",
         )
 
     try:
-        path.mkdir(parents=True, exist_ok=True)
+        path_value.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
         return ResetItem(
-            path=str(path),
+            path=str(path_value),
             action="recreated",
             ok=True,
-            message="",
         )
-    except Exception as exc:
+
+    except OSError as exc:
         return ResetItem(
-            path=str(path),
+            path=str(path_value),
             action="recreate failed",
             ok=False,
             message=str(exc),
@@ -90,49 +236,93 @@ def run_reset(
     dry_run: bool,
     backup: bool,
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
-) -> tuple[str | None, list[ResetItem]]:
+) -> tuple[
+    str | None,
+    tuple[ResetItem, ...],
+]:
+    dry_run_value = _validate_flag(
+        dry_run,
+        name="dry_run",
+    )
+    backup_value = _validate_flag(
+        backup,
+        name="backup",
+    )
+    config_value = _validate_config(config)
+
     backup_name: str | None = None
 
-    if backup and not dry_run:
+    if backup_value and not dry_run_value:
         report = create_backup(
             name=None,
-            config=config,
+            config=config_value,
         )
         backup_name = report.name
 
-    items: list[ResetItem] = []
-
-    for path in config.paths.reset_paths:
-        items.append(
+    items = (
+        *(
             remove_path(
                 path,
-                dry_run=dry_run,
+                dry_run=dry_run_value,
             )
-        )
-
-    for path in config.paths.recreate_paths:
-        items.append(
+            for path in (config_value.paths.reset_paths)
+        ),
+        *(
             recreate_path(
                 path,
-                dry_run=dry_run,
+                dry_run=dry_run_value,
             )
-        )
+            for path in (config_value.paths.recreate_paths)
+        ),
+    )
 
-    return backup_name, items
+    return (
+        backup_name,
+        items,
+    )
 
 
 def print_report(
-    *, dry_run: bool, backup_name: str | None, items: list[ResetItem]
+    *,
+    dry_run: bool,
+    backup: bool,
+    backup_name: str | None,
+    items: tuple[ResetItem, ...],
 ) -> bool:
+    dry_run_value = _validate_flag(
+        dry_run,
+        name="dry_run",
+    )
+    items_value = _validate_items(items)
+
+    backup_value = _validate_flag(
+        backup,
+        name="backup",
+    )
+
+    if backup_name is not None:
+        if not isinstance(
+            backup_name,
+            str,
+        ):
+            raise TypeError("backup_name must be a string")
+
+        backup_name_value = backup_name.strip()
+
+        if not backup_name_value:
+            raise ValueError("backup_name cannot be empty")
+    else:
+        backup_name_value = None
+
     print()
     print("Betabox Reset")
     print("=============")
     print()
-    print(f"Mode:   {'dry-run' if dry_run else 'reset'}")
+    print(f"Mode:   {'dry-run' if dry_run_value else 'reset'}")
 
-    if backup_name:
-        print(f"Backup: {backup_name}")
-    elif dry_run:
+    if backup_name_value:
+        print(f"Backup: {backup_name_value}")
+    elif backup_value and dry_run_value:
         print("Backup: would create backup before reset")
     else:
         print("Backup: skipped")
@@ -143,7 +333,7 @@ def print_report(
 
     all_ok = True
 
-    for item in items:
+    for item in items_value:
         status = "OK" if item.ok else "FAIL"
         print(f"[{status}] {item.action}: {item.path}")
 
@@ -158,7 +348,7 @@ def print_report(
     if all_ok:
         print(
             "Reset completed successfully."
-            if not dry_run
+            if not dry_run_value
             else "Dry run completed successfully."
         )
     else:
@@ -168,17 +358,34 @@ def print_report(
     return all_ok
 
 
-def main(argv: list[str] | None = None) -> int:
+def parse_args(
+    argv: list[str] | None = None,
+) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="betabox reset")
+
     parser.add_argument(
-        "--dry-run", action="store_true", help="Show what would be reset"
+        "--dry-run",
+        action="store_true",
+        help="Show what would be reset",
     )
-    parser.add_argument("--yes", action="store_true", help="Confirm reset")
     parser.add_argument(
-        "--no-backup", action="store_true", help="Skip automatic backup"
+        "--yes",
+        action="store_true",
+        help="Confirm reset",
+    )
+    parser.add_argument(
+        "--no-backup",
+        action="store_true",
+        help="Skip automatic backup",
     )
 
-    args = parser.parse_args(argv)
+    return parser.parse_args(argv)
+
+
+def main(
+    argv: list[str] | None = None,
+) -> int:
+    args = parse_args(argv)
 
     if not args.dry_run and not args.yes:
         print()
@@ -192,20 +399,37 @@ def main(argv: list[str] | None = None) -> int:
         print()
         return 1
 
-    backup_name, items = run_reset(
-        dry_run=args.dry_run,
-        backup=not args.no_backup,
-    )
+    backup_requested = not args.no_backup
 
-    return (
-        0
-        if print_report(
+    try:
+        backup_name, items = run_reset(
             dry_run=args.dry_run,
+            backup=backup_requested,
+        )
+    except (
+        TypeError,
+        ValueError,
+        OSError,
+    ) as exc:
+        print(str(exc))
+        return 1
+
+    try:
+        success = print_report(
+            dry_run=args.dry_run,
+            backup=backup_requested,
             backup_name=backup_name,
             items=items,
         )
-        else 1
-    )
+    except (
+        TypeError,
+        ValueError,
+        OSError,
+    ) as exc:
+        print(str(exc))
+        return 1
+
+    return 0 if success else 1
 
 
 if __name__ == "__main__":

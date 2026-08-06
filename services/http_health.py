@@ -5,28 +5,73 @@ import urllib.error
 import urllib.request
 
 
+def _validate_url(
+    value: object,
+) -> str:
+    if not isinstance(value, str):
+        raise TypeError("url must be a string")
+
+    result = value.strip()
+
+    if not result:
+        raise ValueError("url cannot be empty")
+
+    return result
+
+
+def _validate_timeout(
+    value: object,
+) -> float:
+    if isinstance(value, bool) or not isinstance(
+        value,
+        int | float,
+    ):
+        raise TypeError("timeout must be a number")
+
+    result = float(value)
+
+    if result <= 0:
+        raise ValueError("timeout must be greater than 0")
+
+    return result
+
+
+def _validate_optional_service(
+    value: object,
+) -> str | None:
+    if value is None:
+        return None
+
+    if not isinstance(value, str):
+        raise TypeError("expected_service must be a string or None")
+
+    result = value.strip()
+
+    if not result:
+        raise ValueError("expected_service cannot be empty")
+
+    return result
+
+
 def check_http_available(
     url: str,
     *,
     timeout: float = 3.0,
 ) -> tuple[bool, str]:
+    url_value = _validate_url(url)
+    timeout_value = _validate_timeout(timeout)
+
     request = urllib.request.Request(
-        url,
+        url_value,
         method="GET",
     )
 
     try:
         with urllib.request.urlopen(
             request,
-            timeout=timeout,
+            timeout=timeout_value,
         ) as response:
-            if response.status == 200:
-                return True, "responding"
-
-            return (
-                False,
-                f"unexpected HTTP status {response.status}",
-            )
+            status_code = response.status
 
     except urllib.error.HTTPError as exc:
         return (
@@ -41,10 +86,27 @@ def check_http_available(
         )
 
     except TimeoutError:
-        return False, "request timed out"
+        return (
+            False,
+            "request timed out",
+        )
 
-    except Exception as exc:
-        return False, str(exc)
+    except OSError as exc:
+        return (
+            False,
+            f"request failed: {exc}",
+        )
+
+    if status_code == 200:
+        return (
+            True,
+            "responding",
+        )
+
+    return (
+        False,
+        f"unexpected HTTP status {status_code}",
+    )
 
 
 def check_json_health(
@@ -53,8 +115,12 @@ def check_json_health(
     expected_service: str | None = None,
     timeout: float = 3.0,
 ) -> tuple[bool, str]:
+    url_value = _validate_url(url)
+    timeout_value = _validate_timeout(timeout)
+    service_value = _validate_optional_service(expected_service)
+
     request = urllib.request.Request(
-        url,
+        url_value,
         method="GET",
         headers={
             "Accept": "application/json",
@@ -64,7 +130,7 @@ def check_json_health(
     try:
         with urllib.request.urlopen(
             request,
-            timeout=timeout,
+            timeout=timeout_value,
         ) as response:
             status_code = response.status
             body = response.read().decode(
@@ -85,10 +151,16 @@ def check_json_health(
         )
 
     except TimeoutError:
-        return False, "request timed out"
+        return (
+            False,
+            "request timed out",
+        )
 
-    except Exception as exc:
-        return False, str(exc)
+    except OSError as exc:
+        return (
+            False,
+            f"request failed: {exc}",
+        )
 
     if status_code != 200:
         return (
@@ -104,27 +176,34 @@ def check_json_health(
             "response was not valid JSON",
         )
 
-    if not isinstance(payload, dict):
+    if not isinstance(
+        payload,
+        dict,
+    ):
         return (
             False,
             "response JSON was not an object",
         )
 
-    if payload.get("status") != "ok":
+    status = payload.get("status")
+
+    if status != "ok":
         return (
             False,
-            "health status was "
-            f"{payload.get('status', 'missing')}",
+            f"health status was {status if status is not None else 'missing'}",
         )
 
-    if (
-        expected_service is not None
-        and payload.get("service") != expected_service
-    ):
-        return (
-            False,
-            "unexpected service identity: "
-            f"{payload.get('service', 'missing')}",
-        )
+    if service_value is not None:
+        service = payload.get("service")
 
-    return True, "healthy"
+        if service != service_value:
+            return (
+                False,
+                "unexpected service identity: "
+                + f"{service if service is not None else 'missing'}",
+            )
+
+    return (
+        True,
+        "healthy",
+    )

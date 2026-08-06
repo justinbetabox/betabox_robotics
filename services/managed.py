@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from types import MappingProxyType
 
 from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
@@ -9,17 +11,90 @@ from betabox_robotics.config import (
 )
 
 
-@dataclass(frozen=True)
+def _validate_string(
+    value: object,
+    *,
+    name: str,
+) -> str:
+    if not isinstance(value, str):
+        raise TypeError(f"{name} must be a string")
+
+    result = value.strip()
+
+    if not result:
+        raise ValueError(f"{name} cannot be empty")
+
+    return result
+
+
+def _validate_optional_path(
+    value: object,
+    *,
+    name: str,
+) -> Path | None:
+    if value is None:
+        return None
+
+    if isinstance(value, bool) or not isinstance(
+        value,
+        str | Path,
+    ):
+        raise TypeError(f"{name} must be a string, Path, or None")
+
+    return Path(value).expanduser()
+
+
+@dataclass(frozen=True, slots=True)
 class ManagedService:
     name: str
     title: str
     unit: str
     log_file: Path | None = None
 
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "name",
+            _validate_string(
+                self.name,
+                name="name",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "title",
+            _validate_string(
+                self.title,
+                name="title",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "unit",
+            _validate_string(
+                self.unit,
+                name="unit",
+            ),
+        )
+        object.__setattr__(
+            self,
+            "log_file",
+            _validate_optional_path(
+                self.log_file,
+                name="log_file",
+            ),
+        )
+
 
 def managed_services(
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> dict[str, ManagedService]:
+    if not isinstance(
+        config,
+        PlatformConfig,
+    ):
+        raise TypeError("config must be a PlatformConfig")
+
     services = config.services
 
     return {
@@ -69,4 +144,4 @@ def managed_services(
     }
 
 
-MANAGED_SERVICES = managed_services()
+MANAGED_SERVICES: Mapping[str, ManagedService] = MappingProxyType(managed_services())

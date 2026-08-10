@@ -8,10 +8,39 @@ from aiohttp import web
 from betabox_robotics.launchpad.auth import (
     LAUNCHPAD_CONTEXT_KEY,
     LaunchpadContext,
+    Permission,
 )
 from betabox_robotics.services.events import (
     collect_event_report,
 )
+
+_EVENT_COLLECTION_ERRORS = (
+    LookupError,
+    OSError,
+    RuntimeError,
+    TypeError,
+)
+
+_ALLOWED_SEVERITIES = frozenset(
+    {
+        "info",
+        "warning",
+        "error",
+        "critical",
+    }
+)
+
+MAX_EVENT_COUNT = 250
+
+
+def events_context(
+    request: web.Request,
+) -> LaunchpadContext:
+    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
+
+    context.require(Permission.EVENTS)
+
+    return context
 
 
 def parse_last(
@@ -29,11 +58,15 @@ def parse_last(
 
     try:
         value = int(raw_value)
+
     except ValueError as exc:
         raise web.HTTPBadRequest(text="last must be an integer") from exc
 
     if value < 0:
         raise web.HTTPBadRequest(text="last cannot be negative")
+
+    if value > MAX_EVENT_COUNT:
+        raise web.HTTPBadRequest(text=(f"last cannot exceed {MAX_EVENT_COUNT}"))
 
     return value
 
@@ -59,6 +92,8 @@ def parse_optional_filter(
 async def events_page(
     request: web.Request,
 ) -> web.Response:
+    events_context(request)
+
     return aiohttp_jinja2.render_template(
         "events.html",
         request,
@@ -85,7 +120,7 @@ async def events_api(
     - ``component``
     """
 
-    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
+    context = events_context(request)
 
     platform = context.platform
 
@@ -104,17 +139,23 @@ async def events_api(
         "component",
     )
 
-    allowed_severities = {
-        "info",
-        "warning",
-        "error",
-        "critical",
-    }
+    severity = parse_optional_filter(
+        request,
+        "severity",
+    )
 
-    if severity is not None and severity.lower() not in allowed_severities:
-        raise web.HTTPBadRequest(
-            text=("severity must be one of: info, warning, error, critical")
-        )
+    component = parse_optional_filter(
+        request,
+        "component",
+    )
+
+    if severity is not None:
+        severity = severity.lower()
+
+        if severity not in _ALLOWED_SEVERITIES:
+            raise web.HTTPBadRequest(
+                text=("severity must be one of: info, warning, error, critical")
+            )
 
     try:
         report = await asyncio.to_thread(
@@ -132,7 +173,7 @@ async def events_api(
             },
             status=400,
         )
-    except Exception as exc:
+    except _EVENT_COLLECTION_ERRORS as exc:
         return web.json_response(
             {
                 "error": "events_unavailable",

@@ -4,6 +4,8 @@ import { EVENTS_API_URL } from "./constants.js";
 
 import { elements } from "./dom.js";
 
+/* Request URL */
+
 function buildApiUrl() {
     const params = new URLSearchParams();
 
@@ -26,6 +28,111 @@ function buildApiUrl() {
     return `${EVENTS_API_URL}?${params}`;
 }
 
+/* Validation */
+
+function normalizeCount(value) {
+    const number = Number(value);
+
+    if (!Number.isFinite(number) || number < 0) {
+        return 0;
+    }
+
+    return Math.floor(number);
+}
+
+function normalizeSummary(summary) {
+    if (
+        summary === null ||
+        typeof summary !== "object" ||
+        Array.isArray(summary)
+    ) {
+        throw new Error("The event response does not include a summary.");
+    }
+
+    return {
+        ...summary,
+
+        total: normalizeCount(summary.total),
+
+        total_available: normalizeCount(summary.total_available),
+
+        info: normalizeCount(summary.info),
+
+        warning: normalizeCount(summary.warning),
+
+        error: normalizeCount(summary.error),
+
+        critical: normalizeCount(summary.critical),
+    };
+}
+
+function normalizeSeverity(value) {
+    switch (value) {
+        case "info":
+        case "warning":
+        case "error":
+        case "critical":
+            return value;
+
+        default:
+            return "info";
+    }
+}
+
+function normalizeEvent(event) {
+    if (event === null || typeof event !== "object" || Array.isArray(event)) {
+        throw new Error("The event response contains an invalid event.");
+    }
+
+    return {
+        ...event,
+
+        severity: normalizeSeverity(event.severity),
+
+        component:
+            typeof event.component === "string" && event.component.trim() !== ""
+                ? event.component.trim()
+                : "unknown",
+
+        message:
+            typeof event.message === "string" && event.message.trim() !== ""
+                ? event.message.trim()
+                : "Unknown event",
+
+        timestamp: typeof event.timestamp === "string" ? event.timestamp : "",
+
+        event: typeof event.event === "string" ? event.event : "",
+
+        details:
+            event.details !== null &&
+            typeof event.details === "object" &&
+            !Array.isArray(event.details)
+                ? event.details
+                : null,
+    };
+}
+
+function normalizeComponents(components) {
+    if (components === undefined) {
+        return [];
+    }
+
+    if (!Array.isArray(components)) {
+        throw new Error("The event response contains invalid components.");
+    }
+
+    const values = components
+        .filter((component) => typeof component === "string")
+        .map((component) => component.trim())
+        .filter((component) => component !== "");
+
+    return [...new Set(values)].sort((left, right) =>
+        left.localeCompare(right, undefined, {
+            sensitivity: "base",
+        }),
+    );
+}
+
 function validatePayload(payload) {
     if (
         payload === null ||
@@ -35,27 +142,22 @@ function validatePayload(payload) {
         throw new Error("The Events API returned an invalid response.");
     }
 
-    if (
-        payload.summary === null ||
-        typeof payload.summary !== "object" ||
-        Array.isArray(payload.summary)
-    ) {
-        throw new Error("The event response does not include a summary.");
-    }
-
     if (!Array.isArray(payload.events)) {
         throw new Error("The event response does not include events.");
     }
 
-    if (
-        payload.components !== undefined &&
-        !Array.isArray(payload.components)
-    ) {
-        throw new Error("The event response contains invalid components.");
-    }
+    return {
+        ...payload,
 
-    return payload;
+        summary: normalizeSummary(payload.summary),
+
+        events: payload.events.map(normalizeEvent),
+
+        components: normalizeComponents(payload.components),
+    };
 }
+
+/* Error responses */
 
 async function responseErrorMessage(response) {
     let message = `Events API returned HTTP ${response.status}.`;
@@ -79,6 +181,8 @@ async function responseErrorMessage(response) {
     return message;
 }
 
+/* API */
+
 export async function requestEvents() {
     const response = await fetch(buildApiUrl(), {
         method: "GET",
@@ -92,7 +196,5 @@ export async function requestEvents() {
         throw new Error(await responseErrorMessage(response));
     }
 
-    const payload = await response.json();
-
-    return validatePayload(payload);
+    return validatePayload(await response.json());
 }

@@ -1,9 +1,13 @@
 {% extends "interior.html" %}
 
+{% block body_class %}
+    interior-body events-page
+{% endblock %}
+
 {% block interior_styles %}
     <link
         rel="stylesheet"
-        href="/static/css/events.css"
+        href="{{ url('static', filename='css/events.css') }}"
     >
 {% endblock %}
 
@@ -35,6 +39,7 @@
                         "
                         role="status"
                         aria-live="polite"
+                        aria-atomic="true"
                     >
                         Connecting…
                     </div>
@@ -190,7 +195,10 @@
                     Severity
                 </span>
 
-                <select id="severity-filter">
+                <select
+                    id="severity-filter"
+                    name="severity"
+                >
                     <option value="">
                         All severities
                     </option>
@@ -218,7 +226,10 @@
                     Component
                 </span>
 
-                <select id="component-filter">
+                <select
+                    id="component-filter"
+                    name="component"
+                >
                     <option value="">
                         All components
                     </option>
@@ -230,7 +241,10 @@
                     Number of events
                 </span>
 
-                <select id="limit-filter">
+                <select
+                    id="limit-filter"
+                    name="limit"
+                >
                     <option value="25">
                         25
                     </option>
@@ -289,7 +303,11 @@
         <div
             id="events-list"
             class="events-list"
+            role="region"
             aria-live="polite"
+            aria-atomic="false"
+            aria-busy="true"
+            aria-labelledby="events-heading"
         >
             <div class="events-empty">
                 Loading platform events…
@@ -300,6 +318,7 @@
     <section
         id="events-error-panel"
         class="error-panel"
+        role="alert"
         aria-labelledby="events-error-heading"
         hidden
     >
@@ -328,5 +347,8 @@
 {% endblock %}
 
 {% block interior_scripts %}
-    <script src="/static/js/events.js"></script>
+    <script
+        type="module"
+        src="{{ url('static', filename='js/events.js') }}"
+    ></script>
 {% endblock %}

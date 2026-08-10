@@ -176,9 +176,7 @@
 }
 
 .events-page .event-critical {
-    box-shadow:
-        var(--shadow-small),
-        0 0 0 1px rgb(221 31 120 / 12%);
+    box-shadow: var(--shadow-small);
 }
 
 .events-page .event-content {
@@ -239,20 +237,20 @@
 .events-page .event-badge-info {
     color: var(--color-info);
     border-color: var(--color-info);
-    background: var(--brand-blue-light);
+    background: var(--color-info-subtle);
 }
 
 .events-page .event-badge-warning {
     color: var(--color-warning);
     border-color: var(--color-warning);
-    background: var(--brand-orange-light);
+    background: var(--color-warning-subtle);
 }
 
 .events-page .event-badge-error,
 .events-page .event-badge-critical {
     color: var(--color-critical);
     border-color: var(--color-critical);
-    background: var(--brand-pink-light);
+    background: var(--color-critical-subtle);
 }
 
 /* Event content */

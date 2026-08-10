@@ -183,7 +183,7 @@ export function renderEvents(events, summary) {
         const message = document.createElement("p");
 
         message.textContent =
-            "Try changing the selected filters " + "or check again later.";
+            "Try changing the selected filters or check again later.";
 
         empty.append(title, message);
 
@@ -201,13 +201,12 @@ export function renderEvents(events, summary) {
         elements.eventsList.append(createEventCard(event));
     }
 
-    const shown = Number(summary.total ?? events.length);
+    const shown = summary.total;
 
-    const available = Number(summary.total_available ?? shown);
+    const available = summary.total_available;
 
     if (shown < available) {
-        elements.listSummary.textContent =
-            `Showing ${shown} of ${available} ` + "matching events";
+        elements.listSummary.textContent = `Showing ${shown} of ${available} matching events`;
     } else {
         elements.listSummary.textContent = `${shown} ${
             shown === 1 ? "event" : "events"

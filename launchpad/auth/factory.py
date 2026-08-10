@@ -106,7 +106,7 @@ def build_account_context(
         username=account.username,
         display_name=account.display_name,
         role=role,
-        authenticated=(role is not Role.GUEST),
+        authenticated=role is not Role.GUEST,
     )
 
     root = account.home if workspace_root_value is None else workspace_root_value

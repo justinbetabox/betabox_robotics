@@ -30,8 +30,15 @@ from .session_manager import (
     SESSION_MANAGER_KEY,
     SessionManager,
 )
-from .templates import build_permission_checker, launchpad_template_context
-from .workspace import MediaWorkspace, Workspace, build_workspace
+from .templates import (
+    build_permission_checker,
+    launchpad_template_context,
+)
+from .workspace import (
+    MediaWorkspace,
+    Workspace,
+    build_workspace,
+)
 
 __all__ = [
     "AUTHENTICATION_SERVICE_KEY",

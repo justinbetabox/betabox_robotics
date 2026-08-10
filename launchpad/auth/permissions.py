@@ -27,23 +27,7 @@ class Permission(StrEnum):
     EVENTS = "events"
 
 
-STANDARD_PERMISSIONS: frozenset[Permission] = frozenset(
-    {
-        Permission.ROBOT_DRIVE,
-        Permission.CODE,
-        Permission.VISION,
-        Permission.MEDIA,
-        Permission.MEDIA_UPLOAD,
-        Permission.MEDIA_DOWNLOAD,
-        Permission.CALIBRATION,
-        Permission.STATUS,
-        Permission.DIAGNOSTICS,
-        Permission.SERVICES,
-        Permission.INFORMATION,
-        Permission.PREFERENCES,
-        Permission.EVENTS,
-    }
-)
+STANDARD_PERMISSIONS: frozenset[Permission] = frozenset(Permission)
 
 GUEST_PERMISSIONS: frozenset[Permission] = STANDARD_PERMISSIONS
 STUDENT_PERMISSIONS: frozenset[Permission] = STANDARD_PERMISSIONS

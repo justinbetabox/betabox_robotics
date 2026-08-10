@@ -14,6 +14,9 @@ from betabox_robotics.services.accounts import (
 
 AUTH_HELPER = Path("/opt/betabox/venv/bin/betabox-auth-check")
 
+AUTHENTICATION_TIMEOUT = 10.0
+
+
 AuthRunner = Callable[
     [str, str],
     Awaitable[bool],
@@ -81,11 +84,13 @@ class AuthenticationService:
                 username,
                 name="username",
             )
+
             password_value = _validate_string(
                 password,
                 name="password",
                 strip=False,
             )
+
         except (
             TypeError,
             ValueError,
@@ -94,6 +99,7 @@ class AuthenticationService:
 
         try:
             account = account_by_username(username_value)
+
         except LookupError as exc:
             raise AuthenticationError("Invalid username or password.") from exc
 
@@ -105,8 +111,10 @@ class AuthenticationService:
                 account.username,
                 password_value,
             )
+
         except asyncio.CancelledError:
             raise
+
         except (
             OSError,
             RuntimeError,
@@ -117,7 +125,9 @@ class AuthenticationService:
             authenticated,
             bool,
         ):
-            raise TypeError("authentication runner must return a boolean")
+            raise AuthenticationError(
+                "Authentication service returned an invalid result."
+            )
 
         if not authenticated:
             raise AuthenticationError("Invalid username or password.")
@@ -133,6 +143,7 @@ class AuthenticationService:
             username,
             name="username",
         )
+
         password_value = _validate_string(
             password,
             name="password",
@@ -163,13 +174,26 @@ class AuthenticationService:
         )
 
         try:
-            await process.communicate(payload)
+            await asyncio.wait_for(
+                process.communicate(payload),
+                timeout=AUTHENTICATION_TIMEOUT,
+            )
+
         except asyncio.CancelledError:
             if process.returncode is None:
                 process.kill()
+
                 await process.wait()
 
             raise
+
+        except TimeoutError as exc:
+            if process.returncode is None:
+                process.kill()
+
+                await process.wait()
+
+            raise RuntimeError("authentication helper timed out") from exc
 
         return process.returncode == 0
 

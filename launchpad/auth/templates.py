@@ -1,8 +1,14 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 
 from aiohttp import web
+
+from betabox_robotics.launchpad.preferences import (
+    default_preferences,
+    read_preferences,
+)
 
 from .context import LaunchpadContext
 from .permissions import Permission
@@ -91,13 +97,24 @@ async def launchpad_template_context(
     ):
         raise TypeError("Launchpad context is invalid")
 
+    try:
+        launchpad_preferences = read_preferences(context.workspace.preferences)
+    except (
+        json.JSONDecodeError,
+        OSError,
+        TypeError,
+        ValueError,
+    ):
+        launchpad_preferences = default_preferences()
+
     return {
         "launchpad": context,
         "identity": context.identity,
         "is_guest": context.guest,
         "is_student": context.student,
         "is_teacher": context.teacher,
-        "is_authenticated": (context.authenticated),
+        "is_authenticated": context.authenticated,
         "can": build_permission_checker(context),
-        "login_failed": (request_value.query.get("login") == "failed"),
+        "login_failed": request_value.query.get("login") == "failed",
+        "launchpad_preferences": launchpad_preferences,
     }

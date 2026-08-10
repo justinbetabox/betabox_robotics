@@ -1,0 +1,152 @@
+.vision-page {
+    display: grid;
+    grid-template-rows:
+        auto
+        minmax(0, 1fr);
+
+    width: 100%;
+    height: 100dvh;
+    min-height: 0;
+
+    overflow: hidden;
+}
+
+/* Vision viewport */
+
+.vision-page .vision-main {
+    min-width: 0;
+    min-height: 0;
+
+    height: 100%;
+    padding: 1rem;
+
+    overflow: hidden;
+}
+
+.vision-page .vision-view {
+    position: relative;
+
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+
+    overflow: hidden;
+
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-large);
+
+    background: var(--color-surface-inset);
+
+    box-shadow: var(--shadow-small);
+}
+
+.vision-page .vision-video {
+    display: block;
+
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    min-height: 0;
+
+    background: #000;
+
+    object-fit: contain;
+}
+
+.vision-page .vision-status {
+    position: absolute;
+    top: 1rem;
+    right: 1rem;
+    z-index: 2;
+
+    pointer-events: none;
+
+    box-shadow: var(--shadow-small);
+
+    backdrop-filter: blur(10px);
+}
+
+.vision-page .vision-message {
+    position: absolute;
+    top: 1rem;
+    left: 1rem;
+
+    max-width: calc(100% - 2rem);
+
+    padding: 0.55rem 0.8rem;
+
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-pill);
+
+    color: var(--color-text);
+    background: var(--color-surface-overlay);
+
+    font-size: 0.8rem;
+    font-weight: 850;
+
+    box-shadow: var(--shadow-small);
+
+    backdrop-filter: blur(10px);
+
+    transition: opacity var(--transition-fast);
+}
+
+.vision-page .vision-view[data-video-state="connected"] .vision-message {
+    opacity: 0;
+    pointer-events: none;
+}
+
+/* Compact layout */
+
+html[data-compact-layout="true"] .vision-page .interior-header {
+    padding-top: 0.55rem;
+    padding-bottom: 0.55rem;
+}
+
+html[data-compact-layout="true"] .vision-page .vision-main {
+    padding: 0.45rem;
+}
+
+/* Short browser windows */
+
+@media (max-height: 700px) and (min-width: 641px) {
+    .vision-page .interior-header {
+        padding-top: 0.6rem;
+        padding-bottom: 0.6rem;
+    }
+
+    .vision-page .interior-header-title h1 {
+        font-size: 1.6rem;
+    }
+
+    .vision-page .interior-header-title .eyebrow {
+        display: none;
+    }
+
+    .vision-page .vision-main {
+        padding: 0.65rem;
+    }
+}
+
+/* Phones */
+
+@media (max-width: 640px) {
+    .vision-page .vision-main {
+        padding: 0.75rem;
+    }
+
+    .vision-page .vision-status {
+        top: 0.75rem;
+        right: 0.75rem;
+    }
+
+    .vision-page .vision-message {
+        top: 0.75rem;
+        left: 0.75rem;
+
+        max-width: calc(100% - 1.5rem);
+
+        font-size: 0.72rem;
+    }
+}

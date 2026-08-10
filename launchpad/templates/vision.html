@@ -1,0 +1,57 @@
+{% extends "interior.html" %}
+
+{% block body_class %}
+    interior-body vision-page
+{% endblock %}
+
+{% block interior_styles %}
+    <link
+        rel="stylesheet"
+        href="{{ url('static', filename='css/vision.css') }}"
+    >
+{% endblock %}
+
+{% block page_content %}
+    <section
+        class="vision-view"
+        data-video-state="connecting"
+        aria-label="Live robot vision"
+    >
+        <video
+            id="live-vision"
+            class="vision-video"
+            autoplay
+            playsinline
+            muted
+            aria-label="Live robot vision feed"
+        ></video>
+
+        <div
+            id="vision-status"
+            class="
+                vision-status
+                connection-status
+                status-connecting
+            "
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+        >
+            Connecting…
+        </div>
+
+        <div
+            class="vision-message"
+            aria-hidden="true"
+        >
+            Connecting vision…
+        </div>
+    </section>
+{% endblock %}
+
+{% block interior_scripts %}
+    <script
+        type="module"
+        src="{{ url('static', filename='js/vision.js') }}"
+    ></script>
+{% endblock %}

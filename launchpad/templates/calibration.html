@@ -3,7 +3,7 @@
 {% block interior_styles %}
     <link
         rel="stylesheet"
-        href="/static/css/calibration.css"
+        href="{{ url('static', filename='css/calibration.css') }}"
     >
 {% endblock %}
 
@@ -22,8 +22,9 @@
             </h2>
 
             <p class="calibration-description">
-                View the saved steering, motor, and
-                line sensor calibration used by this robot.
+                View and adjust the steering, camera mount,
+                motor, and line sensor calibration used by
+                this robot.
             </p>
         </div>
 
@@ -32,6 +33,9 @@
                 <div
                     id="calibration-connection"
                     class="connection-status status-connecting"
+                    role="status"
+                    aria-live="polite"
+                    aria-atomic="true"
                 >
                     Loading…
                 </div>
@@ -65,6 +69,7 @@
         id="calibration-loading"
         class="panel calibration-state"
         role="status"
+        aria-atomic="true"
     >
         <div
             class="calibration-spinner"
@@ -173,6 +178,7 @@
                 class="form-message"
                 role="status"
                 aria-live="polite"
+                aria-atomic="true"
             ></p>
         </section>
 
@@ -295,6 +301,7 @@
                 class="form-message"
                 role="status"
                 aria-live="polite"
+                aria-atomic="true"
             ></p>
         </section>
 
@@ -425,6 +432,7 @@
                 class="form-message"
                 role="status"
                 aria-live="polite"
+                aria-atomic="true"
             ></p>
         </section>
 
@@ -561,6 +569,7 @@
                 class="form-message"
                 role="status"
                 aria-live="polite"
+                aria-atomic="true"
             ></p>
         </section>
     </div>
@@ -606,6 +615,6 @@
 {% block interior_scripts %}
     <script
         type="module"
-        src="/static/js/calibration.js"
+        src="{{ url('static', filename='js/calibration.js') }}"
     ></script>
 {% endblock %}

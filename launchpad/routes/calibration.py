@@ -3,12 +3,16 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Callable
 from time import sleep
+from typing import Any
 
 import aiohttp_jinja2
 import lgpio
 from aiohttp import web
 from gpiozero.exc import GPIOPinInUse
 
+from betabox_robotics.calibration.storage import (
+    CalibrationStorageError,
+)
 from betabox_robotics.camera import (
     CameraMount,
 )
@@ -16,9 +20,13 @@ from betabox_robotics.drive import Drive
 from betabox_robotics.exceptions import (
     RobotBusyError,
 )
+from betabox_robotics.hardware import (
+    HardwareError,
+)
 from betabox_robotics.launchpad.auth import (
     LAUNCHPAD_CONTEXT_KEY,
     LaunchpadContext,
+    Permission,
 )
 from betabox_robotics.robots.betabox_car import (
     BETABOX_CAR,
@@ -31,10 +39,41 @@ from betabox_robotics.services.calibration import (
 )
 
 
+async def json_object(
+    request: web.Request,
+) -> dict[str, Any]:
+    try:
+        body = await request.json()
+
+    except (
+        TypeError,
+        ValueError,
+    ) as exc:
+        raise ValueError("request body must be valid JSON") from exc
+
+    if not isinstance(
+        body,
+        dict,
+    ):
+        raise TypeError("request body must be a JSON object")
+
+    return body
+
+
+def calibration_context(
+    request: web.Request,
+) -> LaunchpadContext:
+    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
+
+    context.require(Permission.CALIBRATION)
+
+    return context
+
+
 def calibration_service(
     request: web.Request,
 ) -> CalibrationService:
-    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
+    context = calibration_context(request)
 
     return context.services.calibration_service
 
@@ -62,46 +101,12 @@ def error_response(
 
 async def run_preview(
     preview: Callable[..., None],
-    *,
-    failure_message: str,
     **kwargs: object,
-) -> web.Response:
-    try:
-        await asyncio.to_thread(
-            preview,
-            **kwargs,
-        )
-
-        return web.json_response(
-            {
-                "status": "ok",
-            }
-        )
-
-    except ValueError as exc:
-        return error_response(
-            error="invalid_request",
-            message=str(exc),
-            status=400,
-        )
-
-    except RobotBusyError as exc:
-        return error_response(
-            error="robot_busy",
-            message=(
-                "The robot hardware is currently being used by another application."
-            ),
-            detail=str(exc),
-            status=409,
-        )
-
-    except Exception as exc:
-        return error_response(
-            error="preview_failed",
-            message=failure_message,
-            detail=str(exc),
-            status=500,
-        )
+) -> None:
+    await asyncio.to_thread(
+        preview,
+        **kwargs,
+    )
 
 
 def sample_grayscale(
@@ -215,6 +220,7 @@ def preview_motor_trim(
                 drive.forward(25)
 
                 sleep(1.5)
+
             finally:
                 drive.stop()
 
@@ -238,6 +244,8 @@ def calibration_response(
 async def calibration_page(
     request: web.Request,
 ) -> web.Response:
+    calibration_context(request)
+
     return aiohttp_jinja2.render_template(
         "calibration.html",
         request,
@@ -245,7 +253,7 @@ async def calibration_page(
             "page": {
                 "title": "Calibration",
                 "eyebrow": "Robot Setup",
-                "main_class": "page-layout calibration-layout",
+                "main_class": ("page-layout calibration-layout"),
             },
         },
     )
@@ -258,10 +266,11 @@ async def calibration_api(
 
     try:
         return calibration_response(service)
-    except Exception as exc:
+
+    except CalibrationStorageError as exc:
         return error_response(
             error="calibration_unavailable",
-            message="Unable to load robot calibration.",
+            message=("Unable to load robot calibration."),
             detail=str(exc),
             status=500,
         )
@@ -270,8 +279,12 @@ async def calibration_api(
 async def sample_grayscale_api(
     request: web.Request,
 ) -> web.Response:
+    calibration_context(request)
+
     try:
-        values = sample_grayscale()
+        values = await asyncio.to_thread(
+            sample_grayscale,
+        )
 
         return web.json_response(
             {
@@ -279,7 +292,13 @@ async def sample_grayscale_api(
             }
         )
 
-    except Exception as exc:
+    except (
+        HardwareError,
+        OSError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ) as exc:
         return error_response(
             error="sample_failed",
             message="Unable to read the line sensor.",
@@ -294,10 +313,7 @@ async def update_motors_api(
     service = calibration_service(request)
 
     try:
-        body = await request.json()
-
-        if not isinstance(body, dict):
-            raise TypeError
+        body = await json_object(request)
 
         left_trim = float(body["left_trim"])
 
@@ -317,14 +333,14 @@ async def update_motors_api(
     ):
         return error_response(
             error="invalid_request",
-            message="Valid left and right motor trim values are required.",
+            message=("Valid left and right motor trim values are required."),
             status=400,
         )
 
-    except Exception as exc:
+    except CalibrationStorageError as exc:
         return error_response(
             error="update_failed",
-            message="Unable to save motor trim calibration.",
+            message=("Unable to save motor trim calibration."),
             detail=str(exc),
             status=500,
         )
@@ -336,10 +352,7 @@ async def update_steering_api(
     service = calibration_service(request)
 
     try:
-        body = await request.json()
-
-        if not isinstance(body, dict):
-            raise TypeError
+        body = await json_object(request)
 
         offset = float(body["offset"])
 
@@ -356,14 +369,14 @@ async def update_steering_api(
     ):
         return error_response(
             error="invalid_request",
-            message="A valid steering offset is required.",
+            message=("A valid steering offset is required."),
             status=400,
         )
 
-    except Exception as exc:
+    except CalibrationStorageError as exc:
         return error_response(
             error="update_failed",
-            message="Unable to save steering calibration.",
+            message=("Unable to save steering calibration."),
             detail=str(exc),
             status=500,
         )
@@ -372,11 +385,10 @@ async def update_steering_api(
 async def preview_steering_api(
     request: web.Request,
 ) -> web.Response:
-    try:
-        body = await request.json()
+    calibration_context(request)
 
-        if not isinstance(body, dict):
-            raise TypeError
+    try:
+        body = await json_object(request)
 
         offset = float(body["offset"])
 
@@ -387,25 +399,58 @@ async def preview_steering_api(
     ):
         return error_response(
             error="invalid_request",
-            message="A valid steering offset is required.",
+            message=("A valid steering offset is required."),
             status=400,
         )
 
-    return await run_preview(
-        preview_steering,
-        failure_message="Unable to move the steering servo.",
-        offset=offset,
-    )
+    try:
+        await run_preview(
+            preview_steering,
+            offset=offset,
+        )
+
+        return web.json_response(
+            {
+                "status": "ok",
+            }
+        )
+
+    except ValueError as exc:
+        return error_response(
+            error="invalid_request",
+            message=str(exc),
+            status=400,
+        )
+
+    except RobotBusyError as exc:
+        return error_response(
+            error="robot_busy",
+            message=(
+                "The robot hardware is currently being used by another application."
+            ),
+            detail=str(exc),
+            status=409,
+        )
+
+    except (
+        OSError,
+        RuntimeError,
+    ) as exc:
+        return error_response(
+            error="preview_failed",
+            message=("Unable to move the steering servo."),
+            detail=str(exc),
+            status=500,
+        )
 
 
 async def preview_camera_mount_api(
     request: web.Request,
 ) -> web.Response:
-    try:
-        body = await request.json()
+    calibration_context(request)
 
-        if not isinstance(body, dict):
-            raise TypeError
+    try:
+        body = await json_object(request)
 
         pan_offset = float(body["pan_offset"])
 
@@ -418,16 +463,50 @@ async def preview_camera_mount_api(
     ):
         return error_response(
             error="invalid_request",
-            message="Valid camera pan and tilt offsets are required.",
+            message=("Valid camera pan and tilt offsets are required."),
             status=400,
         )
 
-    return await run_preview(
-        preview_camera_mount,
-        failure_message="Unable to move the camera mount.",
-        pan_offset=pan_offset,
-        tilt_offset=tilt_offset,
-    )
+    try:
+        await run_preview(
+            preview_camera_mount,
+            pan_offset=pan_offset,
+            tilt_offset=tilt_offset,
+        )
+
+        return web.json_response(
+            {
+                "status": "ok",
+            }
+        )
+
+    except ValueError as exc:
+        return error_response(
+            error="invalid_request",
+            message=str(exc),
+            status=400,
+        )
+
+    except RobotBusyError as exc:
+        return error_response(
+            error="robot_busy",
+            message=(
+                "The robot hardware is currently being used by another application."
+            ),
+            detail=str(exc),
+            status=409,
+        )
+
+    except (
+        OSError,
+        RuntimeError,
+    ) as exc:
+        return error_response(
+            error="preview_failed",
+            message=("Unable to move the camera mount."),
+            detail=str(exc),
+            status=500,
+        )
 
 
 async def preview_motor_trim_api(
@@ -436,13 +515,7 @@ async def preview_motor_trim_api(
     service = calibration_service(request)
 
     try:
-        body = await request.json()
-
-        if not isinstance(
-            body,
-            dict,
-        ):
-            raise TypeError
+        body = await json_object(request)
 
         left_trim = float(body["left_trim"])
 
@@ -450,20 +523,66 @@ async def preview_motor_trim_api(
 
         calibration = service.load()
 
-    except (KeyError, TypeError, ValueError):
+    except (
+        KeyError,
+        TypeError,
+        ValueError,
+    ):
         return error_response(
             error="invalid_request",
-            message="Valid left and right motor trim values are required.",
+            message=("Valid left and right motor trim values are required."),
             status=400,
         )
 
-    return await run_preview(
-        preview_motor_trim,
-        failure_message="Unable to preview motor trim.",
-        left_trim=left_trim,
-        right_trim=right_trim,
-        steering_offset=(calibration.steering.offset),
-    )
+    except CalibrationStorageError as exc:
+        return error_response(
+            error="calibration_unavailable",
+            message=("Unable to load robot calibration."),
+            detail=str(exc),
+            status=500,
+        )
+
+    try:
+        await run_preview(
+            preview_motor_trim,
+            left_trim=left_trim,
+            right_trim=right_trim,
+            steering_offset=(calibration.steering.offset),
+        )
+
+        return web.json_response(
+            {
+                "status": "ok",
+            }
+        )
+
+    except ValueError as exc:
+        return error_response(
+            error="invalid_request",
+            message=str(exc),
+            status=400,
+        )
+
+    except RobotBusyError as exc:
+        return error_response(
+            error="robot_busy",
+            message=(
+                "The robot hardware is currently being used by another application."
+            ),
+            detail=str(exc),
+            status=409,
+        )
+
+    except (
+        OSError,
+        RuntimeError,
+    ) as exc:
+        return error_response(
+            error="preview_failed",
+            message=("Unable to preview motor trim."),
+            detail=str(exc),
+            status=500,
+        )
 
 
 async def update_camera_mount_api(
@@ -472,10 +591,7 @@ async def update_camera_mount_api(
     service = calibration_service(request)
 
     try:
-        body = await request.json()
-
-        if not isinstance(body, dict):
-            raise TypeError
+        body = await json_object(request)
 
         pan_offset = float(body["pan_offset"])
 
@@ -495,14 +611,14 @@ async def update_camera_mount_api(
     ):
         return error_response(
             error="invalid_request",
-            message="Valid camera pan and tilt offsets are required.",
+            message=("Valid camera pan and tilt offsets are required."),
             status=400,
         )
 
-    except Exception as exc:
+    except CalibrationStorageError as exc:
         return error_response(
             error="update_failed",
-            message="Unable to save camera mount calibration.",
+            message=("Unable to save camera mount calibration."),
             detail=str(exc),
             status=500,
         )
@@ -514,16 +630,19 @@ async def update_grayscale_api(
     service = calibration_service(request)
 
     try:
-        body = await request.json()
-
-        if not isinstance(body, dict):
-            raise TypeError
+        body = await json_object(request)
 
         floor = body["floor"]
         line = body["line"]
 
-        if not isinstance(floor, list) or not isinstance(line, list):
-            raise TypeError
+        if not isinstance(
+            floor,
+            list,
+        ) or not isinstance(
+            line,
+            list,
+        ):
+            raise TypeError("floor and line must be lists")
 
         service.update_grayscale(
             floor=floor,
@@ -539,14 +658,14 @@ async def update_grayscale_api(
     ):
         return error_response(
             error="invalid_request",
-            message="Valid floor and line sensor readings are required.",
+            message=("Valid floor and line sensor readings are required."),
             status=400,
         )
 
-    except Exception as exc:
+    except CalibrationStorageError as exc:
         return error_response(
             error="update_failed",
-            message="Unable to save line sensor calibration.",
+            message=("Unable to save line sensor calibration."),
             detail=str(exc),
             status=500,
         )
@@ -562,10 +681,10 @@ async def clear_grayscale_api(
 
         return calibration_response(service)
 
-    except Exception as exc:
+    except CalibrationStorageError as exc:
         return error_response(
             error="clear_failed",
-            message="Unable to clear line sensor calibration.",
+            message=("Unable to clear line sensor calibration."),
             detail=str(exc),
             status=500,
         )

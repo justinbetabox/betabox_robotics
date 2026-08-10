@@ -8,21 +8,39 @@ from aiohttp import web
 from betabox_robotics.launchpad.auth import (
     LAUNCHPAD_CONTEXT_KEY,
     LaunchpadContext,
+    Permission,
 )
 from betabox_robotics.services.http_health import (
     check_http_available,
-)
-from betabox_robotics.services.platform_summary import (
-    collect_platform_summary,
 )
 from betabox_robotics.services.status import (
     collect_status,
 )
 
+_STATUS_COLLECTION_ERRORS = (
+    LookupError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
+
+def status_context(
+    request: web.Request,
+) -> LaunchpadContext:
+    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
+
+    context.require(Permission.STATUS)
+
+    return context
+
 
 async def status_page(
     request: web.Request,
 ) -> web.Response:
+    status_context(request)
+
     return aiohttp_jinja2.render_template(
         "status.html",
         request,
@@ -30,7 +48,7 @@ async def status_page(
             "page": {
                 "title": "Robot Status",
                 "eyebrow": "Platform Diagnostics",
-                "main_class": "page-layout",
+                "main_class": ("page-layout status-layout"),
             },
         },
     )
@@ -39,17 +57,17 @@ async def status_page(
 async def status_api(
     request: web.Request,
 ) -> web.Response:
-    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
+    context = status_context(request)
 
     platform = context.platform
     services = context.services
 
     def collect_payload() -> dict[str, object]:
-        summary = collect_platform_summary(platform)
+        report = collect_status(platform)
 
-        payload = summary.to_dict()
+        payload = report.to_dict()
 
-        jupyter_state = summary.services.get(
+        jupyter_state = report.services.get(
             platform.services.jupyterhub.unit,
             "unknown",
         )
@@ -76,7 +94,8 @@ async def status_api(
 
     try:
         payload = await services.status_cache.get(collect_payload)
-    except Exception as exc:
+
+    except _STATUS_COLLECTION_ERRORS as exc:
         return web.json_response(
             {
                 "error": "status_unavailable",
@@ -92,7 +111,7 @@ async def status_api(
 async def status_report_api(
     request: web.Request,
 ) -> web.Response:
-    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
+    context = status_context(request)
 
     platform = context.platform
 
@@ -101,7 +120,8 @@ async def status_report_api(
             collect_status,
             platform,
         )
-    except Exception as exc:
+
+    except _STATUS_COLLECTION_ERRORS as exc:
         return web.json_response(
             {
                 "error": ("status_report_unavailable"),

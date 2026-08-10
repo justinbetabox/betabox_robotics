@@ -4,7 +4,7 @@
 {% block interior_styles %}
     <link
         rel="stylesheet"
-        href="/static/css/media.css"
+        href="{{ url('static', filename='css/media.css') }}"
     >
 {% endblock %}
 
@@ -289,9 +289,12 @@
                             type="button"
                             data-media-view="grid"
                             aria-pressed="true"
+                            aria-label="Grid view"
                             title="Grid view"
                         >
-                            ⊞
+                            <span aria-hidden="true">
+                                ⊞
+                            </span>
                         </button>
 
                         <button
@@ -300,9 +303,12 @@
                             type="button"
                             data-media-view="list"
                             aria-pressed="false"
+                            aria-label="List view"
                             title="List view"
                         >
-                            ☰
+                            <span aria-hidden="true">
+                                ☰
+                            </span>
                         </button>
                     </div>
                 </div>
@@ -313,6 +319,7 @@
                 id="media-loading"
                 class="media-state"
                 role="status"
+                aria-atomic="true"
             >
                 <div
                     class="media-loading-spinner"
@@ -395,7 +402,6 @@
                     media-items
                     media-grid
                 "
-                aria-live="polite"
                 hidden
             ></div>
         </div>
@@ -597,11 +603,15 @@
                             .ogg,
                             .m4a
                         "
+                        aria-describedby="media-upload-notice"
                         multiple
                     >
                 </label>
 
-                <p class="notice notice-warning">
+                <p
+                    id="media-upload-notice"
+                    class="notice notice-warning"
+                >
                     Videos cannot be uploaded. Videos in
                     the Media Library are recordings created
                     by the robot.
@@ -637,6 +647,7 @@
                     class="media-upload-result"
                     role="status"
                     aria-live="polite"
+                    aria-atomic="true"
                     hidden
                 ></div>
 
@@ -844,6 +855,6 @@
 {% block interior_scripts %}
     <script
         type="module"
-        src="/static/js/media.js"
+        src="{{ url('static', filename='js/media.js') }}"
     ></script>
 {% endblock %}

@@ -13,6 +13,7 @@ from aiohttp import web
 from betabox_robotics.launchpad.auth import (
     LAUNCHPAD_CONTEXT_KEY,
     LaunchpadContext,
+    Permission,
     Workspace,
 )
 
@@ -61,7 +62,7 @@ MAX_UPLOAD_FILE_SIZE = 25 * 1024 * 1024
 UPLOAD_CHUNK_SIZE = 64 * 1024
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MediaItem:
     category: str
     name: str
@@ -87,7 +88,7 @@ class MediaItem:
         }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class MediaUploadFailure:
     name: str
     reason: str
@@ -130,7 +131,7 @@ def validate_filename(
         raise web.HTTPBadRequest(reason="media filename cannot be empty")
 
     if filename.startswith("."):
-        raise web.HTTPBadRequest(reason=("hidden media files are not available"))
+        raise web.HTTPBadRequest(reason="hidden media files are not available")
 
     if Path(filename).name != filename or "/" in filename or "\\" in filename:
         raise web.HTTPBadRequest(reason="invalid media filename")
@@ -353,13 +354,12 @@ async def save_uploaded_file(
         temporary_path.replace(destination)
 
         return bytes_written
-    except BaseException:
+
+    finally:
         try:
             temporary_path.unlink(missing_ok=True)
         except OSError:
             pass
-
-        raise
 
 
 def upload_failure(
@@ -421,9 +421,25 @@ def list_category_media(
     return items
 
 
+def media_context(
+    request: web.Request,
+    permission: Permission,
+) -> LaunchpadContext:
+    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
+
+    context.require(permission)
+
+    return context
+
+
 async def media_page(
     request: web.Request,
 ) -> web.Response:
+    media_context(
+        request,
+        Permission.MEDIA,
+    )
+
     return aiohttp_jinja2.render_template(
         "media.html",
         request,
@@ -431,7 +447,7 @@ async def media_page(
             "page": {
                 "title": "Media",
                 "eyebrow": "Robot Files",
-                "main_class": "page-layout media-page",
+                "main_class": ("page-layout media-page"),
             },
         },
     )
@@ -440,7 +456,10 @@ async def media_page(
 async def media_api(
     request: web.Request,
 ) -> web.Response:
-    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
+    context = media_context(
+        request,
+        Permission.MEDIA,
+    )
 
     workspace = context.workspace
 
@@ -488,7 +507,7 @@ async def media_api(
             "files": [item.to_dict() for item in items],
             "counts": counts,
             "total_count": len(items),
-            "total_size_bytes": (total_size_bytes),
+            "total_size_bytes": total_size_bytes,
         }
     )
 
@@ -496,19 +515,19 @@ async def media_api(
 async def upload_media(
     request: web.Request,
 ) -> web.Response:
-    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
-
+    context = media_context(
+        request,
+        Permission.MEDIA_UPLOAD,
+    )
     workspace = context.workspace
 
     if not request.content_type.startswith("multipart/"):
-        raise web.HTTPBadRequest(reason=("media uploads must use multipart form data"))
+        raise web.HTTPBadRequest(reason="media uploads must use multipart form data")
 
     try:
         reader = await request.multipart()
     except (ValueError, OSError) as exc:
-        raise web.HTTPBadRequest(
-            reason=("the upload request could not be read")
-        ) from exc
+        raise web.HTTPBadRequest(reason="the upload request could not be read") from exc
 
     uploaded: list[MediaItem] = []
 
@@ -521,7 +540,7 @@ async def upload_media(
             field = await reader.next()
         except (ValueError, OSError) as exc:
             raise web.HTTPBadRequest(
-                reason=("the upload request could not be read")
+                reason="the upload request could not be read"
             ) from exc
 
         if field is None:
@@ -532,27 +551,29 @@ async def upload_media(
 
         submitted_files += 1
 
-        original_filename = Path(field.filename).name
+        submitted_filename = field.filename
 
         if submitted_files > MAX_UPLOAD_FILES:
             upload_failure(
                 failures,
-                original_filename,
-                ("Only 10 files can be uploaded at once."),
+                submitted_filename,
+                "Only 10 files can be uploaded at once.",
             )
 
             continue
 
         try:
-            validate_filename(original_filename)
+            validate_filename(submitted_filename)
         except web.HTTPException as exc:
             upload_failure(
                 failures,
-                original_filename,
+                submitted_filename,
                 exc.reason or "Invalid media filename.",
             )
 
             continue
+
+        original_filename = submitted_filename
 
         category = upload_category(original_filename)
 
@@ -631,7 +652,7 @@ async def upload_media(
             )
 
     if submitted_files == 0:
-        raise web.HTTPBadRequest(reason=("the upload does not contain any files"))
+        raise web.HTTPBadRequest(reason="the upload does not contain any files")
 
     status = 201 if uploaded else 400
 
@@ -649,12 +670,18 @@ async def upload_media(
 async def media_file(
     request: web.Request,
 ) -> web.StreamResponse:
-    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
+    download = request.query.get("download") == "1"
+
+    permission = Permission.MEDIA_DOWNLOAD if download else Permission.MEDIA
+
+    context = media_context(
+        request,
+        permission,
+    )
 
     workspace = context.workspace
 
     category = request.match_info["category"]
-
     filename = request.match_info["filename"]
 
     directory = require_category(
@@ -677,7 +704,7 @@ async def media_file(
 
     response.content_type = media_mime_type(path)
 
-    if request.query.get("download") == "1":
+    if download:
         encoded_filename = quote(
             path.name,
             safe="",
@@ -693,8 +720,10 @@ async def media_file(
 async def delete_media_file(
     request: web.Request,
 ) -> web.Response:
-    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
-
+    context = media_context(
+        request,
+        Permission.MEDIA_DELETE,
+    )
     workspace = context.workspace
 
     category = request.match_info["category"]
@@ -723,7 +752,7 @@ async def delete_media_file(
         raise web.HTTPNotFound(reason="media file not found") from exc
     except OSError as exc:
         raise web.HTTPInternalServerError(
-            reason=("media file could not be deleted")
+            reason="media file could not be deleted"
         ) from exc
 
     return web.json_response(

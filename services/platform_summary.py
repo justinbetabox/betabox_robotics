@@ -15,6 +15,9 @@ from betabox_robotics.hardware.ownership import (
     RobotOwnershipStatus,
     probe_robot_ownership,
 )
+from betabox_robotics.robots.betabox_car import (
+    BETABOX_CAR,
+)
 from betabox_robotics.services.command import run
 from betabox_robotics.services.hardware_checks import (
     BatteryStatus,
@@ -273,8 +276,12 @@ def collect_platform_summary(
         ),
         control=probe_robot_ownership(),
         hardware=PlatformHardwareSummary(
-            battery=collect_battery_status(config_value),
-            vision=collect_vision_status(config_value),
+            battery=collect_battery_status(
+                BETABOX_CAR.sensors,
+            ),
+            vision=collect_vision_status(
+                config_value,
+            ),
         ),
         system_health=collect_system_health(config_value),
     )

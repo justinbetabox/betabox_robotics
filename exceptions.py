@@ -4,3 +4,9 @@ class BetaboxError(Exception):
 
 class RobotBusyError(BetaboxError):
     """The robot is currently owned by another application."""
+
+
+__all__ = [
+    "BetaboxError",
+    "RobotBusyError",
+]

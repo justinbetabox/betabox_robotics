@@ -1,14 +1,14 @@
 from .car import Car
+from .exceptions import BetaboxError, RobotBusyError
 from .robot import Robot
 from .robots import BetaboxCar
 from .version import __version__
-from .exceptions import BetaboxError, RobotBusyError
 
 __all__ = [
+    "BetaboxCar",
+    "BetaboxError",
     "Car",
     "Robot",
-    "BetaboxCar",
-    "__version__",
-    "BetaboxError",
     "RobotBusyError",
+    "__version__",
 ]

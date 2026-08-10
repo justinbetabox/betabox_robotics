@@ -303,8 +303,6 @@ export class DriveConnection {
 
         state.controlPaused = false;
 
-        this.resumeRequested = true;
-
         setConnectionState("Reconnecting…", "status-connecting");
 
         elements.owner.textContent = "Requesting robot control…";
@@ -313,6 +311,8 @@ export class DriveConnection {
             this.websocket !== null &&
             this.websocket.readyState === WebSocket.CLOSING
         ) {
+            this.resumeRequested = true;
+
             return;
         }
 

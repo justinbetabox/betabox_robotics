@@ -1,15 +1,35 @@
 "use strict";
 
-function setupStudentLogin() {
-    const modal = document.querySelector("#student-login-modal");
+function setupLoginModal() {
+    const modal = document.querySelector("#launchpad-login-modal");
 
     if (!(modal instanceof HTMLDialogElement)) {
         return;
     }
 
     const openButtons = document.querySelectorAll("[data-login-open]");
-    const closeButtons = document.querySelectorAll("[data-login-close]");
-    const returnToInputs = document.querySelectorAll("[data-return-to]");
+
+    const closeButtons = modal.querySelectorAll("[data-login-close]");
+
+    const returnToInputs = modal.querySelectorAll("[data-return-to]");
+
+    let opener = null;
+
+    const openModal = (button = null) => {
+        if (button instanceof HTMLElement) {
+            opener = button;
+        }
+
+        if (!modal.open) {
+            modal.showModal();
+        }
+    };
+
+    const closeModal = () => {
+        if (modal.open) {
+            modal.close();
+        }
+    };
 
     const returnUrl = new URL(window.location.href);
 
@@ -26,43 +46,39 @@ function setupStudentLogin() {
 
     openButtons.forEach((button) => {
         button.addEventListener("click", () => {
-            modal.showModal();
-
-            const username = modal.querySelector('input[name="username"]');
-
-            if (username instanceof HTMLInputElement) {
-                username.focus();
-            }
+            openModal(button);
         });
     });
 
     closeButtons.forEach((button) => {
-        button.addEventListener("click", () => {
-            modal.close();
-        });
+        button.addEventListener("click", closeModal);
     });
 
     modal.addEventListener("click", (event) => {
         if (event.target === modal) {
-            modal.close();
+            closeModal();
         }
+    });
+
+    modal.addEventListener("close", () => {
+        if (opener instanceof HTMLElement) {
+            opener.focus();
+        }
+
+        opener = null;
     });
 
     const query = new URLSearchParams(window.location.search);
 
-    if (query.get("login") === "failed" && !modal.open) {
-        modal.showModal();
-
-        const username = modal.querySelector('input[name="username"]');
-
-        if (username instanceof HTMLInputElement) {
-            username.focus();
-        }
+    if (query.get("login") === "failed") {
+        openModal();
     }
 }
 
 if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", setupStudentLogin);
+    document.addEventListener("DOMContentLoaded", setupLoginModal, {
+        once: true,
+    });
 } else {
-    setupStudentLogin();
+    setupLoginModal();
 }

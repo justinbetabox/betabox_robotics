@@ -3,6 +3,6 @@
 # Permit the classroom administrator to run only the exact Guest
 # workspace provision and reset commands without a password.
 
-pi ALL=(root) NOPASSWD: /opt/betabox/venv/bin/betabox guest provision
-pi ALL=(root) NOPASSWD: /opt/betabox/venv/bin/betabox guest reset
-pi ALL=(root) NOPASSWD: /opt/betabox/venv/bin/betabox-auth-check
+@SERVICE_USER@ ALL=(root) NOPASSWD: /opt/betabox/venv/bin/betabox guest provision
+@SERVICE_USER@ ALL=(root) NOPASSWD: /opt/betabox/venv/bin/betabox guest reset
+@SERVICE_USER@ ALL=(root) NOPASSWD: /opt/betabox/venv/bin/betabox-auth-check

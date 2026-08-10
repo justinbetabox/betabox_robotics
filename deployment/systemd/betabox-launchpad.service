@@ -7,8 +7,8 @@ Requires=betabox-guest-reset.service
 [Service]
 Type=simple
 
-User=pi
-Group=pi
+User=@SERVICE_USER@
+Group=@SERVICE_GROUP@
 
 WorkingDirectory=/opt/libs/betabox_robotics
 

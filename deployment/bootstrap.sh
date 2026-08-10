@@ -5,12 +5,15 @@ REPO_URL="https://github.com/justinbetabox/betabox_robotics.git"
 LIB_DIR="/opt/libs"
 SDK_DIR="$LIB_DIR/betabox_robotics"
 
+SERVICE_USER="$(id -un)"
+SERVICE_GROUP="$(id -gn "$SERVICE_USER")"
+
 echo "======================================"
 echo " Betabox Robotics Bootstrap"
 echo "======================================"
 
 if [[ "$EUID" -eq 0 ]]; then
-    echo "Please run this script as pi, not with sudo."
+    echo "Please run this script as the Betabox service user, not with sudo."
     exit 1
 fi
 
@@ -20,7 +23,8 @@ sudo apt install -y git
 
 echo "[2/4] Preparing /opt/libs..."
 sudo mkdir -p "$LIB_DIR"
-sudo chown -R "$USER:$USER" "$LIB_DIR"
+sudo chown -R "$SERVICE_USER:$SERVICE_GROUP" \
+    "$LIB_DIR"
 
 echo "[3/4] Cloning or updating SDK..."
 if [[ -d "$SDK_DIR/.git" ]]; then

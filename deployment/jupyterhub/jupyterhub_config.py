@@ -9,7 +9,7 @@ c.JupyterHub.db_url = "sqlite:////opt/jupyterhub/jupyterhub.sqlite"
 c.JupyterHub.template_paths = ["/opt/jupyterhub/theme/templates"]
 
 c.Authenticator.allow_all = True
-c.Authenticator.admin_users = {"pi"}
+c.Authenticator.admin_users = {"@SERVICE_USER@"}
 
 c.Spawner.cmd = ["/opt/jupyterhub/venv/bin/jupyterhub-singleuser"]
 c.Spawner.default_url = "/lab"

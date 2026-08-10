@@ -5,8 +5,8 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-User=pi
-Group=pi
+User=@SERVICE_USER@
+Group=@SERVICE_GROUP@
 WorkingDirectory=/opt/libs/betabox_robotics
 ExecStart=/opt/betabox/venv/bin/betabox boot-announce
 RemainAfterExit=no

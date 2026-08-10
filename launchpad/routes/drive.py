@@ -13,6 +13,7 @@ from betabox_robotics.exceptions import (
 from betabox_robotics.launchpad.auth import (
     LAUNCHPAD_CONTEXT_KEY,
     LaunchpadContext,
+    Permission,
 )
 from betabox_robotics.launchpad.drive_controller import (
     ControlState,
@@ -32,9 +33,31 @@ def parse_bool(
     raise DriveControlError(f"{name} must be a boolean")
 
 
+def drive_context(
+    request: web.Request,
+) -> LaunchpadContext:
+    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
+
+    context.require(Permission.ROBOT_DRIVE)
+
+    return context
+
+
+def vision_context(
+    request: web.Request,
+) -> LaunchpadContext:
+    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
+
+    context.require(Permission.VISION)
+
+    return context
+
+
 async def drive_page(
     request: web.Request,
 ) -> web.Response:
+    drive_context(request)
+
     return aiohttp_jinja2.render_template(
         "drive.html",
         request,
@@ -42,7 +65,7 @@ async def drive_page(
             "page": {
                 "title": "Manual Drive",
                 "eyebrow": "Robot Control",
-                "main_class": ("drive-layout"),
+                "main_class": ("interior-content-wide drive-layout"),
             },
         },
     )
@@ -51,7 +74,7 @@ async def drive_page(
 async def drive_websocket(
     request: web.Request,
 ) -> web.WebSocketResponse:
-    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
+    context = drive_context(request)
 
     controller = context.services.require_drive_controller()
 
@@ -84,7 +107,13 @@ async def drive_websocket(
 
             return websocket
 
-        except Exception as exc:
+        except (
+            DriveControlError,
+            OSError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ) as exc:
             await send_json_if_open(
                 websocket,
                 {
@@ -159,14 +188,17 @@ async def drive_websocket(
                 break
 
     finally:
-        await controller.release(client_id)
+        try:
+            await controller.release(client_id)
+        except DriveControlError:
+            pass
 
     return websocket
 
 
 async def send_json_if_open(
     websocket: web.WebSocketResponse,
-    data: dict,
+    data: dict[str, object],
 ) -> bool:
     if websocket.closed:
         return False
@@ -195,6 +227,12 @@ async def handle_drive_message(
             raise DriveControlError("message must be a JSON object")
 
         message_type = data.get("type")
+
+        if not isinstance(
+            message_type,
+            str,
+        ):
+            raise DriveControlError("message type must be a string")
 
         if message_type == "heartbeat":
             await controller.heartbeat(client_id)
@@ -261,23 +299,38 @@ async def handle_drive_message(
 async def vision_offer_proxy(
     request: web.Request,
 ) -> web.Response:
-    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
+    context = vision_context(request)
 
     platform = context.platform
 
     try:
         offer = await request.json()
 
-        if not isinstance(offer, dict):
-            raise ValueError("offer must be a JSON object")
+        if not isinstance(
+            offer,
+            dict,
+        ):
+            raise TypeError("offer must be a JSON object")
 
         sdp = offer.get("sdp")
         offer_type = offer.get("type")
 
-        if not isinstance(sdp, str) or not sdp:
+        if (
+            not isinstance(
+                sdp,
+                str,
+            )
+            or not sdp
+        ):
             raise ValueError("offer sdp must be a non-empty string")
 
-        if not isinstance(offer_type, str) or not offer_type:
+        if (
+            not isinstance(
+                offer_type,
+                str,
+            )
+            or not offer_type
+        ):
             raise ValueError("offer type must be a non-empty string")
 
         vision_url = f"{platform.network.vision_url}/offer"
@@ -294,7 +347,20 @@ async def vision_offer_proxy(
                 },
             ) as response,
         ):
-            response_data = await response.json()
+            try:
+                response_data = await response.json()
+
+            except (
+                json.JSONDecodeError,
+                aiohttp.ContentTypeError,
+            ) as exc:
+                return web.json_response(
+                    {
+                        "error": ("Vision signaling returned an invalid response."),
+                        "detail": str(exc),
+                    },
+                    status=502,
+                )
 
             if response.status >= 400:
                 return web.json_response(
@@ -308,6 +374,7 @@ async def vision_offer_proxy(
         return web.json_response(response_data)
 
     except (
+        TypeError,
         ValueError,
         json.JSONDecodeError,
     ) as exc:
@@ -318,7 +385,10 @@ async def vision_offer_proxy(
             status=400,
         )
 
-    except (TimeoutError, aiohttp.ClientError) as exc:
+    except (
+        TimeoutError,
+        aiohttp.ClientError,
+    ) as exc:
         return web.json_response(
             {
                 "error": str(exc),

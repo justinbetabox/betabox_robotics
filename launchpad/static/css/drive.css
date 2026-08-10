@@ -1,74 +1,48 @@
-.drive-layout {
-    /* Drive-specific aliases for the shared Launchpad palette */
+.drive-page .drive-layout {
     --drive-crosshair: rgb(35 43 51 / 14%);
     --drive-page: var(--color-page);
     --drive-panel: var(--color-surface);
     --drive-panel-raised: var(--color-surface-raised);
     --drive-panel-inset: var(--color-surface-inset);
-
     --drive-border: var(--color-border);
     --drive-border-strong: var(--color-border-strong);
-
     --drive-text: var(--color-text);
     --drive-text-muted: var(--color-text-muted);
     --drive-text-soft: var(--color-text-soft);
-
     --drive-overlay: var(--color-surface-overlay);
-
     --drive-healthy: var(--color-healthy);
     --drive-warning: var(--color-warning);
     --drive-critical: var(--color-critical);
-
     --drive-video-overlay: rgb(9 14 18 / 82%);
 
     display: grid;
     grid-template-columns:
         minmax(0, 1.55fr)
         minmax(420px, 0.85fr);
-
     gap: 1rem;
 
     min-width: 0;
     min-height: 0;
     height: 100%;
-
     padding: 1rem;
     overflow: hidden;
 
     color: var(--drive-text);
 }
 
-:root[data-theme="dark"] .drive-layout {
+:root[data-theme="dark"] .drive-page .drive-layout {
     --drive-crosshair: rgb(255 255 255 / 12%);
 }
 
 @media (prefers-color-scheme: dark) {
-    :root:not([data-theme]) .drive-layout {
+    :root:not([data-theme]) .drive-page .drive-layout {
         --drive-crosshair: rgb(255 255 255 / 12%);
     }
 }
 
-/* Main layout */
-
-.drive-layout {
-    display: grid;
-    grid-template-columns:
-        minmax(0, 1.55fr)
-        minmax(420px, 0.85fr);
-
-    gap: 1rem;
-
-    min-width: 0;
-    min-height: 0;
-    height: 100%;
-
-    padding: 1rem;
-    overflow: hidden;
-}
-
 /* Video */
 
-.video-panel {
+.drive-page .video-panel {
     position: relative;
 
     min-width: 0;
@@ -86,7 +60,7 @@
     box-shadow: var(--shadow-small);
 }
 
-.drive-video {
+.drive-page .drive-video {
     display: block;
 
     width: 100%;
@@ -100,7 +74,7 @@
     object-fit: contain;
 }
 
-.video-overlay {
+.drive-page .video-overlay {
     position: absolute;
     right: 1rem;
     bottom: 1rem;
@@ -122,7 +96,7 @@
     backdrop-filter: blur(10px);
 }
 
-.video-status {
+.drive-page .video-status {
     position: absolute;
     top: 4.9rem;
     left: 1rem;
@@ -145,14 +119,14 @@
     transition: opacity var(--transition-fast);
 }
 
-.video-panel[data-video-state="connected"] .video-status {
+.drive-page .video-panel[data-video-state="connected"] .video-status {
     opacity: 0;
     pointer-events: none;
 }
 
 /* Drive HUD */
 
-.drive-hud {
+.drive-page .drive-hud {
     position: absolute;
     top: 1rem;
     right: 1rem;
@@ -181,13 +155,13 @@
     backdrop-filter: blur(12px);
 }
 
-.drive-hud-primary {
+.drive-page .drive-hud-primary {
     display: flex;
     align-items: center;
     gap: 0.6rem;
 }
 
-.drive-hud-dot {
+.drive-page .drive-hud-dot {
     width: 0.75rem;
     height: 0.75rem;
 
@@ -196,38 +170,38 @@
     border-radius: 50%;
 }
 
-.drive-hud-dot.hud-unknown {
+.drive-page .drive-hud-dot.hud-unknown {
     background: var(--color-neutral);
 
     box-shadow: 0 0 0 4px rgb(125 139 148 / 18%);
 }
 
-.drive-hud-dot.hud-healthy {
+.drive-page .drive-hud-dot.hud-healthy {
     background: var(--drive-healthy);
 
     box-shadow: 0 0 0 4px rgb(37 182 122 / 18%);
 }
 
-.drive-hud-dot.hud-warning {
+.drive-page .drive-hud-dot.hud-warning {
     background: var(--drive-warning);
 
     box-shadow: 0 0 0 4px rgb(241 118 59 / 18%);
 }
 
-.drive-hud-dot.hud-critical {
+.drive-page .drive-hud-dot.hud-critical {
     background: var(--drive-critical);
 
     box-shadow: 0 0 0 4px rgb(221 31 120 / 18%);
 }
 
-.drive-hud-value {
+.drive-page .drive-hud-value {
     display: grid;
     gap: 0.1rem;
 
     min-width: max-content;
 }
 
-.drive-hud-value span {
+.drive-page .drive-hud-value span {
     color: var(--drive-text-soft);
 
     font-size: 0.62rem;
@@ -237,35 +211,35 @@
     text-transform: uppercase;
 }
 
-.drive-hud-value strong {
+.drive-page .drive-hud-value strong {
     color: var(--drive-text);
 
     font-size: 0.82rem;
 }
 
-.drive-hud,
-.video-overlay,
-.video-status {
+.drive-page .drive-hud,
+.drive-page .video-overlay,
+.drive-page .video-status {
     background: var(--drive-video-overlay);
     color: var(--brand-white);
     border-color: rgb(255 255 255 / 18%);
 }
 
-.drive-hud .drive-hud-value span {
+.drive-page .drive-hud .drive-hud-value span {
     color: rgb(255 255 255 / 68%);
 }
 
-.drive-hud .drive-hud-value strong {
+.drive-page .drive-hud .drive-hud-value strong {
     color: var(--brand-white);
 }
 
-.video-status {
+.drive-page .video-status {
     color: rgb(255 255 255 / 78%);
 }
 
 /* Control panel */
 
-.control-panel {
+.drive-page .control-panel {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
 
@@ -306,7 +280,7 @@
 
 /* Control session status */
 
-.drive-control-status {
+.drive-page .drive-control-status {
     grid-area: status;
 
     display: flex;
@@ -320,15 +294,15 @@
     border-bottom: 1px solid var(--drive-border);
 }
 
-.drive-control-status > div:first-child {
+.drive-page .drive-control-status > div:first-child {
     min-width: 0;
 }
 
-.drive-control-status .eyebrow {
+.drive-page .drive-control-status .eyebrow {
     margin-bottom: 0.2rem;
 }
 
-.drive-control-status-text {
+.drive-page .drive-control-status-text {
     margin: 0;
 
     color: var(--drive-text-muted);
@@ -337,13 +311,13 @@
     line-height: 1.4;
 }
 
-.drive-control-status .connection-status {
+.drive-page .drive-control-status .connection-status {
     flex: 0 0 auto;
 }
 
 /* Speed control */
 
-.speed-control {
+.drive-page .speed-control {
     grid-area: speed;
 
     display: flex;
@@ -352,26 +326,26 @@
     gap: 1rem;
 }
 
-.speed-control input {
+.drive-page .speed-control input {
     width: min(260px, 55%);
 }
 
-.speed-control input[type="range"] {
-    accent-color: var(--brand-blue);
+.drive-page .speed-control input[type="range"] {
+    accent-color: var(--color-primary);
 }
 
 /* Joystick sections */
 
-.joystick-section {
+.drive-page .joystick-section {
     grid-area: drive;
 }
 
-.camera-control-section {
+.drive-page .camera-control-section {
     grid-area: camera;
 }
 
-.joystick-section,
-.camera-control-section {
+.drive-page .joystick-section,
+.drive-page .camera-control-section {
     display: grid;
     grid-template-rows:
         auto
@@ -389,17 +363,17 @@
     overflow: hidden;
 }
 
-.joystick-section > div:first-child,
-.camera-control-heading {
+.drive-page .joystick-section > div:first-child,
+.drive-page .camera-control-heading {
     width: 100%;
 }
 
-.joystick-section .eyebrow,
-.camera-control-section .eyebrow {
+.drive-page .joystick-section .eyebrow,
+.drive-page .camera-control-section .eyebrow {
     margin-bottom: 0.25rem;
 }
 
-.joystick-help {
+.drive-page .joystick-help {
     margin: 0;
 
     color: var(--drive-text-soft);
@@ -410,7 +384,7 @@
 
 /* Joystick geometry and theme */
 
-.joystick {
+.drive-page .joystick {
     position: relative;
 
     width: min(100%, clamp(160px, 28vh, 250px));
@@ -439,25 +413,24 @@
     user-select: none;
 }
 
-.joystick:focus-visible {
-    outline: 3px solid rgb(0 125 198 / 48%);
-
+.drive-page .joystick:focus-visible {
+    outline: 3px solid var(--color-focus-ring);
     outline-offset: 4px;
 }
 
-.joystick:active {
+.drive-page .joystick:active {
     cursor: grabbing;
 }
 
-.joystick-crosshair {
+.drive-page .joystick-crosshair {
     position: absolute;
     inset: 0;
 
     pointer-events: none;
 }
 
-.joystick-crosshair::before,
-.joystick-crosshair::after {
+.drive-page .joystick-crosshair::before,
+.drive-page .joystick-crosshair::after {
     position: absolute;
 
     content: "";
@@ -465,7 +438,7 @@
     background: var(--drive-crosshair);
 }
 
-.joystick-crosshair::before {
+.drive-page .joystick-crosshair::before {
     top: 50%;
     right: 12%;
     left: 12%;
@@ -473,7 +446,7 @@
     height: 1px;
 }
 
-.joystick-crosshair::after {
+.drive-page .joystick-crosshair::after {
     top: 12%;
     bottom: 12%;
     left: 50%;
@@ -481,7 +454,7 @@
     width: 1px;
 }
 
-.joystick-stick {
+.drive-page .joystick-stick {
     position: absolute;
     top: 50%;
     left: 50%;
@@ -512,7 +485,7 @@
     will-change: transform;
 }
 
-.joystick-label {
+.drive-page .joystick-label {
     position: absolute;
 
     color: var(--drive-text-soft);
@@ -526,35 +499,35 @@
     pointer-events: none;
 }
 
-.joystick-forward {
+.drive-page .joystick-forward {
     top: 6%;
     left: 50%;
 
     transform: translateX(-50%);
 }
 
-.joystick-reverse {
+.drive-page .joystick-reverse {
     bottom: 6%;
     left: 50%;
 
     transform: translateX(-50%);
 }
 
-.joystick-left {
+.drive-page .joystick-left {
     top: 50%;
     left: 5%;
 
     transform: translateY(-50%) rotate(-90deg);
 }
 
-.joystick-right {
+.drive-page .joystick-right {
     top: 50%;
     right: 4%;
 
     transform: translateY(-50%) rotate(90deg);
 }
 
-.joystick-readout {
+.drive-page .joystick-readout {
     display: flex;
     align-items: center;
     justify-content: center;
@@ -567,25 +540,25 @@
     font-size: 0.72rem;
 }
 
-.joystick-readout span {
+.drive-page .joystick-readout span {
     display: grid;
     gap: 0.25rem;
 
     text-align: center;
 }
 
-.joystick-readout strong {
+.drive-page .joystick-readout strong {
     color: var(--drive-text);
 }
 
 /* Camera control */
 
-.camera-control-heading {
+.drive-page .camera-control-heading {
     display: grid;
     gap: 0.45rem;
 }
 
-.camera-joystick {
+.drive-page .camera-joystick {
     width: min(100%, clamp(145px, 24vh, 220px));
 
     background: radial-gradient(
@@ -596,7 +569,7 @@
     );
 }
 
-.camera-stick {
+.drive-page .camera-stick {
     width: 29%;
 
     border-color: #f6a47b;
@@ -608,7 +581,7 @@
     );
 }
 
-.camera-center-button {
+.drive-page .camera-center-button {
     justify-self: stretch;
 
     padding: 0.45rem 0.65rem;
@@ -631,20 +604,24 @@
         border-color var(--transition-fast);
 }
 
-.camera-center-button:hover {
+.drive-page .camera-center-button:hover:not(:disabled) {
     background: var(--color-surface-subtle);
     border-color: var(--color-primary);
 }
 
-.camera-center-button:focus-visible {
-    outline: 3px solid rgb(0 125 198 / 48%);
-
+.drive-page .camera-center-button:focus-visible {
+    outline: 3px solid var(--color-focus-ring);
     outline-offset: 3px;
+}
+
+.drive-page .camera-center-button:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
 }
 
 /* Emergency stop */
 
-.emergency-stop {
+.drive-page .emergency-stop {
     grid-area: stop;
 
     display: flex;
@@ -655,11 +632,11 @@
     width: 100%;
     min-height: 52px;
 
-    border: 1px solid var(--brand-pink);
+    border: 1px solid var(--color-danger);
 
     border-radius: var(--radius-medium);
 
-    background: var(--brand-pink);
+    background: var(--color-danger);
     color: var(--brand-white);
 
     font: inherit;
@@ -675,29 +652,33 @@
         transform var(--transition-fast);
 }
 
-.emergency-stop:hover {
-    background: #bd1765;
+.drive-page .emergency-stop:hover:not(:disabled) {
+    background: var(--color-danger-hover);
 }
 
-.emergency-stop:active {
+.drive-page .emergency-stop:active:not(:disabled) {
     transform: translateY(1px);
 
-    background: #a41358;
+    background: var(--color-danger-hover);
 }
 
-.emergency-stop:focus-visible {
-    outline: 3px solid rgb(221 31 120 / 44%);
-
+.drive-page .emergency-stop:focus-visible {
+    outline: 3px solid var(--color-focus-ring);
     outline-offset: 3px;
 }
 
-.stop-icon {
+.drive-page .emergency-stop:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.drive-page .stop-icon {
     font-size: 1.35rem;
 }
 
 /* Keyboard and safety information */
 
-.keyboard-help {
+.drive-page .keyboard-help {
     grid-area: keyboard;
 
     display: flex;
@@ -716,13 +697,13 @@
     font-size: 0.72rem;
 }
 
-.keyboard-help strong {
+.drive-page .keyboard-help strong {
     width: 100%;
 
     color: var(--drive-text);
 }
 
-.drive-safety {
+.drive-page .drive-safety {
     grid-area: safety;
 
     margin: 0;
@@ -733,26 +714,26 @@
     line-height: 1.35;
 }
 
-html[data-compact-layout="true"] .drive-control-status {
+html[data-compact-layout="true"] .drive-page .drive-control-status {
     padding-bottom: 0.45rem;
 }
 
-html[data-compact-layout="true"] .drive-layout {
+html[data-compact-layout="true"] .drive-page .drive-layout {
     gap: 0.5rem;
     padding: 0.5rem;
 }
 
-html[data-compact-layout="true"] .control-panel {
+html[data-compact-layout="true"] .drive-page .control-panel {
     gap: 0.4rem;
     padding: 0.6rem;
 }
 
-html[data-compact-layout="true"] .drive-hud {
+html[data-compact-layout="true"] .drive-page .drive-hud {
     gap: 0.55rem;
     padding: 0.4rem 0.55rem;
 }
 
-html[data-compact-layout="true"] .video-overlay {
+html[data-compact-layout="true"] .drive-page .video-overlay {
     right: 0.5rem;
     bottom: 0.5rem;
     left: 0.5rem;
@@ -760,51 +741,51 @@ html[data-compact-layout="true"] .video-overlay {
     padding: 0.45rem 0.6rem;
 }
 
-html[data-compact-layout="true"] .keyboard-help {
+html[data-compact-layout="true"] .drive-page .keyboard-help {
     padding: 0.4rem 0.55rem;
 }
 
-html[data-compact-layout="true"] .joystick-section,
-html[data-compact-layout="true"] .camera-control-section {
+html[data-compact-layout="true"] .drive-page .joystick-section,
+html[data-compact-layout="true"] .drive-page .camera-control-section {
     gap: 0.35rem;
 }
 
 /* Short desktop windows */
 
 @media (max-height: 760px) and (min-width: 961px) {
-    .drive-layout {
+    .drive-page .drive-layout {
         gap: 0.65rem;
         padding: 0.65rem;
     }
 
-    .control-panel {
+    .drive-page .control-panel {
         gap: 0.5rem;
         padding: 0.75rem;
     }
 
-    .drive-control-status {
+    .drive-page .drive-control-status {
         padding-bottom: 0.4rem;
     }
 
-    .drive-control-status-text {
+    .drive-page .drive-control-status-text {
         display: none;
     }
 
-    .joystick {
+    .drive-page .joystick {
         width: min(100%, clamp(130px, 23vh, 190px));
     }
 
-    .camera-joystick {
+    .drive-page .camera-joystick {
         width: min(100%, clamp(120px, 20vh, 170px));
     }
 
-    .joystick-help,
-    .keyboard-help,
-    .drive-safety {
+    .drive-page .joystick-help,
+    .drive-page .keyboard-help,
+    .drive-page .drive-safety {
         display: none;
     }
 
-    .emergency-stop {
+    .drive-page .emergency-stop {
         min-height: 44px;
     }
 }
@@ -812,7 +793,7 @@ html[data-compact-layout="true"] .camera-control-section {
 /* Tablet and narrow layouts */
 
 @media (max-width: 960px) {
-    .drive-layout {
+    .drive-page .drive-layout {
         grid-template-columns: 1fr;
 
         height: auto;
@@ -821,18 +802,18 @@ html[data-compact-layout="true"] .camera-control-section {
         overflow: visible;
     }
 
-    .video-panel,
-    .drive-video {
+    .drive-page .video-panel,
+    .drive-page .drive-video {
         min-height: min(52dvh, 420px);
     }
 
-    .control-panel {
+    .drive-page .control-panel {
         height: auto;
         overflow: visible;
     }
 
-    .joystick-section,
-    .camera-control-section {
+    .drive-page .joystick-section,
+    .drive-page .camera-control-section {
         overflow: visible;
     }
 }
@@ -840,11 +821,11 @@ html[data-compact-layout="true"] .camera-control-section {
 /* Phones */
 
 @media (max-width: 640px) {
-    .drive-layout {
+    .drive-page .drive-layout {
         padding: 0.75rem;
     }
 
-    .drive-hud {
+    .drive-page .drive-hud {
         right: 0.6rem;
         left: 0.6rem;
 
@@ -854,33 +835,33 @@ html[data-compact-layout="true"] .camera-control-section {
         gap: 0.75rem;
     }
 
-    .drive-hud-value strong {
+    .drive-page .drive-hud-value strong {
         font-size: 0.75rem;
     }
 
-    .drive-hud-value span {
+    .drive-page .drive-hud-value span {
         font-size: 0.56rem;
     }
 
-    .drive-hud-value:nth-child(3) {
+    .drive-page .drive-hud-value:nth-child(3) {
         display: none;
     }
 
-    .video-panel,
-    .drive-video {
+    .drive-page .video-panel,
+    .drive-page .drive-video {
         min-height: 300px;
     }
 
-    .drive-control-status {
+    .drive-page .drive-control-status {
         align-items: flex-start;
         flex-direction: column;
     }
 
-    .drive-control-status .connection-status {
+    .drive-page .drive-control-status .connection-status {
         align-self: flex-start;
     }
 
-    .control-panel {
+    .drive-page .control-panel {
         grid-template-columns: 1fr;
 
         grid-template-areas:
@@ -893,27 +874,27 @@ html[data-compact-layout="true"] .camera-control-section {
             "safety";
     }
 
-    .keyboard-help {
+    .drive-page .keyboard-help {
         display: none;
     }
 
-    .joystick {
+    .drive-page .joystick {
         width: min(82vw, 300px);
     }
 
-    .camera-joystick {
+    .drive-page .camera-joystick {
         width: min(68vw, 230px);
     }
 
-    .joystick-readout {
+    .drive-page .joystick-readout {
         gap: 1rem;
     }
 
-    .camera-control-heading {
+    .drive-page .camera-control-heading {
         align-items: stretch;
     }
 
-    .camera-center-button {
+    .drive-page .camera-center-button {
         width: 100%;
     }
 }

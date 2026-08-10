@@ -1,10 +1,13 @@
 {% extends "interior.html" %}
 
+{% block body_class %}
+    interior-body drive-page
+{% endblock %}
 
 {% block interior_styles %}
     <link
         rel="stylesheet"
-        href="/static/css/drive.css"
+        href="{{ url('static', filename='css/drive.css') }}"
     >
 {% endblock %}
 
@@ -19,6 +22,7 @@
             class="video-status"
             role="status"
             aria-live="polite"
+            aria-atomic="true"
         >
             Connecting camera…
         </div>
@@ -27,7 +31,6 @@
             id="drive-hud"
             class="drive-hud"
             aria-label="Robot status"
-            aria-live="polite"
         >
             <div class="drive-hud-primary">
                 <span
@@ -105,7 +108,12 @@
                 Waiting for control…
             </span>
 
-            <span id="drive-command">
+            <span
+                id="drive-command"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+            >
                 Stopped
             </span>
         </div>
@@ -136,6 +144,7 @@
                 "
                 role="status"
                 aria-live="polite"
+                aria-atomic="true"
             >
                 Connecting…
             </div>
@@ -153,6 +162,13 @@
                 </strong>
             </div>
 
+            <label
+                class="sr-only"
+                for="speed"
+            >
+                Drive speed
+            </label>
+
             <input
                 id="speed"
                 type="range"
@@ -160,7 +176,7 @@
                 max="100"
                 step="5"
                 value="40"
-                aria-label="Drive speed"
+                aria-describedby="speed-value"
             >
         </div>
 
@@ -180,7 +196,6 @@
             <div
                 id="drive-joystick"
                 class="joystick"
-                role="application"
                 aria-label="Two-axis drive joystick"
                 tabindex="0"
             >
@@ -281,7 +296,6 @@
                     joystick
                     camera-joystick
                 "
-                role="application"
                 aria-label="Camera pan and tilt joystick"
                 tabindex="0"
             >
@@ -360,6 +374,7 @@
             id="emergency-stop"
             class="emergency-stop"
             type="button"
+            aria-describedby="drive-safety"
         >
             <span
                 class="stop-icon"
@@ -402,7 +417,8 @@
         </div>
 
 
-        <p class="drive-safety">
+        <p  id="drive-safety"
+            class="drive-safety">
             The robot stops automatically if this
             page disconnects or stops sending
             control heartbeats.
@@ -414,6 +430,6 @@
 {% block interior_scripts %}
     <script
         type="module"
-        src="/static/js/drive.js"
+        src="{{ url('static', filename='js/drive.js') }}"
     ></script>
 {% endblock %}

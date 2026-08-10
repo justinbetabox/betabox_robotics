@@ -8,16 +8,37 @@ from aiohttp import web
 from betabox_robotics.launchpad.auth import (
     LAUNCHPAD_CONTEXT_KEY,
     LaunchpadContext,
+    Permission,
 )
 from betabox_robotics.services.services import (
     collect_services,
     service_summary,
 )
 
+_SERVICE_COLLECTION_ERRORS = (
+    LookupError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
+
+def services_context(
+    request: web.Request,
+) -> LaunchpadContext:
+    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
+
+    context.require(Permission.SERVICES)
+
+    return context
+
 
 async def services_page(
     request: web.Request,
 ) -> web.Response:
+    services_context(request)
+
     return aiohttp_jinja2.render_template(
         "services.html",
         request,
@@ -25,7 +46,7 @@ async def services_page(
             "page": {
                 "title": "Services",
                 "eyebrow": "Platform Services",
-                "main_class": "page-layout",
+                "main_class": "page-layout services-layout",
             },
         },
     )
@@ -38,14 +59,14 @@ async def services_api(
     Return read-only status information for managed platform services.
     """
 
-    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
+    context = services_context(request)
 
     try:
         statuses = await asyncio.to_thread(
             collect_services,
             context.platform,
         )
-    except Exception as exc:
+    except _SERVICE_COLLECTION_ERRORS as exc:
         return web.json_response(
             {
                 "error": "services_unavailable",
@@ -55,12 +76,14 @@ async def services_api(
             status=500,
         )
 
-    payload = {
-        "summary": service_summary(statuses),
-        "services": [status.to_dict() for status in statuses],
-    }
-
-    return web.json_response(payload)
+    return web.json_response(
+        {
+            "summary": service_summary(
+                statuses,
+            ),
+            "services": [status.to_dict() for status in statuses],
+        }
+    )
 
 
 def setup_services_routes(

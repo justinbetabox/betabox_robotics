@@ -1,9 +1,13 @@
 {% extends "interior.html" %}
 
+{% block body_class %}
+    interior-body services-page
+{% endblock %}
+
 {% block interior_styles %}
     <link
         rel="stylesheet"
-        href="/static/css/services.css"
+        href="{{ url('static', filename='css/services.css') }}"
     >
 {% endblock %}
 
@@ -33,6 +37,7 @@
                         "
                         role="status"
                         aria-live="polite"
+                        aria-atomic="true"
                     >
                         Connecting…
                     </div>
@@ -214,6 +219,7 @@
     <section
         id="services-error-panel"
         class="error-panel"
+        role="alert"
         aria-labelledby="services-error-heading"
         hidden
     >
@@ -242,5 +248,8 @@
 {% endblock %}
 
 {% block interior_scripts %}
-    <script src="/static/js/services.js"></script>
+    <script
+        type="module"
+        src="{{ url('static', filename='js/services.js') }}"
+    ></script>
 {% endblock %}

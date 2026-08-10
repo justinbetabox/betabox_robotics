@@ -1,9 +1,13 @@
 {% extends "interior.html" %}
 
+{% block body_class %}
+    interior-body jupyter-page
+{% endblock %}
+
 {% block interior_styles %}
     <link
         rel="stylesheet"
-        href="/static/css/jupyter.css"
+        href="{{ url('static', filename='css/jupyter.css') }}"
     >
 {% endblock %}
 
@@ -24,6 +28,7 @@
                 class="jupyter-card-status"
                 role="status"
                 aria-live="polite"
+                aria-atomic="true"
             >
 
                 <span
@@ -93,6 +98,7 @@
             "
             href="#"
             aria-disabled="true"
+            aria-describedby="jupyter-message"
             tabindex="-1"
         >
             Open JupyterLab
@@ -136,5 +142,8 @@ with BetaboxCar() as car:
 {% endblock %}
 
 {% block interior_scripts %}
-    <script src="/static/js/jupyter.js"></script>
+    <script
+        type="module"
+        src="{{ url('static', filename='js/jupyter.js') }}"
+    ></script>
 {% endblock %}

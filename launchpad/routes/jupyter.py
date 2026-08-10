@@ -9,6 +9,7 @@ from aiohttp import web
 from betabox_robotics.launchpad.auth import (
     LAUNCHPAD_CONTEXT_KEY,
     LaunchpadContext,
+    Permission,
 )
 from betabox_robotics.services.http_health import (
     check_http_available,
@@ -28,20 +29,33 @@ def service_state(
             capture_output=True,
             text=True,
             timeout=3,
+            check=False,
         )
-    except Exception:
+    except (
+        OSError,
+        subprocess.SubprocessError,
+    ):
         return "unknown"
 
-    return result.stdout.strip() or "unknown"
+    return result.stdout.strip() or result.stderr.strip() or "unknown"
+
+
+def jupyter_context(
+    request: web.Request,
+) -> LaunchpadContext:
+    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
+
+    context.require(Permission.CODE)
+
+    return context
 
 
 async def jupyter_status(
     request: web.Request,
 ) -> web.Response:
-    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
+    context = jupyter_context(request)
 
     platform = context.platform
-
     unit = platform.services.jupyterhub.unit
 
     state = await asyncio.to_thread(
@@ -53,7 +67,10 @@ async def jupyter_status(
     health_message = "Service is not active."
 
     if state == "active":
-        responding, health_message = await asyncio.to_thread(
+        (
+            responding,
+            health_message,
+        ) = await asyncio.to_thread(
             check_http_available,
             platform.network.jupyterhub_health_url,
         )
@@ -74,6 +91,8 @@ async def jupyter_status(
 async def jupyter_page(
     request: web.Request,
 ) -> web.Response:
+    jupyter_context(request)
+
     return aiohttp_jinja2.render_template(
         "jupyter.html",
         request,
@@ -81,7 +100,7 @@ async def jupyter_page(
             "page": {
                 "title": "JupyterLab",
                 "eyebrow": "Betabox Coding",
-                "main_class": "page-layout jupyter-layout",
+                "main_class": ("page-layout jupyter-layout"),
             },
         },
     )

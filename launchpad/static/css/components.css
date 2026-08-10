@@ -704,11 +704,11 @@ video {
 }
 
 .button-danger {
-    background: var(--brand-pink);
+    background: var(--color-danger);
 }
 
 .button-danger:hover:not(:disabled) {
-    background: #bd1765;
+    background: var(--color-danger-hover);
 }
 
 /* Navigation */
@@ -820,6 +820,30 @@ video {
     color: var(--color-primary);
 }
 
+.skip-link {
+    position: absolute;
+    left: 1rem;
+    top: -4rem;
+
+    z-index: 1000;
+
+    padding: 0.75rem 1rem;
+
+    border-radius: var(--radius-medium);
+
+    background: var(--color-primary);
+    color: var(--color-text-on-primary);
+
+    font-weight: 700;
+    text-decoration: none;
+
+    transition: top var(--transition-fast);
+}
+
+.skip-link:focus {
+    top: 1rem;
+}
+
 /* Status */
 
 /* Connection status */
@@ -869,6 +893,13 @@ video {
     border-color: var(--color-healthy);
     background: var(--brand-green-light);
     color: var(--color-healthy);
+}
+
+.connection-status.status-disconnected {
+    border-color: var(--color-warning);
+
+    color: var(--color-warning);
+    background: var(--color-warning-subtle);
 }
 
 .connection-status.status-busy,
@@ -968,7 +999,7 @@ video {
 }
 
 .status-badge.status-info .status-dot {
-    background: var(--brand-blue);
+    background: var(--color-info);
 }
 
 /* =========================================================
@@ -1022,19 +1053,19 @@ Detail cards
 }
 
 .notice-info {
-    border-left-color: var(--brand-blue);
+    border-left-color: var(--color-info);
 }
 
 .notice-warning {
-    border-left-color: var(--brand-orange);
+    border-left-color: var(--color-warning);
 }
 
 .notice-critical {
-    border-left-color: var(--brand-pink);
+    border-left-color: var(--color-critical);
 }
 
 .notice-success {
-    border-left-color: var(--brand-green);
+    border-left-color: var(--color-healthy);
 }
 
 /* Error panels */
@@ -1163,7 +1194,7 @@ Detail cards
     white-space: nowrap;
 }
 
-/* Student login modal */
+/* Launchpad login modal */
 
 .login-modal {
     width: min(92vw, 440px);
@@ -1307,6 +1338,34 @@ Detail cards
     margin-top: 0.25rem;
 
     border-radius: var(--radius-small);
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+    outline: 3px solid var(--color-focus-ring);
+    outline-offset: 2px;
+}
+
+::selection {
+    background: var(--color-primary-subtle);
+    color: var(--color-text);
+}
+
+[aria-disabled="true"] {
+    opacity: 0.55;
+    pointer-events: none;
+}
+
+.sr-only-focusable:not(:focus):not(:active) {
+    position: absolute;
+
+    width: 1px;
+    height: 1px;
+
+    overflow: hidden;
+
+    clip: rect(0, 0, 0, 0);
 }
 
 /* Responsive authentication components */
@@ -1511,18 +1570,16 @@ html[data-compact-layout="true"] .overview-card {
     }
 }
 
-@media (prefers-reduced-motion: reduce) {
-    *,
-    *::before,
-    *::after {
-        scroll-behavior: auto !important;
-        transition-duration: 0.01ms !important;
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
+@media print {
+    .button,
+    .identity-badge,
+    .login-modal,
+    .connection-status {
+        display: none !important;
     }
 
-    .action-card:hover,
-    .button:active {
-        transform: none;
+    body {
+        background: white;
+        color: black;
     }
 }

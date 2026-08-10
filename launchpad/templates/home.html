@@ -269,5 +269,8 @@
 {% endblock %}
 
 {% block page_scripts %}
-    <script src="{{ url('static', filename='js/home.js') }}"></script>
+    <script
+        type="module"
+        src="{{ url('static', filename='js/home.js') }}"
+    ></script>
 {% endblock %}

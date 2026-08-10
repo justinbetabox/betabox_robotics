@@ -11,9 +11,9 @@ function requireElement(selector, expectedType = HTMLElement) {
 }
 
 export const elements = {
-    connection: requireElement("#status-connection"),
+    connectionStatus: requireElement("#status-connection"),
 
-    updated: requireElement("#status-updated"),
+    updatedTime: requireElement("#status-updated"),
 
     refreshButton: requireElement("#refresh-status", HTMLButtonElement),
 

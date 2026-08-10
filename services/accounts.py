@@ -239,7 +239,7 @@ BETABOX_ACCOUNTS: tuple[ProvisionedAccount, ...] = (
         group="guest",
         home=Path("/home/guest"),
         shell=Path("/usr/sbin/nologin"),
-        supplemental_groups=(BETABOX_HARDWARE_GROUPS),
+        supplemental_groups=BETABOX_HARDWARE_GROUPS,
         persistent=False,
     ),
     ProvisionedAccount(
@@ -248,7 +248,8 @@ BETABOX_ACCOUNTS: tuple[ProvisionedAccount, ...] = (
         group="admin",
         home=Path("/home/admin"),
         shell=Path("/bin/bash"),
-        supplemental_groups=(BETABOX_HARDWARE_GROUPS),
+        password="teachthefuture",
+        supplemental_groups=BETABOX_HARDWARE_GROUPS,
     ),
     ProvisionedAccount(
         username="student",
@@ -256,7 +257,8 @@ BETABOX_ACCOUNTS: tuple[ProvisionedAccount, ...] = (
         group="student",
         home=Path("/home/student"),
         shell=Path("/bin/bash"),
-        supplemental_groups=(BETABOX_HARDWARE_GROUPS),
+        password="learnbydoing",
+        supplemental_groups=BETABOX_HARDWARE_GROUPS,
     ),
     ProvisionedAccount(
         username="student1",
@@ -264,7 +266,8 @@ BETABOX_ACCOUNTS: tuple[ProvisionedAccount, ...] = (
         group="student1",
         home=Path("/home/student1"),
         shell=Path("/bin/bash"),
-        supplemental_groups=(BETABOX_HARDWARE_GROUPS),
+        password="learnbydoing",
+        supplemental_groups=BETABOX_HARDWARE_GROUPS,
     ),
     ProvisionedAccount(
         username="student2",
@@ -272,7 +275,8 @@ BETABOX_ACCOUNTS: tuple[ProvisionedAccount, ...] = (
         group="student2",
         home=Path("/home/student2"),
         shell=Path("/bin/bash"),
-        supplemental_groups=(BETABOX_HARDWARE_GROUPS),
+        password="learnbydoing",
+        supplemental_groups=BETABOX_HARDWARE_GROUPS,
     ),
     ProvisionedAccount(
         username="student3",
@@ -280,7 +284,8 @@ BETABOX_ACCOUNTS: tuple[ProvisionedAccount, ...] = (
         group="student3",
         home=Path("/home/student3"),
         shell=Path("/bin/bash"),
-        supplemental_groups=(BETABOX_HARDWARE_GROUPS),
+        password="learnbydoing",
+        supplemental_groups=BETABOX_HARDWARE_GROUPS,
     ),
 )
 

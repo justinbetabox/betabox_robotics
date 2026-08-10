@@ -44,6 +44,10 @@
     --color-primary-active: #005487;
     --color-primary-subtle: var(--brand-blue-light);
 
+    /* Destructive actions */
+    --color-danger: var(--brand-pink);
+    --color-danger-hover: #bd1765;
+
     /* Status */
     --color-healthy: #25b67a;
     --color-warning: #f1763b;
@@ -51,7 +55,14 @@
     --color-neutral: #7d8b94;
     --color-info: #007dc6;
 
+    /* Semantic status backgrounds */
+    --color-info-subtle: var(--brand-blue-light);
+    --color-healthy-subtle: var(--brand-green-light);
+    --color-warning-subtle: var(--brand-orange-light);
+    --color-critical-subtle: var(--brand-pink-light);
+
     /* Focus */
+    --color-focus-outline: var(--color-primary);
     --color-focus-ring: rgb(0 125 198 / 32%);
 
     /* Typography */
@@ -93,6 +104,10 @@
     --transition-medium: 220ms ease;
 }
 
+:root[data-theme="light"] {
+    color-scheme: light;
+}
+
 :root[data-theme="dark"] {
     color-scheme: dark;
 
@@ -129,6 +144,7 @@
     --brand-pink-light: #4a2035;
 
     --color-neutral: #8998a3;
+    --color-focus-outline: var(--color-primary);
     --color-focus-ring: rgb(22 143 212 / 42%);
 
     /* Shadows */

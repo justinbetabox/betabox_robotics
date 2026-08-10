@@ -17,6 +17,11 @@ def safe_return_to(
 ) -> str:
     """Return a safe local redirect target."""
 
+    if value is None:
+        return "/"
+
+    value = value.strip()
+
     if not value:
         return "/"
 
@@ -24,6 +29,9 @@ def safe_return_to(
         return "/"
 
     if value.startswith("//"):
+        return "/"
+
+    if "\\" in value:
         return "/"
 
     return value
@@ -36,8 +44,20 @@ async def login(
 
     form = await request.post()
 
-    username = str(form.get("username", ""))
-    password = str(form.get("password", ""))
+    username = str(
+        form.get(
+            "username",
+            "",
+        )
+    ).strip()
+
+    password = str(
+        form.get(
+            "password",
+            "",
+        )
+    )
+
     return_to = safe_return_to(
         str(
             form.get(
@@ -48,6 +68,7 @@ async def login(
     )
 
     authentication_service = request.app[AUTHENTICATION_SERVICE_KEY]
+
     session_manager = request.app[SESSION_MANAGER_KEY]
 
     try:
@@ -56,8 +77,12 @@ async def login(
             password,
         )
 
-        session = session_manager.create(username.strip())
-    except (AuthenticationError, ValueError):
+        session = session_manager.create(username)
+
+    except (
+        AuthenticationError,
+        ValueError,
+    ):
         query = urlencode(
             {
                 "login": "failed",
@@ -66,7 +91,7 @@ async def login(
 
         separator = "&" if "?" in return_to else "?"
 
-        raise web.HTTPSeeOther(location=f"{return_to}{separator}{query}")
+        raise web.HTTPSeeOther(location=(f"{return_to}{separator}{query}"))
 
     assert session.id is not None
 

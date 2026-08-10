@@ -121,7 +121,7 @@ async function loadInformation() {
         showError(
             error instanceof Error
                 ? error.message
-                : "The Information API " + "did not respond.",
+                : "The Information API did not respond.",
         );
 
         clearTimestamp();

@@ -4,7 +4,15 @@ import { INFORMATION_API_URL } from "./constants.js";
 
 /* Validation */
 
-function validatePayload(payload) {
+function requireObject(value, name) {
+    if (value === null || typeof value !== "object" || Array.isArray(value)) {
+        throw new Error(`The information response is missing ${name}.`);
+    }
+
+    return value;
+}
+
+function normalizePayload(payload) {
     if (
         payload === null ||
         typeof payload !== "object" ||
@@ -13,28 +21,21 @@ function validatePayload(payload) {
         throw new Error("The Information API returned an invalid response.");
     }
 
-    const sections = [
-        "robot",
-        "network",
-        "software",
-        "storage",
-        "media",
-        "features",
-    ];
+    return {
+        ...payload,
 
-    for (const section of sections) {
-        const value = payload[section];
+        robot: requireObject(payload.robot, "robot"),
 
-        if (
-            value === null ||
-            typeof value !== "object" ||
-            Array.isArray(value)
-        ) {
-            throw new Error(`The information response is missing ${section}.`);
-        }
-    }
+        network: requireObject(payload.network, "network"),
 
-    return payload;
+        software: requireObject(payload.software, "software"),
+
+        storage: requireObject(payload.storage, "storage"),
+
+        media: requireObject(payload.media, "media"),
+
+        features: requireObject(payload.features, "features"),
+    };
 }
 
 /* Error responses */
@@ -76,7 +77,5 @@ export async function requestInformation() {
         throw new Error(await responseErrorMessage(response));
     }
 
-    const payload = await response.json();
-
-    return validatePayload(payload);
+    return normalizePayload(await response.json());
 }

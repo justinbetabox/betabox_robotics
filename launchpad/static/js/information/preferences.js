@@ -11,6 +11,8 @@ const DEFAULT_PREFERENCES = Object.freeze({
     compact_layout: false,
 });
 
+let preferenceRequestVersion = 0;
+
 let statusTimer = null;
 
 /* Validation */
@@ -190,8 +192,16 @@ function showPreferenceStatus(message) {
 /* Persistence */
 
 async function persistFormPreferences() {
+    const requestVersion = ++preferenceRequestVersion;
+
+    const requestedPreferences = preferencesFromForm();
+
     try {
-        const preferences = await savePreferences(preferencesFromForm());
+        const preferences = await savePreferences(requestedPreferences);
+
+        if (requestVersion !== preferenceRequestVersion) {
+            return;
+        }
 
         renderPreferences(preferences);
 
@@ -199,6 +209,10 @@ async function persistFormPreferences() {
 
         showPreferenceStatus("Preferences saved");
     } catch (error) {
+        if (requestVersion !== preferenceRequestVersion) {
+            return;
+        }
+
         console.error("Unable to save Launchpad preferences:", error);
 
         showPreferenceStatus("Unable to save preferences");
@@ -206,8 +220,14 @@ async function persistFormPreferences() {
 }
 
 async function restoreDefaultPreferences() {
+    const requestVersion = ++preferenceRequestVersion;
+
     try {
         const preferences = await resetPreferences();
+
+        if (requestVersion !== preferenceRequestVersion) {
+            return;
+        }
 
         renderPreferences(preferences);
 
@@ -215,6 +235,10 @@ async function restoreDefaultPreferences() {
 
         showPreferenceStatus("Preferences reset");
     } catch (error) {
+        if (requestVersion !== preferenceRequestVersion) {
+            return;
+        }
+
         console.error("Unable to reset Launchpad preferences:", error);
 
         showPreferenceStatus("Unable to reset preferences");

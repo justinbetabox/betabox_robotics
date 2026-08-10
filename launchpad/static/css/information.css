@@ -153,19 +153,19 @@
 .information-page .information-badge-healthy {
     color: var(--color-healthy);
     border-color: var(--color-healthy);
-    background: var(--brand-green-light);
+    background: var(--color-healthy-subtle);
 }
 
 .information-page .information-badge-warning {
     color: var(--color-warning);
     border-color: var(--color-warning);
-    background: var(--brand-orange-light);
+    background: var(--color-warning-subtle);
 }
 
 .information-page .information-badge-error {
     color: var(--color-critical);
     border-color: var(--color-critical);
-    background: var(--brand-pink-light);
+    background: var(--color-critical-subtle);
 }
 
 .information-page .information-badge-neutral {
@@ -458,6 +458,16 @@ html[data-compact-layout="true"] .information-page .preferences-actions {
 
 html[data-compact-layout="true"] .information-page .preference-group {
     padding: 0.75rem 0.9rem 0.65rem;
+}
+
+html[data-reduced-motion="true"] .information-page .storage-meter-fill {
+    transition: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .information-page .storage-meter-fill {
+        transition: none;
+    }
 }
 
 @media (min-width: 900px) {

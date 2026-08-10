@@ -1,9 +1,13 @@
 {% extends "interior.html" %}
 
+{% block body_class %}
+    interior-body information-page
+{% endblock %}
+
 {% block interior_styles %}
     <link
         rel="stylesheet"
-        href="/static/css/information.css"
+        href="{{ url('static', filename='css/information.css') }}"
     >
 {% endblock %}
 
@@ -38,6 +42,7 @@
                         "
                         role="status"
                         aria-live="polite"
+                        aria-atomic="true"
                     >
                         Updating…
                     </div>
@@ -413,7 +418,7 @@
                     <div class="feature-row">
                         <div>
                             <strong>
-                                Camera
+                                Camera Feed
                             </strong>
 
                             <span>
@@ -561,9 +566,10 @@
                 </div>
 
                 <p class="preferences-description">
-                    These preferences are stored only in this
-                    browser. They do not change the robot or affect
-                    other students.
+                    These preferences are saved to your current
+                    Launchpad workspace. Guest preferences are
+                    temporary, while student preferences persist
+                    between sessions.
                 </p>
 
                 <div class="preference-list">
@@ -677,6 +683,7 @@
                         class="preferences-status"
                         role="status"
                         aria-live="polite"
+                        aria-atomic="true"
                     ></span>
                 </div>
             </section>
@@ -686,6 +693,7 @@
     <section
         id="information-error-panel"
         class="error-panel"
+        role="alert"
         aria-labelledby="error-heading"
         hidden
     >
@@ -714,5 +722,8 @@
 {% endblock %}
 
 {% block interior_scripts %}
-    <script src="/static/js/information.js"></script>
+    <script
+        type="module"
+        src="{{ url('static', filename='js/information.js') }}"
+    ></script>
 {% endblock %}

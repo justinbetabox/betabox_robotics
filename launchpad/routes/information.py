@@ -8,15 +8,36 @@ from aiohttp import web
 from betabox_robotics.launchpad.auth import (
     LAUNCHPAD_CONTEXT_KEY,
     LaunchpadContext,
+    Permission,
 )
 from betabox_robotics.services.platform_information import (
     collect_platform_information,
 )
 
+_INFORMATION_COLLECTION_ERRORS = (
+    LookupError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
+
+def information_context(
+    request: web.Request,
+) -> LaunchpadContext:
+    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
+
+    context.require(Permission.INFORMATION)
+
+    return context
+
 
 async def information_page(
     request: web.Request,
 ) -> web.Response:
+    information_context(request)
+
     return aiohttp_jinja2.render_template(
         "information.html",
         request,
@@ -40,14 +61,15 @@ async def information_api(
     complete PlatformConfig or administrative configuration values.
     """
 
-    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
+    context = information_context(request)
 
     try:
         report = await asyncio.to_thread(
             collect_platform_information,
             context.platform,
         )
-    except Exception as exc:
+
+    except _INFORMATION_COLLECTION_ERRORS as exc:
         return web.json_response(
             {
                 "error": "information_unavailable",

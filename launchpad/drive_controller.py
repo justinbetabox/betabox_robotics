@@ -2,17 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from math import isfinite
-from typing import TYPE_CHECKING
 
-from betabox_robotics.calibration import (
-    CalibrationManager,
-)
+from betabox_robotics import BetaboxCar
 from betabox_robotics.exceptions import BetaboxError
 
-if TYPE_CHECKING:
-    from betabox_robotics import BetaboxCar
+RobotFactory = Callable[[], BetaboxCar]
 
 
 def _validate_axis(
@@ -226,20 +223,17 @@ class ManualDriveController:
 
     def __init__(
         self,
-        calibration_manager: CalibrationManager,
+        robot_factory: RobotFactory,
         *,
         heartbeat_timeout: float = 1.0,
         update_hz: float = 20.0,
         maximum_speed: int = 100,
         steering_angle: float = 30.0,
     ) -> None:
-        if not isinstance(
-            calibration_manager,
-            CalibrationManager,
-        ):
-            raise TypeError("calibration_manager must be a CalibrationManager")
+        if not callable(robot_factory):
+            raise TypeError("robot_factory must be callable")
 
-        self.calibration_manager = calibration_manager
+        self._robot_factory = robot_factory
 
         self.heartbeat_timeout = _validate_positive_number(
             heartbeat_timeout,
@@ -487,17 +481,22 @@ class ManualDriveController:
 
         await self._safe_neutralize()
 
-    async def _ensure_robot(self) -> None:
+    async def _ensure_robot(
+        self,
+    ) -> None:
         if self._robot is not None:
             return
 
-        robot = await asyncio.to_thread(
-            self.calibration_manager.create_car,
-            owner="Manual Drive",
-        )
+        try:
+            robot = await asyncio.to_thread(self._robot_factory)
+        except BetaboxError as exc:
+            raise DriveControlError(f"failed to create robot: {exc}") from exc
 
-        if robot is None:
-            raise DriveControlError("failed to create robot")
+        if not isinstance(
+            robot,
+            BetaboxCar,
+        ):
+            raise DriveControlError("robot factory must return a BetaboxCar")
 
         self._robot = robot
 
@@ -511,7 +510,7 @@ class ManualDriveController:
         async with self._hardware_lock:
             try:
                 await asyncio.to_thread(robot.close)
-            except Exception as exc:
+            except BetaboxError as exc:
                 raise DriveControlError(f"failed to close robot: {exc}") from exc
 
     async def _safe_neutralize(
@@ -691,7 +690,7 @@ class ManualDriveController:
 
         except DriveControlError:
             raise
-        except Exception as exc:
+        except BetaboxError as exc:
             raise DriveControlError(f"failed to apply throttle: {exc}") from exc
 
     async def _stop_motion(
@@ -705,7 +704,7 @@ class ManualDriveController:
 
         try:
             await asyncio.to_thread(robot.stop)
-        except Exception as exc:
+        except BetaboxError as exc:
             raise DriveControlError(f"failed to stop robot motion: {exc}") from exc
 
     async def _apply_steering_axis(
@@ -737,7 +736,7 @@ class ManualDriveController:
 
             await asyncio.to_thread(robot.center)
 
-        except Exception as exc:
+        except BetaboxError as exc:
             raise DriveControlError(f"failed to apply steering: {exc}") from exc
 
     async def _apply_camera_axes(
@@ -777,7 +776,7 @@ class ManualDriveController:
                 tilt=tilt_angle,
                 smooth=False,
             )
-        except Exception as exc:
+        except BetaboxError as exc:
             raise DriveControlError(f"failed to apply camera position: {exc}") from exc
 
     def _camera_axis_to_angle(

@@ -8,6 +8,7 @@ import aiohttp_jinja2
 import jinja2
 from aiohttp import web
 
+from betabox_robotics import BetaboxCar
 from betabox_robotics.calibration import (
     CalibrationManager,
 )
@@ -41,6 +42,7 @@ from betabox_robotics.launchpad.services import (
 from betabox_robotics.launchpad.status_cache import (
     StatusCache,
 )
+from betabox_robotics.robots import BETABOX_CAR
 from betabox_robotics.services.calibration import (
     CalibrationService,
 )
@@ -55,7 +57,14 @@ async def drive_controller_context(
 ) -> AsyncIterator[None]:
     services = app[LAUNCHPAD_SERVICES_KEY]
 
-    controller = ManualDriveController(services.calibration_manager)
+    def create_robot() -> BetaboxCar:
+        calibration = services.calibration_manager.load()
+
+        return BetaboxCar(
+            calibration=calibration,
+        )
+
+    controller = ManualDriveController(create_robot)
 
     await controller.start()
     services.drive_controller = controller
@@ -112,7 +121,11 @@ def create_app(
 
     calibration_service = CalibrationService(calibration_manager)
 
-    calibration_hardware = CalibrationHardware()
+    calibration_hardware = CalibrationHardware(
+        drive_config=BETABOX_CAR.drive,
+        camera_mount_config=BETABOX_CAR.camera_mount,
+        grayscale_config=BETABOX_CAR.sensors.grayscale,
+    )
 
     status_cache = StatusCache(ttl_seconds=3.0)
 

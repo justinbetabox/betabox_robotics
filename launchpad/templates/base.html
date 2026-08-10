@@ -1,5 +1,25 @@
 <!doctype html>
-<html lang="en">
+<html
+    lang="en"
+    {% if launchpad_preferences["theme"] != "system" %}
+        data-theme="{{ launchpad_preferences['theme'] }}"
+    {% endif %}
+    data-reduced-motion="{{
+        'true'
+        if launchpad_preferences["reduced_motion"]
+        else 'false'
+    }}"
+    data-larger-text="{{
+        'true'
+        if launchpad_preferences["larger_text"]
+        else 'false'
+    }}"
+    data-compact-layout="{{
+        'true'
+        if launchpad_preferences["compact_layout"]
+        else 'false'
+    }}"
+>
 <head>
     <meta charset="utf-8">
 
@@ -14,60 +34,14 @@
         {% endblock %}
     </title>
 
-    <script>
-    (() => {
-        const root = document.documentElement;
-
-        const readStoredValue = (key) => {
-            try {
-                return window.localStorage.getItem(key);
-            } catch {
-                return null;
-            }
-        };
-
-        const theme = readStoredValue(
-            "betabox-launchpad-theme"
-        );
-
-        if (
-            theme === "light"
-            || theme === "dark"
-        ) {
-            root.dataset.theme = theme;
-        }
-
-        root.dataset.reducedMotion =
-            readStoredValue(
-                "betabox-launchpad-reduced-motion"
-            ) === "true"
-                ? "true"
-                : "false";
-
-        root.dataset.largerText =
-            readStoredValue(
-                "betabox-launchpad-larger-text"
-            ) === "true"
-                ? "true"
-                : "false";
-
-        root.dataset.compactLayout =
-            readStoredValue(
-                "betabox-launchpad-compact-layout"
-            ) === "true"
-                ? "true"
-                : "false";
-    })();
-    </script>
-
     <link
         rel="stylesheet"
-        href="/static/css/tokens.css"
+        href="{{ url('static', filename='css/tokens.css') }}"
     >
 
     <link
         rel="stylesheet"
-        href="/static/css/components.css"
+        href="{{ url('static', filename='css/components.css') }}"
     >
 
     {% block page_styles %}
@@ -75,13 +49,20 @@
 </head>
 
 <body class="{% block body_class %}{% endblock %}">
+    <a
+        class="skip-link"
+        href="#main-content"
+    >
+        Skip to main content
+    </a>
+
     {% block body %}
     {% endblock %}
 
     {% include "_login_modal.html" %}
 
-    <script src="/static/js/theme.js"></script>
-    <script src="/static/js/launchpad.js"></script>
+    <script src="{{ url('static', filename='js/theme.js') }}"></script>
+    <script src="{{ url('static', filename='js/launchpad.js') }}"></script>
 
     {% block shared_scripts %}
     {% endblock %}

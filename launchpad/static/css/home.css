@@ -34,6 +34,11 @@
     );
 }
 
+.launchpad-home .theme-toggle:disabled {
+    cursor: wait;
+    opacity: 0.7;
+}
+
 .launchpad-header {
     background: linear-gradient(180deg, var(--brand-blue), #078bd4);
 
@@ -194,7 +199,7 @@
     min-width: 0;
 }
 
-.hud-toggle-icon {
+.hud-expand-icon {
     flex: 0 0 auto;
 }
 
@@ -315,43 +320,6 @@
 
     color: rgb(255 255 255 / 68%);
     font-size: var(--font-size-small);
-}
-
-.admin-preview {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 2rem;
-
-    padding: clamp(1.25rem, 3vw, 2rem);
-
-    background: var(--brand-charcoal);
-    color: var(--brand-white);
-
-    border-radius: var(--radius-large);
-}
-
-.admin-preview .eyebrow {
-    color: var(--brand-orange);
-}
-
-.admin-preview p {
-    max-width: 42rem;
-    margin-bottom: 0;
-
-    color: rgb(255 255 255 / 72%);
-    line-height: 1.6;
-}
-
-.admin-preview .button-secondary {
-    background: var(--brand-white);
-    border-color: var(--brand-white);
-    color: var(--brand-charcoal);
-}
-
-.admin-preview .button-secondary:hover {
-    background: #edf4f8;
-    border-color: #edf4f8;
 }
 
 .launchpad-header .identity-badge {
@@ -502,7 +470,7 @@
         grid-column: auto;
     }
 
-    .hud-toggle-icon {
+    .hud-expand-icon {
         justify-self: end;
     }
 

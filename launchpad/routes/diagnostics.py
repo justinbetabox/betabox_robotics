@@ -8,15 +8,36 @@ from aiohttp import web
 from betabox_robotics.launchpad.auth import (
     LAUNCHPAD_CONTEXT_KEY,
     LaunchpadContext,
+    Permission,
 )
 from betabox_robotics.services.doctor import (
     collect_doctor_report,
 )
 
+_DIAGNOSTIC_ERRORS = (
+    LookupError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+)
+
+
+def diagnostics_context(
+    request: web.Request,
+) -> LaunchpadContext:
+    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
+
+    context.require(Permission.DIAGNOSTICS)
+
+    return context
+
 
 async def diagnostics_page(
     request: web.Request,
 ) -> web.Response:
+    diagnostics_context(request)
+
     return aiohttp_jinja2.render_template(
         "diagnostics.html",
         request,
@@ -24,7 +45,7 @@ async def diagnostics_page(
             "page": {
                 "title": "Diagnostics",
                 "eyebrow": "Platform Health",
-                "main_class": "page-layout diagnostics-layout",
+                "main_class": ("page-layout diagnostics-layout"),
             },
         },
     )
@@ -41,18 +62,20 @@ async def diagnostics_api(
     the aiohttp event loop.
     """
 
-    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
+    context = diagnostics_context(request)
 
     try:
         report = await asyncio.to_thread(
             collect_doctor_report,
             context.platform,
         )
-    except Exception:
+
+    except _DIAGNOSTIC_ERRORS as exc:
         return web.json_response(
             {
                 "error": "diagnostics_unavailable",
-                "message": "Unable to run platform diagnostics.",
+                "message": ("Unable to run platform diagnostics."),
+                "detail": str(exc),
             },
             status=500,
         )

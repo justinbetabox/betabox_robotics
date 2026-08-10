@@ -1,9 +1,13 @@
 {% extends "interior.html" %}
 
+{% block body_class %}
+    interior-body diagnostics-page
+{% endblock %}
+
 {% block interior_styles %}
     <link
         rel="stylesheet"
-        href="/static/css/diagnostics.css"
+        href="{{ url('static', filename='css/diagnostics.css') }}"
     >
 {% endblock %}
 
@@ -31,12 +35,13 @@
                         id="diagnostics-connection"
                         class="
                             connection-status
-                            status-connecting
+                            status-unknown
                         "
                         role="status"
                         aria-live="polite"
+                        aria-atomic="true"
                     >
-                        Checking…
+                        Ready
                     </div>
 
                     <p
@@ -252,6 +257,7 @@
     <section
         id="diagnostics-error-panel"
         class="error-panel"
+        role="alert"
         aria-labelledby="diagnostics-error-heading"
         hidden
     >
@@ -280,5 +286,8 @@
 {% endblock %}
 
 {% block interior_scripts %}
-    <script src="/static/js/diagnostics.js"></script>
+    <script
+        type="module"
+        src="{{ url('static', filename='js/diagnostics.js') }}"
+    ></script>
 {% endblock %}

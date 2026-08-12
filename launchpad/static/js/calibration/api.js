@@ -14,6 +14,10 @@ export async function requestJson(
         errorMessage = "Calibration request failed.",
     } = {},
 ) {
+    if (typeof url !== "string" || url.length === 0) {
+        throw new TypeError("url must be a non-empty string");
+    }
+
     const headers = {
         Accept: "application/json",
     };

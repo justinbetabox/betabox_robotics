@@ -109,11 +109,19 @@ export function renderGrayscaleEditor() {
 /* Sampling */
 
 async function sampleGrayscale() {
+    if (state.pageClosing) {
+        return null;
+    }
+
     const payload = await requestJson("/api/calibration/grayscale/sample", {
         cache: "no-store",
         invalidMessage: "Line sensor API returned " + "an invalid response.",
-        errorMessage: "Unable to read the line sensor.",
+        errorMessage: "Unable to read the " + "line sensor.",
     });
+
+    if (state.pageClosing) {
+        return null;
+    }
 
     const values = copySensorValues(payload.values);
 
@@ -125,6 +133,10 @@ async function sampleGrayscale() {
 }
 
 async function captureGrayscaleFloor() {
+    if (state.pageClosing) {
+        return;
+    }
+
     setGrayscaleControlsDisabled(true);
 
     elements.refreshButton.disabled = true;
@@ -132,7 +144,13 @@ async function captureGrayscaleFloor() {
     elements.grayscale.message.textContent = "Reading floor surface…";
 
     try {
-        state.grayscale.floor = await sampleGrayscale();
+        const values = await sampleGrayscale();
+
+        if (state.pageClosing || values === null) {
+            return;
+        }
+
+        state.grayscale.floor = values;
 
         renderGrayscaleEditor();
 
@@ -140,6 +158,10 @@ async function captureGrayscaleFloor() {
 
         elements.announcement.textContent = "Floor reference captured.";
     } catch (error) {
+        if (state.pageClosing) {
+            return;
+        }
+
         renderGrayscaleEditor();
 
         elements.grayscale.message.textContent =
@@ -147,13 +169,19 @@ async function captureGrayscaleFloor() {
                 ? error.message
                 : "Unable to capture " + "floor reference.";
     } finally {
-        setGrayscaleControlsDisabled(false);
+        if (!state.pageClosing) {
+            setGrayscaleControlsDisabled(false);
 
-        elements.refreshButton.disabled = false;
+            elements.refreshButton.disabled = false;
+        }
     }
 }
 
 async function captureGrayscaleLine() {
+    if (state.pageClosing) {
+        return;
+    }
+
     setGrayscaleControlsDisabled(true);
 
     elements.refreshButton.disabled = true;
@@ -161,7 +189,13 @@ async function captureGrayscaleLine() {
     elements.grayscale.message.textContent = "Reading line surface…";
 
     try {
-        state.grayscale.line = await sampleGrayscale();
+        const values = await sampleGrayscale();
+
+        if (state.pageClosing || values === null) {
+            return;
+        }
+
+        state.grayscale.line = values;
 
         renderGrayscaleEditor();
 
@@ -169,6 +203,10 @@ async function captureGrayscaleLine() {
 
         elements.announcement.textContent = "Line reference captured.";
     } catch (error) {
+        if (state.pageClosing) {
+            return;
+        }
+
         renderGrayscaleEditor();
 
         elements.grayscale.message.textContent =
@@ -176,15 +214,21 @@ async function captureGrayscaleLine() {
                 ? error.message
                 : "Unable to capture " + "line reference.";
     } finally {
-        setGrayscaleControlsDisabled(false);
+        if (!state.pageClosing) {
+            setGrayscaleControlsDisabled(false);
 
-        elements.refreshButton.disabled = false;
+            elements.refreshButton.disabled = false;
+        }
     }
 }
 
 /* Persistence */
 
 async function saveGrayscale(renderCalibration) {
+    if (state.pageClosing) {
+        return;
+    }
+
     if (state.grayscale.floor === null || state.grayscale.line === null) {
         elements.grayscale.message.textContent =
             "Capture both surfaces before saving.";
@@ -207,8 +251,12 @@ async function saveGrayscale(renderCalibration) {
                 floor: state.grayscale.floor,
                 line: state.grayscale.line,
             },
-            errorMessage: "Unable to save line sensor " + "calibration.",
+            errorMessage: "Unable to save line " + "sensor calibration.",
         });
+
+        if (state.pageClosing) {
+            return;
+        }
 
         renderCalibration(payload);
 
@@ -228,18 +276,28 @@ async function saveGrayscale(renderCalibration) {
 
         elements.announcement.textContent = "Line sensor calibration saved.";
     } catch (error) {
+        if (state.pageClosing) {
+            return;
+        }
+
         renderGrayscaleEditor();
 
         elements.grayscale.message.textContent =
             error instanceof Error
                 ? error.message
-                : "Unable to save line sensor " + "calibration.";
+                : "Unable to save line " + "sensor calibration.";
     } finally {
-        elements.refreshButton.disabled = false;
+        if (!state.pageClosing) {
+            elements.refreshButton.disabled = false;
+        }
     }
 }
 
 async function clearGrayscale(renderCalibration) {
+    if (state.pageClosing) {
+        return;
+    }
+
     elements.grayscale.clearButton.disabled = true;
 
     elements.refreshButton.disabled = true;
@@ -250,8 +308,12 @@ async function clearGrayscale(renderCalibration) {
     try {
         const payload = await requestJson("/api/calibration/grayscale/clear", {
             method: "POST",
-            errorMessage: "Unable to clear line sensor " + "calibration.",
+            errorMessage: "Unable to clear line " + "sensor calibration.",
         });
+
+        if (state.pageClosing) {
+            return;
+        }
 
         renderCalibration(payload);
 
@@ -263,14 +325,20 @@ async function clearGrayscale(renderCalibration) {
 
         elements.announcement.textContent = "Line sensor calibration cleared.";
     } catch (error) {
+        if (state.pageClosing) {
+            return;
+        }
+
         renderGrayscaleEditor();
 
         elements.grayscale.message.textContent =
             error instanceof Error
                 ? error.message
-                : "Unable to clear line sensor " + "calibration.";
+                : "Unable to clear line " + "sensor calibration.";
     } finally {
-        elements.refreshButton.disabled = false;
+        if (!state.pageClosing) {
+            elements.refreshButton.disabled = false;
+        }
     }
 }
 
@@ -298,6 +366,10 @@ export function setupGrayscale({ renderCalibration }) {
     }
 
     elements.grayscale.resetButton.addEventListener("click", () => {
+        if (state.pageClosing) {
+            return;
+        }
+
         state.grayscale.floor =
             state.grayscale.savedFloor === null
                 ? null
@@ -315,18 +387,34 @@ export function setupGrayscale({ renderCalibration }) {
     });
 
     elements.grayscale.captureFloorButton.addEventListener("click", () => {
+        if (state.pageClosing) {
+            return;
+        }
+
         void captureGrayscaleFloor();
     });
 
     elements.grayscale.captureLineButton.addEventListener("click", () => {
+        if (state.pageClosing) {
+            return;
+        }
+
         void captureGrayscaleLine();
     });
 
     elements.grayscale.saveButton.addEventListener("click", () => {
+        if (state.pageClosing) {
+            return;
+        }
+
         void saveGrayscale(renderCalibration);
     });
 
     elements.grayscale.clearButton.addEventListener("click", () => {
+        if (state.pageClosing) {
+            return;
+        }
+
         void clearGrayscale(renderCalibration);
     });
 }

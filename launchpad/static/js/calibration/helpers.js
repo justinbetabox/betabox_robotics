@@ -31,6 +31,14 @@ export function setBadge(element, text, tone) {
         throw new TypeError("element must be an HTMLElement");
     }
 
+    if (typeof text !== "string") {
+        throw new TypeError("text must be a string");
+    }
+
+    if (typeof tone !== "string") {
+        throw new TypeError("tone must be a string");
+    }
+
     element.className =
         tone === "neutral" ? "status-badge" : `status-badge status-${tone}`;
 

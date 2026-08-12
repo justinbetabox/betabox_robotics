@@ -11,7 +11,6 @@ import { state } from "./state.js";
 import {
     renderSteering,
     renderSteeringEditor,
-    restoreSavedSteering,
     setSteeringControlsDisabled,
     setupSteering,
 } from "./steering.js";
@@ -19,7 +18,6 @@ import {
 import {
     renderCameraMount,
     renderCameraMountEditor,
-    restoreSavedCameraMount,
     setCameraControlsDisabled,
     setupCameraMount,
 } from "./camera_mount.js";
@@ -56,6 +54,7 @@ function showLoading() {
     elements.errorPanel.hidden = true;
 
     elements.refreshButton.disabled = true;
+
     elements.refreshButton.textContent = "Refreshing…";
 
     setSteeringControlsDisabled(true);
@@ -72,10 +71,13 @@ function showLoading() {
 
 function showError(message) {
     elements.loadingPanel.hidden = true;
+
     elements.contentPanel.hidden = true;
+
     elements.errorPanel.hidden = false;
 
     elements.refreshButton.disabled = false;
+
     elements.refreshButton.textContent = "Refresh";
 
     elements.errorMessage.textContent = message;
@@ -110,6 +112,10 @@ function renderMetadata(payload) {
 /* Rendering */
 
 function renderCalibration(payload) {
+    if (state.pageClosing) {
+        return;
+    }
+
     const calibration = payload.calibration;
 
     if (
@@ -133,10 +139,13 @@ function renderCalibration(payload) {
     state.hasLoadedOnce = true;
 
     elements.loadingPanel.hidden = true;
+
     elements.errorPanel.hidden = true;
+
     elements.contentPanel.hidden = false;
 
     elements.refreshButton.disabled = false;
+
     elements.refreshButton.textContent = "Refresh";
 
     setConnectionState("connected", "Connected");
@@ -157,6 +166,10 @@ function renderCalibration(payload) {
 /* API */
 
 async function loadCalibration() {
+    if (state.pageClosing) {
+        return;
+    }
+
     showLoading();
 
     try {
@@ -165,8 +178,16 @@ async function loadCalibration() {
             errorMessage: "Unable to load calibration.",
         });
 
+        if (state.pageClosing) {
+            return;
+        }
+
         renderCalibration(payload);
     } catch (error) {
+        if (state.pageClosing) {
+            return;
+        }
+
         showError(
             error instanceof Error
                 ? error.message
@@ -190,13 +211,36 @@ function setupPageUI() {
 /* Cleanup */
 
 function cleanupCalibrationPage() {
-    restoreSavedSteering();
-    restoreSavedCameraMount();
+    if (state.pageClosing) {
+        return;
+    }
+
+    state.pageClosing = true;
+
+    if (state.steering.previewTimer !== null) {
+        window.clearTimeout(state.steering.previewTimer);
+
+        state.steering.previewTimer = null;
+    }
+
+    if (state.camera.previewTimer !== null) {
+        window.clearTimeout(state.camera.previewTimer);
+
+        state.camera.previewTimer = null;
+    }
 }
 
 /* Initialization */
 
 export function initializeCalibrationPage() {
+    if (state.pageInitialized) {
+        return;
+    }
+
+    state.pageInitialized = true;
+
+    state.pageClosing = false;
+
     setupPageUI();
 
     setupSteering({
@@ -216,6 +260,8 @@ export function initializeCalibrationPage() {
     });
 
     window.addEventListener("pagehide", cleanupCalibrationPage);
+
+    window.addEventListener("beforeunload", cleanupCalibrationPage);
 
     void loadCalibration();
 }

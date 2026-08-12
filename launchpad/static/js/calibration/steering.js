@@ -54,6 +54,10 @@ export function renderSteeringEditor() {
 /* Preview */
 
 async function previewSteering() {
+    if (state.pageClosing) {
+        return;
+    }
+
     await requestJson("/api/calibration/steering/preview", {
         method: "POST",
         body: {
@@ -65,26 +69,42 @@ async function previewSteering() {
 }
 
 function scheduleSteeringPreview() {
+    if (state.pageClosing) {
+        return;
+    }
+
     if (state.steering.previewTimer !== null) {
         window.clearTimeout(state.steering.previewTimer);
+
+        state.steering.previewTimer = null;
     }
 
     state.steering.previewTimer = window.setTimeout(async () => {
         state.steering.previewTimer = null;
+
+        if (state.pageClosing) {
+            return;
+        }
 
         setSteeringControlsDisabled(true);
 
         try {
             await previewSteering();
         } catch (error) {
+            if (state.pageClosing) {
+                return;
+            }
+
             elements.steering.message.textContent =
                 error instanceof Error
                     ? error.message
                     : "Unable to move " + "steering.";
         } finally {
-            setSteeringControlsDisabled(false);
+            if (!state.pageClosing) {
+                setSteeringControlsDisabled(false);
 
-            renderSteeringEditor();
+                renderSteeringEditor();
+            }
         }
     }, 75);
 }
@@ -92,6 +112,10 @@ function scheduleSteeringPreview() {
 /* Persistence */
 
 async function saveSteering(renderCalibration) {
+    if (state.pageClosing) {
+        return;
+    }
+
     elements.steering.saveButton.disabled = true;
 
     elements.steering.resetButton.disabled = true;
@@ -109,6 +133,10 @@ async function saveSteering(renderCalibration) {
             errorMessage: "Unable to save steering " + "calibration.",
         });
 
+        if (state.pageClosing) {
+            return;
+        }
+
         renderCalibration(payload);
 
         showTemporaryMessage(
@@ -119,6 +147,10 @@ async function saveSteering(renderCalibration) {
 
         elements.announcement.textContent = "Steering calibration saved.";
     } catch (error) {
+        if (state.pageClosing) {
+            return;
+        }
+
         renderSteeringEditor();
 
         elements.steering.message.textContent =
@@ -126,39 +158,10 @@ async function saveSteering(renderCalibration) {
                 ? error.message
                 : "Unable to save steering " + "calibration.";
     } finally {
-        elements.refreshButton.disabled = false;
+        if (!state.pageClosing) {
+            elements.refreshButton.disabled = false;
+        }
     }
-}
-
-/* Cleanup */
-
-export function restoreSavedSteering() {
-    if (state.steering.previewTimer !== null) {
-        window.clearTimeout(state.steering.previewTimer);
-
-        state.steering.previewTimer = null;
-    }
-
-    if (state.steering.offset === state.steering.savedOffset) {
-        return;
-    }
-
-    fetch("/api/calibration/steering/preview", {
-        method: "POST",
-        keepalive: true,
-        headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-        },
-        body: JSON.stringify({
-            offset: state.steering.savedOffset,
-        }),
-    }).catch(() => {
-        /*
-         * The page is leaving, so there is
-         * nowhere useful to display an error.
-         */
-    });
 }
 
 /* Controls */
@@ -183,6 +186,10 @@ export function setupSteering({ renderCalibration }) {
     }
 
     elements.steering.increaseButton.addEventListener("click", () => {
+        if (state.pageClosing) {
+            return;
+        }
+
         state.steering.offset = clamp(
             state.steering.offset + STEERING_STEP,
             STEERING_MIN,
@@ -190,10 +197,15 @@ export function setupSteering({ renderCalibration }) {
         );
 
         renderSteeringEditor();
+
         scheduleSteeringPreview();
     });
 
     elements.steering.decreaseButton.addEventListener("click", () => {
+        if (state.pageClosing) {
+            return;
+        }
+
         state.steering.offset = clamp(
             state.steering.offset - STEERING_STEP,
             STEERING_MIN,
@@ -201,17 +213,27 @@ export function setupSteering({ renderCalibration }) {
         );
 
         renderSteeringEditor();
+
         scheduleSteeringPreview();
     });
 
     elements.steering.resetButton.addEventListener("click", () => {
+        if (state.pageClosing) {
+            return;
+        }
+
         state.steering.offset = state.steering.savedOffset;
 
         renderSteeringEditor();
+
         scheduleSteeringPreview();
     });
 
     elements.steering.saveButton.addEventListener("click", () => {
+        if (state.pageClosing) {
+            return;
+        }
+
         void saveSteering(renderCalibration);
     });
 }

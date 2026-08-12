@@ -2,21 +2,14 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Callable
-from time import sleep
 from typing import Any
 
 import aiohttp_jinja2
-import lgpio
 from aiohttp import web
-from gpiozero.exc import GPIOPinInUse
 
 from betabox_robotics.calibration.storage import (
     CalibrationStorageError,
 )
-from betabox_robotics.camera import (
-    CameraMount,
-)
-from betabox_robotics.drive import Drive
 from betabox_robotics.exceptions import (
     RobotBusyError,
 )
@@ -27,12 +20,6 @@ from betabox_robotics.launchpad.auth import (
     LAUNCHPAD_CONTEXT_KEY,
     LaunchpadContext,
     Permission,
-)
-from betabox_robotics.robots.betabox_car import (
-    BETABOX_CAR,
-)
-from betabox_robotics.sensors import (
-    Grayscale,
 )
 from betabox_robotics.services.calibration import (
     CalibrationService,
@@ -78,6 +65,14 @@ def calibration_service(
     return context.services.calibration_service
 
 
+def calibration_hardware(
+    request: web.Request,
+) -> CalibrationHardware:
+    context = calibration_context(request)
+
+    return context.services.calibration_hardware
+
+
 def error_response(
     *,
     error: str,
@@ -107,132 +102,6 @@ async def run_preview(
         preview,
         **kwargs,
     )
-
-
-def sample_grayscale(
-    *,
-    samples: int = 10,
-) -> list[int]:
-    if samples < 1:
-        raise ValueError("samples must be at least 1")
-
-    totals = [
-        0.0,
-        0.0,
-        0.0,
-    ]
-
-    with Grayscale.default(BETABOX_CAR.sensors.grayscale) as grayscale:
-        for _ in range(samples):
-            values = grayscale.read()
-
-            totals[0] += values[0]
-            totals[1] += values[1]
-            totals[2] += values[2]
-
-    return [round(total / samples) for total in totals]
-
-
-def preview_steering(
-    *,
-    offset: float,
-) -> None:
-    steering_config = BETABOX_CAR.drive.steering
-
-    minimum = steering_config.min_angle
-    maximum = steering_config.max_angle
-
-    if not minimum <= offset <= maximum:
-        raise ValueError(f"steering offset must be between {minimum} and {maximum}")
-
-    try:
-        with Drive.default(
-            BETABOX_CAR.drive,
-            steering_offset=offset,
-        ) as drive:
-            drive.center()
-
-    except (
-        GPIOPinInUse,
-        lgpio.error,
-    ) as exc:
-        raise RobotBusyError(
-            "The steering hardware could not be "
-            "acquired. Another process may be "
-            "using the robot."
-        ) from exc
-
-
-def preview_camera_mount(
-    *,
-    pan_offset: float,
-    tilt_offset: float,
-) -> None:
-    config = BETABOX_CAR.camera_mount
-
-    if not (config.pan_min_angle <= pan_offset <= config.pan_max_angle):
-        raise ValueError("pan offset is out of range")
-
-    if not (config.tilt_min_angle <= tilt_offset <= config.tilt_max_angle):
-        raise ValueError("tilt offset is out of range")
-
-    try:
-        with CameraMount.default(
-            config,
-            pan_offset=pan_offset,
-            tilt_offset=tilt_offset,
-        ) as camera:
-            camera.center()
-
-    except (
-        GPIOPinInUse,
-        lgpio.error,
-    ) as exc:
-        raise RobotBusyError(
-            "The camera hardware could not be "
-            "acquired. Another process may be "
-            "using the robot."
-        ) from exc
-
-
-def preview_motor_trim(
-    *,
-    left_trim: float,
-    right_trim: float,
-    steering_offset: float,
-) -> None:
-    if not 0.0 <= left_trim <= 1.0:
-        raise ValueError("left trim must be between 0 and 1.")
-
-    if not 0.0 <= right_trim <= 1.0:
-        raise ValueError("right trim must be between 0 and 1.")
-
-    try:
-        with Drive.default(
-            BETABOX_CAR.drive,
-            left_trim=left_trim,
-            right_trim=right_trim,
-            steering_offset=steering_offset,
-        ) as drive:
-            drive.center()
-
-            try:
-                drive.forward(25)
-
-                sleep(1.5)
-
-            finally:
-                drive.stop()
-
-    except (
-        GPIOPinInUse,
-        lgpio.error,
-    ) as exc:
-        raise RobotBusyError(
-            "The drive hardware could not be "
-            "acquired. Another process may be "
-            "using the robot."
-        ) from exc
 
 
 def calibration_response(
@@ -279,17 +148,27 @@ async def calibration_api(
 async def sample_grayscale_api(
     request: web.Request,
 ) -> web.Response:
-    calibration_context(request)
+    hardware = calibration_hardware(request)
 
     try:
         values = await asyncio.to_thread(
-            sample_grayscale,
+            hardware.sample_grayscale,
         )
 
         return web.json_response(
             {
                 "values": values,
             }
+        )
+
+    except RobotBusyError as exc:
+        return error_response(
+            error="robot_busy",
+            message=(
+                "The robot hardware is currently being used by another application."
+            ),
+            detail=str(exc),
+            status=409,
         )
 
     except (
@@ -385,7 +264,7 @@ async def update_steering_api(
 async def preview_steering_api(
     request: web.Request,
 ) -> web.Response:
-    calibration_context(request)
+    hardware = calibration_hardware(request)
 
     try:
         body = await json_object(request)
@@ -405,7 +284,7 @@ async def preview_steering_api(
 
     try:
         await run_preview(
-            preview_steering,
+            hardware.preview_steering,
             offset=offset,
         )
 
@@ -447,7 +326,7 @@ async def preview_steering_api(
 async def preview_camera_mount_api(
     request: web.Request,
 ) -> web.Response:
-    calibration_context(request)
+    hardware = calibration_hardware(request)
 
     try:
         body = await json_object(request)
@@ -469,7 +348,7 @@ async def preview_camera_mount_api(
 
     try:
         await run_preview(
-            preview_camera_mount,
+            hardware.preview_camera_mount,
             pan_offset=pan_offset,
             tilt_offset=tilt_offset,
         )
@@ -513,6 +392,7 @@ async def preview_motor_trim_api(
     request: web.Request,
 ) -> web.Response:
     service = calibration_service(request)
+    hardware = calibration_hardware(request)
 
     try:
         body = await json_object(request)
@@ -544,10 +424,10 @@ async def preview_motor_trim_api(
 
     try:
         await run_preview(
-            preview_motor_trim,
+            hardware.preview_motor_trim,
             left_trim=left_trim,
             right_trim=right_trim,
-            steering_offset=(calibration.steering.offset),
+            steering_offset=calibration.steering.offset,
         )
 
         return web.json_response(

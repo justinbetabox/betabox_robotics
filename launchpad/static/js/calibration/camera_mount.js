@@ -74,6 +74,10 @@ export function renderCameraMountEditor() {
 /* Preview */
 
 async function previewCameraMount() {
+    if (state.pageClosing) {
+        return;
+    }
+
     await requestJson("/api/calibration/camera-mount/preview", {
         method: "POST",
         body: {
@@ -86,26 +90,42 @@ async function previewCameraMount() {
 }
 
 function scheduleCameraPreview() {
+    if (state.pageClosing) {
+        return;
+    }
+
     if (state.camera.previewTimer !== null) {
         window.clearTimeout(state.camera.previewTimer);
+
+        state.camera.previewTimer = null;
     }
 
     state.camera.previewTimer = window.setTimeout(async () => {
         state.camera.previewTimer = null;
+
+        if (state.pageClosing) {
+            return;
+        }
 
         setCameraControlsDisabled(true);
 
         try {
             await previewCameraMount();
         } catch (error) {
+            if (state.pageClosing) {
+                return;
+            }
+
             elements.camera.message.textContent =
                 error instanceof Error
                     ? error.message
                     : "Unable to move " + "camera.";
         } finally {
-            setCameraControlsDisabled(false);
+            if (!state.pageClosing) {
+                setCameraControlsDisabled(false);
 
-            renderCameraMountEditor();
+                renderCameraMountEditor();
+            }
         }
     }, 75);
 }
@@ -113,6 +133,10 @@ function scheduleCameraPreview() {
 /* Persistence */
 
 async function saveCameraMount(renderCalibration) {
+    if (state.pageClosing) {
+        return;
+    }
+
     elements.camera.saveButton.disabled = true;
 
     elements.camera.resetButton.disabled = true;
@@ -131,6 +155,10 @@ async function saveCameraMount(renderCalibration) {
             errorMessage: "Unable to save camera mount " + "calibration.",
         });
 
+        if (state.pageClosing) {
+            return;
+        }
+
         renderCalibration(payload);
 
         showTemporaryMessage(
@@ -143,6 +171,10 @@ async function saveCameraMount(renderCalibration) {
 
         elements.announcement.textContent = "Camera mount calibration saved.";
     } catch (error) {
+        if (state.pageClosing) {
+            return;
+        }
+
         renderCameraMountEditor();
 
         elements.camera.message.textContent =
@@ -150,42 +182,10 @@ async function saveCameraMount(renderCalibration) {
                 ? error.message
                 : "Unable to save camera mount " + "calibration.";
     } finally {
-        elements.refreshButton.disabled = false;
+        if (!state.pageClosing) {
+            elements.refreshButton.disabled = false;
+        }
     }
-}
-
-/* Cleanup */
-
-export function restoreSavedCameraMount() {
-    if (state.camera.previewTimer !== null) {
-        window.clearTimeout(state.camera.previewTimer);
-
-        state.camera.previewTimer = null;
-    }
-
-    if (
-        state.camera.panOffset === state.camera.savedPanOffset &&
-        state.camera.tiltOffset === state.camera.savedTiltOffset
-    ) {
-        return;
-    }
-
-    fetch("/api/calibration/camera-mount/preview", {
-        method: "POST",
-        keepalive: true,
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-            pan_offset: state.camera.savedPanOffset,
-            tilt_offset: state.camera.savedTiltOffset,
-        }),
-    }).catch(() => {
-        /*
-         * The page is leaving, so there is
-         * nowhere useful to display an error.
-         */
-    });
 }
 
 /* Controls */
@@ -214,6 +214,10 @@ export function setupCameraMount({ renderCalibration }) {
     }
 
     elements.camera.panIncreaseButton.addEventListener("click", () => {
+        if (state.pageClosing) {
+            return;
+        }
+
         state.camera.panOffset = clamp(
             state.camera.panOffset + CAMERA_OFFSET_STEP,
             CAMERA_OFFSET_MIN,
@@ -221,10 +225,15 @@ export function setupCameraMount({ renderCalibration }) {
         );
 
         renderCameraMountEditor();
+
         scheduleCameraPreview();
     });
 
     elements.camera.panDecreaseButton.addEventListener("click", () => {
+        if (state.pageClosing) {
+            return;
+        }
+
         state.camera.panOffset = clamp(
             state.camera.panOffset - CAMERA_OFFSET_STEP,
             CAMERA_OFFSET_MIN,
@@ -232,10 +241,15 @@ export function setupCameraMount({ renderCalibration }) {
         );
 
         renderCameraMountEditor();
+
         scheduleCameraPreview();
     });
 
     elements.camera.tiltIncreaseButton.addEventListener("click", () => {
+        if (state.pageClosing) {
+            return;
+        }
+
         state.camera.tiltOffset = clamp(
             state.camera.tiltOffset + CAMERA_OFFSET_STEP,
             CAMERA_OFFSET_MIN,
@@ -243,10 +257,15 @@ export function setupCameraMount({ renderCalibration }) {
         );
 
         renderCameraMountEditor();
+
         scheduleCameraPreview();
     });
 
     elements.camera.tiltDecreaseButton.addEventListener("click", () => {
+        if (state.pageClosing) {
+            return;
+        }
+
         state.camera.tiltOffset = clamp(
             state.camera.tiltOffset - CAMERA_OFFSET_STEP,
             CAMERA_OFFSET_MIN,
@@ -254,19 +273,29 @@ export function setupCameraMount({ renderCalibration }) {
         );
 
         renderCameraMountEditor();
+
         scheduleCameraPreview();
     });
 
     elements.camera.resetButton.addEventListener("click", () => {
+        if (state.pageClosing) {
+            return;
+        }
+
         state.camera.panOffset = state.camera.savedPanOffset;
 
         state.camera.tiltOffset = state.camera.savedTiltOffset;
 
         renderCameraMountEditor();
+
         scheduleCameraPreview();
     });
 
     elements.camera.saveButton.addEventListener("click", () => {
+        if (state.pageClosing) {
+            return;
+        }
+
         void saveCameraMount(renderCalibration);
     });
 }

@@ -1,6 +1,9 @@
 "use strict";
 
 export const state = {
+    pageInitialized: false,
+    pageClosing: false,
+
     hasLoadedOnce: false,
 
     steering: {

@@ -70,6 +70,10 @@ export function renderMotorEditor() {
 /* Preview */
 
 async function previewMotorTrim() {
+    if (state.pageClosing) {
+        return;
+    }
+
     await requestJson("/api/calibration/motors/preview", {
         method: "POST",
         body: {
@@ -82,6 +86,10 @@ async function previewMotorTrim() {
 }
 
 async function runMotorPreview() {
+    if (state.pageClosing) {
+        return;
+    }
+
     setMotorControlsDisabled(true);
 
     elements.refreshButton.disabled = true;
@@ -91,22 +99,32 @@ async function runMotorPreview() {
     try {
         await previewMotorTrim();
     } catch (error) {
+        if (state.pageClosing) {
+            return;
+        }
+
         elements.motors.message.textContent =
             error instanceof Error
                 ? error.message
                 : "Unable to preview " + "motor trim.";
     } finally {
-        setMotorControlsDisabled(false);
+        if (!state.pageClosing) {
+            setMotorControlsDisabled(false);
 
-        elements.refreshButton.disabled = false;
+            elements.refreshButton.disabled = false;
 
-        renderMotorEditor();
+            renderMotorEditor();
+        }
     }
 }
 
 /* Persistence */
 
 async function saveMotors(renderCalibration) {
+    if (state.pageClosing) {
+        return;
+    }
+
     elements.motors.saveButton.disabled = true;
 
     elements.motors.resetButton.disabled = true;
@@ -125,6 +143,10 @@ async function saveMotors(renderCalibration) {
             errorMessage: "Unable to save motor trim " + "calibration.",
         });
 
+        if (state.pageClosing) {
+            return;
+        }
+
         renderCalibration(payload);
 
         showTemporaryMessage(
@@ -137,6 +159,10 @@ async function saveMotors(renderCalibration) {
 
         elements.announcement.textContent = "Motor trim calibration saved.";
     } catch (error) {
+        if (state.pageClosing) {
+            return;
+        }
+
         renderMotorEditor();
 
         elements.motors.message.textContent =
@@ -144,7 +170,9 @@ async function saveMotors(renderCalibration) {
                 ? error.message
                 : "Unable to save motor trim " + "calibration.";
     } finally {
-        elements.refreshButton.disabled = false;
+        if (!state.pageClosing) {
+            elements.refreshButton.disabled = false;
+        }
     }
 }
 
@@ -176,6 +204,10 @@ export function setupMotors({ renderCalibration }) {
     }
 
     elements.motors.leftIncreaseButton.addEventListener("click", () => {
+        if (state.pageClosing) {
+            return;
+        }
+
         state.motors.leftTrim = clamp(
             Number((state.motors.leftTrim + MOTOR_TRIM_STEP).toFixed(2)),
             MOTOR_TRIM_MIN,
@@ -186,6 +218,10 @@ export function setupMotors({ renderCalibration }) {
     });
 
     elements.motors.leftDecreaseButton.addEventListener("click", () => {
+        if (state.pageClosing) {
+            return;
+        }
+
         state.motors.leftTrim = clamp(
             Number((state.motors.leftTrim - MOTOR_TRIM_STEP).toFixed(2)),
             MOTOR_TRIM_MIN,
@@ -196,6 +232,10 @@ export function setupMotors({ renderCalibration }) {
     });
 
     elements.motors.rightIncreaseButton.addEventListener("click", () => {
+        if (state.pageClosing) {
+            return;
+        }
+
         state.motors.rightTrim = clamp(
             Number((state.motors.rightTrim + MOTOR_TRIM_STEP).toFixed(2)),
             MOTOR_TRIM_MIN,
@@ -206,6 +246,10 @@ export function setupMotors({ renderCalibration }) {
     });
 
     elements.motors.rightDecreaseButton.addEventListener("click", () => {
+        if (state.pageClosing) {
+            return;
+        }
+
         state.motors.rightTrim = clamp(
             Number((state.motors.rightTrim - MOTOR_TRIM_STEP).toFixed(2)),
             MOTOR_TRIM_MIN,
@@ -216,6 +260,10 @@ export function setupMotors({ renderCalibration }) {
     });
 
     elements.motors.resetButton.addEventListener("click", () => {
+        if (state.pageClosing) {
+            return;
+        }
+
         state.motors.leftTrim = state.motors.savedLeftTrim;
 
         state.motors.rightTrim = state.motors.savedRightTrim;
@@ -226,10 +274,18 @@ export function setupMotors({ renderCalibration }) {
     });
 
     elements.motors.previewButton.addEventListener("click", () => {
+        if (state.pageClosing) {
+            return;
+        }
+
         void runMotorPreview();
     });
 
     elements.motors.saveButton.addEventListener("click", () => {
+        if (state.pageClosing) {
+            return;
+        }
+
         void saveMotors(renderCalibration);
     });
 }

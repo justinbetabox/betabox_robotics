@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import math
 import time
-from typing import TYPE_CHECKING, ClassVar, Self, TypeAlias, cast
+from typing import TYPE_CHECKING, ClassVar, Self, TypeAlias
 
 from betabox_robotics.hardware import (
     DigitalPin,
@@ -43,6 +43,11 @@ class Ultrasonic:
     TRIGGER_SETTLE_SECONDS: ClassVar[float] = 0.001
     TRIGGER_PULSE_SECONDS: ClassVar[float] = 0.00001
 
+    timeout: float
+    trigger: Pin | None
+    echo: Pin | None
+    _closed: bool
+
     def __init__(
         self,
         trigger: PinInput,
@@ -60,8 +65,8 @@ class Ultrasonic:
 
         self.timeout = timeout_value
 
-        self.trigger: Pin | None = None
-        self.echo: Pin | None = None
+        self.trigger = None
+        self.echo = None
         self._closed = False
 
         try:
@@ -76,7 +81,7 @@ class Ultrasonic:
                 raise UltrasonicError("trigger and echo must use different GPIO pins")
 
             # Begin in a known, inactive trigger state.
-            trigger_pin.off()
+            _ = trigger_pin.off()
 
         except (
             HardwareError,
@@ -164,18 +169,9 @@ class Ultrasonic:
     def _make_output_pin(
         pin: PinInput,
     ) -> Pin:
-        if isinstance(
-            pin,
-            Pin,
-        ):
-            existing_pin = cast(
-                Pin,
-                pin,
-            )
-
-            existing_pin.output()
-
-            return existing_pin
+        if isinstance(pin, Pin):
+            pin.output()
+            return pin
 
         return Pin(
             pin,
@@ -186,20 +182,11 @@ class Ultrasonic:
     def _make_input_pin(
         pin: PinInput,
     ) -> Pin:
-        if isinstance(
-            pin,
-            Pin,
-        ):
-            existing_pin = cast(
-                Pin,
-                pin,
-            )
-
-            existing_pin.input(
+        if isinstance(pin, Pin):
+            pin.input(
                 pull=Pull.DOWN,
             )
-
-            return existing_pin
+            return pin
 
         return Pin(
             pin,
@@ -228,12 +215,12 @@ class Ultrasonic:
 
         trigger = self.trigger_pin
 
-        trigger.off()
+        _ = trigger.off()
         time.sleep(self.TRIGGER_SETTLE_SECONDS)
 
-        trigger.on()
+        _ = trigger.on()
         time.sleep(self.TRIGGER_PULSE_SECONDS)
-        trigger.off()
+        _ = trigger.off()
 
         pulse_start = self._wait_for_echo_state(
             1,

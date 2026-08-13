@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import math
-from dataclasses import asdict, dataclass
-from typing import TYPE_CHECKING, Any, Self
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Self
 
 from betabox_robotics.hardware import (
     PWM,
@@ -31,8 +31,15 @@ class DriveStatus:
     right_trim: float
     steering_offset: float
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+    def to_dict(
+        self,
+    ) -> dict[str, bool | float]:
+        return {
+            "closed": self.closed,
+            "left_trim": self.left_trim,
+            "right_trim": self.right_trim,
+            "steering_offset": self.steering_offset,
+        }
 
 
 class Drive:
@@ -43,6 +50,15 @@ class Drive:
     each Motor or Servo is wired unless using the default hardware setup.
     """
 
+    left_motor: Motor
+    right_motor: Motor
+    steering: Servo
+
+    left_trim: float
+    right_trim: float
+
+    _closed: bool
+
     def __init__(
         self,
         left_motor: Motor,
@@ -52,24 +68,6 @@ class Drive:
         left_trim: float = 1.0,
         right_trim: float = 1.0,
     ) -> None:
-        if not isinstance(
-            left_motor,
-            Motor,
-        ):
-            raise TypeError("left_motor must be a Motor instance")
-
-        if not isinstance(
-            right_motor,
-            Motor,
-        ):
-            raise TypeError("right_motor must be a Motor instance")
-
-        if not isinstance(
-            steering,
-            Servo,
-        ):
-            raise TypeError("steering must be a Servo instance")
-
         left_trim_value = self._require_finite_number(
             left_trim,
             name="left_trim",
@@ -218,12 +216,6 @@ class Drive:
         smooth: bool = True,
     ) -> None:
         self._require_open()
-
-        if not isinstance(
-            smooth,
-            bool,
-        ):
-            raise TypeError("smooth must be a boolean")
 
         left_speed = self._validate_speed(left)
         right_speed = self._validate_speed(right)

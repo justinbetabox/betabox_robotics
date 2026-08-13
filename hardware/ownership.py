@@ -4,10 +4,11 @@ import fcntl
 import grp
 import json
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import IO, Any, Self
+from typing import IO, Self, cast
 
 from betabox_robotics.exceptions import (
     RobotBusyError,
@@ -78,7 +79,12 @@ def _open_robot_lock(
             encoding="utf-8",
         )
 
-    except BaseException:
+    except (
+        OSError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ):
         os.close(fd)
         raise
 
@@ -93,7 +99,7 @@ class RobotOwnershipStatus:
 
     def to_dict(
         self,
-    ) -> dict[str, Any]:
+    ) -> dict[str, bool | str | int | None]:
         return {
             "available": self.available,
             "owner": self.owner,
@@ -105,6 +111,10 @@ class RobotOwnershipStatus:
 
 class RobotOwnership:
     """Cross-process exclusive ownership of robot hardware."""
+
+    owner: str
+    lock_path: Path
+    _file: IO[str] | None
 
     def __init__(
         self,
@@ -119,7 +129,7 @@ class RobotOwnership:
 
         self.owner = normalized_owner
         self.lock_path = Path(lock_path)
-        self._file: IO[str] | None = None
+        self._file = None
 
     @property
     def acquired(self) -> bool:
@@ -149,14 +159,12 @@ class RobotOwnership:
             owner = _optional_string(details.get("owner")) or "another application"
 
             raise RobotBusyError(
-                "The robot is currently being used by "
-                f"{owner}. Close that application or "
-                "finish its robot code, then try again."
+                f"The robot is currently being used by {owner}. Close that application or finish its robot code, then try again."
             ) from None
 
         try:
-            lock_file.seek(0)
-            lock_file.truncate()
+            _ = lock_file.seek(0)
+            _ = lock_file.truncate()
 
             json.dump(
                 {
@@ -170,7 +178,11 @@ class RobotOwnership:
             lock_file.flush()
             os.fsync(lock_file.fileno())
 
-        except BaseException:
+        except (
+            OSError,
+            TypeError,
+            ValueError,
+        ):
             try:
                 fcntl.flock(
                     lock_file.fileno(),
@@ -192,8 +204,8 @@ class RobotOwnership:
         self._file = None
 
         try:
-            lock_file.seek(0)
-            lock_file.truncate()
+            _ = lock_file.seek(0)
+            _ = lock_file.truncate()
             lock_file.flush()
 
             fcntl.flock(
@@ -212,9 +224,9 @@ class RobotOwnership:
 
     def __exit__(
         self,
-        exc_type,
-        exc_value,
-        traceback,
+        exc_type: object,
+        exc_value: object,
+        traceback: object,
     ) -> None:
         self.release()
 
@@ -281,23 +293,33 @@ def _read_lock_metadata(
     lock_file: IO[str],
 ) -> dict[str, object]:
     try:
-        lock_file.seek(0)
-        value = json.load(lock_file)
+        _ = lock_file.seek(0)
+        value: object = json.load(lock_file)  # pyright: ignore[reportAny]
 
-        if isinstance(
+        if not isinstance(value, dict):
+            return {}
+
+        mapping = cast(
+            Mapping[object, object],
             value,
-            dict,
-        ):
-            return value
+        )
+
+        result: dict[str, object] = {}
+
+        for key, item in mapping.items():
+            if not isinstance(key, str):
+                return {}
+
+            result[key] = item
+
+        return result
 
     except (
         OSError,
         ValueError,
         json.JSONDecodeError,
     ):
-        pass
-
-    return {}
+        return {}
 
 
 def _optional_string(

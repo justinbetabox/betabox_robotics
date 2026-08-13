@@ -1,6 +1,10 @@
 import logging
+from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from pathlib import Path
+from typing import ClassVar
+
+from typing_extensions import override
 
 from betabox_robotics.audio import (
     Audio,
@@ -67,12 +71,15 @@ def _detection_area(
     if isinstance(value, bool):
         return 0.0
 
+    if not isinstance(
+        value,
+        int | float | str,
+    ):
+        return 0.0
+
     try:
         area = float(value)
-    except (
-        TypeError,
-        ValueError,
-    ):
+    except ValueError:
         return 0.0
 
     return max(
@@ -81,7 +88,10 @@ def _detection_area(
     )
 
 
-class CarRobot(Robot):
+class CarRobot(
+    Robot,
+    ABC,
+):
     """
     Base class for car-style Betabox robots.
 
@@ -92,7 +102,7 @@ class CarRobot(Robot):
     delegate to the underlying subsystem APIs.
     """
 
-    capabilities = frozenset(
+    capabilities: ClassVar[frozenset[RobotCapability]] = frozenset(
         {
             RobotCapability.DRIVE,
             RobotCapability.SENSORS,
@@ -102,16 +112,47 @@ class CarRobot(Robot):
         }
     )
 
-    drive: Drive
-    sensors: Sensors
-    camera_mount: CameraMount
-    vision: VisionClient
-    audio: Audio
-    system: System
+    _recording_started_by_robot: bool
 
     def __init__(self) -> None:
         super().__init__()
         self._recording_started_by_robot = False
+
+    @property
+    @abstractmethod
+    def drive(self) -> Drive:
+        """Return the robot drive subsystem."""
+        ...
+
+    @property
+    @abstractmethod
+    def sensors(self) -> Sensors:
+        """Return the robot sensor subsystem."""
+        ...
+
+    @property
+    @abstractmethod
+    def camera_mount(self) -> CameraMount:
+        """Return the robot camera mount."""
+        ...
+
+    @property
+    @abstractmethod
+    def vision(self) -> VisionClient:
+        """Return the robot Vision client."""
+        ...
+
+    @property
+    @abstractmethod
+    def audio(self) -> Audio:
+        """Return the robot audio subsystem."""
+        ...
+
+    @property
+    @abstractmethod
+    def system(self) -> System:
+        """Return the robot system subsystem."""
+        ...
 
     def forward(self, speed: float) -> None:
         self._require_ready()
@@ -605,12 +646,13 @@ class CarRobot(Robot):
         self._require_ready()
         return self.audio.status()
 
+    @override
     def stop_all(self) -> None:
         self.require_open()
 
         if self._recording_started_by_robot:
             try:
-                self.vision.stop_recording()
+                _ = self.vision.stop_recording()
             except Exception:
                 logger.exception("Failed to stop robot-started recording.")
             finally:
@@ -634,7 +676,7 @@ class CarRobot(Robot):
 
         if callable(system_stop_all):
             try:
-                system_stop_all()
+                _ = system_stop_all()
             except Exception:
                 logger.exception("Failed to stop system subsystem.")
 

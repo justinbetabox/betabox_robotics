@@ -91,7 +91,7 @@ async def jupyter_status(
 async def jupyter_page(
     request: web.Request,
 ) -> web.Response:
-    jupyter_context(request)
+    _ = jupyter_context(request)
 
     return aiohttp_jinja2.render_template(
         "jupyter.html",
@@ -109,13 +109,13 @@ async def jupyter_page(
 def setup_jupyter_routes(
     app: web.Application,
 ) -> None:
-    app.router.add_get(
+    _ = app.router.add_get(
         "/jupyter",
         jupyter_page,
         name="jupyter-page",
     )
 
-    app.router.add_get(
+    _ = app.router.add_get(
         "/api/jupyter/status",
         jupyter_status,
         name="jupyter-status-api",

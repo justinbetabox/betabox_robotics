@@ -19,22 +19,20 @@ class Detector(ABC):
     the camera, manage frame acquisition, or modify the original frame image.
     """
 
+    name: str
+    _enabled: bool
+    _state_lock: threading.Lock
+
     def __init__(
         self,
         name: str,
         *,
         enabled: bool = False,
     ) -> None:
-        if not isinstance(name, str):
-            raise TypeError("detector name must be a string")
-
         normalized_name = name.strip()
 
         if not normalized_name:
             raise ValueError("detector name cannot be empty")
-
-        if not isinstance(enabled, bool):
-            raise TypeError("enabled must be a boolean")
 
         self.name = normalized_name
         self._enabled = enabled

@@ -25,39 +25,6 @@ class LaunchpadContext:
     workspace: Workspace
     permissions: Permissions
 
-    def __post_init__(
-        self,
-    ) -> None:
-        if not isinstance(
-            self.platform,
-            PlatformConfig,
-        ):
-            raise TypeError("platform must be a PlatformConfig")
-
-        if not isinstance(
-            self.services,
-            LaunchpadServices,
-        ):
-            raise TypeError("services must be LaunchpadServices")
-
-        if not isinstance(
-            self.identity,
-            Identity,
-        ):
-            raise TypeError("identity must be an Identity")
-
-        if not isinstance(
-            self.workspace,
-            Workspace,
-        ):
-            raise TypeError("workspace must be a Workspace")
-
-        if not isinstance(
-            self.permissions,
-            Permissions,
-        ):
-            raise TypeError("permissions must be Permissions")
-
     def can(
         self,
         permission: Permission,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from pathlib import Path
+from typing import cast
 
 from betabox_robotics.config import PlatformConfig
 
@@ -125,7 +126,15 @@ def validate_checks(
     ):
         raise TypeError("checks must be a tuple")
 
-    if not all(isinstance(check, CheckResult) for check in value):
+    checks = cast(
+        tuple[object, ...],
+        value,
+    )
+
+    if not all(isinstance(check, CheckResult) for check in checks):
         raise TypeError("checks must contain only CheckResult values")
 
-    return value
+    return cast(
+        tuple[CheckResult, ...],
+        checks,
+    )

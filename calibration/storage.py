@@ -4,7 +4,6 @@ import json
 import os
 import tempfile
 from pathlib import Path
-from typing import Any
 
 from .models import RobotCalibration
 
@@ -35,7 +34,6 @@ def load_calibration(
     calibrated yet, so factory calibration defaults
     are returned.
     """
-
     calibration_path = _validate_path(path)
 
     try:
@@ -43,7 +41,7 @@ def load_calibration(
             "r",
             encoding="utf-8",
         ) as file:
-            value: Any = json.load(file)
+            value: object = json.load(file)  # pyright: ignore[reportAny]
 
     except FileNotFoundError:
         return RobotCalibration.default()
@@ -74,14 +72,7 @@ def save_calibration(
     The complete JSON document is written to a
     temporary file before replacing the current file.
     """
-
     calibration_path = _validate_path(path)
-
-    if not isinstance(
-        calibration,
-        RobotCalibration,
-    ):
-        raise TypeError("calibration must be a RobotCalibration")
 
     parent = calibration_path.parent
     temporary_path: Path | None = None
@@ -109,11 +100,11 @@ def save_calibration(
                 sort_keys=True,
             )
 
-            file.write("\n")
+            _ = file.write("\n")
             file.flush()
             os.fsync(file.fileno())
 
-        temporary_path.replace(calibration_path)
+        _ = temporary_path.replace(calibration_path)
 
     except (
         OSError,

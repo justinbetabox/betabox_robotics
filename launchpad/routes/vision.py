@@ -23,7 +23,7 @@ def vision_context(
 async def vision_page(
     request: web.Request,
 ) -> web.Response:
-    vision_context(request)
+    _ = vision_context(request)
 
     return aiohttp_jinja2.render_template(
         "vision.html",
@@ -41,7 +41,7 @@ async def vision_page(
 def setup_vision_routes(
     app: web.Application,
 ) -> None:
-    app.router.add_get(
+    _ = app.router.add_get(
         "/vision",
         vision_page,
         name="vision-page",

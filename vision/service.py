@@ -3,11 +3,20 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Self
+from typing import Self, TypedDict
+
+from typing_extensions import override
 
 from betabox_robotics.vision.detection import DetectionManager
 from betabox_robotics.vision.detectors.color import HSVRangeInput
-from betabox_robotics.vision.frame_source import FrameSource, FrameSourceError
+from betabox_robotics.vision.frame_source import (
+    FrameSource,
+    FrameSourceError,
+    FrameSourceStatistics,
+)
+from betabox_robotics.vision.interfaces import (
+    VisionServiceInterface,
+)
 from betabox_robotics.vision.metadata import Metadata
 from betabox_robotics.vision.metadata_bus import MetadataBus
 from betabox_robotics.vision.overlay import OverlayRenderer
@@ -28,6 +37,31 @@ from betabox_robotics.vision.stream import StreamError
 from betabox_robotics.vision.webrtc import WebRTCStreamer
 
 
+class VisionRecordingStatistics(TypedDict):
+    active: bool
+    overlay: dict[str, bool | str | None]
+
+
+class VisionDetectionStatistics(TypedDict):
+    detectors: dict[str, bool]
+    metadata_sources: list[str]
+
+
+class VisionServerStatistics(TypedDict):
+    host: str
+    port: int
+    fps: int
+
+
+class VisionServiceStatistics(TypedDict):
+    running: bool
+    camera: FrameSourceStatistics
+    streaming: dict[str, object]
+    recording: VisionRecordingStatistics
+    detection: VisionDetectionStatistics
+    server: VisionServerStatistics
+
+
 @dataclass(frozen=True, slots=True)
 class VisionServiceConfig:
     host: str = "0.0.0.0"
@@ -35,28 +69,13 @@ class VisionServiceConfig:
     fps: int = 20
 
     def __post_init__(self) -> None:
-        if not isinstance(self.host, str):
-            raise TypeError("host must be a string")
-
         host = self.host.strip()
 
         if not host:
             raise ValueError("host cannot be empty")
 
-        if isinstance(self.port, bool) or not isinstance(
-            self.port,
-            int,
-        ):
-            raise TypeError("port must be an integer")
-
         if not 1 <= self.port <= 65535:
             raise ValueError("port must be between 1 and 65535")
-
-        if isinstance(self.fps, bool) or not isinstance(
-            self.fps,
-            int,
-        ):
-            raise TypeError("fps must be an integer")
 
         if self.fps <= 0:
             raise ValueError("fps must be greater than zero")
@@ -68,7 +87,7 @@ class VisionServiceConfig:
         )
 
 
-class VisionService:
+class VisionService(VisionServiceInterface):
     """
     Owns the camera frame pipeline for managed Betabox video streaming.
 
@@ -76,16 +95,23 @@ class VisionService:
     when running as betabox-video.service.
     """
 
+    config: VisionServiceConfig
+
+    frame_source: FrameSource
+    metadata_bus: MetadataBus
+    overlay: OverlayRenderer
+    detection: DetectionManager
+    recording: RecordingService
+    streamer: WebRTCStreamer
+    snapshot: SnapshotService
+    server: WebRTCSignalingServer
+
+    _running: bool
+
     def __init__(
         self,
         config: VisionServiceConfig | None = None,
     ) -> None:
-        if config is not None and not isinstance(
-            config,
-            VisionServiceConfig,
-        ):
-            raise TypeError("config must be a VisionServiceConfig")
-
         self.config = config if config is not None else VisionServiceConfig()
 
         self.frame_source = FrameSource(
@@ -200,7 +226,8 @@ class VisionService:
         if shutdown_error is not None:
             raise shutdown_error
 
-    def statistics(self) -> dict[str, Any]:
+    @override
+    def statistics(self) -> VisionServiceStatistics:
         return {
             "running": self._running,
             "camera": self.frame_source.statistics(),
@@ -255,6 +282,7 @@ class VisionService:
             image_format=image_format,
         )
 
+    @override
     def capture_snapshot_data(
         self,
         *,
@@ -281,6 +309,7 @@ class VisionService:
             image_format=image_format,
         )
 
+    @override
     def start_recording(
         self,
         *,
@@ -298,9 +327,11 @@ class VisionService:
     def stop_recording(self) -> Recording:
         return self.recording.stop()
 
+    @override
     def stop_recording_data(self) -> RecordingData:
         return self.recording.stop_data()
 
+    @override
     def enable_color_detection(
         self,
         colors: str | Sequence[str] | None = None,
@@ -318,26 +349,33 @@ class VisionService:
             min_area=min_area,
         )
 
+    @override
     def enable_detection(self, name: str) -> None:
         self.detection.enable(name)
 
+    @override
     def disable_detection(self, name: str) -> None:
         self.detection.disable(name)
 
+    @override
     def detection_names(self) -> list[str]:
         return self.detection.names()
 
+    @override
     def detection_status(self) -> dict[str, bool]:
         return {
             name: self.detection.is_enabled(name) for name in self.detection.names()
         }
 
+    @override
     def enable_stream_overlay(self, source: str | None = None) -> None:
         self.streamer.enable_overlay(source)
 
+    @override
     def disable_stream_overlay(self) -> None:
         self.streamer.disable_overlay()
 
+    @override
     def stream_overlay_status(self) -> dict[str, bool | str | None]:
         return self.streamer.overlay_status()
 
@@ -350,6 +388,7 @@ class VisionService:
     def recording_overlay_status(self) -> dict[str, bool | str | None]:
         return self.recording.overlay_status()
 
+    @override
     def latest_metadata(self, source: str | None = None) -> Metadata | None:
         return self.metadata_bus.latest(source)
 

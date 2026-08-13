@@ -1,19 +1,24 @@
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
+
 from aiohttp import web
 
 from betabox_robotics.config import PlatformConfig
 from betabox_robotics.launchpad.services import (
     LAUNCHPAD_SERVICES_KEY,
-    LaunchpadServices,
 )
 
 from .context import LaunchpadContext
 from .factory import build_account_context
 from .session_manager import (
     SESSION_MANAGER_KEY,
-    SessionManager,
 )
+
+RequestHandler = Callable[
+    [web.Request],
+    Awaitable[web.StreamResponse],
+]
 
 
 def _validate_platform(
@@ -43,6 +48,8 @@ def _validate_request(
 class LaunchpadContextProvider:
     """Create Launchpad contexts for incoming requests."""
 
+    _platform: PlatformConfig
+
     def __init__(
         self,
         platform: PlatformConfig,
@@ -65,18 +72,6 @@ class LaunchpadContextProvider:
 
         services = request_value.app[LAUNCHPAD_SERVICES_KEY]
         session_manager = request_value.app[SESSION_MANAGER_KEY]
-
-        if not isinstance(
-            services,
-            LaunchpadServices,
-        ):
-            raise TypeError("Launchpad services are invalid")
-
-        if not isinstance(
-            session_manager,
-            SessionManager,
-        ):
-            raise TypeError("Session manager is invalid")
 
         session = session_manager.resolve(request_value)
 
@@ -101,17 +96,11 @@ LAUNCHPAD_CONTEXT_PROVIDER_KEY = web.AppKey(
 @web.middleware
 async def launchpad_context_middleware(
     request: web.Request,
-    handler: web.RequestHandler,
+    handler: RequestHandler,
 ) -> web.StreamResponse:
     """Attach the current Launchpad context to the request."""
 
     provider = request.app[LAUNCHPAD_CONTEXT_PROVIDER_KEY]
-
-    if not isinstance(
-        provider,
-        LaunchpadContextProvider,
-    ):
-        raise TypeError("Launchpad context provider is invalid")
 
     request[LAUNCHPAD_CONTEXT_KEY] = provider.context(request)
 

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import TypedDict
 
 
 def _validate_string(
@@ -30,6 +30,17 @@ def _validate_bool(
         raise TypeError(f"{name} must be a boolean")
 
     return value
+
+
+class HealthCheckData(TypedDict):
+    name: str
+    ok: bool
+    message: str
+
+
+class RobotHealthData(TypedDict):
+    ok: bool
+    checks: list[HealthCheckData]
 
 
 @dataclass(
@@ -68,7 +79,7 @@ class HealthCheck:
             ),
         )
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> HealthCheckData:
         return {
             "name": self.name,
             "ok": self.ok,
@@ -84,29 +95,6 @@ class RobotHealth:
     ok: bool
     checks: tuple[HealthCheck, ...] = ()
 
-    def __post_init__(self) -> None:
-        object.__setattr__(
-            self,
-            "ok",
-            _validate_bool(
-                self.ok,
-                name="ok",
-            ),
-        )
-
-        if not isinstance(
-            self.checks,
-            tuple,
-        ):
-            raise TypeError("checks must be a tuple")
-
-        for check in self.checks:
-            if not isinstance(
-                check,
-                HealthCheck,
-            ):
-                raise TypeError("checks must contain only HealthCheck instances")
-
     @property
     def messages(
         self,
@@ -121,7 +109,7 @@ class RobotHealth:
     ) -> tuple[HealthCheck, ...]:
         return tuple(check for check in self.checks if not check.ok)
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> RobotHealthData:
         return {
             "ok": self.ok,
             "checks": [check.to_dict() for check in self.checks],

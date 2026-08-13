@@ -4,7 +4,7 @@ import logging
 import subprocess
 from collections.abc import Callable, Sequence
 from functools import wraps
-from typing import Concatenate, ParamSpec, Self, TypeVar
+from typing import ClassVar, Concatenate, ParamSpec, Self, TypeVar
 
 from smbus2 import SMBus
 
@@ -64,7 +64,14 @@ def retry_i2c(
 class I2C:
     """Betabox I2C device abstraction."""
 
-    DEFAULT_RETRY_COUNT = 5
+    logger: logging.Logger
+    bus_number: int
+    retry_count: int
+    address: int | None
+
+    _smbus: SMBus | None
+
+    DEFAULT_RETRY_COUNT: ClassVar[int] = 5
 
     def __init__(
         self,
@@ -72,17 +79,8 @@ class I2C:
         bus: int = 1,
         retry_count: int = DEFAULT_RETRY_COUNT,
     ) -> None:
-        if isinstance(bus, bool) or not isinstance(
-            bus,
-            int,
-        ):
-            raise TypeError("bus must be an integer")
-
         if bus < 0:
             raise ValueError("bus cannot be negative")
-
-        if isinstance(retry_count, bool) or not isinstance(retry_count, int):
-            raise TypeError("retry_count must be an integer")
 
         if retry_count < 1:
             raise ValueError("retry_count must be at least 1")
@@ -93,15 +91,21 @@ class I2C:
 
         self.bus_number = bus
         self.retry_count = retry_count
-        self.address: int | None = None
-        self._smbus: SMBus | None = None
+        self.address = None
+        self._smbus = None
 
         try:
             self._smbus = SMBus(self.bus_number)
 
             self.address = self._select_address(normalized_address)
 
-        except BaseException:
+        except (
+            HardwareError,
+            OSError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ):
             self.close()
             raise
 
@@ -328,12 +332,6 @@ class I2C:
         self,
         length: int = 1,
     ) -> list[int]:
-        if isinstance(length, bool) or not isinstance(
-            length,
-            int,
-        ):
-            raise TypeError("length must be an integer")
-
         if length <= 0:
             raise ValueError("length must be greater than 0")
 
@@ -356,12 +354,6 @@ class I2C:
         length: int,
         memaddr: int,
     ) -> list[int]:
-        if isinstance(length, bool) or not isinstance(
-            length,
-            int,
-        ):
-            raise TypeError("length must be an integer")
-
         if length <= 0:
             raise ValueError("length must be greater than 0")
 
@@ -409,12 +401,8 @@ class I2C:
 
         if isinstance(data, bytearray):
             values = list(data)
-
-        elif isinstance(data, list):
-            values = [self._validate_byte(value) for value in data]
-
         else:
-            raise TypeError("write data must be an int, list, or bytearray")
+            values = [self._validate_byte(value) for value in data]
 
         if not values:
             raise ValueError("write data cannot be empty")

@@ -1,21 +1,30 @@
+from __future__ import annotations
+
+from collections.abc import Mapping
 from dataclasses import asdict, is_dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TypeAlias, cast
 
 from aiohttp import web
+from aiohttp.typedefs import Handler
 
 from betabox_robotics.vision.detection import DetectionError
+from betabox_robotics.vision.detectors.color import HSVRangeInput
 from betabox_robotics.vision.frame_source import FrameSourceError
+from betabox_robotics.vision.interfaces import (
+    VisionServiceInterface,
+)
 from betabox_robotics.vision.overlay import OverlayError
 from betabox_robotics.vision.recording import RecordingError
 from betabox_robotics.vision.snapshot import (
     SnapshotError,
-    _normalize_image_format,
+    normalize_image_format,
 )
 from betabox_robotics.vision.stream import StreamError
+from betabox_robotics.vision.webrtc import WebRTCStreamer
 
-if TYPE_CHECKING:
-    from betabox_robotics.vision.service import VisionService
+JSONScalar: TypeAlias = str | int | float | bool | None
+JSONValue: TypeAlias = JSONScalar | list["JSONValue"] | dict[str, "JSONValue"]
 
 HANDLED_ERRORS = (
     TypeError,
@@ -189,10 +198,12 @@ def _validate_port(
 @web.middleware
 async def error_middleware(
     request: web.Request,
-    handler,
+    handler: Handler,
 ) -> web.StreamResponse:
     try:
-        return await handler(request)
+        response: web.StreamResponse = await handler(request)
+        return response
+
     except HANDLED_ERRORS as exc:
         return fail(
             str(exc),
@@ -200,26 +211,52 @@ async def error_middleware(
         )
 
 
-def to_json(value: Any) -> Any:
+def to_json(
+    value: object,
+) -> JSONValue:
     if value is None:
         return None
 
-    if is_dataclass(value) and not isinstance(value, type):
-        return to_json(asdict(value))
-
-    if isinstance(value, dict):
-        return {str(key): to_json(item) for key, item in value.items()}
-
-    if isinstance(value, (list, tuple, set)):
-        return [to_json(item) for item in value]
+    if isinstance(
+        value,
+        str | int | float | bool,
+    ):
+        return value
 
     if isinstance(value, Path):
         return str(value)
 
-    return value
+    if is_dataclass(value) and not isinstance(
+        value,
+        type,
+    ):
+        return to_json(asdict(value))
+
+    if isinstance(value, Mapping):
+        mapping = cast(
+            Mapping[object, object],
+            value,
+        )
+
+        return {str(key): to_json(item) for key, item in mapping.items()}
+
+    if isinstance(
+        value,
+        list | tuple | set,
+    ):
+        values = cast(
+            list[object] | tuple[object, ...] | set[object],
+            value,
+        )
+
+        return [to_json(item) for item in values]
+
+    raise TypeError(f"value is not JSON serializable: {type(value).__name__}")
 
 
-def ok(data: Any = None) -> web.Response:
+def ok(
+    data: object = None,
+) -> web.Response:
     return web.json_response(
         {
             "success": True,
@@ -266,9 +303,12 @@ def query_bool(
 
 async def json_object(
     request: web.Request,
-) -> dict[str, Any]:
+) -> dict[str, JSONValue]:
     try:
-        data = await request.json()
+        raw_data = cast(
+            object,
+            await request.json(),
+        )
     except (
         UnicodeDecodeError,
         ValueError,
@@ -276,14 +316,19 @@ async def json_object(
     ) as exc:
         raise ValueError("request body must contain valid JSON") from exc
 
-    if not isinstance(data, dict):
+    if not isinstance(raw_data, dict):
         raise TypeError("request JSON must be an object")
+
+    data = cast(
+        dict[str, JSONValue],
+        raw_data,
+    )
 
     return data
 
 
 def required_string(
-    data: dict[str, Any],
+    data: dict[str, JSONValue],
     name: str,
 ) -> str:
     value = data.get(name)
@@ -294,6 +339,140 @@ def required_string(
     return value.strip()
 
 
+def optional_string_sequence(
+    value: JSONValue,
+    *,
+    name: str,
+) -> str | list[str] | None:
+    if value is None:
+        return None
+
+    if isinstance(value, str):
+        return value
+
+    if isinstance(value, list):
+        values: list[str] = []
+
+        for item in value:
+            if not isinstance(item, str):
+                raise TypeError(f"{name} must contain only strings")
+
+            values.append(item)
+
+        return values
+
+    raise ValueError(f"{name} must be a string or array of strings")
+
+
+def hsv_value(
+    value: JSONValue,
+    *,
+    name: str,
+) -> tuple[int, int, int]:
+    if not isinstance(value, list) or len(value) != 3:
+        raise ValueError(f"{name} must contain three integers")
+
+    components: list[int] = []
+
+    for component in value:
+        if isinstance(component, bool) or not isinstance(
+            component,
+            int,
+        ):
+            raise TypeError(f"{name} must contain three integers")
+
+        components.append(component)
+
+    return (
+        components[0],
+        components[1],
+        components[2],
+    )
+
+
+def hsv_range(
+    value: JSONValue,
+    *,
+    name: str,
+) -> HSVRangeInput:
+    if not isinstance(value, list):
+        raise TypeError(f"{name} must be an HSV range")
+
+    # Single range:
+    # [[h, s, v], [h, s, v]]
+    if len(value) == 2:
+        try:
+            lower = hsv_value(
+                value[0],
+                name=f"{name} lower",
+            )
+            upper = hsv_value(
+                value[1],
+                name=f"{name} upper",
+            )
+        except ValueError:
+            pass
+        else:
+            return (
+                lower,
+                upper,
+            )
+
+    # Sequence of ranges:
+    # [
+    #   [[h, s, v], [h, s, v]],
+    #   [[h, s, v], [h, s, v]],
+    # ]
+    ranges: list[
+        tuple[
+            tuple[int, int, int],
+            tuple[int, int, int],
+        ]
+    ] = []
+
+    for index, item in enumerate(value):
+        if not isinstance(item, list) or len(item) != 2:
+            raise ValueError(f"{name}[{index}] must be an HSV range")
+
+        ranges.append(
+            (
+                hsv_value(
+                    item[0],
+                    name=f"{name}[{index}] lower",
+                ),
+                hsv_value(
+                    item[1],
+                    name=f"{name}[{index}] upper",
+                ),
+            )
+        )
+
+    if not ranges:
+        raise ValueError(f"{name} must contain at least one HSV range")
+
+    return ranges
+
+
+def optional_custom_ranges(
+    value: JSONValue,
+) -> dict[str, HSVRangeInput] | None:
+    if value is None:
+        return None
+
+    if not isinstance(value, dict):
+        raise TypeError("custom_ranges must be an object")
+
+    result: dict[str, HSVRangeInput] = {}
+
+    for name, raw_range in value.items():
+        result[name] = hsv_range(
+            raw_range,
+            name=f"custom_ranges.{name}",
+        )
+
+    return result
+
+
 class WebRTCSignalingServer:
     """
     Minimal local WebRTC signaling server.
@@ -302,9 +481,15 @@ class WebRTCSignalingServer:
     camera. It only connects browser offers to WebRTCStreamer.
     """
 
+    vision: VisionServiceInterface
+    streamer: WebRTCStreamer
+    host: str
+    port: int
+    app: web.Application
+
     def __init__(
         self,
-        vision: "VisionService",
+        vision: VisionServiceInterface,
         *,
         host: str = "0.0.0.0",
         port: int = 8080,
@@ -326,26 +511,62 @@ class WebRTCSignalingServer:
         )
         self.app.on_shutdown.append(self.on_shutdown)
 
-        self.app.router.add_get("/", self.index)
-        self.app.router.add_post("/offer", self.offer)
-        self.app.router.add_get("/stats", self.stats)
-        self.app.router.add_post("/snapshot", self.snapshot)
-        self.app.router.add_post("/recording/start", self.recording_start)
-        self.app.router.add_post("/recording/stop", self.recording_stop)
-        self.app.router.add_get("/metadata", self.metadata)
-        self.app.router.add_get("/detection", self.detection_status)
-        self.app.router.add_post("/detection/enable", self.detection_enable)
-        self.app.router.add_post("/detection/disable", self.detection_disable)
-        self.app.router.add_post(
+        _ = self.app.router.add_get(
+            "/",
+            self.index,
+        )
+        _ = self.app.router.add_post(
+            "/offer",
+            self.offer,
+        )
+        _ = self.app.router.add_get(
+            "/stats",
+            self.stats,
+        )
+        _ = self.app.router.add_post(
+            "/snapshot",
+            self.snapshot,
+        )
+        _ = self.app.router.add_post(
+            "/recording/start",
+            self.recording_start,
+        )
+        _ = self.app.router.add_post(
+            "/recording/stop",
+            self.recording_stop,
+        )
+        _ = self.app.router.add_get(
+            "/metadata",
+            self.metadata,
+        )
+        _ = self.app.router.add_get(
+            "/detection",
+            self.detection_status,
+        )
+        _ = self.app.router.add_post(
+            "/detection/enable",
+            self.detection_enable,
+        )
+        _ = self.app.router.add_post(
+            "/detection/disable",
+            self.detection_disable,
+        )
+        _ = self.app.router.add_post(
             "/detection/color/enable",
             self.color_detection_enable,
         )
-        self.app.router.add_post("/stream/overlay/enable", self.stream_overlay_enable)
-        self.app.router.add_post("/stream/overlay/disable", self.stream_overlay_disable)
+        _ = self.app.router.add_post(
+            "/stream/overlay/enable",
+            self.stream_overlay_enable,
+        )
+        _ = self.app.router.add_post(
+            "/stream/overlay/disable",
+            self.stream_overlay_disable,
+        )
 
     async def index(
         self,
-        request: web.Request,
+        _request: web.Request,
     ) -> web.Response:
         return web.Response(text=INDEX_HTML, content_type="text/html")
 
@@ -373,7 +594,7 @@ class WebRTCSignalingServer:
 
     async def stats(
         self,
-        request: web.Request,
+        _request: web.Request,
     ) -> web.Response:
         return ok(self.vision.statistics())
 
@@ -387,7 +608,7 @@ class WebRTCSignalingServer:
         )
 
         source = request.query.get("source")
-        image_format = _normalize_image_format(
+        image_format = normalize_image_format(
             request.query.get(
                 "format",
                 "jpg",
@@ -422,7 +643,7 @@ class WebRTCSignalingServer:
         source = request.query.get("source")
         filename = request.query.get("filename")
 
-        self.vision.start_recording(
+        path = self.vision.start_recording(
             filename=filename,
             overlay=overlay,
             source=source,
@@ -431,12 +652,13 @@ class WebRTCSignalingServer:
         return ok(
             {
                 "recording": True,
+                "path": path,
             }
         )
 
     async def recording_stop(
         self,
-        request: web.Request,
+        _request: web.Request,
     ) -> web.Response:
         recording = self.vision.stop_recording_data()
 
@@ -462,7 +684,7 @@ class WebRTCSignalingServer:
 
     async def detection_status(
         self,
-        request: web.Request,
+        _request: web.Request,
     ) -> web.Response:
         return ok(
             {
@@ -508,9 +730,26 @@ class WebRTCSignalingServer:
     ) -> web.Response:
         params = await json_object(request)
 
-        colors = params.get("colors")
-        custom_ranges = params.get("custom_ranges")
-        min_area = params.get("min_area")
+        colors = optional_string_sequence(
+            params.get("colors"),
+            name="colors",
+        )
+
+        custom_ranges = optional_custom_ranges(
+            params.get("custom_ranges"),
+        )
+
+        min_area_value = params.get("min_area")
+
+        if min_area_value is None:
+            min_area = None
+        elif isinstance(min_area_value, bool) or not isinstance(
+            min_area_value,
+            int | float,
+        ):
+            raise ValueError("min_area must be a number")
+        else:
+            min_area = float(min_area_value)
 
         self.vision.enable_color_detection(
             colors,
@@ -541,12 +780,12 @@ class WebRTCSignalingServer:
 
     async def stream_overlay_disable(
         self,
-        request: web.Request,
+        _request: web.Request,
     ) -> web.Response:
         self.vision.disable_stream_overlay()
         return ok(self.vision.stream_overlay_status())
 
-    async def on_shutdown(self, app: web.Application) -> None:
+    async def on_shutdown(self, _app: web.Application) -> None:
         await self.streamer.close_peers()
 
     def run(self, *, handle_signals: bool = True) -> None:

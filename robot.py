@@ -22,12 +22,6 @@ class Robot:
         cls,
         config: RobotConfig,
     ) -> BetaboxCar:
-        if not isinstance(
-            config,
-            RobotConfig,
-        ):
-            raise TypeError("config must be a RobotConfig")
-
         return BetaboxCar(config)
 
 

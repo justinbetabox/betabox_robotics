@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import time
 from subprocess import CompletedProcess
+from typing import cast
 
 from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
@@ -165,12 +166,6 @@ def command_error(
     if result is None:
         return "command could not be executed"
 
-    if not isinstance(
-        result,
-        CompletedProcess,
-    ):
-        raise TypeError("result must be a CompletedProcess or None")
-
     stderr = result.stderr.strip()
     stdout = result.stdout.strip()
 
@@ -238,7 +233,7 @@ def enable_wifi_radio(
     if enable_result is None or enable_result.returncode != 0:
         print(
             "wifi-fallback: failed to enable "
-            f"Wi-Fi radio: {command_error(enable_result)}"
+            + f"Wi-Fi radio: {command_error(enable_result)}"
         )
         return False
 
@@ -515,28 +510,28 @@ def parse_args(
 
     parser = argparse.ArgumentParser(prog="betabox wifi-fallback")
 
-    parser.add_argument(
+    _ = parser.add_argument(
         "--delay",
         type=int,
         default=(network.wifi_fallback_delay_seconds),
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--wifi-iface",
         default=network.wifi_interface,
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--eth-iface",
         default=network.ethernet_interface,
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--ap-name",
         default=network.ap_connection_name,
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--ssid-prefix",
         default=network.identity_prefix,
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--dry-run",
         action="store_true",
     )
@@ -554,15 +549,64 @@ def main(
     )
 
     try:
+        delay_seconds = _validate_non_negative_int(
+            cast(
+                object,
+                args.delay,
+            ),
+            name="delay_seconds",
+        )
+
+        wifi_iface = _validate_string(
+            cast(
+                object,
+                args.wifi_iface,
+            ),
+            name="wifi_iface",
+        )
+
+        eth_iface = _validate_string(
+            cast(
+                object,
+                args.eth_iface,
+            ),
+            name="eth_iface",
+        )
+
+        ap_name = _validate_string(
+            cast(
+                object,
+                args.ap_name,
+            ),
+            name="ap_name",
+        )
+
+        ssid_prefix = _validate_string(
+            cast(
+                object,
+                args.ssid_prefix,
+            ),
+            name="ssid_prefix",
+        )
+
+        dry_run = _validate_flag(
+            cast(
+                object,
+                args.dry_run,
+            ),
+            name="dry_run",
+        )
+
         return run_wifi_fallback(
-            delay_seconds=args.delay,
-            wifi_iface=args.wifi_iface,
-            eth_iface=args.eth_iface,
-            ap_name=args.ap_name,
-            ssid_prefix=args.ssid_prefix,
-            dry_run=args.dry_run,
+            delay_seconds=delay_seconds,
+            wifi_iface=wifi_iface,
+            eth_iface=eth_iface,
+            ap_name=ap_name,
+            ssid_prefix=ssid_prefix,
+            dry_run=dry_run,
             config=config,
         )
+
     except (
         TypeError,
         ValueError,

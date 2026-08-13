@@ -5,7 +5,7 @@ import socket
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any
+from typing import cast
 
 from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
@@ -35,6 +35,50 @@ from betabox_robotics.services.system_health import (
     collect_system_health,
 )
 from betabox_robotics.version import __version__
+
+JSONValue = str | int | float | bool | None | list["JSONValue"] | dict[str, "JSONValue"]
+
+
+def _to_json_value(
+    value: object,
+) -> JSONValue:
+    if value is None:
+        return None
+
+    if isinstance(
+        value,
+        str | int | float | bool,
+    ):
+        return value
+
+    if isinstance(value, Mapping):
+        mapping = cast(
+            Mapping[object, object],
+            value,
+        )
+
+        result: dict[str, JSONValue] = {}
+
+        for key, item in mapping.items():
+            if not isinstance(key, str):
+                raise TypeError("JSON object keys must be strings")
+
+            result[key] = _to_json_value(item)
+
+        return result
+
+    if isinstance(
+        value,
+        list | tuple,
+    ):
+        values = cast(
+            list[object] | tuple[object, ...],
+            value,
+        )
+
+        return [_to_json_value(item) for item in values]
+
+    raise TypeError(f"value is not JSON serializable: {type(value).__name__}")
 
 
 def _validate_config(
@@ -68,34 +112,36 @@ def _validate_string(
     return result
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+)
 class PlatformHardwareSummary:
     battery: BatteryStatus
     vision: VisionStatus
 
-    def __post_init__(self) -> None:
-        if not isinstance(
-            self.battery,
-            BatteryStatus,
-        ):
-            raise TypeError("battery must be a BatteryStatus")
-
-        if not isinstance(
-            self.vision,
-            VisionStatus,
-        ):
-            raise TypeError("vision must be a VisionStatus")
-
     def to_dict(
         self,
-    ) -> dict[str, Any]:
+    ) -> dict[str, JSONValue]:
+        battery = _to_json_value(self.battery.to_dict())
+        vision = _to_json_value(self.vision.to_dict())
+
+        if not isinstance(battery, dict):
+            raise TypeError("battery data must be a JSON object")
+
+        if not isinstance(vision, dict):
+            raise TypeError("vision data must be a JSON object")
+
         return {
-            "battery": self.battery.to_dict(),
-            "vision": self.vision.to_dict(),
+            "battery": battery,
+            "vision": vision,
         }
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+)
 class PlatformSummary:
     version: str
     hostname: str
@@ -106,7 +152,9 @@ class PlatformSummary:
     hardware: PlatformHardwareSummary
     system_health: SystemHealthStatus
 
-    def __post_init__(self) -> None:
+    def __post_init__(
+        self,
+    ) -> None:
         object.__setattr__(
             self,
             "version",
@@ -124,23 +172,19 @@ class PlatformSummary:
             ),
         )
 
-        if not isinstance(
-            self.ip_addresses,
-            tuple,
-        ):
-            raise TypeError("ip_addresses must be a tuple")
-
-        for address in self.ip_addresses:
+        normalized_addresses = tuple(
             _validate_string(
                 address,
-                name="IP address",
+                name="ip address",
             )
+            for address in self.ip_addresses
+        )
 
-        if not isinstance(
-            self.services,
-            Mapping,
-        ):
-            raise TypeError("services must be a mapping")
+        object.__setattr__(
+            self,
+            "ip_addresses",
+            normalized_addresses,
+        )
 
         normalized_services: dict[str, str] = {}
 
@@ -153,6 +197,7 @@ class PlatformSummary:
                 state,
                 name="service state",
             )
+
             normalized_services[unit_value] = state_value
 
         object.__setattr__(
@@ -161,42 +206,27 @@ class PlatformSummary:
             MappingProxyType(normalized_services),
         )
 
-        if not isinstance(
-            self.jupyterhub_proxy_available,
-            bool,
-        ):
-            raise TypeError("jupyterhub_proxy_available must be a boolean")
-
-        if not isinstance(
-            self.control,
-            RobotOwnershipStatus,
-        ):
-            raise TypeError("control must be a RobotOwnershipStatus")
-
-        if not isinstance(
-            self.hardware,
-            PlatformHardwareSummary,
-        ):
-            raise TypeError("hardware must be a PlatformHardwareSummary")
-
-        if not isinstance(
-            self.system_health,
-            SystemHealthStatus,
-        ):
-            raise TypeError("system_health must be a SystemHealthStatus")
-
     def to_dict(
         self,
-    ) -> dict[str, Any]:
+    ) -> dict[str, JSONValue]:
+        control = _to_json_value(self.control.to_dict())
+        system_health = _to_json_value(self.system_health.to_dict())
+
+        if not isinstance(control, dict):
+            raise TypeError("control data must be a JSON object")
+
+        if not isinstance(system_health, dict):
+            raise TypeError("system health data must be a JSON object")
+
         return {
             "version": self.version,
             "hostname": self.hostname,
             "ip_addresses": list(self.ip_addresses),
             "services": dict(self.services),
             "jupyterhub_proxy_available": (self.jupyterhub_proxy_available),
-            "control": self.control.to_dict(),
+            "control": control,
             "hardware": self.hardware.to_dict(),
-            "system_health": (self.system_health.to_dict()),
+            "system_health": system_health,
         }
 
 
@@ -262,7 +292,7 @@ def collect_platform_summary(
     config_value = _validate_config(config)
     managed = managed_services(config_value)
 
-    services = {
+    services: dict[str, str] = {
         service.unit: service_state(service.unit) for service in managed.values()
     }
 

@@ -336,15 +336,26 @@ def check_ultrasonic_read(
     """
 
     robot_config_value = _validate_robot_config(robot_config)
-    sensors = None
 
     try:
-        from betabox_robotics.sensors import (
-            Sensors,
-        )
+        from betabox_robotics.sensors import Sensors
 
         sensors = Sensors.default(robot_config_value.sensors)
 
+    except (
+        HardwareError,
+        SensorError,
+        OSError,
+        TypeError,
+        ValueError,
+    ) as exc:
+        return CheckResult(
+            name="hardware:ultrasonic_read",
+            ok=False,
+            message=str(exc),
+        )
+
+    try:
         distance = float(sensors.ultrasonic.distance(samples=3))
 
     except (
@@ -360,32 +371,25 @@ def check_ultrasonic_read(
             message=str(exc),
         )
 
-    if sensors is not None:
-        close = getattr(
-            sensors,
-            "close",
-            None,
-        )
-
-        if callable(close):
-            try:
-                close()
-            except (
-                HardwareError,
-                SensorError,
-                OSError,
-            ) as exc:
-                return CheckResult(
-                    name="hardware:ultrasonic_read",
-                    ok=False,
-                    message=(f"ultrasonic read succeeded but cleanup failed: {exc}"),
-                )
+    finally:
+        try:
+            sensors.close()
+        except (
+            HardwareError,
+            SensorError,
+            OSError,
+        ) as exc:
+            return CheckResult(
+                name="hardware:ultrasonic_read",
+                ok=False,
+                message=(f"ultrasonic read succeeded but cleanup failed: {exc}"),
+            )
 
     if distance < 0:
         return CheckResult(
             name="hardware:ultrasonic_read",
             ok=False,
-            message=(f"invalid distance result: {distance}"),
+            message=f"invalid distance result: {distance}",
         )
 
     return CheckResult(

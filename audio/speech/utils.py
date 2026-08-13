@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
-from typing import Final
+from typing import Final, cast
 
 from betabox_robotics.audio.exceptions import SpeechError
 
@@ -11,7 +11,7 @@ SPEECH_TIMEOUT_SECONDS: Final[float] = 30.0
 
 def validate_speech_request(
     text: object,
-    output_path: str | Path,
+    output_path: object,
 ) -> tuple[str, Path]:
     if not isinstance(text, str):
         raise TypeError("text must be a string")
@@ -44,7 +44,7 @@ def run_speech_command(
     timeout: float = SPEECH_TIMEOUT_SECONDS,
 ) -> None:
     try:
-        result = subprocess.run(
+        _ = subprocess.run(
             command,
             input=input_text,
             check=True,
@@ -63,7 +63,8 @@ def run_speech_command(
         raise SpeechError(f"failed to start {backend_name}: {exc}") from exc
 
     except subprocess.CalledProcessError as exc:
-        details = exc.stderr.strip() if exc.stderr else ""
+        stderr = cast(str | None, exc.stderr)
+        details = stderr.strip() if stderr else ""
 
         message = (
             f"{backend_name} speech failed: {details}"
@@ -72,9 +73,6 @@ def run_speech_command(
         )
 
         raise SpeechError(message) from exc
-
-    if result.returncode != 0:
-        raise SpeechError(f"{backend_name} speech failed")
 
 
 def verify_speech_output(

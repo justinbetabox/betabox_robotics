@@ -89,12 +89,6 @@ class ManagedService:
 def managed_services(
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> dict[str, ManagedService]:
-    if not isinstance(
-        config,
-        PlatformConfig,
-    ):
-        raise TypeError("config must be a PlatformConfig")
-
     services = config.services
 
     return {

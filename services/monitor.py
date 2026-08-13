@@ -3,8 +3,9 @@ from __future__ import annotations
 import argparse
 import json
 import time
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
-from typing import Literal
+from typing import Literal, cast
 
 from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
@@ -75,14 +76,59 @@ def _validate_mapping(
     value: object,
     *,
     name: str,
-) -> dict:
+) -> Mapping[str, object]:
+    mapping = _optional_mapping(
+        value,
+        name=name,
+    )
+
+    if mapping is None:
+        raise TypeError(f"{name} must be a mapping")
+
+    return mapping
+
+
+def _validate_flag(
+    value: object,
+    *,
+    name: str,
+) -> bool:
     if not isinstance(
         value,
-        dict,
+        bool,
     ):
-        raise TypeError(f"{name} must be a dictionary")
+        raise TypeError(f"{name} must be a boolean")
 
     return value
+
+
+def _optional_mapping(
+    value: object,
+    *,
+    name: str,
+) -> Mapping[str, object] | None:
+    if not isinstance(
+        value,
+        Mapping,
+    ):
+        return None
+
+    mapping = cast(
+        Mapping[object, object],
+        value,
+    )
+
+    for key in mapping:
+        if not isinstance(
+            key,
+            str,
+        ):
+            raise TypeError(f"{name} keys must be strings")
+
+    return cast(
+        Mapping[str, object],
+        mapping,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -106,12 +152,6 @@ class MonitorEvent:
                 name="timestamp",
             ),
         )
-
-        if not isinstance(
-            self.severity,
-            str,
-        ):
-            raise TypeError("severity must be a string")
 
         severity = self.severity.strip().lower()
 
@@ -163,12 +203,6 @@ def write_event(
     event: MonitorEvent,
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> None:
-    if not isinstance(
-        event,
-        MonitorEvent,
-    ):
-        raise TypeError("event must be a MonitorEvent")
-
     config_value = _validate_config(config)
 
     config_value.paths.state_dir.mkdir(
@@ -180,7 +214,7 @@ def write_event(
         "a",
         encoding="utf-8",
     ) as file:
-        file.write(
+        _ = file.write(
             json.dumps(
                 asdict(event),
                 sort_keys=True,
@@ -196,7 +230,6 @@ def write_event(
 
 def severity_for_change(
     path: str,
-    previous: object,
     current: object,
 ) -> Severity:
     path_value = _validate_string(
@@ -348,7 +381,7 @@ def log(
         "a",
         encoding="utf-8",
     ) as file:
-        file.write(f"{timestamp()} {message_value}\n")
+        _ = file.write(f"{timestamp()} {message_value}\n")
 
 
 def collect_snapshot(
@@ -366,147 +399,158 @@ def collect_snapshot(
 
 
 def summarize(
-    snapshot: dict,
+    snapshot: Mapping[str, object],
 ) -> dict[str, object]:
     snapshot_value = _validate_mapping(
         snapshot,
         name="snapshot",
     )
 
-    hardware = snapshot_value.get(
-        "hardware",
-        {},
-    )
-    system_health = snapshot_value.get(
-        "system_health",
-        {},
-    )
-
-    if not isinstance(
-        hardware,
-        dict,
-    ):
-        raise TypeError("snapshot hardware must be a dictionary")
-
-    if not isinstance(
-        system_health,
-        dict,
-    ):
-        raise TypeError("snapshot system_health must be a dictionary")
-
-    battery = hardware.get(
-        "battery",
-        {},
-    )
-    audio = hardware.get(
-        "audio",
-        {},
-    )
-    vision = hardware.get(
-        "vision",
-        {},
-    )
-    sensors = hardware.get(
-        "sensors",
-        {},
-    )
-    i2c = hardware.get(
-        "i2c",
-        {},
+    hardware = _validate_mapping(
+        snapshot_value.get(
+            "hardware",
+            {},
+        ),
+        name="snapshot hardware",
     )
 
-    temperature = system_health.get(
-        "temperature",
-        {},
-    )
-    throttling = system_health.get(
-        "throttling",
-        {},
-    )
-    memory = system_health.get(
-        "memory",
-        {},
-    )
-    disk = system_health.get(
-        "disk",
-        {},
-    )
-    ethernet = system_health.get(
-        "ethernet",
-        {},
-    )
-    wifi = system_health.get(
-        "wifi",
-        {},
+    system_health = _validate_mapping(
+        snapshot_value.get(
+            "system_health",
+            {},
+        ),
+        name="snapshot system_health",
     )
 
-    nested = {
-        "battery": battery,
-        "audio": audio,
-        "vision": vision,
-        "sensors": sensors,
-        "i2c": i2c,
-        "temperature": temperature,
-        "throttling": throttling,
-        "memory": memory,
-        "disk": disk,
-        "ethernet": ethernet,
-        "wifi": wifi,
-    }
-
-    for name, value in nested.items():
-        if not isinstance(
-            value,
-            dict,
-        ):
-            raise TypeError(f"{name} must be a dictionary")
-
-    services = snapshot_value.get(
-        "services",
-        {},
+    battery = _validate_mapping(
+        hardware.get(
+            "battery",
+            {},
+        ),
+        name="battery",
     )
 
-    if not isinstance(
-        services,
-        dict,
-    ):
-        raise TypeError("snapshot services must be a dictionary")
+    audio = _validate_mapping(
+        hardware.get(
+            "audio",
+            {},
+        ),
+        name="audio",
+    )
+
+    vision = _validate_mapping(
+        hardware.get(
+            "vision",
+            {},
+        ),
+        name="vision",
+    )
+
+    sensors = _validate_mapping(
+        hardware.get(
+            "sensors",
+            {},
+        ),
+        name="sensors",
+    )
+
+    i2c = _validate_mapping(
+        hardware.get(
+            "i2c",
+            {},
+        ),
+        name="i2c",
+    )
+
+    temperature = _validate_mapping(
+        system_health.get(
+            "temperature",
+            {},
+        ),
+        name="temperature",
+    )
+
+    throttling = _validate_mapping(
+        system_health.get(
+            "throttling",
+            {},
+        ),
+        name="throttling",
+    )
+
+    memory = _validate_mapping(
+        system_health.get(
+            "memory",
+            {},
+        ),
+        name="memory",
+    )
+
+    disk = _validate_mapping(
+        system_health.get(
+            "disk",
+            {},
+        ),
+        name="disk",
+    )
+
+    ethernet = _validate_mapping(
+        system_health.get(
+            "ethernet",
+            {},
+        ),
+        name="ethernet",
+    )
+
+    wifi = _validate_mapping(
+        system_health.get(
+            "wifi",
+            {},
+        ),
+        name="wifi",
+    )
+
+    services = _validate_mapping(
+        snapshot_value.get(
+            "services",
+            {},
+        ),
+        name="snapshot services",
+    )
 
     return {
         "services": dict(services),
         "hardware": {
             "robot_available": hardware.get("passive_hardware_available"),
-            "i2c_available": (i2c.get("available")),
-            "i2c_devices": (
-                i2c.get(
-                    "devices",
-                    [],
-                )
+            "i2c_available": i2c.get("available"),
+            "i2c_devices": i2c.get(
+                "devices",
+                [],
             ),
-            "battery_state": (battery.get("state")),
-            "grayscale_available": (sensors.get("grayscale_available")),
-            "audio_available": (audio.get("available")),
-            "vision_service_available": (vision.get("service_available")),
-            "vision_running": (vision.get("running")),
-            "camera_running": (vision.get("camera_running")),
-            "camera_has_frame": (vision.get("camera_has_frame")),
+            "battery_state": battery.get("state"),
+            "grayscale_available": sensors.get("grayscale_available"),
+            "audio_available": audio.get("available"),
+            "vision_service_available": vision.get("service_available"),
+            "vision_running": vision.get("running"),
+            "camera_running": vision.get("camera_running"),
+            "camera_has_frame": vision.get("camera_has_frame"),
         },
         "system": {
-            "temperature_state": (temperature.get("state")),
-            "undervoltage_now": (throttling.get("undervoltage_now")),
-            "undervoltage_occurred": (throttling.get("undervoltage_occurred")),
-            "throttled_now": (throttling.get("throttled_now")),
-            "throttled_occurred": (throttling.get("throttled_occurred")),
-            "memory_state": (memory.get("state")),
-            "disk_state": (disk.get("state")),
-            "ethernet_connected": (ethernet.get("connected")),
-            "wifi_connected": (wifi.get("connected")),
+            "temperature_state": temperature.get("state"),
+            "undervoltage_now": throttling.get("undervoltage_now"),
+            "undervoltage_occurred": throttling.get("undervoltage_occurred"),
+            "throttled_now": throttling.get("throttled_now"),
+            "throttled_occurred": throttling.get("throttled_occurred"),
+            "memory_state": memory.get("state"),
+            "disk_state": disk.get("state"),
+            "ethernet_connected": ethernet.get("connected"),
+            "wifi_connected": wifi.get("connected"),
         },
     }
 
 
 def run_once(
-    previous_summary: dict | None = None,
+    previous_summary: Mapping[str, object] | None = None,
     *,
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> dict[str, object]:
@@ -548,7 +592,6 @@ def run_once(
             timestamp=timestamp(),
             severity=severity_for_change(
                 path,
-                previous,
                 current,
             ),
             component=path.split(
@@ -618,8 +661,8 @@ def run_forever(
 
 
 def find_changes(
-    previous: dict,
-    current: dict,
+    previous: Mapping[str, object],
+    current: Mapping[str, object],
     prefix: str = "",
 ) -> list[
     tuple[
@@ -637,12 +680,6 @@ def find_changes(
         name="current",
     )
 
-    if not isinstance(
-        prefix,
-        str,
-    ):
-        raise TypeError("prefix must be a string")
-
     prefix_value = prefix.strip()
 
     changes: list[
@@ -659,24 +696,37 @@ def find_changes(
         keys,
         key=str,
     ):
-        if not isinstance(
-            key,
-            str,
-        ):
-            raise TypeError("summary keys must be strings")
-
         path = f"{prefix_value}.{key}" if prefix_value else key
-        old = previous_value.get(key)
-        new = current_value.get(key)
 
-        if isinstance(old, dict) and isinstance(new, dict):
+        old = cast(
+            object,
+            previous_value.get(key),
+        )
+
+        new = cast(
+            object,
+            current_value.get(key),
+        )
+
+        old_mapping = _optional_mapping(
+            old,
+            name=f"{path} previous",
+        )
+
+        new_mapping = _optional_mapping(
+            new,
+            name=f"{path} current",
+        )
+
+        if old_mapping is not None and new_mapping is not None:
             changes.extend(
                 find_changes(
-                    old,
-                    new,
+                    old_mapping,
+                    new_mapping,
                     path,
                 )
             )
+
         elif old != new:
             changes.append(
                 (
@@ -694,12 +744,12 @@ def _build_parser() -> argparse.ArgumentParser:
         prog="betabox monitor",
     )
 
-    parser.add_argument(
+    _ = parser.add_argument(
         "--once",
         action="store_true",
         help="Run one monitoring pass and exit",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--interval",
         type=int,
         help="Monitoring interval in seconds",
@@ -721,17 +771,30 @@ def main(
     args = parse_args(argv)
 
     try:
-        if args.once:
-            run_once(
-                config=config,
-            )
-            return 0
+        once = _validate_flag(
+            cast(
+                object,
+                args.once,
+            ),
+            name="once",
+        )
+
+        raw_interval = cast(
+            object,
+            args.interval,
+        )
 
         interval = (
             config.monitoring.interval_seconds
-            if args.interval is None
-            else args.interval
+            if raw_interval is None
+            else _validate_interval(raw_interval)
         )
+
+        if once:
+            _ = run_once(
+                config=config,
+            )
+            return 0
 
         return run_forever(
             interval,

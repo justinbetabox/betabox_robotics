@@ -12,17 +12,17 @@ from betabox_robotics.config import (
 from betabox_robotics.services.guest import (
     GuestWorkspaceStatus,
 )
-from betabox_robotics.services.hardware_status import RobotHardwareStatus
+from betabox_robotics.services.hardware_checks.models import RobotHardwareStatus
 from betabox_robotics.services.http_health import (
     check_http_available,
     check_json_health,
 )
 from betabox_robotics.services.managed import managed_services
 from betabox_robotics.services.status import StatusReport, collect_status
-from betabox_robotics.services.system_health import (
+from betabox_robotics.services.system_checks.models import (
     SystemHealthStatus,
 )
-from betabox_robotics.services.verify import CheckResult, collect_checks
+from betabox_robotics.services.verify_checks import CheckResult, collect_checks
 
 Severity = Literal["info", "warning", "error", "critical"]
 
@@ -116,12 +116,17 @@ def _validate_string_list(
     ):
         raise TypeError(f"{name} must be a list or tuple")
 
+    values = cast(
+        list[object] | tuple[object, ...],
+        value,
+    )
+
     return tuple(
         _validate_string(
             item,
             name=f"{name} item",
         )
-        for item in value
+        for item in values
     )
 
 
@@ -154,12 +159,6 @@ class Diagnosis:
                 name="ok",
             ),
         )
-
-        if not isinstance(
-            self.severity,
-            str,
-        ):
-            raise TypeError("severity must be a string")
 
         severity = self.severity.strip().lower()
 
@@ -222,35 +221,25 @@ class DoctorReport:
     def __post_init__(
         self,
     ) -> None:
-        if not isinstance(
-            self.diagnoses,
-            tuple,
-        ):
-            raise TypeError("diagnoses must be a tuple")
-
-        if not all(
-            isinstance(
-                diagnosis,
-                Diagnosis,
-            )
-            for diagnosis in self.diagnoses
-        ):
-            raise TypeError("diagnoses must contain only Diagnosis values")
-
         for name in (
             "critical",
             "error",
             "warning",
             "healthy",
         ):
+            value = cast(
+                object,
+                getattr(
+                    self,
+                    name,
+                ),
+            )
+
             object.__setattr__(
                 self,
                 name,
                 _validate_non_negative_int(
-                    getattr(
-                        self,
-                        name,
-                    ),
+                    value,
                     name=name,
                 ),
             )
@@ -339,12 +328,6 @@ def healthy(
 def result_map(
     results: list[CheckResult] | tuple[CheckResult, ...],
 ) -> dict[str, CheckResult]:
-    if not isinstance(results, list | tuple):
-        raise TypeError("results must be a list or tuple")
-
-    if not all(isinstance(result, CheckResult) for result in results):
-        raise TypeError("results must contain only CheckResult values")
-
     return {result.name: result for result in results}
 
 
@@ -642,9 +625,7 @@ def diagnose_jupyterhub(
 
     elif not health_ok:
         causes.append(
-            "JupyterHub service is active, "
-            "but its health endpoint failed: "
-            f"{health_message}."
+            f"JupyterHub service is active, but its health endpoint failed: {health_message}."
         )
 
         actions.extend(
@@ -1234,21 +1215,6 @@ def diagnose_power(status: SystemHealthStatus) -> Diagnosis:
 def diagnosis_counts(
     diagnoses: list[Diagnosis] | tuple[Diagnosis, ...],
 ) -> dict[str, int]:
-    if not isinstance(
-        diagnoses,
-        list | tuple,
-    ):
-        raise TypeError("diagnoses must be a list or tuple")
-
-    if not all(
-        isinstance(
-            diagnosis,
-            Diagnosis,
-        )
-        for diagnosis in diagnoses
-    ):
-        raise TypeError("diagnoses must contain only Diagnosis values")
-
     return {
         "critical": sum(
             1
@@ -1361,7 +1327,7 @@ def main(
 ) -> int:
     parser = argparse.ArgumentParser(prog="betabox doctor")
 
-    parser.add_argument(
+    _ = parser.add_argument(
         "--json",
         action="store_true",
         help=("print the diagnostic report as JSON"),
@@ -1369,11 +1335,19 @@ def main(
 
     args = parser.parse_args(argv)
 
+    json_requested = _validate_flag(
+        cast(
+            object,
+            args.json,
+        ),
+        name="json",
+    )
+
     config = DEFAULT_PLATFORM_CONFIG
 
     report = collect_doctor_report(config)
 
-    if args.json:
+    if json_requested:
         print(
             json.dumps(
                 report.to_dict(),
@@ -1381,7 +1355,7 @@ def main(
             )
         )
     else:
-        print_diagnoses(report.diagnoses)
+        _ = print_diagnoses(report.diagnoses)
 
     return 0 if report.ok else 1
 

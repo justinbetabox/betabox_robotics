@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import NoReturn
+from typing import NoReturn, cast
 
 BETABOX_EXECUTABLE = Path("/opt/betabox/venv/bin/betabox")
 
@@ -12,21 +12,32 @@ SUDO_EXECUTABLE = Path("/usr/bin/sudo")
 def _validate_arguments(
     value: object,
 ) -> list[str]:
-    if not isinstance(value, list):
+    if not isinstance(
+        value,
+        list,
+    ):
         raise TypeError("arguments must be a list of strings")
+
+    arguments = cast(
+        list[object],
+        value,
+    )
 
     result: list[str] = []
 
-    for argument in value:
-        if not isinstance(argument, str):
+    for argument in arguments:
+        if not isinstance(
+            argument,
+            str,
+        ):
             raise TypeError("arguments must contain only strings")
 
-        argument = argument.strip()
+        argument_value = argument.strip()
 
-        if not argument:
+        if not argument_value:
             raise ValueError("arguments cannot contain empty strings")
 
-        result.append(argument)
+        result.append(argument_value)
 
     return result
 

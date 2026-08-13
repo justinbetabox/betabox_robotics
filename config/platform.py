@@ -4,7 +4,7 @@ import math
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
-from typing import TypeVar
+from typing import TypeVar, cast
 
 EnumType = TypeVar(
     "EnumType",
@@ -114,9 +114,14 @@ def _validate_string_tuple(
     if not isinstance(value, tuple):
         raise TypeError(f"{name} must be a tuple of strings")
 
+    items = cast(
+        tuple[object, ...],
+        value,
+    )
+
     normalized: list[str] = []
 
-    for item in value:
+    for item in items:
         normalized.append(
             _validate_string(
                 item,
@@ -400,24 +405,6 @@ class PlatformHealthConfig:
     wifi_interface: str = "wlan0"
 
     def __post_init__(self) -> None:
-        if not isinstance(
-            self.temperature,
-            TemperatureThresholdConfig,
-        ):
-            raise TypeError("temperature must be a TemperatureThresholdConfig")
-
-        if not isinstance(
-            self.memory,
-            UsageThresholdConfig,
-        ):
-            raise TypeError("memory must be a UsageThresholdConfig")
-
-        if not isinstance(
-            self.disk,
-            UsageThresholdConfig,
-        ):
-            raise TypeError("disk must be a UsageThresholdConfig")
-
         object.__setattr__(
             self,
             "disk_path",
@@ -468,52 +455,57 @@ class PlatformNetworkConfig:
     wifi_fallback_delay_seconds: int = 20
 
     def __post_init__(self) -> None:
-        for name in (
+        object.__setattr__(
+            self,
             "local_host",
-            "bind_host",
-            "wifi_interface",
-            "ethernet_interface",
-            "ap_connection_name",
-            "identity_prefix",
-        ):
-            object.__setattr__(
-                self,
-                name,
-                _validate_string(
-                    getattr(
-                        self,
-                        name,
-                    ),
-                    name=name,
-                ),
-            )
-
-        for name in (
-            "jupyterhub_port",
-            "vision_port",
-            "launchpad_port",
-        ):
-            object.__setattr__(
-                self,
-                name,
-                _validate_int(
-                    getattr(
-                        self,
-                        name,
-                    ),
-                    name=name,
-                    minimum=1,
-                    maximum=65535,
-                ),
-            )
+            _validate_string(
+                self.local_host,
+                name="local_host",
+            ),
+        )
 
         object.__setattr__(
             self,
-            "wifi_fallback_delay_seconds",
-            _validate_int(
-                self.wifi_fallback_delay_seconds,
-                name=("wifi_fallback_delay_seconds"),
-                minimum=0,
+            "bind_host",
+            _validate_string(
+                self.bind_host,
+                name="bind_host",
+            ),
+        )
+
+        object.__setattr__(
+            self,
+            "wifi_interface",
+            _validate_string(
+                self.wifi_interface,
+                name="wifi_interface",
+            ),
+        )
+
+        object.__setattr__(
+            self,
+            "ethernet_interface",
+            _validate_string(
+                self.ethernet_interface,
+                name="ethernet_interface",
+            ),
+        )
+
+        object.__setattr__(
+            self,
+            "ap_connection_name",
+            _validate_string(
+                self.ap_connection_name,
+                name="ap_connection_name",
+            ),
+        )
+
+        object.__setattr__(
+            self,
+            "identity_prefix",
+            _validate_string(
+                self.identity_prefix,
+                name="identity_prefix",
             ),
         )
 
@@ -566,22 +558,32 @@ class ServiceDefinition:
     startup: ServiceStartup
 
     def __post_init__(self) -> None:
-        for name in (
+        object.__setattr__(
+            self,
             "unit",
+            _validate_string(
+                self.unit,
+                name="unit",
+            ),
+        )
+
+        object.__setattr__(
+            self,
             "display_name",
+            _validate_string(
+                self.display_name,
+                name="display_name",
+            ),
+        )
+
+        object.__setattr__(
+            self,
             "description",
-        ):
-            object.__setattr__(
-                self,
-                name,
-                _validate_string(
-                    getattr(
-                        self,
-                        name,
-                    ),
-                    name=name,
-                ),
-            )
+            _validate_string(
+                self.description,
+                name="description",
+            ),
+        )
 
         object.__setattr__(
             self,
@@ -592,6 +594,7 @@ class ServiceDefinition:
                 enum_type=ServiceCategory,
             ),
         )
+
         object.__setattr__(
             self,
             "startup",
@@ -835,6 +838,7 @@ class PlatformVerificationConfig:
                 name="i2c_device",
             ),
         )
+
         object.__setattr__(
             self,
             "boot_config_file",
@@ -843,6 +847,7 @@ class PlatformVerificationConfig:
                 name="boot_config_file",
             ),
         )
+
         object.__setattr__(
             self,
             "i2c_bus",
@@ -852,33 +857,52 @@ class PlatformVerificationConfig:
                 minimum=0,
             ),
         )
+
         object.__setattr__(
             self,
             "command_timeout_seconds",
             _validate_int(
                 self.command_timeout_seconds,
-                name=("command_timeout_seconds"),
+                name="command_timeout_seconds",
                 minimum=1,
             ),
         )
 
-        for name in (
+        object.__setattr__(
+            self,
             "required_boot_config_lines",
+            _validate_string_tuple(
+                self.required_boot_config_lines,
+                name="required_boot_config_lines",
+            ),
+        )
+
+        object.__setattr__(
+            self,
             "required_python_modules",
+            _validate_string_tuple(
+                self.required_python_modules,
+                name="required_python_modules",
+            ),
+        )
+
+        object.__setattr__(
+            self,
             "required_executables",
+            _validate_string_tuple(
+                self.required_executables,
+                name="required_executables",
+            ),
+        )
+
+        object.__setattr__(
+            self,
             "hifiberry_identifiers",
-        ):
-            object.__setattr__(
-                self,
-                name,
-                _validate_string_tuple(
-                    getattr(
-                        self,
-                        name,
-                    ),
-                    name=name,
-                ),
-            )
+            _validate_string_tuple(
+                self.hifiberry_identifiers,
+                name="hifiberry_identifiers",
+            ),
+        )
 
 
 @dataclass(

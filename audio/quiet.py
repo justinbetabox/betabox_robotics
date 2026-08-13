@@ -10,7 +10,7 @@ def suppress_stderr() -> Generator[None, None, None]:
     Suppress C-level stderr noise from ALSA, PyAudio, and ONNX Runtime.
     """
     try:
-        sys.stderr.flush()
+        _ = sys.stderr.flush()
     except (OSError, RuntimeError):
         pass
 
@@ -18,9 +18,9 @@ def suppress_stderr() -> Generator[None, None, None]:
     devnull_fd = os.open(os.devnull, os.O_WRONLY)
 
     try:
-        os.dup2(devnull_fd, 2)
+        _ = os.dup2(devnull_fd, 2)
         yield
     finally:
-        os.dup2(saved_fd, 2)
+        _ = os.dup2(saved_fd, 2)
         os.close(saved_fd)
         os.close(devnull_fd)

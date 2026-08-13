@@ -2,10 +2,37 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping, Sequence
-from dataclasses import asdict, dataclass, field
-from typing import Any
+from dataclasses import dataclass, field
+from typing import TypedDict, cast
 
 CALIBRATION_VERSION = 1
+
+
+class SteeringCalibrationDict(TypedDict):
+    offset: float
+
+
+class MotorCalibrationDict(TypedDict):
+    left_trim: float
+    right_trim: float
+
+
+class CameraMountCalibrationDict(TypedDict):
+    pan_offset: float
+    tilt_offset: float
+
+
+class GrayscaleCalibrationDict(TypedDict):
+    floor: tuple[float, float, float] | None
+    line: tuple[float, float, float] | None
+
+
+class RobotCalibrationDict(TypedDict):
+    version: int
+    camera_mount: CameraMountCalibrationDict
+    steering: SteeringCalibrationDict
+    motors: MotorCalibrationDict
+    grayscale: GrayscaleCalibrationDict
 
 
 def _float_value(
@@ -138,7 +165,18 @@ def _mapping_value(
     ):
         raise TypeError(f"{field_name} must be an object")
 
-    return value
+    mapping = cast(
+        Mapping[object, object],
+        value,
+    )
+
+    if not all(isinstance(key, str) for key in mapping):
+        raise TypeError(f"{field_name} keys must be strings")
+
+    return cast(
+        Mapping[str, object],
+        mapping,
+    )
 
 
 @dataclass(
@@ -436,40 +474,6 @@ class RobotCalibration:
         if version != CALIBRATION_VERSION:
             raise ValueError(f"unsupported calibration version: {version}")
 
-        expected_types = (
-            (
-                "camera_mount",
-                self.camera_mount,
-                CameraMountCalibration,
-            ),
-            (
-                "steering",
-                self.steering,
-                SteeringCalibration,
-            ),
-            (
-                "motors",
-                self.motors,
-                MotorCalibration,
-            ),
-            (
-                "grayscale",
-                self.grayscale,
-                GrayscaleCalibration,
-            ),
-        )
-
-        for (
-            name,
-            value,
-            expected_type,
-        ) in expected_types:
-            if not isinstance(
-                value,
-                expected_type,
-            ):
-                raise TypeError(f"{name} must be a {expected_type.__name__}")
-
         object.__setattr__(
             self,
             "version",
@@ -485,7 +489,7 @@ class RobotCalibration:
     @classmethod
     def from_dict(
         cls,
-        value: Mapping[str, object],
+        value: object,
     ) -> RobotCalibration:
         if not isinstance(
             value,
@@ -493,38 +497,63 @@ class RobotCalibration:
         ):
             raise TypeError("calibration data must be an object")
 
+        mapping = cast(
+            Mapping[str, object],
+            value,
+        )
+
         version = _int_value(
-            value.get("version"),
+            mapping.get("version"),
             field_name="calibration version",
             default=CALIBRATION_VERSION,
         )
 
         camera_mount_value = _mapping_value(
-            value.get("camera_mount"),
+            mapping.get("camera_mount"),
             field_name="camera_mount calibration",
         )
+
         steering_value = _mapping_value(
-            value.get("steering"),
+            mapping.get("steering"),
             field_name="steering calibration",
         )
+
         motors_value = _mapping_value(
-            value.get("motors"),
+            mapping.get("motors"),
             field_name="motors calibration",
         )
+
         grayscale_value = _mapping_value(
-            value.get("grayscale"),
+            mapping.get("grayscale"),
             field_name="grayscale calibration",
         )
 
         return cls(
             version=version,
-            camera_mount=(CameraMountCalibration.from_dict(camera_mount_value)),
-            steering=(SteeringCalibration.from_dict(steering_value)),
-            motors=(MotorCalibration.from_dict(motors_value)),
-            grayscale=(GrayscaleCalibration.from_dict(grayscale_value)),
+            camera_mount=CameraMountCalibration.from_dict(camera_mount_value),
+            steering=SteeringCalibration.from_dict(steering_value),
+            motors=MotorCalibration.from_dict(motors_value),
+            grayscale=GrayscaleCalibration.from_dict(grayscale_value),
         )
 
     def to_dict(
         self,
-    ) -> dict[str, Any]:
-        return asdict(self)
+    ) -> RobotCalibrationDict:
+        return {
+            "version": self.version,
+            "camera_mount": {
+                "pan_offset": self.camera_mount.pan_offset,
+                "tilt_offset": self.camera_mount.tilt_offset,
+            },
+            "steering": {
+                "offset": self.steering.offset,
+            },
+            "motors": {
+                "left_trim": self.motors.left_trim,
+                "right_trim": self.motors.right_trim,
+            },
+            "grayscale": {
+                "floor": self.grayscale.floor,
+                "line": self.grayscale.line,
+            },
+        }

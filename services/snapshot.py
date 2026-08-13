@@ -7,6 +7,7 @@ import socket
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
+from typing import cast
 
 from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
@@ -16,7 +17,7 @@ from betabox_robotics.services.command import run
 from betabox_robotics.services.doctor import collect_diagnoses
 from betabox_robotics.services.services import collect_services
 from betabox_robotics.services.status import collect_status
-from betabox_robotics.services.verify import collect_checks
+from betabox_robotics.services.verify_checks import collect_checks
 from betabox_robotics.version import __version__
 
 SYSTEM_COMMANDS: tuple[
@@ -93,7 +94,12 @@ def _validate_command(
     ):
         raise TypeError("command must be a list")
 
-    if not value:
+    command = cast(
+        list[object],
+        value,
+    )
+
+    if not command:
         raise ValueError("command cannot be empty")
 
     return [
@@ -101,7 +107,7 @@ def _validate_command(
             item,
             name="command item",
         )
-        for item in value
+        for item in command
     ]
 
 
@@ -126,14 +132,32 @@ def _validate_snapshot_list(
         value,
         tuple,
     ):
-        raise TypeError(
-            "snapshots must be a tuple",
-        )
+        raise TypeError("snapshots must be a tuple")
 
-    if not all(isinstance(item, Path) for item in value):
-        raise TypeError(
-            "snapshots must contain only Path values",
-        )
+    items = cast(
+        tuple[object, ...],
+        value,
+    )
+
+    if not all(isinstance(item, Path) for item in items):
+        raise TypeError("snapshots must contain only Path values")
+
+    return cast(
+        tuple[Path, ...],
+        items,
+    )
+
+
+def _validate_flag(
+    value: object,
+    *,
+    name: str,
+) -> bool:
+    if not isinstance(
+        value,
+        bool,
+    ):
+        raise TypeError(f"{name} must be a boolean")
 
     return value
 
@@ -219,7 +243,7 @@ def write_text(
         parents=True,
         exist_ok=True,
     )
-    path_value.write_text(
+    _ = path_value.write_text(
         content_value,
         encoding="utf-8",
     )
@@ -247,7 +271,7 @@ def write_json(
         parents=True,
         exist_ok=True,
     )
-    path_value.write_text(
+    _ = path_value.write_text(
         content,
         encoding="utf-8",
     )
@@ -295,13 +319,13 @@ def copy_if_exists(
         )
 
         if source_value.is_dir():
-            shutil.copytree(
+            _ = shutil.copytree(
                 source_value,
                 destination_value,
                 dirs_exist_ok=True,
             )
         else:
-            shutil.copy2(
+            _ = shutil.copy2(
                 source_value,
                 destination_value,
             )
@@ -415,12 +439,12 @@ def write_log_reports(
 
     logs_dir = snapshot_dir_value / "logs"
 
-    copy_if_exists(
+    _ = copy_if_exists(
         config_value.paths.monitor_log,
         logs_dir / "monitor.log",
     )
 
-    copy_if_exists(
+    _ = copy_if_exists(
         config_value.paths.boot_announce_log,
         logs_dir / "boot_announce.log",
     )
@@ -591,31 +615,25 @@ def print_snapshots(
     print()
 
 
-def _build_parser() -> argparse.ArgumentParser:
+def parse_args(
+    argv: list[str] | None = None,
+) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="betabox snapshot",
     )
 
-    parser.add_argument(
+    _ = parser.add_argument(
         "--list",
         action="store_true",
         help="List existing snapshots",
     )
 
-    parser.add_argument(
+    _ = parser.add_argument(
         "--name",
         help="Optional snapshot name",
     )
 
-    return parser
-
-
-def parse_args(
-    argv: list[str] | None = None,
-) -> argparse.Namespace:
-    return _build_parser().parse_args(
-        argv,
-    )
+    return parser.parse_args(argv)
 
 
 def main(
@@ -625,7 +643,37 @@ def main(
         argv,
     )
 
-    if args.list:
+    try:
+        list_requested = _validate_flag(
+            cast(
+                object,
+                args.list,
+            ),
+            name="list",
+        )
+
+        raw_name = cast(
+            object,
+            args.name,
+        )
+
+        name = (
+            None
+            if raw_name is None
+            else _validate_string(
+                raw_name,
+                name="name",
+            )
+        )
+
+    except (
+        TypeError,
+        ValueError,
+    ) as exc:
+        print(str(exc))
+        return 1
+
+    if list_requested:
         print_snapshots(
             list_snapshots(),
         )
@@ -633,12 +681,12 @@ def main(
 
     try:
         report = create_snapshot(
-            args.name,
+            name,
         )
     except FileExistsError:
-        print(
-            f"Snapshot already exists: {args.name}",
-        )
+        display_name = name if name is not None else "generated snapshot name"
+
+        print(f"Snapshot already exists: {display_name}")
         return 1
 
     print_report(

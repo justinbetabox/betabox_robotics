@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import urllib.error
 import urllib.request
+from http.client import HTTPResponse
+from typing import cast
 
 
 def _validate_url(
@@ -67,9 +69,12 @@ def check_http_available(
     )
 
     try:
-        with urllib.request.urlopen(
-            request,
-            timeout=timeout_value,
+        with cast(
+            HTTPResponse,
+            urllib.request.urlopen(
+                request,
+                timeout=timeout_value,
+            ),
         ) as response:
             status_code = response.status
 
@@ -128,9 +133,12 @@ def check_json_health(
     )
 
     try:
-        with urllib.request.urlopen(
-            request,
-            timeout=timeout_value,
+        with cast(
+            HTTPResponse,
+            urllib.request.urlopen(
+                request,
+                timeout=timeout_value,
+            ),
         ) as response:
             status_code = response.status
             body = response.read().decode(
@@ -169,7 +177,10 @@ def check_json_health(
         )
 
     try:
-        payload = json.loads(body)
+        raw_payload = cast(
+            object,
+            json.loads(body),
+        )
     except json.JSONDecodeError:
         return (
             False,
@@ -177,13 +188,18 @@ def check_json_health(
         )
 
     if not isinstance(
-        payload,
+        raw_payload,
         dict,
     ):
         return (
             False,
             "response JSON was not an object",
         )
+
+    payload = cast(
+        dict[object, object],
+        raw_payload,
+    )
 
     status = payload.get("status")
 

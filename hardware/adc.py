@@ -22,6 +22,13 @@ class ADC:
     An injected bus is borrowed and remains owned by the caller.
     """
 
+    logger: logging.Logger
+    channel: int
+    register: int
+
+    _i2c: I2C | None
+    _owns_i2c: bool
+
     ADDRESSES: ClassVar[tuple[int, ...]] = (
         0x14,
         0x15,
@@ -41,7 +48,7 @@ class ADC:
         self.channel = self._resolve_channel(channel)
         self.register = self._channel_to_register(self.channel)
 
-        self._i2c: I2C | None = None
+        self._i2c = None
         self._owns_i2c = bus is None
 
         try:
@@ -50,7 +57,13 @@ class ADC:
                 if bus is not None
                 else I2C(address=(self.ADDRESSES if address is None else address))
             )
-        except BaseException:
+        except (
+            HardwareError,
+            OSError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ):
             self.close()
             raise
 
@@ -76,24 +89,15 @@ class ADC:
                 "channel must be an int, string channel name, or AnalogChannel"
             )
 
-        if isinstance(channel, int):
-            if channel not in ADC_CHANNELS.values():
-                raise ADCError(f"ADC channel must be in range 0-7, not {channel}")
+        if channel not in ADC_CHANNELS.values():
+            raise ADCError(f"ADC channel must be in range 0-7, not {channel}")
 
-            return channel
-
-        raise TypeError("channel must be an int, string channel name, or AnalogChannel")
+        return channel
 
     @staticmethod
     def _channel_to_register(
         channel: int,
     ) -> int:
-        if isinstance(channel, bool) or not isinstance(
-            channel,
-            int,
-        ):
-            raise TypeError("channel must be an integer")
-
         if not 0 <= channel <= 7:
             raise ADCError("ADC channel must be in range 0-7")
 

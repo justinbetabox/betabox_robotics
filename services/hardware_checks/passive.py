@@ -65,21 +65,14 @@ def collect_battery_status(
 
     finally:
         if battery_sensor is not None:
-            close = getattr(
-                battery_sensor,
-                "close",
-                None,
-            )
-
-            if callable(close):
-                try:
-                    close()
-                except (
-                    HardwareError,
-                    OSError,
-                    RuntimeError,
-                ):
-                    pass
+            try:
+                battery_sensor.close()
+            except (
+                HardwareError,
+                OSError,
+                RuntimeError,
+            ):
+                pass
 
 
 def collect_robot_status(
@@ -96,9 +89,8 @@ def collect_robot_status(
 
     config_value = _validate_sensors_config(sensors_config)
 
-    ultrasonic_configured = config_value.ultrasonic is not None
+    ultrasonic_configured = True
     battery = collect_battery_status(config_value)
-    grayscale_sensor = None
 
     try:
         grayscale_sensor = Grayscale.default(config_value.grayscale)
@@ -116,7 +108,7 @@ def collect_robot_status(
             SensorStatus(
                 grayscale_available=False,
                 grayscale_values=None,
-                ultrasonic_configured=(ultrasonic_configured),
+                ultrasonic_configured=ultrasonic_configured,
                 error=("passive sensors could not be constructed"),
             ),
             str(exc),
@@ -129,7 +121,7 @@ def collect_robot_status(
             sensors = SensorStatus(
                 grayscale_available=True,
                 grayscale_values=tuple(int(value) for value in grayscale_values),
-                ultrasonic_configured=(ultrasonic_configured),
+                ultrasonic_configured=ultrasonic_configured,
             )
 
         except (
@@ -142,7 +134,7 @@ def collect_robot_status(
             sensors = SensorStatus(
                 grayscale_available=False,
                 grayscale_values=None,
-                ultrasonic_configured=(ultrasonic_configured),
+                ultrasonic_configured=ultrasonic_configured,
                 error=str(exc),
             )
 
@@ -161,19 +153,11 @@ def collect_robot_status(
         )
 
     finally:
-        if grayscale_sensor is not None:
-            close = getattr(
-                grayscale_sensor,
-                "close",
-                None,
-            )
-
-            if callable(close):
-                try:
-                    close()
-                except (
-                    HardwareError,
-                    OSError,
-                    RuntimeError,
-                ):
-                    pass
+        try:
+            grayscale_sensor.close()
+        except (
+            HardwareError,
+            OSError,
+            RuntimeError,
+        ):
+            pass

@@ -3,6 +3,10 @@ from abc import ABC, abstractmethod
 from betabox_robotics.vision.frame import Frame
 
 
+class FrameConsumerError(Exception):
+    """Raised when a frame consumer cannot process a frame."""
+
+
 class FrameConsumer(ABC):
     """
     Interface for objects that consume frames from FrameSource.

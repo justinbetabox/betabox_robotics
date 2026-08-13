@@ -6,6 +6,8 @@ import sys
 from pathlib import Path
 from typing import ClassVar
 
+from typing_extensions import override
+
 from betabox_robotics.audio.exceptions import SpeechError
 from betabox_robotics.audio.quiet import suppress_stderr
 from betabox_robotics.audio.speech.base import (
@@ -24,32 +26,28 @@ class PiperSpeech(SpeechBackend):
 
     name: ClassVar[str] = "piper"
 
+    model_path: Path
+    voice: str
+
     def __init__(
         self,
         model_path: str | Path,
         *,
         voice: str | None = None,
     ) -> None:
-        if isinstance(model_path, bool) or not isinstance(
-            model_path,
-            str | Path,
-        ):
-            raise TypeError("model_path must be a string or Path")
-
         path = Path(model_path).expanduser()
 
         if not path.is_file():
             raise SpeechError(f"Piper model not found: {path}")
 
         if voice is not None:
-            if not isinstance(voice, str):
-                raise TypeError("voice must be a string or None")
+            voice = voice.strip()
 
-            if not voice.strip():
+            if not voice:
                 raise ValueError("voice cannot be empty")
 
         self.model_path = path
-        self.voice = voice.strip() if voice is not None else path.stem
+        self.voice = voice if voice is not None else path.stem
 
     @classmethod
     def executable(
@@ -71,6 +69,7 @@ class PiperSpeech(SpeechBackend):
     ) -> bool:
         return cls.executable() is not None
 
+    @override
     def synthesize(
         self,
         text: str,

@@ -5,6 +5,7 @@ import os
 import pwd
 import sys
 from pathlib import Path
+from typing import cast
 
 from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
@@ -187,12 +188,10 @@ def parse_args(
         description=("Verify the Betabox software installation."),
     )
 
-    parser.add_argument(
+    _ = parser.add_argument(
         "--service-user",
         help=(
-            "Linux account used by Betabox "
-            "services. Defaults to SUDO_USER "
-            "when run through sudo."
+            "Linux account used by Betabox services. Defaults to SUDO_USER when run through sudo."
         ),
     )
 
@@ -205,11 +204,25 @@ def main(
     args = parse_args(argv)
 
     try:
-        service_user = resolve_service_user(args.service_user)
+        requested_user = cast(
+            object,
+            args.service_user,
+        )
+
+        service_user = resolve_service_user(
+            None
+            if requested_user is None
+            else validate_string(
+                requested_user,
+                name="service_user",
+            )
+        )
+
         checks = collect_checks(
             DEFAULT_PLATFORM_CONFIG,
             service_user=service_user,
         )
+
     except (
         TypeError,
         ValueError,

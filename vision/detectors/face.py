@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import math
+from pathlib import Path
+from typing import cast
 
 import cv2
-import numpy as np
+from typing_extensions import override
 
 from betabox_robotics.vision.detector import (
     Detector,
@@ -54,10 +56,19 @@ def _validate_min_neighbors(
 def _validate_min_size(
     value: object,
 ) -> tuple[int, int]:
-    if not isinstance(value, tuple) or len(value) != 2:
+    if not isinstance(value, tuple):
         raise TypeError("min_size must be a tuple of two integers")
 
-    width, height = value
+    values = cast(
+        tuple[object, ...],
+        value,
+    )
+
+    if len(values) != 2:
+        raise TypeError("min_size must be a tuple of two integers")
+
+    width = values[0]
+    height = values[1]
 
     if (
         isinstance(width, bool)
@@ -70,7 +81,10 @@ def _validate_min_size(
     if width <= 0 or height <= 0:
         raise ValueError("min_size dimensions must be positive")
 
-    return width, height
+    return (
+        width,
+        height,
+    )
 
 
 class FaceDetector(Detector):
@@ -80,6 +94,11 @@ class FaceDetector(Detector):
     This detector does not draw overlays. It returns face locations for
     other Vision components to display, store, or ignore.
     """
+
+    scale_factor: float
+    min_neighbors: int
+    min_size: tuple[int, int]
+    _cascade: cv2.CascadeClassifier
 
     def __init__(
         self,
@@ -104,7 +123,11 @@ class FaceDetector(Detector):
             min_size=min_size,
         )
 
-        cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+        cascade_path = str(
+            Path(cv2.__file__).resolve().parent
+            / "data"
+            / "haarcascade_frontalface_default.xml"
+        )
 
         try:
             cascade = cv2.CascadeClassifier(cascade_path)
@@ -132,6 +155,7 @@ class FaceDetector(Detector):
         if min_size is not None:
             self.min_size = _validate_min_size(min_size)
 
+    @override
     def enable(
         self,
         *,
@@ -146,17 +170,12 @@ class FaceDetector(Detector):
         )
         super().enable()
 
+    @override
     def detect(
         self,
         frame: Frame,
     ) -> Metadata:
-        if not isinstance(frame, Frame):
-            raise TypeError("frame must be a Frame instance")
-
         image = frame.image
-
-        if not isinstance(image, np.ndarray):
-            raise TypeError("frame image must be a NumPy array")
 
         if image.ndim != 3 or image.shape[2] != 3:
             return Metadata.create(

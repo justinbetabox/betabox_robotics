@@ -4,11 +4,11 @@ import mimetypes
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import cast
 from urllib.parse import quote
 
 import aiohttp_jinja2
-from aiohttp import web
+from aiohttp import BodyPartReader, web
 
 from betabox_robotics.launchpad.auth import (
     LAUNCHPAD_CONTEXT_KEY,
@@ -326,7 +326,7 @@ def unique_media_path(
 
 
 async def save_uploaded_file(
-    field: Any,
+    field: BodyPartReader,
     destination: Path,
 ) -> int:
     bytes_written = 0
@@ -346,12 +346,12 @@ async def save_uploaded_file(
                 if bytes_written > MAX_UPLOAD_FILE_SIZE:
                     raise ValueError("The file exceeds the 25 MB upload limit.")
 
-                output.write(chunk)
+                _ = output.write(chunk)
 
         if bytes_written == 0:
             raise ValueError("The uploaded file is empty.")
 
-        temporary_path.replace(destination)
+        _ = temporary_path.replace(destination)
 
         return bytes_written
 
@@ -435,7 +435,7 @@ def media_context(
 async def media_page(
     request: web.Request,
 ) -> web.Response:
-    media_context(
+    _ = media_context(
         request,
         Permission.MEDIA,
     )
@@ -538,7 +538,10 @@ async def upload_media(
     while True:
         try:
             field = await reader.next()
-        except (ValueError, OSError) as exc:
+        except (
+            ValueError,
+            OSError,
+        ) as exc:
             raise web.HTTPBadRequest(
                 reason="the upload request could not be read"
             ) from exc
@@ -546,12 +549,37 @@ async def upload_media(
         if field is None:
             break
 
-        if field.name != "files" or not field.filename:
+        if not isinstance(
+            field,
+            BodyPartReader,
+        ):
+            continue
+
+        field_name = cast(
+            object,
+            field.name,
+        )
+
+        field_filename = cast(
+            object,
+            field.filename,
+        )
+
+        if field_name != "files":
+            continue
+
+        if not isinstance(
+            field_filename,
+            str,
+        ):
+            continue
+
+        submitted_filename = field_filename.strip()
+
+        if not submitted_filename:
             continue
 
         submitted_files += 1
-
-        submitted_filename = field.filename
 
         if submitted_files > MAX_UPLOAD_FILES:
             upload_failure(
@@ -621,7 +649,7 @@ async def upload_media(
             continue
 
         try:
-            await save_uploaded_file(
+            _ = await save_uploaded_file(
                 field,
                 destination,
             )
@@ -767,31 +795,31 @@ async def delete_media_file(
 def setup_media_routes(
     app: web.Application,
 ) -> None:
-    app.router.add_get(
+    _ = app.router.add_get(
         "/media",
         media_page,
         name="media-page",
     )
 
-    app.router.add_get(
+    _ = app.router.add_get(
         "/api/media",
         media_api,
         name="media-api",
     )
 
-    app.router.add_post(
+    _ = app.router.add_post(
         "/api/media/upload",
         upload_media,
         name="media-upload-api",
     )
 
-    app.router.add_get(
+    _ = app.router.add_get(
         "/api/media/{category}/{filename}",
         media_file,
         name="media-file",
     )
 
-    app.router.add_delete(
+    _ = app.router.add_delete(
         "/api/media/{category}/{filename}",
         delete_media_file,
         name="media-delete-api",

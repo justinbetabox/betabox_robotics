@@ -6,6 +6,7 @@ import shutil
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 from betabox_robotics.services.accounts import (
     ProvisionedAccount,
@@ -158,7 +159,7 @@ def reset_guest(
 def guest_status() -> GuestWorkspaceStatus:
     try:
         account = guest_account()
-        account_ids(account.username)
+        _ = account_ids(account.username)
 
         return GuestWorkspaceStatus(
             account_exists=True,
@@ -185,12 +186,6 @@ def guest_status() -> GuestWorkspaceStatus:
 def print_status(
     status: GuestWorkspaceStatus,
 ) -> None:
-    if not isinstance(
-        status,
-        GuestWorkspaceStatus,
-    ):
-        raise TypeError("status must be a GuestWorkspaceStatus")
-
     print(f"Account:      {'OK' if status.account_exists else 'Missing'}")
     print(f"Home:         {'OK' if status.home_exists else 'Missing'}")
     print(f"Curriculum:   {'OK' if status.curriculum_exists else 'Missing'}")
@@ -207,15 +202,15 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="command",
     )
 
-    subparsers.add_parser(
+    _ = subparsers.add_parser(
         "status",
         help="Show Guest workspace status",
     )
-    subparsers.add_parser(
+    _ = subparsers.add_parser(
         "provision",
         help="Create the Guest workspace",
     )
-    subparsers.add_parser(
+    _ = subparsers.add_parser(
         "reset",
         help="Reset the Guest workspace",
     )
@@ -235,13 +230,24 @@ def main(
     parser = _build_parser()
     args = parser.parse_args(argv)
 
+    command = cast(
+        object,
+        args.command,
+    )
+
+    if command is not None and not isinstance(
+        command,
+        str,
+    ):
+        raise TypeError("command must be a string")
+
     try:
-        if args.command == "status":
+        if command == "status":
             status = guest_status()
             print_status(status)
             return 0 if status.ok else 1
 
-        if args.command == "provision":
+        if command == "provision":
             require_root_or_elevate(
                 [
                     "guest",
@@ -252,7 +258,7 @@ def main(
             print("Guest workspace provisioned.")
             return 0
 
-        if args.command == "reset":
+        if command == "reset":
             require_root_or_elevate(
                 [
                     "guest",

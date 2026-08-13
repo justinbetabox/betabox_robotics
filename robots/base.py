@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Self
+from typing import ClassVar, Self
 
 from .capabilities import RobotCapability
 from .exceptions import RobotLifecycleError
@@ -9,19 +9,12 @@ from .exceptions import RobotLifecycleError
 class RobotBase:
     """
     Base lifecycle contract for Betabox robot platforms.
-
-    start()
-        Marks the robot ready for use. Safe to call repeatedly.
-
-    stop_all()
-        Stops active robot behavior without releasing resources.
-
-    close()
-        Releases resources owned by this robot. Safe to call repeatedly.
-        A closed robot cannot be restarted or used.
     """
 
-    capabilities: frozenset[RobotCapability] = frozenset()
+    capabilities: ClassVar[frozenset[RobotCapability]] = frozenset()
+
+    _started: bool
+    _closed: bool
 
     def __init__(self) -> None:
         self._started = False
@@ -55,10 +48,7 @@ class RobotBase:
         ):
             capability_value = capability
 
-        elif isinstance(
-            capability,
-            str,
-        ):
+        else:
             normalized = capability.strip().casefold()
 
             if not normalized:
@@ -68,9 +58,6 @@ class RobotBase:
                 capability_value = RobotCapability(normalized)
             except ValueError as exc:
                 raise ValueError(f"unknown robot capability: {capability}") from exc
-
-        else:
-            raise TypeError("capability must be a RobotCapability or string")
 
         return capability_value in self.capabilities
 

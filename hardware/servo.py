@@ -36,6 +36,18 @@ class Servo:
     Public angles are in degrees. Default range is -90 to 90.
     """
 
+    logger: logging.Logger
+
+    min_angle: float
+    max_angle: float
+    offset: float
+    max_step: float
+    step_delay: float
+
+    _angle: float | None
+    _physical_angle: float | None
+    _pwm: PWM | None
+
     MIN_PULSE_US: ClassVar[float] = 500.0
     MAX_PULSE_US: ClassVar[float] = 2500.0
     FREQUENCY_HZ: ClassVar[float] = 50.0
@@ -99,9 +111,9 @@ class Servo:
         self.max_step = max_step_value
         self.step_delay = step_delay_value
 
-        self._angle: float | None = None
-        self._physical_angle: float | None = None
-        self._pwm: PWM | None = None
+        self._angle = None
+        self._physical_angle = None
+        self._pwm = None
 
         try:
             self._pwm = PWM(
@@ -116,7 +128,13 @@ class Servo:
 
             self.pwm.set_prescaler(prescaler)
 
-        except BaseException:
+        except (
+            HardwareError,
+            OSError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ):
             try:
                 self.close()
             except (
@@ -172,10 +190,6 @@ class Servo:
             angle,
             name="angle",
         )
-
-        if not isinstance(smooth, bool):
-            raise TypeError("smooth must be a boolean")
-
         physical_target = self._logical_to_physical(logical_target)
 
         if not smooth or self._physical_angle is None:

@@ -5,6 +5,7 @@ import grp
 import os
 import pwd
 from pathlib import Path
+from typing import cast
 
 from betabox_robotics.services.accounts import (
     BETABOX_ACCOUNTS,
@@ -31,7 +32,7 @@ def parse_args() -> argparse.Namespace:
         description=("Provision Betabox accounts and workspaces.")
     )
 
-    parser.add_argument(
+    _ = parser.add_argument(
         "--service-user",
         required=True,
         help=(
@@ -107,8 +108,8 @@ def provision_robot_lock(
 
     print(
         "Robot ownership lock is configured: "
-        f"{ROBOT_LOCK_PATH} -> "
-        f"{service_user}:{BETABOX_SHARED_GROUP}"
+        + f"{ROBOT_LOCK_PATH} -> "
+        + f"{service_user}:{BETABOX_SHARED_GROUP}"
     )
 
 
@@ -117,16 +118,39 @@ def main() -> None:
 
     args = parse_args()
 
+    try:
+        service_user = cast(
+            object,
+            args.service_user,
+        )
+
+        if not isinstance(
+            service_user,
+            str,
+        ):
+            raise TypeError("service_user must be a string")
+
+        service_user = service_user.strip()
+
+        if not service_user:
+            raise ValueError("service_user cannot be empty")
+
+    except (
+        TypeError,
+        ValueError,
+    ) as exc:
+        raise SystemExit(str(exc)) from exc
+
     require_root()
 
     print("Provisioning Betabox accounts...")
 
     provision_accounts(
-        service_user=args.service_user,
+        service_user=service_user,
     )
 
     provision_robot_lock(
-        service_user=args.service_user,
+        service_user=service_user,
     )
 
     print("Provisioning Betabox workspaces...")
@@ -142,7 +166,7 @@ def main() -> None:
     )
 
     create_runtime_media(
-        args.service_user,
+        service_user,
         REPOSITORY_ROOT,
     )
 

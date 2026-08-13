@@ -22,12 +22,6 @@ def setup_routes(
 ) -> None:
     """Register all Launchpad routes."""
 
-    if not isinstance(
-        app,
-        web.Application,
-    ):
-        raise TypeError("app must be a web.Application")
-
     setup_home_routes(app)
 
     setup_drive_routes(app)

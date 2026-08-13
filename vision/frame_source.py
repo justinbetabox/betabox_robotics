@@ -1,10 +1,14 @@
 import math
 import threading
 import time
-from typing import Any, Self
+from typing import Self, TypedDict
 
-from betabox_robotics.vision.camera import CameraError, CameraManager
-from betabox_robotics.vision.consumer import FrameConsumer
+from betabox_robotics.vision.camera import (
+    CameraError,
+    CameraManager,
+    CameraStatistics,
+)
+from betabox_robotics.vision.consumer import FrameConsumer, FrameConsumerError
 from betabox_robotics.vision.frame import Frame
 
 
@@ -28,6 +32,63 @@ def _validate_fps(
     return fps
 
 
+class ConsumerStatistics(TypedDict):
+    call_count: int
+    error_count: int
+    last_duration_seconds: float | None
+    max_duration_seconds: float
+    last_error: str | None
+    _last_started: float | None
+    _last_completed: float | None
+
+
+class ConsumerDiagnostics(TypedDict):
+    call_count: int
+    error_count: int
+    last_duration_seconds: float | None
+    max_duration_seconds: float
+    last_error: str | None
+    in_progress: bool
+    in_progress_seconds: float | None
+    seconds_since_completion: float | None
+
+
+class CaptureStatistics(TypedDict):
+    count: int
+    cycle_age_seconds: float | None
+    in_progress: bool
+    in_progress_seconds: float | None
+    last_duration_seconds: float | None
+    seconds_since_completion: float | None
+
+
+class PublishStatistics(TypedDict):
+    count: int
+    in_progress: bool
+    in_progress_seconds: float | None
+    last_duration_seconds: float | None
+    seconds_since_completion: float | None
+    active_consumer: str | None
+    active_consumer_seconds: float | None
+
+
+class FrameSourceStatistics(TypedDict):
+    running: bool
+    thread_alive: bool
+    phase: str
+    fps: float
+    consumer_count: int
+    has_frame: bool
+    frame_fresh: bool
+    frame_age_seconds: float | None
+    freshness_threshold_seconds: float
+    last_error: str | None
+    camera_manager: CameraStatistics
+    capture: CaptureStatistics
+    publish: PublishStatistics
+    consumers: dict[str, ConsumerDiagnostics]
+
+
 class FrameSourceError(CameraError):
     """Raised when frame source operations fail."""
 
@@ -40,6 +101,39 @@ class FrameSource:
     Capture, publication, and per-consumer timing information is retained
     so the Vision pipeline can identify where frame delivery has stalled.
     """
+
+    camera: CameraManager
+    fps: float
+
+    _latest_frame: Frame | None
+    _running: bool
+    _thread: threading.Thread | None
+
+    _lock: threading.Lock
+    _consumer_lock: threading.Lock
+    _diagnostics_lock: threading.Lock
+
+    _consumers: list[FrameConsumer]
+    _last_error: FrameSourceError | None
+
+    _phase: str
+    _capture_count: int
+    _publish_count: int
+
+    _last_cycle_started: float | None
+
+    _last_capture_started: float | None
+    _last_capture_completed: float | None
+    _last_capture_duration: float | None
+
+    _last_publish_started: float | None
+    _last_publish_completed: float | None
+    _last_publish_duration: float | None
+
+    _active_consumer: str | None
+    _active_consumer_started: float | None
+
+    _consumer_statistics: dict[str, ConsumerStatistics]
 
     def __init__(
         self,
@@ -59,16 +153,16 @@ class FrameSource:
 
         self.fps = fps_value
 
-        self._latest_frame: Frame | None = None
+        self._latest_frame = None
         self._running = False
-        self._thread: threading.Thread | None = None
+        self._thread = None
 
         self._lock = threading.Lock()
         self._consumer_lock = threading.Lock()
         self._diagnostics_lock = threading.Lock()
 
-        self._consumers: list[FrameConsumer] = []
-        self._last_error: FrameSourceError | None = None
+        self._consumers = []
+        self._last_error = None
 
         # Capture-loop diagnostics use monotonic time because they measure
         # elapsed durations rather than wall-clock timestamps.
@@ -76,20 +170,20 @@ class FrameSource:
         self._capture_count = 0
         self._publish_count = 0
 
-        self._last_cycle_started: float | None = None
+        self._last_cycle_started = None
 
-        self._last_capture_started: float | None = None
-        self._last_capture_completed: float | None = None
-        self._last_capture_duration: float | None = None
+        self._last_capture_started = None
+        self._last_capture_completed = None
+        self._last_capture_duration = None
 
-        self._last_publish_started: float | None = None
-        self._last_publish_completed: float | None = None
-        self._last_publish_duration: float | None = None
+        self._last_publish_started = None
+        self._last_publish_completed = None
+        self._last_publish_duration = None
 
-        self._active_consumer: str | None = None
-        self._active_consumer_started: float | None = None
+        self._active_consumer = None
+        self._active_consumer_started = None
 
-        self._consumer_statistics: dict[str, dict[str, Any]] = {}
+        self._consumer_statistics = {}
 
     def start(self) -> None:
         if self._running:
@@ -174,7 +268,7 @@ class FrameSource:
         consumer_name = type(consumer).__name__
 
         with self._diagnostics_lock:
-            self._consumer_statistics.setdefault(
+            _ = self._consumer_statistics.setdefault(
                 consumer_name,
                 self._new_consumer_statistics(),
             )
@@ -200,7 +294,7 @@ class FrameSource:
     def last_error(self) -> FrameSourceError | None:
         return self._last_error
 
-    def statistics(self) -> dict[str, Any]:
+    def statistics(self) -> FrameSourceStatistics:
         now = time.monotonic()
 
         with self._lock:
@@ -227,10 +321,7 @@ class FrameSource:
             active_consumer = self._active_consumer
             active_consumer_started = self._active_consumer_started
 
-            consumer_statistics = {
-                name: values.copy()
-                for name, values in self._consumer_statistics.items()
-            }
+            consumer_statistics: dict[str, ConsumerDiagnostics] = {}
 
         frame_age = self._age(now, last_capture_completed)
         cycle_age = self._age(now, last_cycle_started)
@@ -266,21 +357,28 @@ class FrameSource:
             has_frame and frame_age is not None and frame_age <= freshness_threshold
         )
 
-        for values in consumer_statistics.values():
-            last_started = values.pop("_last_started", None)
-            last_completed = values.pop("_last_completed", None)
+        for name, values in self._consumer_statistics.items():
+            last_started = values["_last_started"]
+            last_completed = values["_last_completed"]
 
             in_progress = last_started is not None and (
                 last_completed is None or last_started > last_completed
             )
 
-            values["in_progress"] = in_progress
-            values["in_progress_seconds"] = (
-                self._age(now, last_started) if in_progress else None
-            )
-            values["seconds_since_completion"] = self._age(
-                now,
-                last_completed,
+            consumer_statistics[name] = ConsumerDiagnostics(
+                call_count=values["call_count"],
+                error_count=values["error_count"],
+                last_duration_seconds=values["last_duration_seconds"],
+                max_duration_seconds=values["max_duration_seconds"],
+                last_error=values["last_error"],
+                in_progress=in_progress,
+                in_progress_seconds=(
+                    self._age(now, last_started) if in_progress else None
+                ),
+                seconds_since_completion=self._age(
+                    now,
+                    last_completed,
+                ),
             )
 
         return {
@@ -419,20 +517,14 @@ class FrameSource:
             try:
                 consumer.on_frame(frame)
 
-            except Exception as exc:
-                wrapped = FrameSourceError(f"{consumer_name} failed: {exc}")
-
-                self._last_error = wrapped
-
+            except FrameConsumerError as exc:
                 with self._diagnostics_lock:
                     statistics = self._consumer_statistics[consumer_name]
-                    statistics["error_count"] += 1
-                    statistics["last_error"] = str(wrapped)
 
-                print(
-                    f"Vision consumer error: {wrapped}",
-                    flush=True,
-                )
+                    statistics["error_count"] += 1
+                    statistics["last_error"] = str(exc)
+
+                continue
 
             finally:
                 completed = time.monotonic()
@@ -453,14 +545,12 @@ class FrameSource:
 
                 if elapsed >= 0.05:
                     print(
-                        "Vision consumer timing: "
-                        f"{consumer_name} took "
-                        f"{elapsed:.3f} seconds",
+                        f"Vision consumer timing: {consumer_name} took {elapsed:.3f} seconds",
                         flush=True,
                     )
 
     @staticmethod
-    def _new_consumer_statistics() -> dict[str, Any]:
+    def _new_consumer_statistics() -> ConsumerStatistics:
         return {
             "call_count": 0,
             "error_count": 0,

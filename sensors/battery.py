@@ -37,6 +37,12 @@ class Battery:
     DEFAULT_LOW_VOLTAGE: ClassVar[float] = 6.6
     DEFAULT_CRITICAL_VOLTAGE: ClassVar[float] = 6.2
 
+    adc: ADC
+    scale: float
+    low_voltage: float
+    critical_voltage: float
+    _closed: bool
+
     def __init__(
         self,
         adc: ADC,
@@ -45,12 +51,6 @@ class Battery:
         low_voltage: float = DEFAULT_LOW_VOLTAGE,
         critical_voltage: float = DEFAULT_CRITICAL_VOLTAGE,
     ) -> None:
-        if not isinstance(
-            adc,
-            ADC,
-        ):
-            raise TypeError("adc must be an ADC instance")
-
         scale_value = self._require_finite_number(
             scale,
             name="scale",
@@ -169,9 +169,6 @@ class Battery:
                 battery_voltage,
                 2,
             )
-
-        except BatteryError:
-            raise
 
         except (
             HardwareError,

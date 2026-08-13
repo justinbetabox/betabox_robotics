@@ -6,11 +6,11 @@ import shutil
 import subprocess
 import tempfile
 import wave
-from collections.abc import Generator
+from collections.abc import Generator, Sequence
 from contextlib import contextmanager
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Final, Self
+from typing import TYPE_CHECKING, Final, Self, cast
 
 import pyaudio
 
@@ -67,8 +67,20 @@ class AudioStatus:
 
     def to_dict(
         self,
-    ) -> dict[str, Any]:
-        return asdict(self)
+    ) -> dict[
+        str,
+        str | list[str] | int | bool | None,
+    ]:
+        return {
+            "backend": self.backend,
+            "available_backends": self.available_backends,
+            "output_device_index": self.output_device_index,
+            "sample_rate": self.sample_rate,
+            "auto_amp": self.auto_amp,
+            "keep_amp_enabled": self.keep_amp_enabled,
+            "playing": self.playing,
+            "closed": self.closed,
+        }
 
 
 def _require_nonempty_string(
@@ -158,6 +170,18 @@ class Audio:
     Provides speech output, sound playback, tone playback, and stop controls.
     """
 
+    sample_rate: int
+    speech_volume: float
+    auto_amp: bool
+    keep_amp_enabled: bool
+    preferred_output_device: str
+    speech_backend: SpeechBackend
+
+    _closed: bool
+    _playing: bool
+    _pyaudio: pyaudio.PyAudio
+    _device_index: int | None
+
     def __init__(
         self,
         *,
@@ -172,24 +196,6 @@ class Audio:
         keep_amp_enabled: bool = False,
         speech_volume: float = DEFAULT_SPEECH_VOLUME,
     ) -> None:
-        if not isinstance(
-            auto_amp,
-            bool,
-        ):
-            raise TypeError("auto_amp must be a boolean")
-
-        if not isinstance(
-            keep_amp_enabled,
-            bool,
-        ):
-            raise TypeError("keep_amp_enabled must be a boolean")
-
-        if not isinstance(
-            preferred_output_device,
-            str,
-        ):
-            raise TypeError("preferred_output_device must be a string")
-
         output_device = preferred_output_device.strip()
 
         self.sample_rate = _require_positive_integer(
@@ -231,7 +237,7 @@ class Audio:
             self._device_index = self._find_device()
 
             if self.keep_amp_enabled:
-                enable_speaker()
+                _ = enable_speaker()
 
         except (
             AmplifierError,
@@ -443,17 +449,11 @@ class Audio:
 
     def play_melody(
         self,
-        notes: list[MelodyNote],
+        notes: Sequence[MelodyNote],
         *,
         gap: float = 0.0,
     ) -> None:
         self._require_open()
-
-        if not isinstance(
-            notes,
-            list,
-        ):
-            raise TypeError("notes must be a list")
 
         gap_value = _require_finite_number(
             gap,
@@ -526,7 +526,7 @@ class Audio:
         self._require_open()
 
         if self.auto_amp and not self.keep_amp_enabled:
-            disable_speaker()
+            _ = disable_speaker()
 
     def is_playing(self) -> bool:
         self._require_open()
@@ -553,7 +553,7 @@ class Audio:
         try:
             if self.auto_amp or self.keep_amp_enabled:
                 try:
-                    disable_speaker()
+                    _ = disable_speaker()
 
                 except (
                     AmplifierError,
@@ -588,7 +588,7 @@ class Audio:
 
     @staticmethod
     def _require_existing_file(
-        value: str | Path,
+        value: object,
         *,
         name: str,
     ) -> Path:
@@ -670,12 +670,6 @@ class Audio:
         self,
         sound: str | Path,
     ) -> Path:
-        if isinstance(sound, bool) or not isinstance(
-            sound,
-            str | Path,
-        ):
-            raise TypeError("sound must be a string or Path")
-
         raw_path = Path(sound).expanduser()
         candidate_names = [raw_path]
 
@@ -812,7 +806,7 @@ class Audio:
         timeout: float,
     ) -> None:
         try:
-            subprocess.run(
+            _ = subprocess.run(
                 command,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.PIPE,
@@ -827,7 +821,8 @@ class Audio:
             ) from exc
 
         except subprocess.CalledProcessError as exc:
-            details = exc.stderr.strip() if exc.stderr else ""
+            stderr = cast(str | None, exc.stderr)
+            details = stderr.strip() if stderr else ""
 
             message = (
                 f"{operation} failed: {details}" if details else f"{operation} failed"
@@ -840,11 +835,11 @@ class Audio:
 
     def _enable_amp_for_playback(self) -> None:
         if self.auto_amp and not self.keep_amp_enabled:
-            enable_speaker()
+            _ = enable_speaker()
 
     def _disable_amp_after_playback(self) -> None:
         if self.auto_amp and not self.keep_amp_enabled:
-            disable_speaker()
+            _ = disable_speaker()
 
     @contextmanager
     def _playback_session(
@@ -866,20 +861,24 @@ class Audio:
         *,
         channels: int,
         sample_rate: int,
-    ) -> Generator[Any, None, None]:
-        stream_kwargs: dict[str, Any] = {
-            "format": pyaudio.paInt16,
-            "channels": channels,
-            "rate": sample_rate,
-            "output": True,
-        }
-
-        if self._device_index is not None:
-            stream_kwargs["output_device_index"] = self._device_index
-
+    ) -> Generator[pyaudio.Stream, None, None]:
         try:
             with suppress_stderr():
-                stream = self._pyaudio.open(**stream_kwargs)
+                if self._device_index is None:
+                    stream = self._pyaudio.open(
+                        format=pyaudio.paInt16,
+                        channels=channels,
+                        rate=sample_rate,
+                        output=True,
+                    )
+                else:
+                    stream = self._pyaudio.open(
+                        format=pyaudio.paInt16,
+                        channels=channels,
+                        rate=sample_rate,
+                        output=True,
+                        output_device_index=self._device_index,
+                    )
 
         except (
             OSError,
@@ -921,7 +920,7 @@ class Audio:
 
     @staticmethod
     def _write_stream(
-        stream: Any,
+        stream: pyaudio.Stream,
         data: bytes,
     ) -> None:
         try:

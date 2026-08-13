@@ -2,18 +2,28 @@ from __future__ import annotations
 
 import json
 import sys
+from typing import Protocol, cast
 
-import pamela
+import pamela  # pyright: ignore[reportMissingTypeStubs]
 
 from betabox_robotics.services.accounts import (
     account_by_username,
 )
 
 
+class PamAuthenticate(Protocol):
+    def __call__(
+        self,
+        username: str,
+        password: str,
+        *,
+        service: str = "login",
+    ) -> object: ...
+
+
 def _validate_string(
     value: object,
     *,
-    name: str,
     strip: bool = True,
 ) -> str:
     if not isinstance(
@@ -30,11 +40,30 @@ def _validate_string(
     return result
 
 
+def _pam_authenticate(
+    username: str,
+    password: str,
+) -> None:
+    authenticate = cast(
+        PamAuthenticate,
+        pamela.authenticate,
+    )
+
+    _ = authenticate(
+        username,
+        password,
+        service="login",
+    )
+
+
 def read_request() -> tuple[str, str]:
     """Read and validate an authentication request from stdin."""
 
     try:
-        payload: object = json.load(sys.stdin)
+        payload = cast(
+            object,
+            json.load(sys.stdin),
+        )
     except (
         json.JSONDecodeError,
         OSError,
@@ -49,13 +78,17 @@ def read_request() -> tuple[str, str]:
     ):
         raise TypeError("Invalid authentication request")
 
-    username = _validate_string(
-        payload.get("username"),
-        name="username",
+    request = cast(
+        dict[object, object],
+        payload,
     )
-    password = _validate_string(
-        payload.get("password"),
-        name="password",
+
+    username: str = _validate_string(
+        request.get("username"),
+    )
+
+    password: str = _validate_string(
+        request.get("password"),
         strip=False,
     )
 
@@ -74,14 +107,17 @@ def authenticate(
     try:
         username_value = _validate_string(
             username,
-            name="username",
         )
+
         password_value = _validate_string(
             password,
-            name="password",
             strip=False,
         )
-    except (TypeError, ValueError):
+
+    except (
+        TypeError,
+        ValueError,
+    ):
         return False
 
     try:
@@ -93,10 +129,9 @@ def authenticate(
         return False
 
     try:
-        pamela.authenticate(
+        _pam_authenticate(
             account.username,
             password_value,
-            service="login",
         )
     except pamela.PAMError:
         return False
@@ -107,7 +142,10 @@ def authenticate(
 def main() -> int:
     try:
         username, password = read_request()
-    except (TypeError, ValueError):
+    except (
+        TypeError,
+        ValueError,
+    ):
         return 1
 
     return (

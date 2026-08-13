@@ -2,6 +2,8 @@
 set -e
 
 REPO_URL="https://github.com/justinbetabox/betabox_robotics.git"
+BRANCH="main"
+
 LIB_DIR="/opt/libs"
 SDK_DIR="$LIB_DIR/betabox_robotics"
 
@@ -23,18 +25,26 @@ sudo apt install -y git
 
 echo "[2/4] Preparing /opt/libs..."
 sudo mkdir -p "$LIB_DIR"
-sudo chown -R "$SERVICE_USER:$SERVICE_GROUP" \
-    "$LIB_DIR"
+sudo chown -R "$SERVICE_USER:$SERVICE_GROUP" "$LIB_DIR"
 
 echo "[3/4] Cloning or updating SDK..."
+
 if [[ -d "$SDK_DIR/.git" ]]; then
     cd "$SDK_DIR"
-    git pull
+
+    git fetch origin "$BRANCH"
+    git checkout "$BRANCH"
+    git pull --ff-only origin "$BRANCH"
 else
-    git clone "$REPO_URL" "$SDK_DIR"
+    git clone \
+        --branch "$BRANCH" \
+        --single-branch \
+        "$REPO_URL" \
+        "$SDK_DIR"
 fi
 
 echo "[4/4] Running installer..."
+
 cd "$SDK_DIR"
 chmod +x deployment/install.sh
 ./deployment/install.sh

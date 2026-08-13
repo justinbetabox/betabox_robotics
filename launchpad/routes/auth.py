@@ -144,12 +144,12 @@ def setup_auth_routes(
 ) -> None:
     """Register authentication routes."""
 
-    app.router.add_post(
+    _ = app.router.add_post(
         "/login",
         login,
     )
 
-    app.router.add_post(
+    _ = app.router.add_post(
         "/logout",
         logout,
     )

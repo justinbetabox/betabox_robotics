@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
@@ -241,12 +242,6 @@ def print_target_logs(
     journal: bool,
     file: bool,
 ) -> None:
-    if not isinstance(
-        target,
-        LogTarget,
-    ):
-        raise TypeError("target must be a LogTarget")
-
     lines_value = _validate_lines(lines)
     journal_value = _validate_flag(
         journal,
@@ -307,15 +302,6 @@ def log_targets(
 def print_targets(
     targets: tuple[LogTarget, ...],
 ) -> None:
-    if not isinstance(
-        targets,
-        tuple,
-    ):
-        raise TypeError("targets must be a tuple")
-
-    if not all(isinstance(target, LogTarget) for target in targets):
-        raise TypeError("targets must contain only LogTarget values")
-
     print()
     print("Available log targets")
     print("=====================")
@@ -336,29 +322,29 @@ def parse_args(
 
     parser = argparse.ArgumentParser(prog="betabox logs")
 
-    parser.add_argument(
+    _ = parser.add_argument(
         "target",
         nargs="?",
         help="Log target name",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "-n",
         "--lines",
         type=int,
         default=(config_value.monitoring.default_log_lines),
         help="Number of lines",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--journal-only",
         action="store_true",
         help="Only show journal logs",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--file-only",
         action="store_true",
         help="Only show file logs",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--list",
         action="store_true",
         help="List available log targets",
@@ -377,7 +363,51 @@ def main(
     )
 
     try:
-        lines = _validate_lines(args.lines)
+        lines = _validate_lines(
+            cast(
+                object,
+                args.lines,
+            )
+        )
+
+        journal_only = _validate_flag(
+            cast(
+                object,
+                args.journal_only,
+            ),
+            name="journal_only",
+        )
+
+        file_only = _validate_flag(
+            cast(
+                object,
+                args.file_only,
+            ),
+            name="file_only",
+        )
+
+        list_requested = _validate_flag(
+            cast(
+                object,
+                args.list,
+            ),
+            name="list",
+        )
+
+        raw_target = cast(
+            object,
+            args.target,
+        )
+
+        target_name = (
+            None
+            if raw_target is None
+            else _validate_string(
+                raw_target,
+                name="target",
+            )
+        )
+
     except (
         TypeError,
         ValueError,
@@ -385,7 +415,7 @@ def main(
         print(str(exc))
         return 1
 
-    if args.journal_only and args.file_only:
+    if journal_only and file_only:
         print("--journal-only and --file-only cannot be used together")
         return 1
 
@@ -399,13 +429,13 @@ def main(
         print(str(exc))
         return 1
 
-    if args.list or not args.target:
+    if list_requested or target_name is None:
         print_targets(targets)
         return 0
 
     try:
         target = get_target(
-            args.target,
+            target_name,
             config,
         )
     except (
@@ -416,7 +446,7 @@ def main(
         return 1
 
     if target is None:
-        print(f"Unknown log target: {args.target}")
+        print(f"Unknown log target: {target_name}")
         print_targets(targets)
         return 1
 
@@ -424,8 +454,8 @@ def main(
         print_target_logs(
             target,
             lines=lines,
-            journal=not args.file_only,
-            file=not args.journal_only,
+            journal=not file_only,
+            file=not journal_only,
         )
     except (
         TypeError,

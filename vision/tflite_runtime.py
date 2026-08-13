@@ -1,15 +1,40 @@
 from __future__ import annotations
 
+import importlib
 import math
 from pathlib import Path
-from typing import Any
+from typing import Protocol, cast
 
 import cv2
 import numpy as np
 from numpy.typing import NDArray
 
-from betabox_robotics.vision.frame import Frame
+from betabox_robotics.vision.frame import (
+    Frame,
+    ImageArray,
+)
 from betabox_robotics.vision.model_runtime import ModelDetection
+
+
+class _TFLiteInterpreter(Protocol):
+    def allocate_tensors(self) -> None: ...
+
+    def get_input_details(self) -> list[dict[str, object]]: ...
+
+    def get_output_details(self) -> list[dict[str, object]]: ...
+
+    def set_tensor(
+        self,
+        tensor_index: int,
+        value: NDArray[np.generic],
+    ) -> None: ...
+
+    def invoke(self) -> None: ...
+
+    def get_tensor(
+        self,
+        tensor_index: int,
+    ) -> NDArray[np.generic]: ...
 
 
 class TFLiteRuntimeError(RuntimeError):
@@ -21,12 +46,6 @@ def _validate_existing_file(
     *,
     name: str,
 ) -> Path:
-    if isinstance(value, bool) or not isinstance(
-        value,
-        str | Path,
-    ):
-        raise TypeError(f"{name} must be a string or Path")
-
     path = Path(value).expanduser()
 
     if not path.is_file():
@@ -38,23 +57,35 @@ def _validate_existing_file(
 def _validate_input_size(
     value: object,
 ) -> tuple[int, int]:
-    if not isinstance(value, tuple) or len(value) != 2:
+    if not isinstance(value, tuple):
         raise TypeError("input_size must be a tuple of two integers")
 
-    width, height = value
+    values = cast(
+        tuple[object, ...],
+        value,
+    )
+
+    if len(values) != 2:
+        raise TypeError("input_size must be a tuple of two integers")
+
+    width_value = values[0]
+    height_value = values[1]
 
     if (
-        isinstance(width, bool)
-        or not isinstance(width, int)
-        or isinstance(height, bool)
-        or not isinstance(height, int)
+        isinstance(width_value, bool)
+        or not isinstance(width_value, int)
+        or isinstance(height_value, bool)
+        or not isinstance(height_value, int)
     ):
         raise TypeError("input_size must contain two integers")
 
-    if width <= 0 or height <= 0:
+    if width_value <= 0 or height_value <= 0:
         raise ValueError("input_size values must be greater than 0")
 
-    return width, height
+    return (
+        width_value,
+        height_value,
+    )
 
 
 def _validate_confidence_threshold(
@@ -77,6 +108,19 @@ def _validate_confidence_threshold(
     return threshold
 
 
+def _get_attribute(
+    obj: object,
+    name: str,
+) -> object:
+    return cast(
+        object,
+        getattr(
+            obj,
+            name,
+        ),
+    )
+
+
 class TFLiteObjectDetectionModel:
     """
     TensorFlow Lite object detection runtime.
@@ -87,6 +131,17 @@ class TFLiteObjectDetectionModel:
     This runtime performs inference only. It does not own the camera,
     acquire frames, or publish metadata.
     """
+
+    model_path: Path
+    labels_path: Path
+    input_size: tuple[int, int]
+    confidence_threshold: float
+
+    labels: dict[int, str]
+
+    interpreter: _TFLiteInterpreter
+    input_details: list[dict[str, object]]
+    output_details: list[dict[str, object]]
 
     def __init__(
         self,
@@ -129,21 +184,78 @@ class TFLiteObjectDetectionModel:
 
         if len(self.output_details) < 3:
             raise TFLiteRuntimeError(
-                "TensorFlow Lite object detection model "
-                "must expose at least three output tensors"
+                "TensorFlow Lite object detection model must expose at least three output tensors"
             )
+
+    @staticmethod
+    def _numeric_value(
+        value: object,
+        *,
+        name: str,
+    ) -> int | float:
+        if isinstance(value, bool):
+            raise TFLiteRuntimeError(
+                f"TensorFlow Lite model returned an invalid {name}"
+            )
+
+        if isinstance(value, int | float):
+            return value
+
+        if isinstance(
+            value,
+            np.integer | np.floating,
+        ):
+            scalar = cast(
+                object,
+                value.item(),
+            )
+
+            if isinstance(scalar, bool) or not isinstance(
+                scalar,
+                int | float,
+            ):
+                raise TFLiteRuntimeError(
+                    f"TensorFlow Lite model returned an invalid {name}"
+                )
+
+            return scalar
+
+        raise TFLiteRuntimeError(f"TensorFlow Lite model returned an invalid {name}")
+
+    @staticmethod
+    def _tensor_index(
+        details: dict[str, object],
+    ) -> int:
+        value = details.get("index")
+
+        if isinstance(value, bool) or not isinstance(
+            value,
+            int,
+        ):
+            raise TFLiteRuntimeError(
+                "TensorFlow Lite model returned an invalid tensor index"
+            )
+
+        return value
 
     def detect(
         self,
         frame: Frame,
     ) -> list[ModelDetection]:
-        if not isinstance(frame, Frame):
-            raise TypeError("frame must be a Frame instance")
-
         input_tensor = self._preprocess(frame.image)
 
         try:
-            input_index = int(self.input_details[0]["index"])
+            index_value = self.input_details[0].get("index")
+
+            if isinstance(index_value, bool) or not isinstance(
+                index_value,
+                int,
+            ):
+                raise TFLiteRuntimeError(
+                    "TensorFlow Lite model returned an invalid input tensor index"
+                )
+
+            input_index = index_value
 
             self.interpreter.set_tensor(
                 input_index,
@@ -169,11 +281,8 @@ class TFLiteObjectDetectionModel:
 
     def _preprocess(
         self,
-        image: Any,
-    ) -> NDArray[Any]:
-        if not isinstance(image, np.ndarray):
-            raise TypeError("frame image must be a NumPy array")
-
+        image: ImageArray,
+    ) -> NDArray[np.generic]:
         if image.ndim != 3 or image.shape[2] != 3:
             raise ValueError("frame image must have three color channels")
 
@@ -191,7 +300,15 @@ class TFLiteObjectDetectionModel:
         )
 
         try:
-            dtype = self.input_details[0]["dtype"]
+            dtype_value = self.input_details[0].get("dtype")
+
+            if not isinstance(dtype_value, type) or not issubclass(
+                dtype_value,
+                np.generic,
+            ):
+                raise TFLiteRuntimeError(
+                    "TensorFlow Lite model returned an invalid input tensor dtype"
+                )
         except (
             IndexError,
             KeyError,
@@ -201,19 +318,58 @@ class TFLiteObjectDetectionModel:
                 "TensorFlow Lite model returned invalid input metadata"
             ) from exc
 
-        if dtype == np.float32:
+        if dtype_value is np.float32:
             return input_tensor.astype(np.float32) / 255.0
 
-        return input_tensor.astype(dtype)
+        return input_tensor.astype(dtype_value)
 
     def _decode_outputs(
         self,
         frame: Frame,
     ) -> list[ModelDetection]:
         try:
-            boxes = self.interpreter.get_tensor(self.output_details[0]["index"])[0]
-            class_ids = self.interpreter.get_tensor(self.output_details[1]["index"])[0]
-            scores = self.interpreter.get_tensor(self.output_details[2]["index"])[0]
+            boxes_tensor: NDArray[np.generic] = self.interpreter.get_tensor(
+                self._tensor_index(
+                    self.output_details[0],
+                )
+            )
+
+            class_ids_tensor: NDArray[np.generic] = self.interpreter.get_tensor(
+                self._tensor_index(
+                    self.output_details[1],
+                )
+            )
+
+            scores_tensor: NDArray[np.generic] = self.interpreter.get_tensor(
+                self._tensor_index(
+                    self.output_details[2],
+                )
+            )
+
+            boxes = cast(
+                NDArray[np.generic],
+                cast(
+                    object,
+                    boxes_tensor[0],
+                ),
+            )
+
+            class_ids = cast(
+                NDArray[np.generic],
+                cast(
+                    object,
+                    class_ids_tensor[0],
+                ),
+            )
+
+            scores = cast(
+                NDArray[np.generic],
+                cast(
+                    object,
+                    scores_tensor[0],
+                ),
+            )
+
         except (
             IndexError,
             KeyError,
@@ -223,25 +379,38 @@ class TFLiteObjectDetectionModel:
         ) as exc:
             raise TFLiteRuntimeError(f"failed to read model outputs: {exc}") from exc
 
-        if not (len(boxes) == len(class_ids) == len(scores)):
+        detection_count = len(boxes)
+
+        if detection_count != len(class_ids) or detection_count != len(scores):
             raise TFLiteRuntimeError(
                 "TensorFlow Lite model returned mismatched detection outputs"
             )
 
         image = frame.image
 
-        if not isinstance(image, np.ndarray):
-            raise TypeError("frame image must be a NumPy array")
+        height: int = image.shape[0]
+        width: int = image.shape[1]
 
-        height, width = image.shape[:2]
         detections: list[ModelDetection] = []
 
-        for box, class_id, score in zip(
-            boxes,
-            class_ids,
-            scores,
-        ):
-            confidence = float(score)
+        for index in range(detection_count):
+            box = cast(
+                NDArray[np.generic],
+                cast(
+                    object,
+                    boxes[index],
+                ),
+            )
+
+            score_value = self._numeric_value(
+                cast(
+                    object,
+                    scores[index],
+                ),
+                name="detection score",
+            )
+
+            confidence = float(score_value)
 
             if not math.isfinite(confidence):
                 continue
@@ -249,28 +418,71 @@ class TFLiteObjectDetectionModel:
             if confidence < self.confidence_threshold:
                 continue
 
+            class_id_value = self._numeric_value(
+                cast(
+                    object,
+                    class_ids[index],
+                ),
+                name="class ID",
+            )
+
+            class_index = int(class_id_value)
+
             if len(box) != 4:
                 raise TFLiteRuntimeError(
                     "TensorFlow Lite model returned an invalid detection box"
                 )
 
-            y_min, x_min, y_max, x_max = (float(value) for value in box)
+            box_values: list[float] = []
+
+            for box_index in range(len(box)):
+                box_values.append(
+                    float(
+                        self._numeric_value(
+                            cast(
+                                object,
+                                box[box_index],
+                            ),
+                            name="detection box value",
+                        )
+                    )
+                )
+
+            y_min = box_values[0]
+            x_min = box_values[1]
+            y_max = box_values[2]
+            x_max = box_values[3]
 
             x_min = min(
                 1.0,
-                max(0.0, x_min),
+                max(
+                    0.0,
+                    x_min,
+                ),
             )
+
             y_min = min(
                 1.0,
-                max(0.0, y_min),
+                max(
+                    0.0,
+                    y_min,
+                ),
             )
+
             x_max = min(
                 1.0,
-                max(0.0, x_max),
+                max(
+                    0.0,
+                    x_max,
+                ),
             )
+
             y_max = min(
                 1.0,
-                max(0.0, y_max),
+                max(
+                    0.0,
+                    y_max,
+                ),
             )
 
             if x_max <= x_min or y_max <= y_min:
@@ -278,14 +490,15 @@ class TFLiteObjectDetectionModel:
 
             x = int(x_min * width)
             y = int(y_min * height)
+
             box_width = int((x_max - x_min) * width)
             box_height = int((y_max - y_min) * height)
 
-            class_index = int(class_id)
-
             detections.append(
                 ModelDetection(
-                    label=self._label_for_class(class_index),
+                    label=self._label_for_class(
+                        class_index,
+                    ),
                     confidence=confidence,
                     box=(
                         x,
@@ -343,22 +556,32 @@ class TFLiteObjectDetectionModel:
     @staticmethod
     def _load_interpreter(
         path: Path,
-    ) -> Any:
+    ) -> _TFLiteInterpreter:
         try:
-            from tflite_runtime.interpreter import Interpreter
+            module = importlib.import_module("tflite_runtime.interpreter")
+
         except ImportError:
             try:
-                from tensorflow.lite.python.interpreter import (
-                    Interpreter,
-                )
+                module = importlib.import_module("tensorflow.lite.python.interpreter")
+
             except ImportError as exc:
                 raise TFLiteRuntimeError(
-                    "no TensorFlow Lite interpreter found; "
-                    "install tflite-runtime or TensorFlow"
+                    "no TensorFlow Lite interpreter found; install tflite-runtime or TensorFlow"
                 ) from exc
 
+        interpreter_class = _get_attribute(
+            module,
+            "Interpreter",
+        )
+
+        if not callable(interpreter_class):
+            raise TFLiteRuntimeError("TensorFlow Lite Interpreter is not callable")
+
         try:
-            return Interpreter(model_path=str(path))
+            interpreter = interpreter_class(
+                model_path=str(path),
+            )
+
         except (
             OSError,
             RuntimeError,
@@ -368,3 +591,8 @@ class TFLiteObjectDetectionModel:
             raise TFLiteRuntimeError(
                 f"failed to load TensorFlow Lite model {path}: {exc}"
             ) from exc
+
+        return cast(
+            _TFLiteInterpreter,
+            interpreter,
+        )

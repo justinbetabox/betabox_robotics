@@ -36,7 +36,7 @@ def information_context(
 async def information_page(
     request: web.Request,
 ) -> web.Response:
-    information_context(request)
+    _ = information_context(request)
 
     return aiohttp_jinja2.render_template(
         "information.html",
@@ -85,13 +85,13 @@ async def information_api(
 def setup_information_routes(
     app: web.Application,
 ) -> None:
-    app.router.add_get(
+    _ = app.router.add_get(
         "/information",
         information_page,
         name="information-page",
     )
 
-    app.router.add_get(
+    _ = app.router.add_get(
         "/api/information",
         information_api,
         name="information-api",

@@ -6,7 +6,7 @@ import shutil
 import socket
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
+from typing import cast
 
 from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
@@ -24,16 +24,22 @@ from betabox_robotics.services.guest import (
 from betabox_robotics.services.guest import (
     print_status as print_guest_status,
 )
-from betabox_robotics.services.hardware_status import (
+from betabox_robotics.services.hardware_checks import (
     RobotHardwareStatus,
+)
+from betabox_robotics.services.hardware_status import (
     collect_hardware_status,
 )
 from betabox_robotics.services.managed import managed_services
-from betabox_robotics.services.system_health import (
+from betabox_robotics.services.system_checks import (
     SystemHealthStatus,
+)
+from betabox_robotics.services.system_health import (
     collect_system_health,
 )
 from betabox_robotics.version import __version__
+
+JSONValue = str | int | float | bool | None | list["JSONValue"] | dict[str, "JSONValue"]
 
 
 def _validate_config(
@@ -114,12 +120,6 @@ class StatusReport:
             ),
         )
 
-        if not isinstance(
-            self.ip_addresses,
-            tuple,
-        ):
-            raise TypeError("ip_addresses must be a tuple")
-
         object.__setattr__(
             self,
             "ip_addresses",
@@ -136,9 +136,12 @@ class StatusReport:
             "media_paths",
             "services",
         ):
-            value = getattr(
-                self,
-                name,
+            value = cast(
+                object,
+                getattr(
+                    self,
+                    name,
+                ),
             )
 
             if not isinstance(
@@ -146,6 +149,11 @@ class StatusReport:
                 dict,
             ):
                 raise TypeError(f"{name} must be a dictionary")
+
+            mapping = cast(
+                dict[object, object],
+                value,
+            )
 
             normalized = {
                 _validate_string(
@@ -155,7 +163,7 @@ class StatusReport:
                     item,
                     name=f"{name} value",
                 )
-                for key, item in value.items()
+                for key, item in mapping.items()
             }
 
             object.__setattr__(
@@ -164,39 +172,18 @@ class StatusReport:
                 normalized,
             )
 
-        _validate_flag(
+        _ = _validate_flag(
             self.jupyterhub_proxy_available,
             name="jupyterhub_proxy_available",
         )
 
-        if not isinstance(
-            self.control,
-            RobotOwnershipStatus,
-        ):
-            raise TypeError("control must be a RobotOwnershipStatus")
-
-        if not isinstance(
-            self.hardware,
-            RobotHardwareStatus,
-        ):
-            raise TypeError("hardware must be a RobotHardwareStatus")
-
-        if not isinstance(
-            self.system_health,
-            SystemHealthStatus,
-        ):
-            raise TypeError("system_health must be a SystemHealthStatus")
-
-        if not isinstance(
-            self.guest,
-            GuestWorkspaceStatus,
-        ):
-            raise TypeError("guest must be a GuestWorkspaceStatus")
-
     def to_dict(
         self,
-    ) -> dict[str, Any]:
-        return asdict(self)
+    ) -> dict[str, JSONValue]:
+        return cast(
+            dict[str, JSONValue],
+            asdict(self),
+        )
 
 
 def hostname() -> str:
@@ -318,11 +305,6 @@ def format_boolean(
 
 
 def print_system_health(system_health: SystemHealthStatus) -> None:
-    if not isinstance(
-        system_health,
-        SystemHealthStatus,
-    ):
-        raise TypeError("system_health must be a SystemHealthStatus")
     print()
     print("System Health")
     print("-------------")
@@ -364,18 +346,13 @@ def print_system_health(system_health: SystemHealthStatus) -> None:
 
 
 def print_hardware_status(hardware: RobotHardwareStatus) -> None:
-    if not isinstance(
-        hardware,
-        RobotHardwareStatus,
-    ):
-        raise TypeError("hardware must be a RobotHardwareStatus")
     print()
     print("Robot Hardware")
     print("--------------")
 
     print(
-        f"Passive Hardware:       "
-        f"{'available' if hardware.passive_hardware_available else 'unavailable'}"
+        "Passive Hardware:       "
+        + f"{'available' if hardware.passive_hardware_available else 'unavailable'}"
     )
 
     print(f"I²C bus:     {format_boolean(hardware.i2c.available)}")
@@ -428,12 +405,6 @@ def print_human(
     report: StatusReport,
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> None:
-    if not isinstance(
-        report,
-        StatusReport,
-    ):
-        raise TypeError("report must be a StatusReport")
-
     config_value = _validate_config(config)
     print()
     print("Betabox Status")
@@ -516,12 +487,6 @@ def print_human(
 def path_available(
     path: str | Path,
 ) -> bool:
-    if isinstance(path, bool) or not isinstance(
-        path,
-        str | Path,
-    ):
-        raise TypeError("path must be a string or Path")
-
     if isinstance(path, str):
         path = path.strip()
 
@@ -541,7 +506,7 @@ def parse_args(
 ) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="betabox status")
 
-    parser.add_argument(
+    _ = parser.add_argument(
         "--json",
         action="store_true",
         help="Print status as JSON",
@@ -553,12 +518,6 @@ def parse_args(
 def print_json(
     report: StatusReport,
 ) -> None:
-    if not isinstance(
-        report,
-        StatusReport,
-    ):
-        raise TypeError("report must be a StatusReport")
-
     print(
         json.dumps(
             report.to_dict(),
@@ -574,9 +533,17 @@ def main(
     args = parse_args(argv)
 
     try:
+        json_requested = _validate_flag(
+            cast(
+                object,
+                args.json,
+            ),
+            name="json",
+        )
+
         report = collect_status(config)
 
-        if args.json:
+        if json_requested:
             print_json(report)
         else:
             print_human(

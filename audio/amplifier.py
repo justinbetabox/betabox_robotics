@@ -160,7 +160,7 @@ def _warm_up_speaker() -> None:
 
     # Best effort only. Speaker enabling has already succeeded, and a
     # failed SoX warm-up should not make enable_speaker() report failure.
-    _run_command(
+    _ = _run_command(
         (
             play,
             "-n",
@@ -212,4 +212,4 @@ def speaker_on(
     try:
         yield enabled
     finally:
-        disable_speaker(pin)
+        _ = disable_speaker(pin)

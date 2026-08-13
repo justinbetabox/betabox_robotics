@@ -169,7 +169,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help_text,
         _,
     ) in COMMANDS.items():
-        subparsers.add_parser(
+        _ = subparsers.add_parser(
             name,
             help=help_text,
             add_help=False,
@@ -193,11 +193,17 @@ def main(
     parser = _build_parser()
     args, extra = parser.parse_known_args(argv)
 
-    if args.command is None:
+    command_name = getattr(
+        args,
+        "command",
+        None,
+    )
+
+    if not isinstance(command_name, str):
         parser.print_help()
         return 1
 
-    command = COMMANDS.get(args.command)
+    command = COMMANDS.get(command_name)
 
     if command is None:
         parser.print_help()
@@ -211,7 +217,7 @@ def main(
         TypeError,
         ValueError,
     ) as exc:
-        print(f"betabox {args.command} failed: {exc}")
+        print(f"betabox {command_name} failed: {exc}")
         return 1
 
 

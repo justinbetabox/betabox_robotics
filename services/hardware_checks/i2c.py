@@ -82,7 +82,7 @@ def collect_i2c_status(
                 continue
 
             try:
-                int(
+                _ = int(
                     value,
                     16,
                 )

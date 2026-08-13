@@ -1,14 +1,19 @@
 from __future__ import annotations
 
 import asyncio
+from typing import cast
 
 import aiohttp_jinja2
 from aiohttp import web
 
-from betabox_robotics.launchpad.auth import (
-    LAUNCHPAD_CONTEXT_KEY,
+from betabox_robotics.launchpad.auth.context import (
     LaunchpadContext,
+)
+from betabox_robotics.launchpad.auth.permissions import (
     Permission,
+)
+from betabox_robotics.launchpad.auth.provider import (
+    LAUNCHPAD_CONTEXT_KEY,
 )
 from betabox_robotics.services.http_health import (
     check_http_available,
@@ -26,10 +31,27 @@ _STATUS_COLLECTION_ERRORS = (
 )
 
 
+def _validate_context(
+    value: object,
+) -> LaunchpadContext:
+    if not isinstance(
+        value,
+        LaunchpadContext,
+    ):
+        raise TypeError("request context must be a LaunchpadContext")
+
+    return value
+
+
 def status_context(
     request: web.Request,
 ) -> LaunchpadContext:
-    context: LaunchpadContext = request[LAUNCHPAD_CONTEXT_KEY]
+    raw_context = cast(
+        object,
+        request[LAUNCHPAD_CONTEXT_KEY],
+    )
+
+    context = _validate_context(raw_context)
 
     context.require(Permission.STATUS)
 
@@ -39,7 +61,7 @@ def status_context(
 async def status_page(
     request: web.Request,
 ) -> web.Response:
-    status_context(request)
+    _ = status_context(request)
 
     return aiohttp_jinja2.render_template(
         "status.html",
@@ -65,7 +87,10 @@ async def status_api(
     def collect_payload() -> dict[str, object]:
         report = collect_status(platform)
 
-        payload = report.to_dict()
+        payload: dict[str, object] = {}
+
+        for key, value in report.to_dict().items():
+            payload[key] = value
 
         jupyter_state = report.services.get(
             platform.services.jupyterhub.unit,
@@ -85,7 +110,7 @@ async def status_api(
 
         payload["jupyterhub"] = {
             "state": jupyter_state,
-            "active": (jupyter_state == "active"),
+            "active": jupyter_state == "active",
             "responding": jupyter_responding,
             "message": jupyter_message,
         }
@@ -137,19 +162,19 @@ async def status_report_api(
 def setup_status_routes(
     app: web.Application,
 ) -> None:
-    app.router.add_get(
+    _ = app.router.add_get(
         "/status",
         status_page,
         name="status-page",
     )
 
-    app.router.add_get(
+    _ = app.router.add_get(
         "/api/status",
         status_api,
         name="status-api",
     )
 
-    app.router.add_get(
+    _ = app.router.add_get(
         "/api/status/report",
         status_report_api,
         name="status-report-api",

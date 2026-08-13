@@ -1,7 +1,52 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
-from typing import Any
+from dataclasses import dataclass
+from typing import TypedDict
+
+
+class I2CStatusData(TypedDict):
+    available: bool
+    devices: list[str]
+    error: str | None
+
+
+class BatteryStatusData(TypedDict):
+    available: bool
+    voltage: float | None
+    state: str
+    error: str | None
+
+
+class SensorStatusData(TypedDict):
+    grayscale_available: bool
+    grayscale_values: list[int] | None
+    ultrasonic_configured: bool
+    error: str | None
+
+
+class AudioStatusData(TypedDict):
+    available: bool
+    device: str | None
+    error: str | None
+
+
+class VisionStatusData(TypedDict):
+    service_available: bool
+    running: bool
+    camera_running: bool
+    camera_has_frame: bool
+    clients: int
+    error: str | None
+
+
+class RobotHardwareStatusData(TypedDict):
+    i2c: I2CStatusData
+    passive_hardware_available: bool
+    battery: BatteryStatusData
+    sensors: SensorStatusData
+    audio: AudioStatusData
+    vision: VisionStatusData
+    passive_hardware_error: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -10,7 +55,7 @@ class I2CStatus:
     devices: tuple[str, ...]
     error: str | None = None
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> I2CStatusData:
         return {
             "available": self.available,
             "devices": list(self.devices),
@@ -25,8 +70,13 @@ class BatteryStatus:
     state: str
     error: str | None = None
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+    def to_dict(self) -> BatteryStatusData:
+        return {
+            "available": self.available,
+            "voltage": self.voltage,
+            "state": self.state,
+            "error": self.error,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -36,13 +86,13 @@ class SensorStatus:
     ultrasonic_configured: bool
     error: str | None = None
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> SensorStatusData:
         return {
-            "grayscale_available": (self.grayscale_available),
+            "grayscale_available": self.grayscale_available,
             "grayscale_values": (
                 None if self.grayscale_values is None else list(self.grayscale_values)
             ),
-            "ultrasonic_configured": (self.ultrasonic_configured),
+            "ultrasonic_configured": self.ultrasonic_configured,
             "error": self.error,
         }
 
@@ -53,8 +103,12 @@ class AudioStatus:
     device: str | None
     error: str | None = None
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+    def to_dict(self) -> AudioStatusData:
+        return {
+            "available": self.available,
+            "device": self.device,
+            "error": self.error,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,8 +120,15 @@ class VisionStatus:
     clients: int
     error: str | None = None
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+    def to_dict(self) -> VisionStatusData:
+        return {
+            "service_available": self.service_available,
+            "running": self.running,
+            "camera_running": self.camera_running,
+            "camera_has_frame": self.camera_has_frame,
+            "clients": self.clients,
+            "error": self.error,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,13 +141,13 @@ class RobotHardwareStatus:
     vision: VisionStatus
     passive_hardware_error: str | None = None
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> RobotHardwareStatusData:
         return {
             "i2c": self.i2c.to_dict(),
-            "passive_hardware_available": (self.passive_hardware_available),
+            "passive_hardware_available": self.passive_hardware_available,
             "battery": self.battery.to_dict(),
             "sensors": self.sensors.to_dict(),
             "audio": self.audio.to_dict(),
             "vision": self.vision.to_dict(),
-            "passive_hardware_error": (self.passive_hardware_error),
+            "passive_hardware_error": self.passive_hardware_error,
         }

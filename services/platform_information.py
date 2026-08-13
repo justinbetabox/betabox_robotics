@@ -4,7 +4,7 @@ import platform
 import shutil
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
+from typing import cast
 
 from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
@@ -14,6 +14,8 @@ from betabox_robotics.services.platform_summary import (
     collect_platform_summary,
 )
 from betabox_robotics.version import __version__
+
+JSONValue = str | int | float | bool | None | list["JSONValue"] | dict[str, "JSONValue"]
 
 
 def _validate_config(
@@ -137,7 +139,7 @@ class RobotInformation:
                 ),
             )
 
-        _validate_flag(
+        _ = _validate_flag(
             self.control_available,
             name="control_available",
         )
@@ -169,9 +171,12 @@ class NetworkInformation:
             "jupyterhub_urls",
             "vision_urls",
         ):
-            value = getattr(
-                self,
-                name,
+            value = cast(
+                object,
+                getattr(
+                    self,
+                    name,
+                ),
             )
 
             if not isinstance(
@@ -180,12 +185,17 @@ class NetworkInformation:
             ):
                 raise TypeError(f"{name} must be a tuple")
 
+            values = cast(
+                tuple[object, ...],
+                value,
+            )
+
             normalized = tuple(
                 _validate_string(
                     item,
                     name=f"{name} item",
                 )
-                for item in value
+                for item in values
             )
 
             object.__setattr__(
@@ -213,11 +223,19 @@ class SoftwareInformation:
             "operating_system",
             "architecture",
         ):
+            value = cast(
+                object,
+                getattr(
+                    self,
+                    name,
+                ),
+            )
+
             object.__setattr__(
                 self,
                 name,
                 _validate_string(
-                    getattr(self, name),
+                    value,
                     name=name,
                 ),
             )
@@ -242,9 +260,12 @@ class StorageInformation:
             "used_bytes",
             "available_bytes",
         ):
-            value = getattr(
-                self,
-                name,
+            value = cast(
+                object,
+                getattr(
+                    self,
+                    name,
+                ),
             )
 
             if isinstance(value, bool) or not isinstance(
@@ -255,15 +276,6 @@ class StorageInformation:
 
             if value < 0:
                 raise ValueError(f"{name} cannot be negative")
-
-        if isinstance(
-            self.used_percent,
-            bool,
-        ) or not isinstance(
-            self.used_percent,
-            int | float,
-        ):
-            raise TypeError("used_percent must be a number")
 
         used_percent = float(self.used_percent)
 
@@ -290,14 +302,24 @@ class MediaLocationInformation:
     videos_available: bool
     sounds_available: bool
 
-    def __post_init__(self) -> None:
+    def __post_init__(
+        self,
+    ) -> None:
         for name in (
             "pictures_available",
             "videos_available",
             "sounds_available",
         ):
-            _validate_flag(
-                getattr(self, name),
+            value = cast(
+                object,
+                getattr(
+                    self,
+                    name,
+                ),
+            )
+
+            _ = _validate_flag(
+                value,
                 name=name,
             )
 
@@ -312,14 +334,24 @@ class FeatureInformation:
     camera_ready: bool
     jupyterhub_available: bool
 
-    def __post_init__(self) -> None:
+    def __post_init__(
+        self,
+    ) -> None:
         for name in (
             "vision_service_available",
             "camera_ready",
             "jupyterhub_available",
         ):
-            _validate_flag(
-                getattr(self, name),
+            value = cast(
+                object,
+                getattr(
+                    self,
+                    name,
+                ),
+            )
+
+            _ = _validate_flag(
+                value,
                 name=name,
             )
 
@@ -337,45 +369,13 @@ class PlatformInformationReport:
     media: MediaLocationInformation
     features: FeatureInformation
 
-    def __post_init__(self) -> None:
-        if not isinstance(
-            self.robot,
-            RobotInformation,
-        ):
-            raise TypeError("robot must be a RobotInformation")
-
-        if not isinstance(
-            self.network,
-            NetworkInformation,
-        ):
-            raise TypeError("network must be a NetworkInformation")
-
-        if not isinstance(
-            self.software,
-            SoftwareInformation,
-        ):
-            raise TypeError("software must be a SoftwareInformation")
-
-        if not isinstance(
-            self.storage,
-            StorageInformation,
-        ):
-            raise TypeError("storage must be a StorageInformation")
-
-        if not isinstance(
-            self.media,
-            MediaLocationInformation,
-        ):
-            raise TypeError("media must be a MediaLocationInformation")
-
-        if not isinstance(
-            self.features,
-            FeatureInformation,
-        ):
-            raise TypeError("features must be a FeatureInformation")
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+    def to_dict(
+        self,
+    ) -> dict[str, JSONValue]:
+        return cast(
+            dict[str, JSONValue],
+            asdict(self),
+        )
 
 
 def robot_identifier(
@@ -413,12 +413,6 @@ def public_urls(
         name="hostname",
     )
     port_value = _validate_port(port)
-
-    if not isinstance(
-        ip_addresses,
-        list | tuple,
-    ):
-        raise TypeError("ip_addresses must be a list or tuple")
 
     hosts: list[str] = []
 
@@ -529,8 +523,7 @@ def collect_platform_information(
             address.strip()
             for address in summary.ip_addresses
             if (
-                isinstance(address, str)
-                and address.strip()
+                address.strip()
                 and ":" not in address
                 and not address.startswith("127.")
                 and address != "0.0.0.0"

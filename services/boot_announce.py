@@ -10,7 +10,9 @@ from betabox_robotics.config import (
     PlatformConfig,
 )
 from betabox_robotics.robots import BETABOX_CAR
-from betabox_robotics.services.verify import collect_checks
+from betabox_robotics.services.verify_checks import (
+    collect_checks,
+)
 
 FAILURE_ANNOUNCEMENTS: tuple[
     tuple[str, str],
@@ -103,7 +105,7 @@ def log(
         "a",
         encoding="utf-8",
     ) as file:
-        file.write(f"{timestamp} {message_value}\n")
+        _ = file.write(f"{timestamp} {message_value}\n")
 
 
 def say(
@@ -176,23 +178,12 @@ def announce_failures(
     audio_value = _validate_audio(audio)
     config_value = _validate_config(config)
 
-    if not isinstance(
-        results,
-        dict,
-    ):
-        raise TypeError("results must be a dictionary")
-
-    if not all(
-        isinstance(name, str) and isinstance(ok, bool) for name, ok in results.items()
-    ):
-        raise TypeError("results must map strings to booleans")
-
     for check_name, message in FAILURE_ANNOUNCEMENTS:
         if not results.get(
             check_name,
             False,
         ):
-            say(
+            _ = say(
                 audio_value,
                 message,
                 config_value,
@@ -257,7 +248,7 @@ def main() -> int:
     result = 1
 
     try:
-        say(
+        _ = say(
             audio,
             "Betabox starting",
             config,
@@ -266,7 +257,7 @@ def main() -> int:
         ready, results = summarize_checks(config)
 
         if ready:
-            say(
+            _ = say(
                 audio,
                 "Ready for class",
                 config,
@@ -282,7 +273,7 @@ def main() -> int:
                 results,
                 config,
             )
-            say(
+            _ = say(
                 audio,
                 "Teacher help needed",
                 config,

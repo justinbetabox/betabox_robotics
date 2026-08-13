@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import argparse
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from enum import Enum
-from typing import Any
+from typing import cast
 
 from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
@@ -17,6 +17,20 @@ from betabox_robotics.services.managed import (
     ManagedService,
     managed_services,
 )
+
+
+def _validate_flag(
+    value: object,
+    *,
+    name: str,
+) -> bool:
+    if not isinstance(
+        value,
+        bool,
+    ):
+        raise TypeError(f"{name} must be a boolean")
+
+    return value
 
 
 class ServiceState(str, Enum):
@@ -91,9 +105,14 @@ def _validate_properties(
     ):
         raise TypeError("properties must be a dictionary")
 
+    properties = cast(
+        dict[object, object],
+        value,
+    )
+
     normalized: dict[str, str] = {}
 
-    for key, item in value.items():
+    for key, item in properties.items():
         key_value = _validate_string(
             key,
             name="property name",
@@ -119,10 +138,18 @@ def _validate_statuses(
     ):
         raise TypeError("statuses must be a tuple")
 
-    if not all(isinstance(status, ServiceStatus) for status in value):
+    statuses = cast(
+        tuple[object, ...],
+        value,
+    )
+
+    if not all(isinstance(status, ServiceStatus) for status in statuses):
         raise TypeError("statuses must contain only ServiceStatus values")
 
-    return value
+    return cast(
+        tuple[ServiceStatus, ...],
+        statuses,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -185,64 +212,49 @@ class ServiceStatus:
             ),
         )
 
-        if not isinstance(
-            self.category,
-            ServiceCategory,
-        ):
-            raise TypeError("category must be a ServiceCategory")
-
-        if not isinstance(
-            self.startup,
-            ServiceStartup,
-        ):
-            raise TypeError("startup must be a ServiceStartup")
-
-        if not isinstance(
-            self.installed,
-            bool,
-        ):
-            raise TypeError("installed must be a boolean")
-
         for name in (
             "load_state",
             "active_state",
             "sub_state",
             "enabled_state",
         ):
+            value = cast(
+                object,
+                getattr(
+                    self,
+                    name,
+                ),
+            )
+
             object.__setattr__(
                 self,
                 name,
                 _validate_string(
-                    getattr(self, name),
+                    value,
                     name=name,
                 ),
             )
 
-        if not isinstance(
-            self.state,
-            ServiceState,
-        ):
-            raise TypeError("state must be a ServiceState")
+    def to_dict(
+        self,
+    ) -> dict[str, str | bool]:
+        result: dict[str, str | bool] = {
+            "name": self.name,
+            "display_name": self.display_name,
+            "description": self.description,
+            "unit": self.unit,
+            "category": self.category.value,
+            "startup": self.startup.value,
+            "installed": self.installed,
+            "load_state": self.load_state,
+            "active_state": self.active_state,
+            "sub_state": self.sub_state,
+            "enabled_state": self.enabled_state,
+            "state": self.state.value,
+            "health": self.health.value,
+        }
 
-        if not isinstance(
-            self.health,
-            ServiceHealth,
-        ):
-            raise TypeError("health must be a ServiceHealth")
-
-    def to_dict(self) -> dict[str, Any]:
-        """
-        Return a JSON-safe dictionary representation.
-        """
-
-        data = asdict(self)
-
-        data["category"] = self.category.value
-        data["startup"] = self.startup.value
-        data["state"] = self.state.value
-        data["health"] = self.health.value
-
-        return data
+        return result
 
 
 def service_properties(
@@ -308,12 +320,6 @@ def normalize_state(
     ServiceState,
     ServiceHealth,
 ]:
-    if not isinstance(
-        installed,
-        bool,
-    ):
-        raise TypeError("installed must be a boolean")
-
     active_state_value = _validate_string(
         active_state,
         name="active_state",
@@ -329,12 +335,6 @@ def normalize_state(
         name="result_state",
         allow_empty=True,
     )
-
-    if not isinstance(
-        startup,
-        ServiceStartup,
-    ):
-        raise TypeError("startup must be a ServiceStartup")
 
     if not installed:
         return (
@@ -443,20 +443,13 @@ def collect_service(
     """
     Collect the current state of one managed service.
     """
-    if not isinstance(
-        managed,
-        ManagedService,
-    ):
-        raise TypeError("managed must be a ManagedService")
-
     config_value = _validate_config(config)
 
     definition = config_value.services.get(managed.unit)
 
     if definition is None:
         raise ValueError(
-            "managed service is not present in the "
-            f"platform service registry: {managed.unit}"
+            f"managed service is not present in the platform service registry: {managed.unit}"
         )
 
     properties = service_properties(definition.unit)
@@ -564,12 +557,6 @@ def service_summary(
 def format_service_state(
     status: ServiceStatus,
 ) -> str:
-    if not isinstance(
-        status,
-        ServiceStatus,
-    ):
-        raise TypeError("status must be a ServiceStatus")
-
     labels = {
         ServiceState.RUNNING: "running",
         ServiceState.COMPLETED: "completed",
@@ -606,9 +593,9 @@ def print_human(
 
     print(
         f"Healthy: {summary['healthy']}  "
-        f"Warning: {summary['warning']}  "
-        f"Errors: {summary['error']}  "
-        f"Unknown: {summary['unknown']}"
+        + f"Warning: {summary['warning']}  "
+        + f"Errors: {summary['error']}  "
+        + f"Unknown: {summary['unknown']}"
     )
 
     print()
@@ -618,9 +605,9 @@ def print_human(
 
         print(
             f"{status.display_name:18} "
-            f"{status.unit:36} "
-            f"{state:14} "
-            f"{status.enabled_state}"
+            + f"{status.unit:36} "
+            + f"{state:14} "
+            + f"{status.enabled_state}"
         )
 
     print()
@@ -654,7 +641,7 @@ def parse_args(
         description=("Show managed Betabox service status."),
     )
 
-    parser.add_argument(
+    _ = parser.add_argument(
         "--json",
         action="store_true",
         help="Print JSON output.",
@@ -669,7 +656,16 @@ def main(
     args = parse_args(argv)
 
     try:
+        json_requested = _validate_flag(
+            cast(
+                object,
+                args.json,
+            ),
+            name="json",
+        )
+
         statuses = collect_services(DEFAULT_PLATFORM_CONFIG)
+
     except (
         TypeError,
         ValueError,
@@ -678,7 +674,7 @@ def main(
         print(str(exc))
         return 1
 
-    if args.json:
+    if json_requested:
         print_json(statuses)
     else:
         print_human(statuses)

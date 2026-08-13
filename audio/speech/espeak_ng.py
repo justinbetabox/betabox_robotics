@@ -3,6 +3,8 @@ from __future__ import annotations
 import shutil
 from typing import ClassVar
 
+from typing_extensions import override
+
 from betabox_robotics.audio.exceptions import SpeechError
 from betabox_robotics.audio.speech.base import (
     SpeechBackend,
@@ -21,15 +23,16 @@ class EspeakNgSpeech(SpeechBackend):
     name: ClassVar[str] = "espeak-ng"
     executable_name: ClassVar[str] = "espeak-ng"
 
+    voice: str
+
     def __init__(
         self,
         *,
         voice: str = "en-us",
     ) -> None:
-        if not isinstance(voice, str):
-            raise TypeError("voice must be a string")
+        voice = voice.strip()
 
-        if not voice.strip():
+        if not voice:
             raise ValueError("voice cannot be empty")
 
         self.voice = voice.strip()
@@ -46,6 +49,7 @@ class EspeakNgSpeech(SpeechBackend):
     ) -> bool:
         return cls.executable() is not None
 
+    @override
     def synthesize(
         self,
         text: str,

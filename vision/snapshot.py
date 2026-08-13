@@ -3,12 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 from time import strftime
-from typing import Literal
+from typing import Literal, cast
 
 import cv2
-import numpy as np
 
-from betabox_robotics.vision.frame import Frame
+from betabox_robotics.vision.frame import Frame, ImageArray
 from betabox_robotics.vision.frame_source import FrameSourceError
 from betabox_robotics.vision.interfaces import FrameProvider
 
@@ -34,7 +33,7 @@ class SnapshotError(FrameSourceError):
     """Raised when snapshot operations fail."""
 
 
-def _normalize_image_format(
+def normalize_image_format(
     value: object,
 ) -> NormalizedImageFormat:
     if not isinstance(value, str):
@@ -98,6 +97,10 @@ class SnapshotService:
     provider that exposes the latest available frame.
     """
 
+    frame_source: FrameProvider
+    directory: Path
+    default_format: NormalizedImageFormat
+
     def __init__(
         self,
         frame_source: FrameProvider,
@@ -105,12 +108,6 @@ class SnapshotService:
         directory: str | Path | None = None,
         default_format: ImageFormat = "jpg",
     ) -> None:
-        if not hasattr(
-            frame_source,
-            "latest_frame",
-        ) or not callable(frame_source.latest_frame):
-            raise TypeError("frame_source must provide latest_frame()")
-
         self.frame_source = frame_source
 
         self.directory = (
@@ -122,9 +119,7 @@ class SnapshotService:
             )
         )
 
-        self.default_format: NormalizedImageFormat = _normalize_image_format(
-            default_format
-        )
+        self.default_format = normalize_image_format(default_format)
 
     def _normalize_format(
         self,
@@ -133,7 +128,7 @@ class SnapshotService:
         if image_format is None:
             return self.default_format
 
-        return _normalize_image_format(image_format)
+        return normalize_image_format(image_format)
 
     def capture(
         self,
@@ -169,9 +164,6 @@ class SnapshotService:
         *,
         image_format: ImageFormat | None = None,
     ) -> SnapshotData:
-        if not isinstance(frame, Frame):
-            raise TypeError("frame must be a Frame instance")
-
         image = self._prepare_image(frame)
         image_format_value = self._normalize_format(image_format)
 
@@ -202,9 +194,6 @@ class SnapshotService:
         directory: str | Path | None = None,
         image_format: ImageFormat | None = None,
     ) -> Snapshot:
-        if not isinstance(frame, Frame):
-            raise TypeError("frame must be a Frame instance")
-
         output_directory = (
             self.directory
             if directory is None
@@ -249,11 +238,8 @@ class SnapshotService:
     def _prepare_image(
         self,
         frame: Frame,
-    ) -> np.ndarray:
+    ) -> ImageArray:
         image = frame.image
-
-        if not isinstance(image, np.ndarray):
-            raise TypeError("frame image must be a NumPy array")
 
         if image.ndim not in {
             2,
@@ -270,15 +256,27 @@ class SnapshotService:
 
         try:
             if image.ndim == 3 and image.shape[2] == 3:
-                return cv2.cvtColor(
-                    image,
-                    cv2.COLOR_RGB2BGR,
+                return cast(
+                    ImageArray,
+                    cast(
+                        object,
+                        cv2.cvtColor(
+                            image,
+                            cv2.COLOR_RGB2BGR,
+                        ),
+                    ),
                 )
 
             if image.ndim == 3 and image.shape[2] == 4:
-                return cv2.cvtColor(
-                    image,
-                    cv2.COLOR_RGBA2BGRA,
+                return cast(
+                    ImageArray,
+                    cast(
+                        object,
+                        cv2.cvtColor(
+                            image,
+                            cv2.COLOR_RGBA2BGRA,
+                        ),
+                    ),
                 )
 
         except cv2.error as exc:

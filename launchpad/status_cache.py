@@ -36,7 +36,18 @@ def _validate_payload(
     ):
         raise TypeError("payload must be a dictionary")
 
-    return value
+    payload = cast(
+        dict[object, object],
+        value,
+    )
+
+    if not all(isinstance(key, str) for key in payload):
+        raise TypeError("payload keys must be strings")
+
+    return cast(
+        Payload,
+        payload,
+    )
 
 
 def _validate_collector(
@@ -66,25 +77,10 @@ class StatusCache:
         if self.payload is not None:
             self.payload = dict(_validate_payload(self.payload))
 
-        if isinstance(
-            self.collected_at,
-            bool,
-        ) or not isinstance(
-            self.collected_at,
-            int | float,
-        ):
-            raise TypeError("collected_at must be a number")
-
         self.collected_at = float(self.collected_at)
 
         if self.collected_at < 0:
             raise ValueError("collected_at cannot be negative")
-
-        if not isinstance(
-            self.lock,
-            asyncio.Lock,
-        ):
-            raise TypeError("lock must be an asyncio.Lock")
 
     def is_fresh(
         self,

@@ -44,12 +44,6 @@ def restore_item(
     filesystem errors are represented in the result.
     """
 
-    if not isinstance(
-        dry_run,
-        bool,
-    ):
-        raise TypeError("dry_run must be a boolean")
-
     backup_dir_value = validate_path(
         backup_dir,
         name="backup_dir",
@@ -86,13 +80,13 @@ def restore_item(
         )
 
         if source.is_dir():
-            shutil.copytree(
+            _ = shutil.copytree(
                 source,
                 destination_value,
                 dirs_exist_ok=True,
             )
         else:
-            shutil.copy2(
+            _ = shutil.copy2(
                 source,
                 destination_value,
             )

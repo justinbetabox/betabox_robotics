@@ -31,6 +31,22 @@ class Motor:
     motor is closed.
     """
 
+    logger: logging.Logger
+
+    mode: MotorMode
+    reversed: bool
+    frequency: float
+    max_step: float
+    step_delay: float
+
+    _speed: float
+    _closed: bool
+
+    pwm: PWM
+    direction: Pin
+    pwm_a: PWM
+    pwm_b: PWM
+
     DEFAULT_FREQUENCY: ClassVar[float] = 100.0
     DEFAULT_MAX_STEP: ClassVar[float] = 5.0
     DEFAULT_STEP_DELAY: ClassVar[float] = 0.01
@@ -47,12 +63,6 @@ class Motor:
         step_delay: float = DEFAULT_STEP_DELAY,
     ) -> None:
         self.logger = logging.getLogger(__name__)
-
-        if not isinstance(mode, MotorMode):
-            raise TypeError("mode must be MotorMode.PWM_DIR or MotorMode.PWM_PWM")
-
-        if not isinstance(reversed, bool):
-            raise TypeError("reversed must be a boolean")
 
         frequency_value = self._require_finite_number(
             frequency,
@@ -85,15 +95,7 @@ class Motor:
         self._speed = 0.0
         self._closed = False
 
-        self.pwm: PWM
-        self.direction: Pin
-        self.pwm_a: PWM
-        self.pwm_b: PWM
-
         if mode is MotorMode.PWM_DIR:
-            if not isinstance(pwm, PWM):
-                raise TypeError("pwm must be a PWM instance")
-
             if not isinstance(direction, Pin):
                 raise TypeError(
                     "direction must be a Pin instance when using PWM_DIR mode"
@@ -103,9 +105,6 @@ class Motor:
             self.direction = direction
 
         else:
-            if not isinstance(pwm, PWM):
-                raise TypeError("pwm must be a PWM instance")
-
             if not isinstance(direction, PWM):
                 raise TypeError(
                     "direction must be a PWM instance when using PWM_PWM mode"
@@ -116,7 +115,13 @@ class Motor:
 
         try:
             self._initialize_outputs()
-        except BaseException:
+        except (
+            HardwareError,
+            OSError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ):
             try:
                 self._close_devices()
             except (
@@ -179,7 +184,7 @@ class Motor:
         if self.mode is MotorMode.PWM_DIR:
             self.pwm.set_frequency(self.frequency)
             self.pwm.set_duty_cycle(0)
-            self.direction.write(False)
+            _ = self.direction.write(False)
             return
 
         self.pwm_a.set_frequency(self.frequency)
@@ -199,9 +204,6 @@ class Motor:
             speed,
             name="speed",
         )
-
-        if not isinstance(smooth, bool):
-            raise TypeError("smooth must be a boolean")
 
         target = self._clamp(
             value,
@@ -282,7 +284,7 @@ class Motor:
                     # De-energize before reversing the direction pin.
                     self.pwm.set_duty_cycle(0)
 
-                self.direction.write(direction)
+                _ = self.direction.write(direction)
                 self.pwm.set_duty_cycle(duty)
 
         else:
@@ -338,9 +340,6 @@ class Motor:
         reversed: bool,
     ) -> None:
         self._require_open()
-
-        if not isinstance(reversed, bool):
-            raise TypeError("reversed must be a boolean")
 
         if self._speed != 0:
             raise MotorError("motor must be stopped before changing reversed state")

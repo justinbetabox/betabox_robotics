@@ -26,7 +26,7 @@ def run_command(
 ) -> None:
     """Run a system command."""
 
-    subprocess.run(
+    _ = subprocess.run(
         command,
         check=True,
     )
@@ -36,7 +36,7 @@ def account_exists(username: str) -> bool:
     """Return whether a Linux account exists."""
 
     try:
-        pwd.getpwnam(username)
+        _ = pwd.getpwnam(username)
     except KeyError:
         return False
 
@@ -47,7 +47,7 @@ def group_exists(group: str) -> bool:
     """Return whether a Linux group exists."""
 
     try:
-        grp.getgrnam(group)
+        _ = grp.getgrnam(group)
     except KeyError:
         return False
 
@@ -210,7 +210,7 @@ def ensure_account_password(
 
     print(f"Setting account password: {account.username}")
 
-    subprocess.run(
+    _ = subprocess.run(
         ["chpasswd"],
         input=f"{account.username}:{account.password}\n",
         text=True,

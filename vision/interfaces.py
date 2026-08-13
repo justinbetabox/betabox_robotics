@@ -2,17 +2,36 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Protocol
+from typing import Literal, Protocol
 
 from betabox_robotics.vision.detectors.color import HSVRangeInput
 from betabox_robotics.vision.frame import Frame
 from betabox_robotics.vision.metadata import Metadata
-from betabox_robotics.vision.recording import RecordingData
-from betabox_robotics.vision.snapshot import (
-    ImageFormat,
-    SnapshotData,
-)
 from betabox_robotics.vision.webrtc import WebRTCStreamer
+
+ImageFormat = Literal[
+    "jpg",
+    "jpeg",
+    "png",
+]
+
+
+class SnapshotDataInterface(Protocol):
+    data: bytes
+    timestamp: float
+    format: Literal[
+        "jpg",
+        "png",
+    ]
+
+
+class RecordingDataInterface(Protocol):
+    data: bytes
+    start_timestamp: float
+    end_timestamp: float
+    frame_count: int
+    fps: float
+    format: str
 
 
 class FrameProvider(Protocol):
@@ -43,7 +62,7 @@ class VisionServiceInterface(Protocol):
         overlay: bool = False,
         source: str | None = None,
         image_format: ImageFormat | None = None,
-    ) -> SnapshotData: ...
+    ) -> SnapshotDataInterface: ...
 
     def start_recording(
         self,
@@ -55,7 +74,7 @@ class VisionServiceInterface(Protocol):
 
     def stop_recording_data(
         self,
-    ) -> RecordingData: ...
+    ) -> RecordingDataInterface: ...
 
     def latest_metadata(
         self,

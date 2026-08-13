@@ -5,6 +5,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from math import isfinite
+from typing import cast
 
 from betabox_robotics import BetaboxCar
 from betabox_robotics.exceptions import BetaboxError
@@ -149,14 +150,19 @@ class ControlState:
             "camera_pan",
             "camera_tilt",
         ):
+            value = cast(
+                object,
+                getattr(
+                    self,
+                    name,
+                ),
+            )
+
             object.__setattr__(
                 self,
                 name,
                 _validate_axis(
-                    getattr(
-                        self,
-                        name,
-                    ),
+                    value,
                     name=name,
                 ),
             )
@@ -230,41 +236,41 @@ class ManualDriveController:
         maximum_speed: int = 100,
         steering_angle: float = 30.0,
     ) -> None:
-        if not callable(robot_factory):
-            raise TypeError("robot_factory must be callable")
+        self._robot_factory: RobotFactory = robot_factory
 
-        self._robot_factory = robot_factory
-
-        self.heartbeat_timeout = _validate_positive_number(
+        self.heartbeat_timeout: float = _validate_positive_number(
             heartbeat_timeout,
             name="heartbeat_timeout",
         )
-        self.update_hz = _validate_positive_number(
+
+        self.update_hz: float = _validate_positive_number(
             update_hz,
             name="update_hz",
         )
-        self.maximum_speed = _validate_maximum_speed(maximum_speed)
-        self.steering_angle = _validate_positive_number(
+
+        self.maximum_speed: int = _validate_maximum_speed(maximum_speed)
+
+        self.steering_angle: float = _validate_positive_number(
             steering_angle,
             name="steering_angle",
         )
 
-        self.update_interval = 1.0 / self.update_hz
+        self.update_interval: float = 1.0 / self.update_hz
 
-        self._desired_state = ControlState()
+        self._desired_state: ControlState = ControlState()
         self._last_applied_state: ControlState | None = None
-        self._state_generation = 0
+        self._state_generation: int = 0
 
         self._robot: BetaboxCar | None = None
         self._owner: str | None = None
         self._claiming: str | None = None
-        self._last_heartbeat = 0.0
+        self._last_heartbeat: float = 0.0
 
-        self._lock = asyncio.Lock()
-        self._hardware_lock = asyncio.Lock()
+        self._lock: asyncio.Lock = asyncio.Lock()
+        self._hardware_lock: asyncio.Lock = asyncio.Lock()
         self._control_task: asyncio.Task[None] | None = None
         self._watchdog_task: asyncio.Task[None] | None = None
-        self._closed = False
+        self._closed: bool = False
 
     @property
     def owner(self) -> str | None:
@@ -305,10 +311,10 @@ class ManualDriveController:
         ]
 
         for task in tasks:
-            task.cancel()
+            _ = task.cancel()
 
         if tasks:
-            await asyncio.gather(
+            _ = await asyncio.gather(
                 *tasks,
                 return_exceptions=True,
             )
@@ -492,12 +498,6 @@ class ManualDriveController:
         except BetaboxError as exc:
             raise DriveControlError(f"failed to create robot: {exc}") from exc
 
-        if not isinstance(
-            robot,
-            BetaboxCar,
-        ):
-            raise DriveControlError("robot factory must return a BetaboxCar")
-
         self._robot = robot
 
     async def _stop_center_close(
@@ -642,12 +642,8 @@ class ManualDriveController:
                     state_value.camera_pan,
                     state_value.camera_tilt,
                 )
-
             async with self._lock:
-                if (
-                    self._owner is not None
-                    and generation_value == self._state_generation
-                ):
+                if generation_value == self._state_generation:
                     self._last_applied_state = state_value
 
     async def _generation_is_current(

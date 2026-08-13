@@ -28,39 +28,6 @@ class LaunchpadServices:
     status_cache: StatusCache
     drive_controller: ManualDriveController | None = None
 
-    def __post_init__(
-        self,
-    ) -> None:
-        if not isinstance(
-            self.calibration_manager,
-            CalibrationManager,
-        ):
-            raise TypeError("calibration_manager must be a CalibrationManager")
-
-        if not isinstance(
-            self.calibration_service,
-            CalibrationService,
-        ):
-            raise TypeError("calibration_service must be a CalibrationService")
-
-        if not isinstance(
-            self.calibration_hardware,
-            CalibrationHardware,
-        ):
-            raise TypeError("calibration_hardware must be a CalibrationHardware")
-
-        if not isinstance(
-            self.status_cache,
-            StatusCache,
-        ):
-            raise TypeError("status_cache must be a StatusCache")
-
-        if self.drive_controller is not None and not isinstance(
-            self.drive_controller,
-            ManualDriveController,
-        ):
-            raise TypeError("drive_controller must be a ManualDriveController or None")
-
     def require_drive_controller(
         self,
     ) -> ManualDriveController:

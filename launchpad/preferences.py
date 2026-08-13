@@ -4,7 +4,7 @@ import json
 from collections.abc import Mapping
 from pathlib import Path
 from types import MappingProxyType
-from typing import Final
+from typing import Final, cast
 
 PREFERENCES_FILENAME: Final[str] = "appearance.json"
 
@@ -36,13 +36,6 @@ def preferences_path(
     preferences_directory: Path,
 ) -> Path:
     """Return the preference file within a workspace preference directory."""
-
-    if not isinstance(
-        preferences_directory,
-        Path,
-    ):
-        raise TypeError("preferences_directory must be a Path")
-
     return preferences_directory / PREFERENCES_FILENAME
 
 
@@ -57,7 +50,12 @@ def validate_preferences(
     ):
         raise TypeError("preferences must be a mapping")
 
-    theme = value.get("theme")
+    preferences_mapping = cast(
+        Mapping[str, object],
+        value,
+    )
+
+    theme = preferences_mapping.get("theme")
 
     if not isinstance(
         theme,
@@ -77,7 +75,7 @@ def validate_preferences(
         "larger_text",
         "compact_layout",
     ):
-        setting = value.get(name)
+        setting = preferences_mapping.get(name)
 
         if not isinstance(
             setting,
@@ -100,10 +98,13 @@ def read_preferences(
     if not path.exists():
         return default_preferences()
 
-    payload = json.loads(
-        path.read_text(
-            encoding="utf-8",
-        )
+    payload = cast(
+        object,
+        json.loads(
+            path.read_text(
+                encoding="utf-8",
+            )
+        ),
     )
 
     return validate_preferences(payload)
@@ -127,7 +128,7 @@ def write_preferences(
     temporary_path = path.with_name(f".{path.name}.tmp")
 
     try:
-        temporary_path.write_text(
+        _ = temporary_path.write_text(
             json.dumps(
                 values,
                 indent=2,
@@ -137,7 +138,7 @@ def write_preferences(
             encoding="utf-8",
         )
 
-        temporary_path.replace(path)
+        _ = temporary_path.replace(path)
     except OSError:
         try:
             temporary_path.unlink(missing_ok=True)

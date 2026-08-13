@@ -94,12 +94,6 @@ class Workspace:
             ),
         )
 
-        if not isinstance(
-            self.media,
-            MediaWorkspace,
-        ):
-            raise TypeError("media must be a MediaWorkspace")
-
         object.__setattr__(
             self,
             "preferences",
@@ -108,12 +102,6 @@ class Workspace:
                 name="preferences",
             ),
         )
-
-        if not isinstance(
-            self.persistent,
-            bool,
-        ):
-            raise TypeError("persistent must be a boolean")
 
     def directories(self) -> tuple[Path, ...]:
         """Return every directory owned by this workspace."""
@@ -146,12 +134,6 @@ def build_workspace(
         root,
         name="root",
     )
-
-    if not isinstance(
-        persistent,
-        bool,
-    ):
-        raise TypeError("persistent must be a boolean")
 
     return Workspace(
         root=root_value,

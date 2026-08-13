@@ -1,12 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+import math
 from collections.abc import Callable
-from typing import Any
+from typing import cast
 
 import aiohttp_jinja2
 from aiohttp import web
 
+from betabox_robotics.calibration.hardware import (
+    CalibrationHardware,
+)
 from betabox_robotics.calibration.storage import (
     CalibrationStorageError,
 )
@@ -26,11 +30,58 @@ from betabox_robotics.services.calibration import (
 )
 
 
+def _validate_float(
+    value: object,
+    *,
+    name: str,
+) -> float:
+    if isinstance(value, bool) or not isinstance(
+        value,
+        int | float,
+    ):
+        raise TypeError(f"{name} must be a number")
+
+    result = float(value)
+
+    if not math.isfinite(result):
+        raise ValueError(f"{name} must be finite")
+
+    return result
+
+
+def _validate_float_list(
+    value: object,
+    *,
+    name: str,
+) -> list[float]:
+    if not isinstance(
+        value,
+        list,
+    ):
+        raise TypeError(f"{name} must be a list")
+
+    values = cast(
+        list[object],
+        value,
+    )
+
+    return [
+        _validate_float(
+            item,
+            name=f"{name} item",
+        )
+        for item in values
+    ]
+
+
 async def json_object(
     request: web.Request,
-) -> dict[str, Any]:
+) -> dict[str, object]:
     try:
-        body = await request.json()
+        body = cast(
+            object,
+            await request.json(),
+        )
 
     except (
         TypeError,
@@ -44,7 +95,23 @@ async def json_object(
     ):
         raise TypeError("request body must be a JSON object")
 
-    return body
+    raw_body = cast(
+        dict[object, object],
+        body,
+    )
+
+    result: dict[str, object] = {}
+
+    for key, value in raw_body.items():
+        if not isinstance(
+            key,
+            str,
+        ):
+            raise TypeError("request body keys must be strings")
+
+        result[key] = value
+
+    return result
 
 
 def calibration_context(
@@ -113,7 +180,7 @@ def calibration_response(
 async def calibration_page(
     request: web.Request,
 ) -> web.Response:
-    calibration_context(request)
+    _ = calibration_context(request)
 
     return aiohttp_jinja2.render_template(
         "calibration.html",
@@ -194,11 +261,17 @@ async def update_motors_api(
     try:
         body = await json_object(request)
 
-        left_trim = float(body["left_trim"])
+        left_trim = _validate_float(
+            body["left_trim"],
+            name="left_trim",
+        )
 
-        right_trim = float(body["right_trim"])
+        right_trim = _validate_float(
+            body["right_trim"],
+            name="right_trim",
+        )
 
-        service.update_motors(
+        _ = service.update_motors(
             left_trim=left_trim,
             right_trim=right_trim,
         )
@@ -233,9 +306,12 @@ async def update_steering_api(
     try:
         body = await json_object(request)
 
-        offset = float(body["offset"])
+        offset = _validate_float(
+            body["offset"],
+            name="offset",
+        )
 
-        service.update_steering(
+        _ = service.update_steering(
             offset=offset,
         )
 
@@ -269,7 +345,10 @@ async def preview_steering_api(
     try:
         body = await json_object(request)
 
-        offset = float(body["offset"])
+        offset = _validate_float(
+            body["offset"],
+            name="offset",
+        )
 
     except (
         KeyError,
@@ -331,9 +410,15 @@ async def preview_camera_mount_api(
     try:
         body = await json_object(request)
 
-        pan_offset = float(body["pan_offset"])
+        pan_offset = _validate_float(
+            body["pan_offset"],
+            name="pan_offset",
+        )
 
-        tilt_offset = float(body["tilt_offset"])
+        tilt_offset = _validate_float(
+            body["tilt_offset"],
+            name="tilt_offset",
+        )
 
     except (
         KeyError,
@@ -397,9 +482,15 @@ async def preview_motor_trim_api(
     try:
         body = await json_object(request)
 
-        left_trim = float(body["left_trim"])
+        left_trim = _validate_float(
+            body["left_trim"],
+            name="left_trim",
+        )
 
-        right_trim = float(body["right_trim"])
+        right_trim = _validate_float(
+            body["right_trim"],
+            name="right_trim",
+        )
 
         calibration = service.load()
 
@@ -473,11 +564,17 @@ async def update_camera_mount_api(
     try:
         body = await json_object(request)
 
-        pan_offset = float(body["pan_offset"])
+        pan_offset = _validate_float(
+            body["pan_offset"],
+            name="pan_offset",
+        )
 
-        tilt_offset = float(body["tilt_offset"])
+        tilt_offset = _validate_float(
+            body["tilt_offset"],
+            name="tilt_offset",
+        )
 
-        service.update_camera_mount(
+        _ = service.update_camera_mount(
             pan_offset=pan_offset,
             tilt_offset=tilt_offset,
         )
@@ -512,19 +609,17 @@ async def update_grayscale_api(
     try:
         body = await json_object(request)
 
-        floor = body["floor"]
-        line = body["line"]
+        floor = _validate_float_list(
+            body["floor"],
+            name="floor",
+        )
 
-        if not isinstance(
-            floor,
-            list,
-        ) or not isinstance(
-            line,
-            list,
-        ):
-            raise TypeError("floor and line must be lists")
+        line = _validate_float_list(
+            body["line"],
+            name="line",
+        )
 
-        service.update_grayscale(
+        _ = service.update_grayscale(
             floor=floor,
             line=line,
         )
@@ -557,7 +652,7 @@ async def clear_grayscale_api(
     service = calibration_service(request)
 
     try:
-        service.clear_grayscale()
+        _ = service.clear_grayscale()
 
         return calibration_response(service)
 
@@ -573,67 +668,67 @@ async def clear_grayscale_api(
 def setup_calibration_routes(
     app: web.Application,
 ) -> None:
-    app.router.add_get(
+    _ = app.router.add_get(
         "/calibration",
         calibration_page,
         name="calibration-page",
     )
 
-    app.router.add_get(
+    _ = app.router.add_get(
         "/api/calibration",
         calibration_api,
         name="calibration-api",
     )
 
-    app.router.add_put(
+    _ = app.router.add_put(
         "/api/calibration/steering",
         update_steering_api,
         name="calibration-steering-api",
     )
 
-    app.router.add_post(
+    _ = app.router.add_post(
         "/api/calibration/steering/preview",
         preview_steering_api,
         name="calibration-steering-preview-api",
     )
 
-    app.router.add_put(
+    _ = app.router.add_put(
         "/api/calibration/camera-mount",
         update_camera_mount_api,
         name="calibration-camera-mount-api",
     )
 
-    app.router.add_post(
+    _ = app.router.add_post(
         "/api/calibration/camera-mount/preview",
         preview_camera_mount_api,
         name="calibration-camera-mount-preview-api",
     )
 
-    app.router.add_put(
+    _ = app.router.add_put(
         "/api/calibration/motors",
         update_motors_api,
         name="calibration-motors-api",
     )
 
-    app.router.add_post(
+    _ = app.router.add_post(
         "/api/calibration/motors/preview",
         preview_motor_trim_api,
         name="calibration-motors-preview-api",
     )
 
-    app.router.add_get(
+    _ = app.router.add_get(
         "/api/calibration/grayscale/sample",
         sample_grayscale_api,
         name="calibration-grayscale-sample-api",
     )
 
-    app.router.add_put(
+    _ = app.router.add_put(
         "/api/calibration/grayscale",
         update_grayscale_api,
         name="calibration-grayscale-api",
     )
 
-    app.router.add_post(
+    _ = app.router.add_post(
         "/api/calibration/grayscale/clear",
         clear_grayscale_api,
         name="calibration-grayscale-clear-api",

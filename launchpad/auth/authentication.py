@@ -62,6 +62,8 @@ class AuthenticationError(Exception):
 class AuthenticationService:
     """Authenticate persistent managed Launchpad accounts."""
 
+    _authenticate: AuthRunner
+
     def __init__(
         self,
         authenticate: AuthRunner | None = None,
@@ -121,14 +123,6 @@ class AuthenticationService:
         ) as exc:
             raise AuthenticationError("Authentication service is unavailable.") from exc
 
-        if not isinstance(
-            authenticated,
-            bool,
-        ):
-            raise AuthenticationError(
-                "Authentication service returned an invalid result."
-            )
-
         if not authenticated:
             raise AuthenticationError("Invalid username or password.")
 
@@ -174,7 +168,7 @@ class AuthenticationService:
         )
 
         try:
-            await asyncio.wait_for(
+            _ = await asyncio.wait_for(
                 process.communicate(payload),
                 timeout=AUTHENTICATION_TIMEOUT,
             )
@@ -183,7 +177,7 @@ class AuthenticationService:
             if process.returncode is None:
                 process.kill()
 
-                await process.wait()
+                _ = await process.wait()
 
             raise
 
@@ -191,7 +185,7 @@ class AuthenticationService:
             if process.returncode is None:
                 process.kill()
 
-                await process.wait()
+                _ = await process.wait()
 
             raise RuntimeError("authentication helper timed out") from exc
 

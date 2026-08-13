@@ -37,7 +37,7 @@ def services_context(
 async def services_page(
     request: web.Request,
 ) -> web.Response:
-    services_context(request)
+    _ = services_context(request)
 
     return aiohttp_jinja2.render_template(
         "services.html",
@@ -89,13 +89,13 @@ async def services_api(
 def setup_services_routes(
     app: web.Application,
 ) -> None:
-    app.router.add_get(
+    _ = app.router.add_get(
         "/services",
         services_page,
         name="services-page",
     )
 
-    app.router.add_get(
+    _ = app.router.add_get(
         "/api/services",
         services_api,
         name="services-api",

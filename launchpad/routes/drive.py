@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import cast
 from uuid import uuid4
 
 import aiohttp
@@ -22,6 +23,34 @@ from betabox_robotics.launchpad.drive_controller import (
 )
 
 
+def _validate_json_object(
+    value: object,
+) -> dict[str, object]:
+    if not isinstance(
+        value,
+        dict,
+    ):
+        raise DriveControlError("message must be a JSON object")
+
+    raw = cast(
+        dict[object, object],
+        value,
+    )
+
+    result: dict[str, object] = {}
+
+    for key, item in raw.items():
+        if not isinstance(
+            key,
+            str,
+        ):
+            raise DriveControlError("message keys must be strings")
+
+        result[key] = item
+
+    return result
+
+
 def parse_bool(
     value: object,
     *,
@@ -31,6 +60,20 @@ def parse_bool(
         return value
 
     raise DriveControlError(f"{name} must be a boolean")
+
+
+def parse_float(
+    value: object,
+    *,
+    name: str,
+) -> float:
+    if isinstance(value, bool) or not isinstance(
+        value,
+        int | float,
+    ):
+        raise DriveControlError(f"{name} must be a number")
+
+    return float(value)
 
 
 def drive_context(
@@ -56,7 +99,7 @@ def vision_context(
 async def drive_page(
     request: web.Request,
 ) -> web.Response:
-    drive_context(request)
+    _ = drive_context(request)
 
     return aiohttp_jinja2.render_template(
         "drive.html",
@@ -83,7 +126,7 @@ async def drive_websocket(
         receive_timeout=15.0,
     )
 
-    await websocket.prepare(request)
+    _ = await websocket.prepare(request)
 
     client_id = uuid4().hex
 
@@ -92,7 +135,7 @@ async def drive_websocket(
             claimed = await controller.claim(client_id)
 
         except RobotBusyError as exc:
-            await send_json_if_open(
+            _ = await send_json_if_open(
                 websocket,
                 {
                     "type": "unavailable",
@@ -100,7 +143,7 @@ async def drive_websocket(
                 },
             )
 
-            await websocket.close(
+            _ = await websocket.close(
                 code=4002,
                 message=b"robot hardware unavailable",
             )
@@ -114,7 +157,7 @@ async def drive_websocket(
             TypeError,
             ValueError,
         ) as exc:
-            await send_json_if_open(
+            _ = await send_json_if_open(
                 websocket,
                 {
                     "type": "error",
@@ -122,7 +165,7 @@ async def drive_websocket(
                 },
             )
 
-            await websocket.close(
+            _ = await websocket.close(
                 code=1011,
                 message=b"manual drive failed",
             )
@@ -139,7 +182,7 @@ async def drive_websocket(
                 }
             )
 
-            await websocket.close(
+            _ = await websocket.close(
                 code=4001,
                 message=b"drive control busy",
             )
@@ -162,7 +205,7 @@ async def drive_websocket(
                 still_owns_robot = await controller.owns(client_id)
 
                 if not still_owns_robot:
-                    await websocket.close(
+                    _ = await websocket.close(
                         code=4003,
                         message=b"manual drive heartbeat timed out",
                     )
@@ -171,11 +214,24 @@ async def drive_websocket(
                 continue
 
             if message.type == WSMsgType.TEXT:
+                raw_message = cast(
+                    object,
+                    message.data,
+                )
+
+                if not isinstance(
+                    raw_message,
+                    str,
+                ):
+                    raise DriveControlError(
+                        "text websocket message must contain a string"
+                    )
+
                 await handle_drive_message(
                     websocket,
                     controller,
                     client_id,
-                    message.data,
+                    raw_message,
                 )
                 continue
 
@@ -221,10 +277,12 @@ async def handle_drive_message(
     raw_message: str,
 ) -> None:
     try:
-        data = json.loads(raw_message)
+        parsed = cast(
+            object,
+            json.loads(raw_message),
+        )
 
-        if not isinstance(data, dict):
-            raise DriveControlError("message must be a JSON object")
+        data = _validate_json_object(parsed)
 
         message_type = data.get("type")
 
@@ -237,7 +295,7 @@ async def handle_drive_message(
         if message_type == "heartbeat":
             await controller.heartbeat(client_id)
 
-            await send_json_if_open(
+            _ = await send_json_if_open(
                 websocket,
                 {
                     "type": "heartbeat",
@@ -248,7 +306,7 @@ async def handle_drive_message(
         if message_type == "stop":
             await controller.emergency_stop(client_id)
 
-            await send_json_if_open(
+            _ = await send_json_if_open(
                 websocket,
                 {
                     "type": "stopped",
@@ -260,16 +318,46 @@ async def handle_drive_message(
             raise DriveControlError("unknown manual-control message type")
 
         state = ControlState(
-            throttle=float(data.get("throttle", 0.0)),
-            steering=float(data.get("steering", 0.0)),
-            camera_pan=float(data.get("camera_pan", 0.0)),
-            camera_tilt=float(data.get("camera_tilt", 0.0)),
+            throttle=parse_float(
+                data.get(
+                    "throttle",
+                    0.0,
+                ),
+                name="throttle",
+            ),
+            steering=parse_float(
+                data.get(
+                    "steering",
+                    0.0,
+                ),
+                name="steering",
+            ),
+            camera_pan=parse_float(
+                data.get(
+                    "camera_pan",
+                    0.0,
+                ),
+                name="camera_pan",
+            ),
+            camera_tilt=parse_float(
+                data.get(
+                    "camera_tilt",
+                    0.0,
+                ),
+                name="camera_tilt",
+            ),
             headlights=parse_bool(
-                data.get("headlights", False),
+                data.get(
+                    "headlights",
+                    False,
+                ),
                 name="headlights",
             ),
             horn=parse_bool(
-                data.get("horn", False),
+                data.get(
+                    "horn",
+                    False,
+                ),
                 name="horn",
             ),
         )
@@ -287,7 +375,7 @@ async def handle_drive_message(
         ValueError,
         json.JSONDecodeError,
     ) as exc:
-        await send_json_if_open(
+        _ = await send_json_if_open(
             websocket,
             {
                 "type": "error",
@@ -304,13 +392,12 @@ async def vision_offer_proxy(
     platform = context.platform
 
     try:
-        offer = await request.json()
+        parsed_offer = cast(
+            object,
+            await request.json(),
+        )
 
-        if not isinstance(
-            offer,
-            dict,
-        ):
-            raise TypeError("offer must be a JSON object")
+        offer = _validate_json_object(parsed_offer)
 
         sdp = offer.get("sdp")
         offer_type = offer.get("type")
@@ -348,7 +435,10 @@ async def vision_offer_proxy(
             ) as response,
         ):
             try:
-                response_data = await response.json()
+                response_data = cast(
+                    object,
+                    await response.json(),
+                )
 
             except (
                 json.JSONDecodeError,
@@ -400,19 +490,19 @@ async def vision_offer_proxy(
 def setup_drive_routes(
     app: web.Application,
 ) -> None:
-    app.router.add_get(
+    _ = app.router.add_get(
         "/drive",
         drive_page,
         name="drive-page",
     )
 
-    app.router.add_get(
+    _ = app.router.add_get(
         "/ws/drive",
         drive_websocket,
         name="drive-websocket",
     )
 
-    app.router.add_post(
+    _ = app.router.add_post(
         "/api/vision/offer",
         vision_offer_proxy,
         name="vision-offer-api",

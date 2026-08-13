@@ -114,7 +114,7 @@ async def home(
 def setup_home_routes(
     app: web.Application,
 ) -> None:
-    app.router.add_get(
+    _ = app.router.add_get(
         "/",
         home,
         name="home-page",

@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 from collections.abc import AsyncIterator
 from pathlib import Path
+from typing import cast
 
 import aiohttp_jinja2
 import jinja2
@@ -77,7 +78,7 @@ async def drive_controller_context(
 
 
 async def health(
-    request: web.Request,
+    _request: web.Request,
 ) -> web.Response:
     return web.json_response(
         {
@@ -96,7 +97,7 @@ def create_app(
         ]
     )
 
-    aiohttp_jinja2.setup(
+    _ = aiohttp_jinja2.setup(
         app,
         loader=jinja2.FileSystemLoader(TEMPLATES_DIR),
         context_processors=(launchpad_template_context,),
@@ -142,13 +143,13 @@ def create_app(
 
     setup_routes(app)
 
-    app.router.add_static(
+    _ = app.router.add_static(
         "/static/",
         STATIC_DIR,
         name="static",
     )
 
-    app.router.add_get(
+    _ = app.router.add_get(
         "/api/health",
         health,
         name="health-api",
@@ -166,12 +167,12 @@ def main(
 
     parser = argparse.ArgumentParser(prog="betabox launchpad")
 
-    parser.add_argument(
+    _ = parser.add_argument(
         "--host",
         default=default_host,
     )
 
-    parser.add_argument(
+    _ = parser.add_argument(
         "--port",
         type=int,
         default=default_port,
@@ -179,18 +180,44 @@ def main(
 
     args = parser.parse_args(argv)
 
-    if not args.host:
+    host = cast(
+        object,
+        args.host,
+    )
+
+    port = cast(
+        object,
+        args.port,
+    )
+
+    if not isinstance(
+        host,
+        str,
+    ):
+        print("--host must be a string")
+        return 1
+
+    host = host.strip()
+
+    if not host:
         print("--host cannot be empty")
         return 1
 
-    if not 1 <= args.port <= 65535:
+    if isinstance(port, bool) or not isinstance(
+        port,
+        int,
+    ):
+        print("--port must be an integer")
+        return 1
+
+    if not 1 <= port <= 65535:
         print("--port must be between 1 and 65535")
         return 1
 
     web.run_app(
         create_app(config),
-        host=args.host,
-        port=args.port,
+        host=host,
+        port=port,
     )
 
     return 0

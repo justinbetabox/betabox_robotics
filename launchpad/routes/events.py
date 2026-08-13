@@ -92,7 +92,7 @@ def parse_optional_filter(
 async def events_page(
     request: web.Request,
 ) -> web.Response:
-    events_context(request)
+    _ = events_context(request)
 
     return aiohttp_jinja2.render_template(
         "events.html",
@@ -189,13 +189,13 @@ async def events_api(
 def setup_events_routes(
     app: web.Application,
 ) -> None:
-    app.router.add_get(
+    _ = app.router.add_get(
         "/events",
         events_page,
         name="events-page",
     )
 
-    app.router.add_get(
+    _ = app.router.add_get(
         "/api/events",
         events_api,
         name="events-api",

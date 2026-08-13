@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from typing import cast
 
 from aiohttp import web
 
@@ -78,7 +79,10 @@ async def update_preferences_api(
     context = preferences_context(request)
 
     try:
-        payload = await request.json()
+        payload = cast(
+            object,
+            await request.json(),
+        )
 
     except (
         TypeError,
@@ -151,19 +155,19 @@ async def reset_preferences_api(
 def setup_preferences_routes(
     app: web.Application,
 ) -> None:
-    app.router.add_get(
+    _ = app.router.add_get(
         "/api/preferences",
         preferences_api,
         name="preferences-api",
     )
 
-    app.router.add_put(
+    _ = app.router.add_put(
         "/api/preferences",
         update_preferences_api,
         name="preferences-update-api",
     )
 
-    app.router.add_delete(
+    _ = app.router.add_delete(
         "/api/preferences",
         reset_preferences_api,
         name="preferences-reset-api",

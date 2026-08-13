@@ -63,18 +63,6 @@ class Identity:
             ),
         )
 
-        if not isinstance(
-            self.role,
-            Role,
-        ):
-            raise TypeError("role must be a Role")
-
-        if not isinstance(
-            self.authenticated,
-            bool,
-        ):
-            raise TypeError("authenticated must be a boolean")
-
     @property
     def guest(
         self,

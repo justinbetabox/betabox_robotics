@@ -91,12 +91,6 @@ async def launchpad_template_context(
 
     context = request_value[LAUNCHPAD_CONTEXT_KEY]
 
-    if not isinstance(
-        context,
-        LaunchpadContext,
-    ):
-        raise TypeError("Launchpad context is invalid")
-
     try:
         launchpad_preferences = read_preferences(context.workspace.preferences)
     except (

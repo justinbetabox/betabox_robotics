@@ -36,7 +36,7 @@ def diagnostics_context(
 async def diagnostics_page(
     request: web.Request,
 ) -> web.Response:
-    diagnostics_context(request)
+    _ = diagnostics_context(request)
 
     return aiohttp_jinja2.render_template(
         "diagnostics.html",
@@ -86,13 +86,13 @@ async def diagnostics_api(
 def setup_diagnostics_routes(
     app: web.Application,
 ) -> None:
-    app.router.add_get(
+    _ = app.router.add_get(
         "/diagnostics",
         diagnostics_page,
         name="diagnostics-page",
     )
 
-    app.router.add_get(
+    _ = app.router.add_get(
         "/api/diagnostics",
         diagnostics_api,
         name="diagnostics-api",

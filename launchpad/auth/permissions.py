@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import StrEnum
+from typing import cast
 
 from .identity import Role
 
@@ -17,6 +18,7 @@ class Permission(StrEnum):
     MEDIA = "media"
     MEDIA_UPLOAD = "media.upload"
     MEDIA_DOWNLOAD = "media.download"
+    MEDIA_DELETE = "media.delete"
 
     CALIBRATION = "calibration"
     STATUS = "status"
@@ -73,7 +75,10 @@ def _validate_permissions(
     ):
         raise TypeError("granted must contain only Permission values")
 
-    return value
+    return cast(
+        frozenset[Permission],
+        value,
+    )
 
 
 @dataclass(
@@ -101,12 +106,6 @@ class Permissions:
     ) -> Permissions:
         """Build the standard permissions for a Launchpad role."""
 
-        if not isinstance(
-            role,
-            Role,
-        ):
-            raise TypeError("role must be a Role")
-
         return cls(granted=ROLE_PERMISSIONS[role])
 
     @classmethod
@@ -116,25 +115,7 @@ class Permissions:
     ) -> Permissions:
         """Build permissions from an explicit collection."""
 
-        if isinstance(
-            permissions,
-            str | bytes,
-        ) or not isinstance(
-            permissions,
-            Iterable,
-        ):
-            raise TypeError("permissions must be an iterable")
-
         values = frozenset(permissions)
-
-        if not all(
-            isinstance(
-                permission,
-                Permission,
-            )
-            for permission in values
-        ):
-            raise TypeError("permissions must contain only Permission values")
 
         return cls(granted=values)
 

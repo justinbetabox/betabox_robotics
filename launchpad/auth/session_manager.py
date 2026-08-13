@@ -118,7 +118,7 @@ class SessionManager:
 
         session_id_value = _validate_session_id(session_id)
 
-        self._sessions.pop(
+        _ = self._sessions.pop(
             session_id_value,
             None,
         )

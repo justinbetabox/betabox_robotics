@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
+from typing import cast
 
 from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
@@ -22,11 +23,16 @@ from betabox_robotics.services.restore_checks import (
 )
 
 
-def _validate_dry_run(
+def _validate_flag(
     value: object,
+    *,
+    name: str,
 ) -> bool:
-    if not isinstance(value, bool):
-        raise TypeError("dry_run must be a boolean")
+    if not isinstance(
+        value,
+        bool,
+    ):
+        raise TypeError(f"{name} must be a boolean")
 
     return value
 
@@ -45,6 +51,7 @@ def backup_path(
 ) -> Path:
     config_value = validate_config(config)
     backup_name = validate_backup_name(name)
+
     backup_root = validate_path(
         config_value.paths.backup_root,
         name="backup_root",
@@ -60,7 +67,12 @@ def restore_backup(
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> tuple[RestoreItem, ...]:
     config_value = validate_config(config)
-    dry_run_value = _validate_dry_run(dry_run)
+
+    dry_run_value = _validate_flag(
+        dry_run,
+        name="dry_run",
+    )
+
     backup_dir = backup_path(
         name,
         config_value,
@@ -82,12 +94,6 @@ def restore_backup(
 def print_backups(
     backups: tuple[Path, ...],
 ) -> None:
-    if not isinstance(
-        backups,
-        tuple,
-    ):
-        raise TypeError("backups must be a tuple")
-
     print()
     print("Betabox Backups")
     print("===============")
@@ -111,16 +117,11 @@ def print_report(
     dry_run: bool,
 ) -> None:
     backup_name = validate_backup_name(name)
-    dry_run_value = _validate_dry_run(dry_run)
 
-    if not isinstance(
-        items,
-        tuple,
-    ):
-        raise TypeError("items must be a tuple")
-
-    if not all(isinstance(item, RestoreItem) for item in items):
-        raise TypeError("items must contain only RestoreItem values")
+    dry_run_value = _validate_flag(
+        dry_run,
+        name="dry_run",
+    )
 
     print()
     print("Betabox Restore")
@@ -150,18 +151,23 @@ def print_report(
 def main(
     argv: list[str] | None = None,
 ) -> int:
-    parser = argparse.ArgumentParser(prog="betabox restore")
-    parser.add_argument(
+    parser = argparse.ArgumentParser(
+        prog="betabox restore",
+    )
+
+    _ = parser.add_argument(
         "name",
         nargs="?",
         help="Backup name to restore",
     )
-    parser.add_argument(
+
+    _ = parser.add_argument(
         "--list",
         action="store_true",
         help="List available backups",
     )
-    parser.add_argument(
+
+    _ = parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Show what would be restored",
@@ -169,15 +175,47 @@ def main(
 
     args = parser.parse_args(argv)
 
-    if args.list or not args.name:
+    try:
+        list_requested = _validate_flag(
+            cast(
+                object,
+                args.list,
+            ),
+            name="list",
+        )
+
+        dry_run = _validate_flag(
+            cast(
+                object,
+                args.dry_run,
+            ),
+            name="dry_run",
+        )
+
+        raw_name = cast(
+            object,
+            args.name,
+        )
+
+        name = None if raw_name is None else validate_backup_name(raw_name)
+
+    except (
+        TypeError,
+        ValueError,
+    ) as exc:
+        print(str(exc))
+        return 1
+
+    if list_requested or name is None:
         print_backups(list_backups())
         return 0
 
     try:
         items = restore_backup(
-            args.name,
-            dry_run=args.dry_run,
+            name,
+            dry_run=dry_run,
         )
+
     except (
         TypeError,
         ValueError,
@@ -185,15 +223,25 @@ def main(
     ) as exc:
         print(str(exc))
         return 1
+
     except OSError as exc:
         print(f"Unable to restore backup: {exc}")
         return 1
 
-    print_report(
-        args.name,
-        items,
-        dry_run=args.dry_run,
-    )
+    try:
+        print_report(
+            name,
+            items,
+            dry_run=dry_run,
+        )
+
+    except (
+        TypeError,
+        ValueError,
+        OSError,
+    ) as exc:
+        print(str(exc))
+        return 1
 
     return 0
 

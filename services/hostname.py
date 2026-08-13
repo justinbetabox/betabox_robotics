@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+from typing import cast
 
 from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
@@ -11,6 +12,8 @@ from betabox_robotics.services.command import run
 from betabox_robotics.services.identity import (
     identity_name,
 )
+
+DEFAULT_HOSTS_PATH = Path("/etc/hosts")
 
 
 def _validate_config(
@@ -117,7 +120,7 @@ def update_hosts_file(
     hostname: str,
     *,
     dry_run: bool = False,
-    path: str | Path = Path("/etc/hosts"),
+    path: str | Path = DEFAULT_HOSTS_PATH,
 ) -> None:
     hostname_value = _validate_string(
         hostname,
@@ -156,7 +159,7 @@ def update_hosts_file(
     if not updated:
         new_lines.append(f"127.0.1.1\t{hostname_value}")
 
-    path_value.write_text(
+    _ = path_value.write_text(
         "\n".join(new_lines) + "\n",
         encoding="utf-8",
     )
@@ -237,11 +240,11 @@ def parse_args(
 
     parser = argparse.ArgumentParser(prog="betabox set-hostname")
 
-    parser.add_argument(
+    _ = parser.add_argument(
         "--prefix",
         default=(config_value.network.identity_prefix),
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--dry-run",
         action="store_true",
     )
@@ -259,11 +262,34 @@ def main(
     )
 
     try:
+        raw_prefix = cast(
+            object,
+            args.prefix,
+        )
+
+        prefix = (
+            None
+            if raw_prefix is None
+            else _validate_string(
+                raw_prefix,
+                name="prefix",
+            )
+        )
+
+        dry_run = _validate_flag(
+            cast(
+                object,
+                args.dry_run,
+            ),
+            name="dry_run",
+        )
+
         return set_hostname(
-            prefix=args.prefix,
-            dry_run=args.dry_run,
+            prefix=prefix,
+            dry_run=dry_run,
             config=config,
         )
+
     except (
         TypeError,
         ValueError,
@@ -271,9 +297,3 @@ def main(
     ) as exc:
         print(str(exc))
         return 1
-
-
-if __name__ == "__main__":
-    import sys
-
-    raise SystemExit(main(sys.argv[1:]))

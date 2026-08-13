@@ -154,12 +154,6 @@ class ProvisionedAccount:
         password = _validate_optional_password(self.password)
         password_max_days = _validate_password_max_days(self.password_max_days)
 
-        if not isinstance(
-            self.supplemental_groups,
-            tuple,
-        ):
-            raise TypeError("supplemental_groups must be a tuple")
-
         supplemental_groups = tuple(
             _validate_account_name(
                 group_name,

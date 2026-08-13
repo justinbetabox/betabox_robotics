@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 import subprocess
+from typing import cast
 
 
 def _validate_command(
@@ -10,10 +11,18 @@ def _validate_command(
     if not isinstance(value, list):
         raise TypeError("command must be a list of strings")
 
+    arguments = cast(
+        list[object],
+        value,
+    )
+
     result: list[str] = []
 
-    for argument in value:
-        if not isinstance(argument, str):
+    for argument in arguments:
+        if not isinstance(
+            argument,
+            str,
+        ):
             raise TypeError("command must contain only strings")
 
         cleaned = argument.strip()

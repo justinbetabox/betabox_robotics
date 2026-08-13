@@ -4,6 +4,7 @@ import argparse
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
+from typing import cast
 
 from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
@@ -83,9 +84,12 @@ class ResetItem:
             "action",
             "message",
         ):
-            value = getattr(
-                self,
-                name,
+            value = cast(
+                object,
+                getattr(
+                    self,
+                    name,
+                ),
             )
 
             if not isinstance(
@@ -105,12 +109,6 @@ class ResetItem:
                 result,
             )
 
-        if not isinstance(
-            self.ok,
-            bool,
-        ):
-            raise TypeError("ok must be a boolean")
-
 
 def _validate_items(
     value: object,
@@ -121,10 +119,18 @@ def _validate_items(
     ):
         raise TypeError("items must be a tuple")
 
-    if not all(isinstance(item, ResetItem) for item in value):
+    items = cast(
+        tuple[object, ...],
+        value,
+    )
+
+    if not all(isinstance(item, ResetItem) for item in items):
         raise TypeError("items must contain only ResetItem values")
 
-    return value
+    return cast(
+        tuple[ResetItem, ...],
+        items,
+    )
 
 
 def remove_path(
@@ -301,12 +307,6 @@ def print_report(
     )
 
     if backup_name is not None:
-        if not isinstance(
-            backup_name,
-            str,
-        ):
-            raise TypeError("backup_name must be a string")
-
         backup_name_value = backup_name.strip()
 
         if not backup_name_value:
@@ -363,17 +363,17 @@ def parse_args(
 ) -> argparse.Namespace:
     parser = argparse.ArgumentParser(prog="betabox reset")
 
-    parser.add_argument(
+    _ = parser.add_argument(
         "--dry-run",
         action="store_true",
         help="Show what would be reset",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--yes",
         action="store_true",
         help="Confirm reset",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--no-backup",
         action="store_true",
         help="Skip automatic backup",
@@ -387,40 +387,58 @@ def main(
 ) -> int:
     args = parse_args(argv)
 
-    if not args.dry_run and not args.yes:
-        print()
-        print("This command removes generated Betabox media.")
-        print()
-        print("Run a preview first:")
-        print("  betabox reset --dry-run")
-        print()
-        print("To perform the reset:")
-        print("  betabox reset --yes")
-        print()
-        return 1
-
-    backup_requested = not args.no_backup
-
     try:
+        dry_run = _validate_flag(
+            cast(
+                object,
+                args.dry_run,
+            ),
+            name="dry_run",
+        )
+
+        confirmed = _validate_flag(
+            cast(
+                object,
+                args.yes,
+            ),
+            name="yes",
+        )
+
+        no_backup = _validate_flag(
+            cast(
+                object,
+                args.no_backup,
+            ),
+            name="no_backup",
+        )
+
+        if not dry_run and not confirmed:
+            print()
+            print("This command removes generated Betabox media.")
+            print()
+            print("Run a preview first:")
+            print("  betabox reset --dry-run")
+            print()
+            print("To perform the reset:")
+            print("  betabox reset --yes")
+            print()
+
+            return 1
+
+        backup_requested = not no_backup
+
         backup_name, items = run_reset(
-            dry_run=args.dry_run,
+            dry_run=dry_run,
             backup=backup_requested,
         )
-    except (
-        TypeError,
-        ValueError,
-        OSError,
-    ) as exc:
-        print(str(exc))
-        return 1
 
-    try:
         success = print_report(
-            dry_run=args.dry_run,
+            dry_run=dry_run,
             backup=backup_requested,
             backup_name=backup_name,
             items=items,
         )
+
     except (
         TypeError,
         ValueError,

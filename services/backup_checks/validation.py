@@ -53,9 +53,7 @@ def validate_backup_name(
 
     if not _BACKUP_NAME_PATTERN.fullmatch(result):
         raise ValueError(
-            "backup name may contain only "
-            "letters, numbers, periods, "
-            "underscores, and hyphens"
+            "backup name may contain only letters, numbers, periods, underscores, and hyphens"
         )
 
     return result

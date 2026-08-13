@@ -5,6 +5,7 @@ import socket
 import sys
 import time
 from pathlib import Path
+from typing import cast
 
 from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
@@ -22,6 +23,31 @@ from betabox_robotics.services.backup_checks.validation import (
     validate_path,
 )
 from betabox_robotics.version import __version__
+
+
+def _arg_bool(
+    value: object,
+    *,
+    name: str,
+) -> bool:
+    if not isinstance(value, bool):
+        raise TypeError(f"{name} must be a boolean")
+
+    return value
+
+
+def _arg_optional_string(
+    value: object,
+    *,
+    name: str,
+) -> str | None:
+    if value is None:
+        return None
+
+    if not isinstance(value, str):
+        raise TypeError(f"{name} must be a string")
+
+    return value
 
 
 def timestamp() -> str:
@@ -98,12 +124,6 @@ def list_backups(
 def print_report(
     report: BackupReport,
 ) -> None:
-    if not isinstance(
-        report,
-        BackupReport,
-    ):
-        raise TypeError("report must be a BackupReport")
-
     print()
     print("Betabox Backup")
     print("==============")
@@ -132,12 +152,6 @@ def print_report(
 def print_backups(
     backups: tuple[Path, ...],
 ) -> None:
-    if not isinstance(
-        backups,
-        tuple,
-    ):
-        raise TypeError("backups must be a tuple")
-
     print()
     print("Betabox Backups")
     print("===============")
@@ -158,24 +172,40 @@ def main(
     argv: list[str] | None = None,
 ) -> int:
     parser = argparse.ArgumentParser(prog="betabox backup")
-    parser.add_argument(
+    _ = parser.add_argument(
         "--list",
         action="store_true",
         help="List existing backups",
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--name",
         help="Optional backup name",
     )
 
     args = parser.parse_args(argv)
 
-    if args.list:
+    list_requested = _arg_bool(
+        cast(
+            object,
+            args.list,
+        ),
+        name="list",
+    )
+
+    backup_name = _arg_optional_string(
+        cast(
+            object,
+            args.name,
+        ),
+        name="name",
+    )
+
+    if list_requested:
         print_backups(list_backups())
         return 0
 
     try:
-        report = create_backup(args.name)
+        report = create_backup(backup_name)
     except (
         TypeError,
         ValueError,
@@ -183,9 +213,9 @@ def main(
         print(str(exc))
         return 1
     except FileExistsError:
-        backup_name = args.name if args.name is not None else "generated timestamp"
+        display_name = backup_name if backup_name is not None else "generated timestamp"
 
-        print(f"Backup already exists: {backup_name}")
+        print(f"Backup already exists: {display_name}")
         return 1
     except OSError as exc:
         print(f"Unable to create backup: {exc}")

@@ -3,6 +3,7 @@ from __future__ import annotations
 import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
+from typing import cast
 
 from betabox_robotics.calibration import (
     CalibrationManager,
@@ -37,14 +38,27 @@ def _validate_mapping(
     value: object,
     *,
     name: str,
-) -> Mapping[str, object]:
+) -> dict[str, object]:
     if not isinstance(
         value,
         Mapping,
     ):
         raise TypeError(f"{name} must be a mapping")
 
-    return value
+    mapping = cast(
+        Mapping[object, object],
+        value,
+    )
+
+    result: dict[str, object] = {}
+
+    for key, item in mapping.items():
+        if not isinstance(key, str):
+            raise TypeError(f"{name} keys must be strings")
+
+        result[key] = item
+
+    return result
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,31 +66,10 @@ class CalibrationStatus:
     saved: bool
     calibration: RobotCalibration
 
-    def __post_init__(self) -> None:
-        if not isinstance(
-            self.saved,
-            bool,
-        ):
-            raise TypeError("saved must be a boolean")
-
-        if not isinstance(
-            self.calibration,
-            RobotCalibration,
-        ):
-            raise TypeError("calibration must be a RobotCalibration")
-
     def to_dict(
         self,
     ) -> dict[str, object]:
         calibration = self.calibration.to_dict()
-
-        grayscale = calibration.get("grayscale")
-
-        if isinstance(
-            grayscale,
-            dict,
-        ):
-            grayscale["calibrated"] = self.calibration.grayscale.calibrated
 
         return {
             "saved": self.saved,
@@ -94,16 +87,12 @@ class CalibrationService:
     objects manually.
     """
 
+    _manager: CalibrationManager
+
     def __init__(
         self,
         manager: CalibrationManager,
     ) -> None:
-        if not isinstance(
-            manager,
-            CalibrationManager,
-        ):
-            raise TypeError("manager must be a CalibrationManager")
-
         self._manager = manager
 
     def status(
@@ -123,13 +112,7 @@ class CalibrationService:
         self,
         calibration: RobotCalibration,
     ) -> CalibrationStatus:
-        if not isinstance(
-            calibration,
-            RobotCalibration,
-        ):
-            raise TypeError("calibration must be a RobotCalibration")
-
-        self._manager.save(calibration)
+        _ = self._manager.save(calibration)
 
         return self.status()
 
@@ -263,7 +246,7 @@ class CalibrationService:
     def reset(
         self,
     ) -> CalibrationStatus:
-        self._manager.reset()
+        _ = self._manager.reset()
 
         return self.status()
 
@@ -282,15 +265,6 @@ class CalibrationService:
         float,
         float,
     ]:
-        if isinstance(
-            values,
-            str | bytes,
-        ) or not isinstance(
-            values,
-            Sequence,
-        ):
-            raise TypeError(f"{name} must be a sequence")
-
         if len(values) != 3:
             raise ValueError(f"{name} must contain exactly 3 values")
 

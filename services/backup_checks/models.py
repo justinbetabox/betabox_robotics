@@ -1,7 +1,23 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
-from typing import Any
+from dataclasses import dataclass
+from typing import TypedDict
+
+
+class BackupItemData(TypedDict):
+    source: str
+    destination: str
+    copied: bool
+    message: str
+
+
+class BackupReportData(TypedDict):
+    name: str
+    path: str
+    created_at: str
+    hostname: str
+    sdk_version: str
+    items: list[BackupItemData]
 
 
 @dataclass(frozen=True, slots=True)
@@ -11,8 +27,13 @@ class BackupItem:
     copied: bool
     message: str = ""
 
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
+    def to_dict(self) -> BackupItemData:
+        return {
+            "source": self.source,
+            "destination": self.destination,
+            "copied": self.copied,
+            "message": self.message,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,7 +45,7 @@ class BackupReport:
     sdk_version: str
     items: tuple[BackupItem, ...]
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> BackupReportData:
         return {
             "name": self.name,
             "path": self.path,

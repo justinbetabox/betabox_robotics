@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import logging
 import time
+from typing import cast
 
 logger = logging.getLogger(__name__)
 
@@ -71,12 +72,6 @@ def log(
         name="message",
     )
 
-    if not isinstance(
-        config,
-        PlatformConfig,
-    ):
-        raise TypeError("config must be a PlatformConfig")
-
     try:
         config.paths.state_dir.mkdir(
             parents=True,
@@ -87,7 +82,7 @@ def log(
             "a",
             encoding="utf-8",
         ) as file:
-            file.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {message_value}\n")
+            _ = file.write(f"{time.strftime('%Y-%m-%d %H:%M:%S')} {message_value}\n")
     except OSError:
         # Logging failure should not prevent the video
         # service from starting or stopping.
@@ -101,12 +96,6 @@ def run_video_service(
     fps: int | None = None,
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> int:
-    if not isinstance(
-        config,
-        PlatformConfig,
-    ):
-        raise TypeError("config must be a PlatformConfig")
-
     selected_host = _validate_string(
         (config.network.bind_host if host is None else host),
         name="host",
@@ -178,16 +167,16 @@ def main(
 
     parser = argparse.ArgumentParser(prog="betabox video")
 
-    parser.add_argument(
+    _ = parser.add_argument(
         "--host",
         default=config.network.bind_host,
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--port",
         type=int,
         default=config.network.vision_port,
     )
-    parser.add_argument(
+    _ = parser.add_argument(
         "--fps",
         type=int,
         default=config.runtime.vision_fps,
@@ -196,12 +185,35 @@ def main(
     args = parser.parse_args(argv)
 
     try:
+        host = _validate_string(
+            cast(
+                object,
+                args.host,
+            ),
+            name="host",
+        )
+
+        port = _validate_port(
+            cast(
+                object,
+                args.port,
+            )
+        )
+
+        fps = _validate_fps(
+            cast(
+                object,
+                args.fps,
+            )
+        )
+
         return run_video_service(
-            host=args.host,
-            port=args.port,
-            fps=args.fps,
+            host=host,
+            port=port,
+            fps=fps,
             config=config,
         )
+
     except (
         TypeError,
         ValueError,

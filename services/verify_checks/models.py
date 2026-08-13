@@ -1,7 +1,13 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
-from typing import Any
+from dataclasses import dataclass
+from typing import TypedDict
+
+
+class CheckResultData(TypedDict):
+    name: str
+    ok: bool
+    message: str
 
 
 def _validate_string(
@@ -40,12 +46,6 @@ class CheckResult:
             ),
         )
 
-        if not isinstance(
-            self.ok,
-            bool,
-        ):
-            raise TypeError("ok must be a boolean")
-
         object.__setattr__(
             self,
             "message",
@@ -58,5 +58,9 @@ class CheckResult:
 
     def to_dict(
         self,
-    ) -> dict[str, Any]:
-        return asdict(self)
+    ) -> CheckResultData:
+        return {
+            "name": self.name,
+            "ok": self.ok,
+            "message": self.message,
+        }

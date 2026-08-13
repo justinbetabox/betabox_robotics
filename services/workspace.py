@@ -106,12 +106,6 @@ def workspace_directories(
     account: ProvisionedAccount,
 ) -> tuple[Path, ...]:
     """Return all directories in an account workspace."""
-    if not isinstance(
-        account,
-        ProvisionedAccount,
-    ):
-        raise TypeError("account must be a ProvisionedAccount")
-
     media = account.home / "media"
 
     return (
@@ -213,12 +207,6 @@ def create_workspace(
     account: ProvisionedAccount,
 ) -> None:
     """Create the workspace for a managed account."""
-    if not isinstance(
-        account,
-        ProvisionedAccount,
-    ):
-        raise TypeError("account must be a ProvisionedAccount")
-
     if not account.home.is_dir():
         raise RuntimeError(f"Account home directory does not exist: {account.home}")
 
@@ -348,12 +336,12 @@ def install_directory(
             continue
 
         if item.is_dir():
-            shutil.copytree(
+            _ = shutil.copytree(
                 item,
                 target,
             )
         elif item.is_file():
-            shutil.copy2(
+            _ = shutil.copy2(
                 item,
                 target,
             )
@@ -383,13 +371,6 @@ def populate_media(
         account_values = tuple(accounts)
     except TypeError as exc:
         raise TypeError("accounts must be iterable") from exc
-
-    for account in account_values:
-        if not isinstance(
-            account,
-            ProvisionedAccount,
-        ):
-            raise TypeError("accounts must contain only ProvisionedAccount instances")
 
     assets = repository_path / "deployment" / "assets" / "sounds"
     gid = group_id(BETABOX_SHARED_GROUP)

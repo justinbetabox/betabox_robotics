@@ -6,12 +6,15 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from types import MappingProxyType
-from typing import Any
+from typing import TypeAlias, TypedDict, cast
 
 from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
     PlatformConfig,
 )
+
+JSONScalar: TypeAlias = str | int | float | bool | None
+JSONValue: TypeAlias = JSONScalar | list["JSONValue"] | dict[str, "JSONValue"]
 
 _SEVERITIES = frozenset(
     {
@@ -78,19 +81,50 @@ def _validate_last(
     return value
 
 
+def _validate_flag(
+    value: object,
+    *,
+    name: str,
+) -> bool:
+    if not isinstance(value, bool):
+        raise TypeError(f"{name} must be a boolean")
+
+    return value
+
+
+class EventRecordData(TypedDict):
+    timestamp: str
+    severity: str
+    component: str
+    message: str
+    event: str | None
+    details: dict[str, JSONValue] | None
+
+
+class EventSummaryData(TypedDict):
+    total: int
+    total_available: int
+    info: int
+    warning: int
+    error: int
+    critical: int
+
+
+class EventReportData(TypedDict):
+    summary: EventSummaryData
+    components: list[str]
+    events: list[EventRecordData]
+
+
 @dataclass(frozen=True, slots=True)
 class EventRecord:
-    """
-    One event recorded by the Betabox Platform.
-    """
-
     timestamp: str
     severity: str
     component: str
     message: str
 
     event: str | None = None
-    details: Mapping[str, Any] | None = None
+    details: Mapping[str, JSONValue] | None = None
 
     def __post_init__(self) -> None:
         timestamp = _validate_string(
@@ -113,23 +147,11 @@ class EventRecord:
         event_name = self.event
 
         if event_name is not None:
-            if not isinstance(
-                event_name,
-                str,
-            ):
-                raise TypeError("event must be a string or None")
-
             event_name = event_name.strip() or None
 
         details = self.details
 
         if details is not None:
-            if not isinstance(
-                details,
-                Mapping,
-            ):
-                raise TypeError("details must be a mapping or None")
-
             details = MappingProxyType(dict(details))
 
         object.__setattr__(
@@ -163,7 +185,9 @@ class EventRecord:
             details,
         )
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(
+        self,
+    ) -> EventRecordData:
         return {
             "timestamp": self.timestamp,
             "severity": self.severity,
@@ -185,32 +209,11 @@ class EventReport:
     components: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        if not isinstance(
-            self.events,
-            tuple,
-        ):
-            raise TypeError("events must be a tuple")
-
-        if not all(isinstance(event, EventRecord) for event in self.events):
-            raise TypeError("events must contain only EventRecord instances")
-
-        if isinstance(self.total_available, bool) or not isinstance(
-            self.total_available,
-            int,
-        ):
-            raise TypeError("total_available must be an integer")
-
         if self.total_available < 0:
             raise ValueError("total_available cannot be negative")
 
         if self.total_available < len(self.events):
             raise ValueError("total_available cannot be less than the number of events")
-
-        if not isinstance(
-            self.components,
-            tuple,
-        ):
-            raise TypeError("components must be a tuple")
 
         components = tuple(
             _validate_string(
@@ -252,7 +255,9 @@ class EventReport:
     def critical(self) -> int:
         return self._count_severity("critical")
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(
+        self,
+    ) -> EventReportData:
         return {
             "summary": {
                 "total": self.total,
@@ -282,18 +287,11 @@ def normalize_severity(
 
 
 def event_from_dict(
-    payload: Mapping[str, Any],
+    payload: Mapping[str, JSONValue],
 ) -> EventRecord:
     """
     Convert a decoded JSON event into a stable event record.
     """
-
-    if not isinstance(
-        payload,
-        Mapping,
-    ):
-        raise TypeError("payload must be a mapping")
-
     timestamp_value = payload.get("timestamp")
     timestamp = (
         timestamp_value.strip()
@@ -367,13 +365,6 @@ def read_events(
     """
     Read valid events from the platform JSONL event log.
     """
-
-    if not isinstance(
-        config,
-        PlatformConfig,
-    ):
-        raise TypeError("config must be a PlatformConfig")
-
     events_file = config.paths.events_file
 
     if not events_file.is_file():
@@ -393,15 +384,23 @@ def read_events(
                     continue
 
                 try:
-                    payload = json.loads(line)
+                    raw_payload = cast(
+                        object,
+                        json.loads(line),
+                    )
                 except json.JSONDecodeError:
                     continue
 
                 if not isinstance(
-                    payload,
+                    raw_payload,
                     dict,
                 ):
                     continue
+
+                payload = cast(
+                    dict[str, JSONValue],
+                    raw_payload,
+                )
 
                 events.append(event_from_dict(payload))
     except OSError:
@@ -416,13 +415,6 @@ def timestamp_sort_key(
     """
     Return a stable sort key for valid and malformed timestamps.
     """
-
-    if not isinstance(
-        event,
-        EventRecord,
-    ):
-        raise TypeError("event must be an EventRecord")
-
     try:
         parsed = datetime.fromisoformat(event.timestamp)
     except ValueError:
@@ -446,18 +438,6 @@ def filter_events(
     severity: str | None = None,
     component: str | None = None,
 ) -> list[EventRecord]:
-    if isinstance(
-        events,
-        str | bytes,
-    ) or not isinstance(
-        events,
-        Sequence,
-    ):
-        raise TypeError("events must be a sequence")
-
-    if not all(isinstance(event, EventRecord) for event in events):
-        raise TypeError("events must contain only EventRecord instances")
-
     requested_severity = _validate_optional_filter(
         severity,
         name="severity",
@@ -530,12 +510,6 @@ def collect_event_report(
 def print_events(
     report: EventReport,
 ) -> None:
-    if not isinstance(
-        report,
-        EventReport,
-    ):
-        raise TypeError("report must be an EventReport")
-
     print()
     print("Betabox Events")
     print("==============")
@@ -548,10 +522,7 @@ def print_events(
 
     for event in report.events:
         print(
-            f"{event.timestamp}  "
-            f"[{event.severity.upper():8}] "
-            f"{event.component}: "
-            f"{event.message}"
+            f"{event.timestamp} [{event.severity.upper():8}] {event.component}: {event.message}"
         )
 
     print()
@@ -564,14 +535,14 @@ def main(
 
     parser = argparse.ArgumentParser(prog="betabox events")
 
-    parser.add_argument(
+    _ = parser.add_argument(
         "--last",
         type=int,
         default=(config.monitoring.default_event_count),
         help=("Show the most recent events"),
     )
 
-    parser.add_argument(
+    _ = parser.add_argument(
         "--severity",
         choices=[
             "info",
@@ -582,12 +553,12 @@ def main(
         help=("Show only events with this severity"),
     )
 
-    parser.add_argument(
+    _ = parser.add_argument(
         "--component",
         help=("Show only events from this component"),
     )
 
-    parser.add_argument(
+    _ = parser.add_argument(
         "--json",
         action="store_true",
         help=("Output the event report as JSON"),
@@ -595,11 +566,42 @@ def main(
 
     args = parser.parse_args(argv)
 
+    last = _validate_last(
+        cast(
+            object,
+            args.last,
+        )
+    )
+
+    severity = _validate_optional_filter(
+        cast(
+            object,
+            args.severity,
+        ),
+        name="severity",
+    )
+
+    component = _validate_optional_filter(
+        cast(
+            object,
+            args.component,
+        ),
+        name="component",
+    )
+
+    json_requested = _validate_flag(
+        cast(
+            object,
+            args.json,
+        ),
+        name="json",
+    )
+
     try:
         report = collect_event_report(
-            last=args.last,
-            severity=args.severity,
-            component=args.component,
+            last=last,
+            severity=severity,
+            component=component,
             config=config,
         )
     except (
@@ -609,7 +611,7 @@ def main(
         print(str(exc))
         return 1
 
-    if args.json:
+    if json_requested:
         print(
             json.dumps(
                 report.to_dict(),

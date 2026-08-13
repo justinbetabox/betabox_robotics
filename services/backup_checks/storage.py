@@ -48,13 +48,13 @@ def copy_item(
         )
 
         if source_value.is_dir():
-            shutil.copytree(
+            _ = shutil.copytree(
                 source_value,
                 destination,
                 dirs_exist_ok=True,
             )
         else:
-            shutil.copy2(
+            _ = shutil.copy2(
                 source_value,
                 destination,
             )
@@ -83,12 +83,6 @@ def write_manifest(
     Write a backup report to manifest.json.
     """
 
-    if not isinstance(
-        report,
-        BackupReport,
-    ):
-        raise TypeError("report must be a BackupReport")
-
     backup_dir_value = validate_path(
         backup_dir,
         name="backup_dir",
@@ -104,7 +98,7 @@ def write_manifest(
             file,
             indent=2,
         )
-        file.write("\n")
+        _ = file.write("\n")
 
 
 def list_backup_directories(

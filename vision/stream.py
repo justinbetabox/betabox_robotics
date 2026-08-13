@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-from typing import Any
 
 from betabox_robotics.vision.consumer import FrameConsumer
 
@@ -29,5 +28,5 @@ class Streamer(FrameConsumer, ABC):
         """Return the number of currently tracked stream clients."""
 
     @abstractmethod
-    def statistics(self) -> dict[str, Any]:
+    def statistics(self) -> dict[str, object]:
         """Return current streamer diagnostics."""

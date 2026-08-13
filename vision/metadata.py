@@ -1,7 +1,7 @@
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from time import time
-from typing import Any, Self, TypeAlias
+from typing import Self, TypeAlias
 
 Box: TypeAlias = tuple[int, int, int, int]
 Point: TypeAlias = tuple[int, int]
@@ -24,7 +24,7 @@ class Detection:
     confidence: float | None = None
     box: Box | None = None
     center: Point | None = None
-    data: dict[str, Any] = field(default_factory=dict)
+    data: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,7 +43,7 @@ class Metadata:
     source: str
     timestamp: float
     detections: tuple[Detection, ...] = ()
-    data: dict[str, Any] = field(default_factory=dict)
+    data: dict[str, object] = field(default_factory=dict)
 
     @classmethod
     def create(
@@ -52,14 +52,8 @@ class Metadata:
         *,
         timestamp: float | None = None,
         detections: Sequence[Detection] | None = None,
-        data: dict[str, Any] | None = None,
+        data: dict[str, object] | None = None,
     ) -> Self:
-        """
-        Create metadata for a Vision source.
-
-        Pass the originating Frame timestamp when the metadata describes a
-        particular frame. If omitted, the current wall-clock time is used.
-        """
         return cls(
             source=source,
             timestamp=time() if timestamp is None else timestamp,

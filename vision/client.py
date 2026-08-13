@@ -4,9 +4,17 @@ import json
 import math
 from collections.abc import Sequence
 from dataclasses import dataclass
+from email.message import Message
 from pathlib import Path
 from time import strftime
-from typing import TYPE_CHECKING, Any, Literal
+from typing import (
+    TYPE_CHECKING,
+    Literal,
+    Protocol,
+    Self,
+    TypeAlias,
+    cast,
+)
 from urllib import error, parse, request
 
 if TYPE_CHECKING:
@@ -16,6 +24,13 @@ ClientSnapshotFormat = Literal[
     "jpg",
     "png",
 ]
+
+JSONScalar: TypeAlias = str | int | float | bool | None
+JSONValue: TypeAlias = JSONScalar | list["JSONValue"] | dict[str, "JSONValue"]
+JSONObject: TypeAlias = dict[str, JSONValue]
+
+QueryValue: TypeAlias = str | int | float | bool | None
+QueryParams: TypeAlias = dict[str, QueryValue]
 
 
 def _validate_base_url(
@@ -64,6 +79,21 @@ def _validate_timeout(
     return timeout
 
 
+class _HTTPResponse(Protocol):
+    headers: Message
+
+    def read(self) -> bytes: ...
+
+    def __enter__(self) -> Self: ...
+
+    def __exit__(
+        self,
+        exc_type: object,
+        exc_value: object,
+        traceback: object,
+    ) -> None: ...
+
+
 class VisionClientError(Exception):
     """Raised when the managed Vision service cannot complete a request."""
 
@@ -94,7 +124,7 @@ class ClientDetection:
     confidence: float | None
     box: tuple[int, int, int, int] | None
     center: tuple[int, int] | None
-    data: dict[str, Any]
+    data: JSONObject
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,7 +132,7 @@ class ClientMetadata:
     source: str
     timestamp: float
     detections: list[ClientDetection]
-    data: dict[str, Any]
+    data: JSONObject
 
 
 @dataclass(frozen=True, slots=True)
@@ -184,6 +214,10 @@ class VisionClient:
     This does not open the camera. It talks to betabox-video.service.
     """
 
+    base_url: str
+    timeout: float
+    _recording_filename: str | None
+
     def __init__(
         self,
         base_url: str = "http://127.0.0.1:8080",
@@ -192,7 +226,7 @@ class VisionClient:
     ) -> None:
         self.base_url = _validate_base_url(base_url)
         self.timeout = _validate_timeout(timeout)
-        self._recording_filename: str | None = None
+        self._recording_filename = None
 
     @staticmethod
     def _snapshot_format(
@@ -200,9 +234,6 @@ class VisionClient:
     ) -> ClientSnapshotFormat:
         if filename is None:
             return "jpg"
-
-        if not isinstance(filename, str):
-            raise TypeError("filename must be a string")
 
         filename_value = filename.strip()
 
@@ -227,7 +258,7 @@ class VisionClient:
         self,
         method: str,
         path: str,
-    ) -> tuple[bytes, Any]:
+    ) -> tuple[bytes, Message]:
         url = f"{self.base_url}{path}"
 
         req = request.Request(
@@ -236,23 +267,42 @@ class VisionClient:
         )
 
         try:
-            with request.urlopen(
-                req,
-                timeout=self.timeout,
-            ) as response:
-                return (
-                    response.read(),
-                    response.headers,
-                )
+            response = cast(
+                _HTTPResponse,
+                cast(
+                    object,
+                    request.urlopen(
+                        req,
+                        timeout=self.timeout,
+                    ),
+                ),
+            )
+
+            with response:
+                response_body = response.read()
+                response_headers = response.headers
 
         except error.HTTPError as exc:
-            response_body = exc.read().decode(
+            response_body_text = exc.read().decode(
                 "utf-8",
                 errors="replace",
             )
 
             try:
-                error_data = json.loads(response_body)
+                raw_error_data = cast(
+                    object,
+                    json.loads(response_body_text),
+                )
+
+                if not isinstance(raw_error_data, dict):
+                    raise VisionClientError(
+                        f"Vision service request failed with HTTP {exc.code}"
+                    ) from exc
+
+                error_data = cast(
+                    JSONObject,
+                    raw_error_data,
+                )
             except json.JSONDecodeError:
                 raise VisionClientError(
                     f"Vision service request failed with HTTP {exc.code}"
@@ -269,10 +319,13 @@ class VisionClient:
 
         except error.URLError as exc:
             raise VisionClientError(
-                "Betabox Vision service is not "
-                "available. Run: sudo systemctl "
-                "start betabox-video.service"
+                "Betabox Vision service is not available. Run: sudo systemctl start betabox-video.service"
             ) from exc
+
+        return (
+            response_body,
+            response_headers,
+        )
 
     @staticmethod
     def _media_output_path(
@@ -300,8 +353,7 @@ class VisionClient:
 
             if filename_path.name != filename or not filename:
                 raise VisionClientError(
-                    f"{media_name} filename must be a plain "
-                    "filename without directory components"
+                    f"{media_name} filename must be a plain filename without directory components"
                 )
 
         output_path = directory / filename
@@ -329,7 +381,7 @@ class VisionClient:
         media_name: str,
     ) -> None:
         try:
-            output_path.write_bytes(data)
+            _ = output_path.write_bytes(data)
         except OSError as exc:
             raise VisionClientError(
                 f"failed to save {media_name}: {output_path}: {exc}"
@@ -423,7 +475,7 @@ class VisionClient:
 
         output_path = self._recording_output_path(filename)
 
-        self._post(path)
+        _ = self._post(path)
 
         self._recording_filename = filename
 
@@ -528,15 +580,12 @@ class VisionClient:
         *,
         min_area: float | None = None,
     ) -> ClientDetectionStatus:
-        payload: dict[str, Any] = {}
+        payload: JSONObject = {}
 
         if colors is not None:
             payload["colors"] = colors if isinstance(colors, str) else list(colors)
 
         if min_area is not None:
-            if isinstance(min_area, bool) or not isinstance(min_area, (int, float)):
-                raise TypeError("min_area must be a number")
-
             payload["min_area"] = min_area
 
         data = self._post_json(
@@ -557,7 +606,7 @@ class VisionClient:
         self,
         source: str | None = None,
     ) -> ClientStreamOverlayStatus:
-        payload: dict[str, Any] = {}
+        payload: JSONObject = {}
 
         if source is not None:
             payload["source"] = source
@@ -579,66 +628,98 @@ class VisionClient:
 
         return self._parse_stream_overlay_status(data)
 
-    def _get(self, path: str) -> dict[str, Any]:
+    def _get(self, path: str) -> JSONObject:
         return self._request("GET", path)
 
-    def _post(self, path: str) -> dict[str, Any]:
+    def _post(self, path: str) -> JSONObject:
         return self._request("POST", path)
 
-    def _post_json(self, path: str, data: dict[str, Any]) -> dict[str, Any]:
+    def _post_json(self, path: str, data: JSONObject) -> JSONObject:
         return self._request("POST", path, data=data)
 
     def _request(
         self,
         method: str,
         path: str,
-        data: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
+        data: JSONObject | None = None,
+    ) -> JSONObject:
         url = f"{self.base_url}{path}"
-        body = None
-        headers = {}
+
+        body: bytes | None = None
+        headers: dict[str, str] = {}
 
         if data is not None:
             body = json.dumps(data).encode("utf-8")
             headers["Content-Type"] = "application/json"
 
-        req = request.Request(url, data=body, headers=headers, method=method)
+        req = request.Request(
+            url,
+            data=body,
+            headers=headers,
+            method=method,
+        )
 
         try:
-            with request.urlopen(
-                req,
-                timeout=self.timeout,
-            ) as response:
+            response = cast(
+                _HTTPResponse,
+                cast(
+                    object,
+                    request.urlopen(
+                        req,
+                        timeout=self.timeout,
+                    ),
+                ),
+            )
+
+            with response:
                 response_body = response.read().decode("utf-8")
 
         except error.HTTPError as exc:
             response_body = exc.read().decode("utf-8")
 
             try:
-                error_data = json.loads(response_body)
+                raw_error_data = cast(
+                    object,
+                    json.loads(response_body),
+                )
+
+                if not isinstance(raw_error_data, dict):
+                    raise VisionClientError(
+                        f"Vision service request failed with HTTP {exc.code}"
+                    ) from exc
+
+                error_data = cast(
+                    JSONObject,
+                    raw_error_data,
+                )
+
             except json.JSONDecodeError:
                 raise VisionClientError(
                     f"Vision service request failed with HTTP {exc.code}"
                 ) from exc
 
-            message = error_data.get("error", f"HTTP {exc.code}")
+            message = error_data.get(
+                "error",
+                f"HTTP {exc.code}",
+            )
+
             raise VisionClientError(str(message)) from exc
 
-        except error.URLError as exc:
-            raise VisionClientError(
-                "Betabox Vision service is not available. "
-                "Run: sudo systemctl start betabox-video.service"
-            ) from exc
-
         try:
-            response_data = json.loads(response_body) if response_body else {}
+            raw_response_data = cast(
+                object,
+                json.loads(response_body),
+            )
         except json.JSONDecodeError as exc:
-            raise VisionClientError(
-                f"invalid Vision service response: {response_body}"
-            ) from exc
+            raise VisionClientError("Vision service returned invalid JSON") from exc
 
-        if not isinstance(response_data, dict):
+        if not isinstance(raw_response_data, dict):
             raise VisionClientError("Vision service returned an unexpected response")
+
+        response_data = cast(
+            JSONObject,
+            raw_response_data,
+        )
 
         if not response_data.get("success", False):
             raise VisionClientError(
@@ -655,7 +736,7 @@ class VisionClient:
     def _path_with_query(
         self,
         path: str,
-        params: dict[str, Any],
+        params: QueryParams,
     ) -> str:
         filtered = {key: value for key, value in params.items() if value is not None}
 
@@ -666,16 +747,22 @@ class VisionClient:
 
     @staticmethod
     def _parse_float(
-        value: Any,
+        value: object,
         *,
         field: str,
     ) -> float:
         if isinstance(value, bool):
             raise VisionClientError(f"Vision service returned invalid {field}")
 
+        if not isinstance(
+            value,
+            int | float | str,
+        ):
+            raise VisionClientError(f"Vision service returned invalid {field}")
+
         try:
             result = float(value)
-        except (TypeError, ValueError) as exc:
+        except ValueError as exc:
             raise VisionClientError(f"Vision service returned invalid {field}") from exc
 
         if not math.isfinite(result):
@@ -685,11 +772,17 @@ class VisionClient:
 
     @staticmethod
     def _parse_int(
-        value: Any,
+        value: object,
         *,
         field: str,
     ) -> int:
         if isinstance(value, bool):
+            raise VisionClientError(f"Vision service returned invalid {field}")
+
+        if not isinstance(
+            value,
+            int | float | str,
+        ):
             raise VisionClientError(f"Vision service returned invalid {field}")
 
         if isinstance(value, float) and not value.is_integer():
@@ -697,11 +790,15 @@ class VisionClient:
 
         try:
             return int(value)
-        except (TypeError, ValueError) as exc:
+        except ValueError as exc:
             raise VisionClientError(f"Vision service returned invalid {field}") from exc
 
     @staticmethod
-    def _parse_bool(value: Any, *, field: str) -> bool:
+    def _parse_bool(
+        value: object,
+        *,
+        field: str,
+    ) -> bool:
         if not isinstance(value, bool):
             raise VisionClientError(f"Vision service returned invalid {field}")
 
@@ -709,7 +806,7 @@ class VisionClient:
 
     @staticmethod
     def _parse_string(
-        value: Any,
+        value: object,
         *,
         field: str,
         allow_empty: bool = False,
@@ -726,7 +823,7 @@ class VisionClient:
 
     def _parse_detection(
         self,
-        data: dict[str, Any],
+        data: JSONObject,
     ) -> ClientDetection:
         label = self._parse_string(
             data.get("label"),
@@ -746,10 +843,22 @@ class VisionClient:
 
             try:
                 box = (
-                    int(box_data[0]),
-                    int(box_data[1]),
-                    int(box_data[2]),
-                    int(box_data[3]),
+                    self._parse_int(
+                        box_data[0],
+                        field="detection box x",
+                    ),
+                    self._parse_int(
+                        box_data[1],
+                        field="detection box y",
+                    ),
+                    self._parse_int(
+                        box_data[2],
+                        field="detection box width",
+                    ),
+                    self._parse_int(
+                        box_data[3],
+                        field="detection box height",
+                    ),
                 )
             except (TypeError, ValueError) as exc:
                 raise VisionClientError(
@@ -764,8 +873,14 @@ class VisionClient:
 
             try:
                 center = (
-                    int(center_data[0]),
-                    int(center_data[1]),
+                    self._parse_int(
+                        center_data[0],
+                        field="detection center x",
+                    ),
+                    self._parse_int(
+                        center_data[1],
+                        field="detection center y",
+                    ),
                 )
             except (TypeError, ValueError) as exc:
                 raise VisionClientError(
@@ -795,7 +910,7 @@ class VisionClient:
 
     def _parse_metadata(
         self,
-        data: dict[str, Any],
+        data: JSONObject,
     ) -> ClientMetadata:
         detections_data = data.get("detections", [])
 
@@ -827,7 +942,7 @@ class VisionClient:
 
     def _parse_detection_status(
         self,
-        data: dict[str, Any],
+        data: JSONObject,
     ) -> ClientDetectionStatus:
         detectors_data = data.get("detectors", {})
         enabled_data = data.get("enabled", {})
@@ -846,17 +961,23 @@ class VisionClient:
             }
 
         elif isinstance(detectors_data, list):
-            # GET /detection returns detector names plus a separate
-            # enabled-state mapping.
             state_map = enabled_data if isinstance(enabled_data, dict) else {}
 
-            detectors = {
-                str(name): self._parse_bool(
-                    state_map.get(name, False),
-                    field=f"{name} detector state",
+            detectors = {}
+
+            for detector_name_value in detectors_data:
+                detector_name = self._parse_string(
+                    detector_name_value,
+                    field="detector name",
                 )
-                for name in detectors_data
-            }
+
+                detectors[detector_name] = self._parse_bool(
+                    state_map.get(
+                        detector_name,
+                        False,
+                    ),
+                    field=f"{detector_name} detector state",
+                )
 
         else:
             raise VisionClientError("Vision service returned invalid detector status")
@@ -875,7 +996,7 @@ class VisionClient:
 
     def _parse_stream_overlay_status(
         self,
-        data: dict[str, Any],
+        data: JSONObject,
     ) -> ClientStreamOverlayStatus:
         source = data.get("source")
 
@@ -899,7 +1020,7 @@ class VisionClient:
 
     def _parse_camera_statistics(
         self,
-        data: dict[str, Any],
+        data: JSONObject,
     ) -> ClientCameraStatistics:
         last_error = data.get("last_error")
 
@@ -931,7 +1052,7 @@ class VisionClient:
 
     def _parse_streaming_statistics(
         self,
-        data: dict[str, Any],
+        data: JSONObject,
     ) -> ClientStreamingStatistics:
         overlay_data = data.get("overlay", {})
 
@@ -966,7 +1087,7 @@ class VisionClient:
 
     def _parse_recording_status(
         self,
-        data: dict[str, Any],
+        data: JSONObject,
     ) -> ClientRecordingStatus:
         overlay_data = data.get("overlay", {})
 
@@ -986,7 +1107,7 @@ class VisionClient:
 
     def _parse_detection_statistics(
         self,
-        data: dict[str, Any],
+        data: JSONObject,
     ) -> ClientDetectionStatistics:
         detectors_data = data.get("detectors", {})
         metadata_sources_data = data.get("metadata_sources", [])
@@ -1020,7 +1141,7 @@ class VisionClient:
 
     def _parse_server_statistics(
         self,
-        data: dict[str, Any],
+        data: JSONObject,
     ) -> ClientVisionServerStatistics:
         return ClientVisionServerStatistics(
             host=self._parse_string(
@@ -1039,7 +1160,7 @@ class VisionClient:
 
     def _parse_statistics(
         self,
-        data: dict[str, Any],
+        data: JSONObject,
     ) -> ClientVisionStatistics:
         camera_data = data.get("camera", {})
         streaming_data = data.get("streaming", {})

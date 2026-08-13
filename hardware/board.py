@@ -9,7 +9,7 @@ numbering, while PWM and analog values identify Robot HAT channels.
 from __future__ import annotations
 
 from enum import IntEnum
-from typing import NoReturn
+from typing import ClassVar, NoReturn
 
 
 class DigitalPin(IntEnum):
@@ -99,63 +99,63 @@ class Pins:
     def __new__(cls) -> NoReturn:
         raise TypeError("Pins is a namespace and cannot be instantiated")
 
-    D0 = DigitalPin.D0
-    D1 = DigitalPin.D1
-    D2 = DigitalPin.D2
-    D3 = DigitalPin.D3
-    D4 = DigitalPin.D4
-    D5 = DigitalPin.D5
-    D6 = DigitalPin.D6
-    D7 = DigitalPin.D7
-    D8 = DigitalPin.D8
-    D9 = DigitalPin.D9
-    D10 = DigitalPin.D10
-    D11 = DigitalPin.D11
-    D12 = DigitalPin.D12
-    D13 = DigitalPin.D13
-    D14 = DigitalPin.D14
-    D15 = DigitalPin.D15
-    D16 = DigitalPin.D16
+    D0: ClassVar[DigitalPin] = DigitalPin.D0
+    D1: ClassVar[DigitalPin] = DigitalPin.D1
+    D2: ClassVar[DigitalPin] = DigitalPin.D2
+    D3: ClassVar[DigitalPin] = DigitalPin.D3
+    D4: ClassVar[DigitalPin] = DigitalPin.D4
+    D5: ClassVar[DigitalPin] = DigitalPin.D5
+    D6: ClassVar[DigitalPin] = DigitalPin.D6
+    D7: ClassVar[DigitalPin] = DigitalPin.D7
+    D8: ClassVar[DigitalPin] = DigitalPin.D8
+    D9: ClassVar[DigitalPin] = DigitalPin.D9
+    D10: ClassVar[DigitalPin] = DigitalPin.D10
+    D11: ClassVar[DigitalPin] = DigitalPin.D11
+    D12: ClassVar[DigitalPin] = DigitalPin.D12
+    D13: ClassVar[DigitalPin] = DigitalPin.D13
+    D14: ClassVar[DigitalPin] = DigitalPin.D14
+    D15: ClassVar[DigitalPin] = DigitalPin.D15
+    D16: ClassVar[DigitalPin] = DigitalPin.D16
 
-    A0 = AnalogChannel.A0
-    A1 = AnalogChannel.A1
-    A2 = AnalogChannel.A2
-    A3 = AnalogChannel.A3
-    A4 = AnalogChannel.A4
-    A5 = AnalogChannel.A5
-    A6 = AnalogChannel.A6
-    A7 = AnalogChannel.A7
+    A0: ClassVar[AnalogChannel] = AnalogChannel.A0
+    A1: ClassVar[AnalogChannel] = AnalogChannel.A1
+    A2: ClassVar[AnalogChannel] = AnalogChannel.A2
+    A3: ClassVar[AnalogChannel] = AnalogChannel.A3
+    A4: ClassVar[AnalogChannel] = AnalogChannel.A4
+    A5: ClassVar[AnalogChannel] = AnalogChannel.A5
+    A6: ClassVar[AnalogChannel] = AnalogChannel.A6
+    A7: ClassVar[AnalogChannel] = AnalogChannel.A7
 
-    SW = DigitalPin.SW
-    USER = DigitalPin.USER
-    LED = DigitalPin.LED
-    BOARD_TYPE = DigitalPin.BOARD_TYPE
-    RST = DigitalPin.RST
-    BLEINT = DigitalPin.BLEINT
-    BLERST = DigitalPin.BLERST
-    MCURST = DigitalPin.MCURST
-    CE = DigitalPin.CE
+    SW: ClassVar[DigitalPin] = DigitalPin.SW
+    USER: ClassVar[DigitalPin] = DigitalPin.USER
+    LED: ClassVar[DigitalPin] = DigitalPin.LED
+    BOARD_TYPE: ClassVar[DigitalPin] = DigitalPin.BOARD_TYPE
+    RST: ClassVar[DigitalPin] = DigitalPin.RST
+    BLEINT: ClassVar[DigitalPin] = DigitalPin.BLEINT
+    BLERST: ClassVar[DigitalPin] = DigitalPin.BLERST
+    MCURST: ClassVar[DigitalPin] = DigitalPin.MCURST
+    CE: ClassVar[DigitalPin] = DigitalPin.CE
 
-    P0 = PWMChannel.P0
-    P1 = PWMChannel.P1
-    P2 = PWMChannel.P2
-    P3 = PWMChannel.P3
-    P4 = PWMChannel.P4
-    P5 = PWMChannel.P5
-    P6 = PWMChannel.P6
-    P7 = PWMChannel.P7
-    P8 = PWMChannel.P8
-    P9 = PWMChannel.P9
-    P10 = PWMChannel.P10
-    P11 = PWMChannel.P11
-    P12 = PWMChannel.P12
-    P13 = PWMChannel.P13
-    P14 = PWMChannel.P14
-    P15 = PWMChannel.P15
-    P16 = PWMChannel.P16
-    P17 = PWMChannel.P17
-    P18 = PWMChannel.P18
-    P19 = PWMChannel.P19
+    P0: ClassVar[PWMChannel] = PWMChannel.P0
+    P1: ClassVar[PWMChannel] = PWMChannel.P1
+    P2: ClassVar[PWMChannel] = PWMChannel.P2
+    P3: ClassVar[PWMChannel] = PWMChannel.P3
+    P4: ClassVar[PWMChannel] = PWMChannel.P4
+    P5: ClassVar[PWMChannel] = PWMChannel.P5
+    P6: ClassVar[PWMChannel] = PWMChannel.P6
+    P7: ClassVar[PWMChannel] = PWMChannel.P7
+    P8: ClassVar[PWMChannel] = PWMChannel.P8
+    P9: ClassVar[PWMChannel] = PWMChannel.P9
+    P10: ClassVar[PWMChannel] = PWMChannel.P10
+    P11: ClassVar[PWMChannel] = PWMChannel.P11
+    P12: ClassVar[PWMChannel] = PWMChannel.P12
+    P13: ClassVar[PWMChannel] = PWMChannel.P13
+    P14: ClassVar[PWMChannel] = PWMChannel.P14
+    P15: ClassVar[PWMChannel] = PWMChannel.P15
+    P16: ClassVar[PWMChannel] = PWMChannel.P16
+    P17: ClassVar[PWMChannel] = PWMChannel.P17
+    P18: ClassVar[PWMChannel] = PWMChannel.P18
+    P19: ClassVar[PWMChannel] = PWMChannel.P19
 
 
 # Use __members__ rather than enum iteration so aliases such as D7,

@@ -1,32 +1,36 @@
+from __future__ import annotations
+
 from dataclasses import dataclass
 from time import time
-from typing import Any, Self
+from typing import Self
+
+import numpy as np
+
+ImageArray = np.ndarray[
+    tuple[int, ...],
+    np.dtype[np.uint8],
+]
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(
+    frozen=True,
+    slots=True,
+)
 class Frame:
     """
     Frame produced by the Vision pipeline.
-
-    A Frame represents one camera image and the time at which it entered the
-    Betabox Vision pipeline. Frame attributes cannot be reassigned, although
-    the underlying image object may itself be mutable.
-
-    The image format is implementation-defined. The current Betabox camera pipeline uses a NumPy ndarray in RGB
-    channel order.
     """
 
-    image: Any
+    image: ImageArray
     timestamp: float
 
     @classmethod
-    def create(cls, image: Any, *, timestamp: float | None = None) -> Self:
-        """
-        Create a frame.
-
-        A timestamp may be supplied when the capture time is already known.
-        Otherwise, the current wall-clock time is used.
-        """
+    def create(
+        cls,
+        image: ImageArray,
+        *,
+        timestamp: float | None = None,
+    ) -> Self:
         return cls(
             image=image,
             timestamp=time() if timestamp is None else timestamp,

@@ -35,6 +35,18 @@ class PWM:
     An injected bus is borrowed and remains owned by the caller.
     """
 
+    logger: logging.Logger
+    channel: int
+    timer_index: int
+
+    _i2c: I2C | None
+    _owns_i2c: bool
+
+    _frequency: float
+    _prescaler: int | None
+    _pulse_width: int
+    _duty_cycle: float | None
+
     REG_CHN: ClassVar[int] = 0x20
     REG_PSC: ClassVar[int] = 0x40
     REG_ARR: ClassVar[int] = 0x44
@@ -62,13 +74,13 @@ class PWM:
 
         self.timer_index = self._timer_index_for_channel(self.channel)
 
-        self._i2c: I2C | None = None
+        self._i2c = None
         self._owns_i2c = bus is None
 
         self._frequency = self.DEFAULT_FREQUENCY
-        self._prescaler: int | None = None
+        self._prescaler = None
         self._pulse_width = 0
-        self._duty_cycle: float | None = None
+        self._duty_cycle = None
 
         try:
             self._i2c = (
@@ -79,7 +91,13 @@ class PWM:
 
             self.set_frequency(self.DEFAULT_FREQUENCY)
 
-        except BaseException:
+        except (
+            HardwareError,
+            OSError,
+            RuntimeError,
+            TypeError,
+            ValueError,
+        ):
             self.close()
             raise
 
@@ -124,13 +142,10 @@ class PWM:
                 "channel must be an int, string channel name, or PWMChannel"
             )
 
-        if isinstance(channel, int):
-            if channel not in PWM_CHANNELS.values():
-                raise PWMError(f"PWM channel must be in range 0-19, not {channel}")
+        if channel not in PWM_CHANNELS.values():
+            raise PWMError(f"PWM channel must be in range 0-19, not {channel}")
 
-            return channel
-
-        raise TypeError("channel must be an int, string channel name, or PWMChannel")
+        return channel
 
     @staticmethod
     def _timer_index_for_channel(

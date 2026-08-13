@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from enum import Enum
-from typing import Self, cast
+from typing import ClassVar, Self, cast
 
-from gpiozero import (
+from gpiozero import (  # pyright: ignore[reportMissingTypeStubs]
     Button,
     InputDevice,
     OutputDevice,
@@ -47,18 +47,27 @@ class Pin:
     top-level hardware owners manage the process-wide pin factory.
     """
 
-    OUT = PinMode.OUT
-    IN = PinMode.IN
+    board_name: str | None
+    pin_number: int
 
-    PULL_UP = Pull.UP
-    PULL_DOWN = Pull.DOWN
-    PULL_NONE = Pull.NONE
+    _mode: PinMode | None
+    _pull: Pull | None
+    _active_state: bool | None
+    _device: PinDevice | None
+    _bounce_time: float | None
 
-    IRQ_FALLING = Trigger.FALLING
-    IRQ_RISING = Trigger.RISING
-    IRQ_BOTH = Trigger.BOTH
+    OUT: ClassVar[PinMode] = PinMode.OUT
+    IN: ClassVar[PinMode] = PinMode.IN
 
-    BOARD_PINS = BOARD_PINS
+    PULL_UP: ClassVar[Pull] = Pull.UP
+    PULL_DOWN: ClassVar[Pull] = Pull.DOWN
+    PULL_NONE: ClassVar[Pull] = Pull.NONE
+
+    IRQ_FALLING: ClassVar[Trigger] = Trigger.FALLING
+    IRQ_RISING: ClassVar[Trigger] = Trigger.RISING
+    IRQ_BOTH: ClassVar[Trigger] = Trigger.BOTH
+
+    BOARD_PINS: ClassVar[dict[str, int]] = BOARD_PINS
 
     def __init__(
         self,
@@ -68,7 +77,7 @@ class Pin:
         active_state: bool | None = None,
     ) -> None:
         if isinstance(pin, DigitalPin):
-            self.board_name: str | None = pin.name
+            self.board_name = pin.name
         elif isinstance(pin, str):
             self.board_name = pin
         else:
@@ -76,11 +85,11 @@ class Pin:
 
         self.pin_number = self._resolve_pin(pin)
 
-        self._mode: PinMode | None = None
-        self._pull: Pull | None = None
-        self._active_state: bool | None = None
-        self._device: PinDevice | None = None
-        self._bounce_time: float | None = None
+        self._mode = None
+        self._pull = None
+        self._active_state = None
+        self._device = None
+        self._bounce_time = None
 
         self.set_mode(
             mode,
@@ -105,19 +114,19 @@ class Pin:
 
             return self.BOARD_PINS[pin]
 
-        if isinstance(pin, int):
-            valid_pins = set(self.BOARD_PINS.values())
+        if isinstance(pin, bool):
+            raise InvalidPinError(
+                "pin must be an int GPIO number, string pin name, or DigitalPin"
+            )
 
-            if pin not in valid_pins:
-                raise InvalidPinError(
-                    f"Unknown GPIO pin {pin}. Valid pins: {sorted(valid_pins)}"
-                )
+        valid_pins = set(self.BOARD_PINS.values())
 
-            return pin
+        if pin not in valid_pins:
+            raise InvalidPinError(
+                f"Unknown GPIO pin {pin}. Valid pins: {sorted(valid_pins)}"
+            )
 
-        raise InvalidPinError(
-            "pin must be an int GPIO number, string pin name, or DigitalPin"
-        )
+        return pin
 
     @property
     def mode(self) -> PinMode | None:
@@ -172,16 +181,6 @@ class Pin:
         pull: Pull = PULL_NONE,
         active_state: bool | None = None,
     ) -> None:
-        if not isinstance(mode, PinMode):
-            raise TypeError(f"mode must be Pin.OUT or Pin.IN, not {mode!r}")
-
-        if not isinstance(pull, Pull):
-            raise TypeError(
-                "pull must be Pin.PULL_UP, "
-                "Pin.PULL_DOWN, or Pin.PULL_NONE, "
-                f"not {pull!r}"
-            )
-
         if mode is PinMode.IN and pull is Pull.NONE and active_state is None:
             raise InvalidModeError("active_state is required when using Pin.PULL_NONE")
 
@@ -250,7 +249,12 @@ class Pin:
     def toggle(self) -> int:
         device = self._output_device()
 
-        if device.value:
+        value = cast(
+            bool,
+            device.value,
+        )
+
+        if value:
             return self.off()
 
         return self.on()
@@ -274,24 +278,10 @@ class Pin:
         bouncetime: int = 200,
         pull: Pull = PULL_UP,
     ) -> None:
-        if not callable(handler):
-            raise TypeError("handler must be callable")
-
-        if not isinstance(trigger, Trigger):
-            raise TypeError(
-                "trigger must be Pin.IRQ_FALLING, Pin.IRQ_RISING, or Pin.IRQ_BOTH"
-            )
-
-        if not isinstance(pull, Pull):
-            raise TypeError("pull must be Pin.PULL_UP, Pin.PULL_DOWN, or Pin.PULL_NONE")
-
         if pull is Pull.NONE:
             raise InvalidModeError(
                 "interrupt pins require Pin.PULL_UP or Pin.PULL_DOWN"
             )
-
-        if isinstance(bouncetime, bool) or not isinstance(bouncetime, int):
-            raise TypeError("bouncetime must be an integer")
 
         if bouncetime < 0:
             raise ValueError("bouncetime cannot be negative")

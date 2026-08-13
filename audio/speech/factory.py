@@ -59,7 +59,7 @@ def _normalize_engine(
 
 def _resolve_piper_model(
     *,
-    piper_model: str | Path | None,
+    piper_model: object,
     piper_voice: str,
 ) -> Path:
     if isinstance(piper_model, bool) or (

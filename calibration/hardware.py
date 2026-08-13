@@ -6,8 +6,8 @@ from collections.abc import Callable
 from time import sleep
 from typing import TYPE_CHECKING, TypeVar
 
-import lgpio
-from gpiozero.exc import GPIOPinInUse
+import lgpio  # pyright: ignore[reportMissingTypeStubs]
+from gpiozero.exc import GPIOPinInUse  # pyright: ignore[reportMissingTypeStubs]
 
 from betabox_robotics.camera import CameraMount
 from betabox_robotics.drive import Drive
@@ -90,6 +90,11 @@ class CalibrationHardware:
     Creating this object does not acquire robot hardware.
     """
 
+    _drive_config: DriveConfig
+    _camera_mount_config: CameraMountConfig
+    _grayscale_config: GrayscaleConfig
+    _operation_lock: threading.Lock
+
     def __init__(
         self,
         *,
@@ -116,9 +121,7 @@ class CalibrationHardware:
 
         if not (steering.min_angle <= offset_value <= steering.max_angle):
             raise ValueError(
-                "steering offset must be between "
-                f"{steering.min_angle} and "
-                f"{steering.max_angle}"
+                f"steering offset must be between {steering.min_angle} and {steering.max_angle}"
             )
 
         self._run(
@@ -146,16 +149,12 @@ class CalibrationHardware:
 
         if not (config.pan_min_angle <= pan_value <= config.pan_max_angle):
             raise ValueError(
-                "pan offset must be between "
-                f"{config.pan_min_angle} and "
-                f"{config.pan_max_angle}"
+                f"pan offset must be between {config.pan_min_angle} and {config.pan_max_angle}"
             )
 
         if not (config.tilt_min_angle <= tilt_value <= config.tilt_max_angle):
             raise ValueError(
-                "tilt offset must be between "
-                f"{config.tilt_min_angle} and "
-                f"{config.tilt_max_angle}"
+                f"tilt offset must be between {config.tilt_min_angle} and {config.tilt_max_angle}"
             )
 
         self._run(
@@ -189,9 +188,7 @@ class CalibrationHardware:
 
         if not (steering.min_angle <= steering_value <= steering.max_angle):
             raise ValueError(
-                "steering offset must be between "
-                f"{steering.min_angle} and "
-                f"{steering.max_angle}"
+                f"steering offset must be between {steering.min_angle} and {steering.max_angle}"
             )
 
         self._run(
@@ -237,9 +234,7 @@ class CalibrationHardware:
                     lgpio.error,
                 ) as exc:
                     raise RobotBusyError(
-                        "The robot hardware could not "
-                        "be acquired. Another application "
-                        "may be using it."
+                        "The robot hardware could not be acquired. Another application may be using it."
                     ) from exc
             finally:
                 try:

@@ -34,22 +34,18 @@ class Vision:
     Long-running platform video should use VisionService instead.
     """
 
+    frame_source: FrameSource
+    metadata: MetadataBus
+    overlay: OverlayRenderer
+    detection: DetectionManager
+    snapshot: SnapshotService
+    recording: RecordingService
+
     def __init__(
         self,
         frame_source: FrameSource | None = None,
         metadata_bus: MetadataBus | None = None,
     ) -> None:
-        if frame_source is not None and not isinstance(
-            frame_source,
-            FrameSource,
-        ):
-            raise TypeError("frame_source must be a FrameSource")
-
-        if metadata_bus is not None and not isinstance(
-            metadata_bus,
-            MetadataBus,
-        ):
-            raise TypeError("metadata_bus must be a MetadataBus")
 
         self.frame_source = frame_source if frame_source is not None else FrameSource()
 
@@ -70,7 +66,7 @@ class Vision:
     @classmethod
     def default(
         cls,
-        robot_config: object | None = None,
+        _robot_config: object | None = None,
     ) -> Self:
         return cls()
 
@@ -82,7 +78,7 @@ class Vision:
 
         if self.recording.is_recording():
             try:
-                self.recording.stop()
+                _ = self.recording.stop()
             except RecordingError as exc:
                 shutdown_error = exc
 

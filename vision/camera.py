@@ -3,10 +3,11 @@ from __future__ import annotations
 import math
 import threading
 import time
-from typing import Any, Final, Self
+from collections.abc import Callable
+from typing import Final, Protocol, Self, TypedDict, cast
 
 from betabox_robotics.hardware import HardwareError
-from betabox_robotics.vision.frame import Frame
+from betabox_robotics.vision.frame import Frame, ImageArray
 
 _CAMERA_OPERATION_ERRORS: Final = (
     AttributeError,
@@ -17,6 +18,44 @@ _CAMERA_OPERATION_ERRORS: Final = (
 )
 
 
+class _CameraRequest(Protocol):
+    def make_array(
+        self,
+        name: str,
+    ) -> ImageArray: ...
+
+
+class _Picamera2(Protocol):
+    post_callback: Callable[[_CameraRequest], None] | None
+
+    def create_video_configuration(
+        self,
+        *,
+        main: dict[str, object],
+        controls: dict[str, object],
+    ) -> object: ...
+
+    def configure(
+        self,
+        config: object,
+    ) -> None: ...
+
+    def start(self) -> None: ...
+
+    def stop(self) -> None: ...
+
+    def close(self) -> None: ...
+
+
+class CameraStatistics(TypedDict):
+    running: bool
+    callback_frame_count: int
+    frame_wait_in_progress: bool
+    last_frame_wait_duration_seconds: float | None
+    max_frame_wait_duration_seconds: float
+    seconds_since_last_callback_frame: float | None
+
+
 class CameraError(HardwareError):
     """Raised when a camera operation fails."""
 
@@ -24,10 +63,18 @@ class CameraError(HardwareError):
 def _validate_resolution(
     value: object,
 ) -> tuple[int, int]:
-    if not isinstance(value, tuple) or len(value) != 2:
+    if not isinstance(value, tuple):
         raise TypeError("resolution must be a tuple of two integers")
 
-    width, height = value
+    resolution = cast(
+        tuple[object, ...],
+        value,
+    )
+
+    if len(resolution) != 2:
+        raise TypeError("resolution must be a tuple of two integers")
+
+    width, height = resolution
 
     if (
         isinstance(width, bool)
@@ -109,6 +156,26 @@ class CameraManager:
     not request a frame directly from Picamera2.
     """
 
+    resolution: tuple[int, int]
+    format: str
+    fps: float
+
+    _camera: _Picamera2 | None
+    _running: bool
+
+    _frame_ready: threading.Condition
+    _latest_frame: Frame | None
+    _frame_sequence: int
+    _callback_error: CameraError | None
+
+    _diagnostics_lock: threading.Lock
+    _callback_frame_count: int
+    _last_callback_completed: float | None
+
+    _frame_wait_in_progress: bool
+    _last_frame_wait_duration: float | None
+    _max_frame_wait_duration: float
+
     def __init__(
         self,
         resolution: tuple[int, int] = (640, 480),
@@ -125,20 +192,20 @@ class CameraManager:
 
         self.fps = _validate_fps(fps)
 
-        self._camera: Any | None = None
+        self._camera = None
         self._running = False
 
         self._frame_ready = threading.Condition()
-        self._latest_frame: Frame | None = None
+        self._latest_frame = None
         self._frame_sequence = 0
-        self._callback_error: CameraError | None = None
+        self._callback_error = None
 
         self._diagnostics_lock = threading.Lock()
         self._callback_frame_count = 0
-        self._last_callback_completed: float | None = None
+        self._last_callback_completed = None
 
         self._frame_wait_in_progress = False
-        self._last_frame_wait_duration: float | None = None
+        self._last_frame_wait_duration = None
         self._max_frame_wait_duration = 0.0
 
     def start(self) -> None:
@@ -149,14 +216,20 @@ class CameraManager:
                 return
 
         try:
-            from picamera2 import Picamera2
+            from picamera2 import Picamera2  # pyright: ignore[reportMissingTypeStubs]
         except ImportError as exc:
             raise CameraError("Picamera2 is not installed or unavailable") from exc
 
-        camera: Any | None = None
+        camera: _Picamera2 | None = None
 
         try:
-            camera = Picamera2()
+            camera = cast(
+                _Picamera2,
+                cast(
+                    object,
+                    Picamera2(),
+                ),
+            )
 
             frame_duration = round(1_000_000 / self.fps)
 
@@ -301,7 +374,7 @@ class CameraManager:
                     and self._frame_sequence <= expected_sequence
                 ):
                     if deadline is None:
-                        self._frame_ready.wait()
+                        _ = self._frame_ready.wait()
                         continue
 
                     remaining = deadline - time.monotonic()
@@ -309,7 +382,7 @@ class CameraManager:
                     if remaining <= 0:
                         raise CameraError("timed out waiting for camera frame")
 
-                    self._frame_ready.wait(
+                    _ = self._frame_ready.wait(
                         timeout=remaining,
                     )
 
@@ -350,7 +423,7 @@ class CameraManager:
 
         return self.capture_frame()
 
-    def statistics(self) -> dict[str, Any]:
+    def statistics(self) -> CameraStatistics:
         """Return camera callback and frame-wait diagnostics."""
 
         now = time.monotonic()
@@ -361,20 +434,20 @@ class CameraManager:
         with self._diagnostics_lock:
             last_callback = self._last_callback_completed
 
-            return {
-                "running": running,
-                "callback_frame_count": self._callback_frame_count,
-                "frame_wait_in_progress": self._frame_wait_in_progress,
-                "last_frame_wait_duration_seconds": self._last_frame_wait_duration,
-                "max_frame_wait_duration_seconds": self._max_frame_wait_duration,
-                "seconds_since_last_callback_frame": (
+            return CameraStatistics(
+                running=running,
+                callback_frame_count=self._callback_frame_count,
+                frame_wait_in_progress=self._frame_wait_in_progress,
+                last_frame_wait_duration_seconds=self._last_frame_wait_duration,
+                max_frame_wait_duration_seconds=self._max_frame_wait_duration,
+                seconds_since_last_callback_frame=(
                     None if last_callback is None else now - last_callback
                 ),
-            }
+            )
 
     def _on_frame(
         self,
-        request: Any,
+        request: _CameraRequest,
     ) -> None:
         """
         Process a completed Picamera2 request.

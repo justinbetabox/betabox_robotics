@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
-from typing import TYPE_CHECKING, Any, Self
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Self
 
 from betabox_robotics.hardware import HardwareError
 
@@ -26,8 +26,13 @@ class SensorsStatus:
 
     def to_dict(
         self,
-    ) -> dict[str, Any]:
-        return asdict(self)
+    ) -> dict[str, bool]:
+        return {
+            "ultrasonic_closed": self.ultrasonic_closed,
+            "grayscale_closed": self.grayscale_closed,
+            "battery_closed": self.battery_closed,
+            "closed": self.closed,
+        }
 
 
 class Sensors:
@@ -38,6 +43,12 @@ class Sensors:
     and closes them when the subsystem is closed.
     """
 
+    ultrasonic: Ultrasonic
+    grayscale: Grayscale
+    battery: Battery
+
+    _closed: bool
+
     def __init__(
         self,
         *,
@@ -45,24 +56,6 @@ class Sensors:
         grayscale: Grayscale,
         battery: Battery,
     ) -> None:
-        if not isinstance(
-            ultrasonic,
-            Ultrasonic,
-        ):
-            raise TypeError("ultrasonic must be an Ultrasonic instance")
-
-        if not isinstance(
-            grayscale,
-            Grayscale,
-        ):
-            raise TypeError("grayscale must be a Grayscale instance")
-
-        if not isinstance(
-            battery,
-            Battery,
-        ):
-            raise TypeError("battery must be a Battery instance")
-
         self.ultrasonic = ultrasonic
         self.grayscale = grayscale
         self.battery = battery

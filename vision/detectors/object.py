@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import math
 
+from typing_extensions import override
+
 from betabox_robotics.vision.detector import (
     Detector,
     DetectorError,
@@ -12,7 +14,6 @@ from betabox_robotics.vision.metadata import (
     Metadata,
 )
 from betabox_robotics.vision.model_runtime import (
-    ModelDetection,
     ObjectDetectionModel,
 )
 
@@ -45,6 +46,9 @@ class ObjectDetector(Detector):
     adapts model results into Betabox Vision metadata.
     """
 
+    model: ObjectDetectionModel | None
+    min_confidence: float
+
     def __init__(
         self,
         model: ObjectDetectionModel | None = None,
@@ -72,6 +76,7 @@ class ObjectDetector(Detector):
         if min_confidence is not None:
             self.min_confidence = _validate_min_confidence(min_confidence)
 
+    @override
     def enable(
         self,
         *,
@@ -84,13 +89,11 @@ class ObjectDetector(Detector):
         )
         super().enable()
 
+    @override
     def detect(
         self,
         frame: Frame,
     ) -> Metadata:
-        if not isinstance(frame, Frame):
-            raise TypeError("frame must be a Frame instance")
-
         if self.model is None:
             return Metadata.create(
                 self.name,
@@ -113,12 +116,6 @@ class ObjectDetector(Detector):
         detections: list[Detection] = []
 
         for result in model_detections:
-            if not isinstance(
-                result,
-                ModelDetection,
-            ):
-                raise DetectorError("object detection model returned an invalid result")
-
             if result.confidence < self.min_confidence:
                 continue
 

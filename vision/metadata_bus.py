@@ -16,22 +16,20 @@ class MetadataBus:
     recently published metadata.
     """
 
+    _latest_by_source: dict[str, Metadata]
+    _history: deque[Metadata]
+    _lock: threading.Lock
+
     def __init__(
         self,
         *,
         max_history: int = 500,
     ) -> None:
-        if isinstance(max_history, bool) or not isinstance(
-            max_history,
-            int,
-        ):
-            raise TypeError("max_history must be an integer")
-
         if max_history <= 0:
             raise ValueError("max_history must be greater than zero")
 
-        self._latest_by_source: dict[str, Metadata] = {}
-        self._history: deque[Metadata] = deque(maxlen=max_history)
+        self._latest_by_source = {}
+        self._history = deque(maxlen=max_history)
         self._lock = threading.Lock()
 
     def publish(
@@ -41,9 +39,6 @@ class MetadataBus:
         """
         Publish metadata and make it the latest item for its source.
         """
-        if not isinstance(metadata, Metadata):
-            raise TypeError("metadata must be a Metadata instance")
-
         with self._lock:
             self._latest_by_source[metadata.source] = metadata
             self._history.append(metadata)
@@ -59,12 +54,6 @@ class MetadataBus:
         Otherwise, return the most recently published metadata from any
         source.
         """
-        if source is not None and not isinstance(
-            source,
-            str,
-        ):
-            raise TypeError("source must be a string")
-
         with self._lock:
             if source is not None:
                 return self._latest_by_source.get(source)
@@ -89,15 +78,8 @@ class MetadataBus:
 
         When limit is supplied, return at most that many of the newest items.
         """
-        if limit is not None:
-            if isinstance(limit, bool) or not isinstance(
-                limit,
-                int,
-            ):
-                raise TypeError("limit must be an integer")
-
-            if limit < 0:
-                raise ValueError("limit must be zero or greater")
+        if limit is not None and limit < 0:
+            raise ValueError("limit must be zero or greater")
 
         with self._lock:
             if limit is None:

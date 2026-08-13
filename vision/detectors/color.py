@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import math
 from collections.abc import Mapping, Sequence
-from typing import ClassVar, TypeAlias
+from typing import ClassVar, TypeAlias, cast
 
 import cv2
 import numpy as np
 from numpy.typing import NDArray
+from typing_extensions import override
 
 from betabox_robotics.vision.detector import (
     Detector,
@@ -28,14 +29,28 @@ def _validate_hsv_value(
     *,
     name: str,
 ) -> HSVValue:
-    if not isinstance(value, tuple) or len(value) != 3:
+    if not isinstance(value, tuple):
         raise TypeError(f"{name} must be a tuple of three integers")
 
-    hue, saturation, brightness = value
+    values = cast(
+        tuple[object, ...],
+        value,
+    )
 
-    if any(
-        isinstance(component, bool) or not isinstance(component, int)
-        for component in value
+    if len(values) != 3:
+        raise TypeError(f"{name} must be a tuple of three integers")
+
+    hue = values[0]
+    saturation = values[1]
+    brightness = values[2]
+
+    if (
+        isinstance(hue, bool)
+        or not isinstance(hue, int)
+        or isinstance(saturation, bool)
+        or not isinstance(saturation, int)
+        or isinstance(brightness, bool)
+        or not isinstance(brightness, int)
     ):
         raise TypeError(f"{name} must contain three integers")
 
@@ -48,7 +63,11 @@ def _validate_hsv_value(
     if not 0 <= brightness <= 255:
         raise ValueError(f"{name} brightness must be between 0 and 255")
 
-    return hue, saturation, brightness
+    return (
+        hue,
+        saturation,
+        brightness,
+    )
 
 
 def _validate_hsv_range(
@@ -56,15 +75,24 @@ def _validate_hsv_range(
     *,
     name: str,
 ) -> HSVRange:
-    if not isinstance(value, tuple) or len(value) != 2:
+    if not isinstance(value, tuple):
+        raise TypeError(f"{name} must contain lower and upper HSV values")
+
+    values = cast(
+        tuple[object, ...],
+        value,
+    )
+
+    if len(values) != 2:
         raise TypeError(f"{name} must contain lower and upper HSV values")
 
     lower = _validate_hsv_value(
-        value[0],
+        values[0],
         name=f"{name} lower value",
     )
+
     upper = _validate_hsv_value(
-        value[1],
+        values[1],
         name=f"{name} upper value",
     )
 
@@ -77,17 +105,39 @@ def _validate_hsv_range(
     ):
         raise ValueError(f"{name} lower values cannot exceed upper values")
 
-    return lower, upper
+    return (
+        lower,
+        upper,
+    )
 
 
 def _is_single_hsv_range(
     value: object,
 ) -> bool:
-    return (
-        isinstance(value, tuple)
-        and len(value) == 2
-        and all(isinstance(bound, tuple) and len(bound) == 3 for bound in value)
+    if not isinstance(value, tuple):
+        return False
+
+    values = cast(
+        tuple[object, ...],
+        value,
     )
+
+    if len(values) != 2:
+        return False
+
+    for bound in values:
+        if not isinstance(bound, tuple):
+            return False
+
+        bound_values = cast(
+            tuple[object, ...],
+            bound,
+        )
+
+        if len(bound_values) != 3:
+            return False
+
+    return True
 
 
 def _validate_custom_ranges(
@@ -96,9 +146,14 @@ def _validate_custom_ranges(
     if not isinstance(value, Mapping):
         raise TypeError("custom_ranges must be a mapping")
 
+    mapping = cast(
+        Mapping[object, object],
+        value,
+    )
+
     validated: dict[str, tuple[HSVRange, ...]] = {}
 
-    for raw_name, raw_ranges in value.items():
+    for raw_name, raw_ranges in mapping.items():
         if not isinstance(raw_name, str):
             raise TypeError("custom color names must be strings")
 
@@ -149,16 +204,11 @@ def _validate_colors(
 ) -> list[str]:
     if isinstance(value, str):
         raw_colors = [value]
-    elif isinstance(value, Sequence):
-        raw_colors = list(value)
     else:
-        raise TypeError("colors must be a string or sequence of strings")
+        raw_colors = list(value)
 
     if not raw_colors:
         raise ValueError("at least one color is required")
-
-    if any(not isinstance(color, str) for color in raw_colors):
-        raise TypeError("colors must contain only strings")
 
     colors = [color.strip().casefold() for color in raw_colors]
 
@@ -170,7 +220,6 @@ def _validate_colors(
     if unsupported:
         raise ValueError("unsupported color(s): " + ", ".join(unsupported))
 
-    # Preserve order while removing duplicates.
     return list(dict.fromkeys(colors))
 
 
@@ -204,6 +253,10 @@ class ColorDetector(Detector):
     This detector does not draw overlays. Other components may display,
     store, or ignore the resulting metadata.
     """
+
+    _ranges: dict[str, tuple[HSVRange, ...]]
+    colors: list[str]
+    min_area: float
 
     DEFAULT_RANGES: ClassVar[dict[str, tuple[HSVRange, ...]]] = {
         "red": (
@@ -314,7 +367,7 @@ class ColorDetector(Detector):
         )
 
         self._ranges = dict(self.DEFAULT_RANGES)
-        self.colors: list[str] = []
+        self.colors = []
         self.min_area = 0.0
 
         self.configure(
@@ -328,17 +381,13 @@ class ColorDetector(Detector):
     ) -> tuple[str, ...]:
         return tuple(self._ranges)
 
+    @override
     def detect(
         self,
         frame: Frame,
     ) -> Metadata:
-        if not isinstance(frame, Frame):
-            raise TypeError("frame must be a Frame instance")
 
         image = frame.image
-
-        if not isinstance(image, np.ndarray):
-            raise TypeError("frame image must be a NumPy array")
 
         if image.ndim != 3 or image.shape[2] != 3:
             return Metadata.create(
@@ -353,9 +402,15 @@ class ColorDetector(Detector):
             )
 
         try:
-            hsv = cv2.cvtColor(
-                image,
-                cv2.COLOR_RGB2HSV,
+            hsv = cast(
+                NDArray[np.uint8],
+                cast(
+                    object,
+                    cv2.cvtColor(
+                        image,
+                        cv2.COLOR_RGB2HSV,
+                    ),
+                ),
             )
 
             all_detections: list[Detection] = []
@@ -374,10 +429,7 @@ class ColorDetector(Detector):
             raise DetectorError(f"color detection failed: {exc}") from exc
 
         all_detections.sort(
-            key=lambda detection: detection.data.get(
-                "area",
-                0,
-            ),
+            key=self._detection_area,
             reverse=True,
         )
 
@@ -392,6 +444,23 @@ class ColorDetector(Detector):
             },
         )
 
+    @staticmethod
+    def _detection_area(
+        detection: Detection,
+    ) -> float:
+        area = detection.data.get(
+            "area",
+            0.0,
+        )
+
+        if isinstance(area, bool) or not isinstance(
+            area,
+            int | float,
+        ):
+            raise DetectorError("color detection returned an invalid area")
+
+        return float(area)
+
     def _detect_color(
         self,
         hsv: NDArray[np.uint8],
@@ -400,20 +469,41 @@ class ColorDetector(Detector):
         mask: NDArray[np.uint8] | None = None
 
         for lower, upper in self._ranges[color]:
-            current = cv2.inRange(
-                hsv,
+            lower_array: NDArray[np.uint8] = np.array(
                 lower,
-                upper,
+                dtype=np.uint8,
             )
 
-            mask = (
-                current
-                if mask is None
-                else cv2.bitwise_or(
-                    mask,
-                    current,
-                )
+            upper_array: NDArray[np.uint8] = np.array(
+                upper,
+                dtype=np.uint8,
             )
+
+            current = cast(
+                NDArray[np.uint8],
+                cast(
+                    object,
+                    cv2.inRange(
+                        hsv,
+                        lower_array,
+                        upper_array,
+                    ),
+                ),
+            )
+
+            if mask is None:
+                mask = current
+            else:
+                mask = cast(
+                    NDArray[np.uint8],
+                    cast(
+                        object,
+                        cv2.bitwise_or(
+                            mask,
+                            current,
+                        ),
+                    ),
+                )
 
         if mask is None:
             return []
@@ -480,6 +570,7 @@ class ColorDetector(Detector):
         if min_area is not None:
             self.min_area = _validate_min_area(min_area)
 
+    @override
     def enable(
         self,
         colors: str | Sequence[str] | None = None,

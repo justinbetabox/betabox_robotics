@@ -3,6 +3,8 @@ from __future__ import annotations
 import threading
 from collections.abc import Mapping, Sequence
 
+from typing_extensions import override
+
 from betabox_robotics.vision.consumer import FrameConsumer
 from betabox_robotics.vision.detector import (
     Detector,
@@ -46,15 +48,21 @@ class DetectionManager(FrameConsumer):
     results to MetadataBus. It does not own the camera or modify frame images.
     """
 
+    metadata_bus: MetadataBus
+
+    _detectors: dict[str, Detector]
+    _lock: threading.Lock
+
+    color: ColorDetector
+    face: FaceDetector
+    objects: ObjectDetector
+
     def __init__(
         self,
         metadata_bus: MetadataBus,
     ) -> None:
-        if not isinstance(metadata_bus, MetadataBus):
-            raise TypeError("metadata_bus must be a MetadataBus")
-
         self.metadata_bus = metadata_bus
-        self._detectors: dict[str, Detector] = {}
+        self._detectors = {}
         self._lock = threading.Lock()
 
         self.color = ColorDetector()
@@ -69,9 +77,6 @@ class DetectionManager(FrameConsumer):
         self,
         detector: Detector,
     ) -> None:
-        if not isinstance(detector, Detector):
-            raise TypeError("detector must be a Detector instance")
-
         with self._lock:
             if detector.name in self._detectors:
                 raise DetectionError(f"detector already registered: {detector.name}")
@@ -85,7 +90,7 @@ class DetectionManager(FrameConsumer):
         detector_name = _validate_detector_name(name)
 
         with self._lock:
-            self._detectors.pop(
+            _ = self._detectors.pop(
                 detector_name,
                 None,
             )
@@ -131,13 +136,11 @@ class DetectionManager(FrameConsumer):
         with self._lock:
             return list(self._detectors)
 
+    @override
     def on_frame(
         self,
         frame: Frame,
     ) -> None:
-        if not isinstance(frame, Frame):
-            raise TypeError("frame must be a Frame instance")
-
         with self._lock:
             detectors = tuple(self._detectors.values())
 

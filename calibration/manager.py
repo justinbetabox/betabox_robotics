@@ -31,6 +31,8 @@ class CalibrationManager:
     calibration. It does not construct robots or access hardware.
     """
 
+    calibration_file: Path
+
     def __init__(
         self,
         calibration_file: str | Path,
@@ -45,7 +47,6 @@ class CalibrationManager:
 
         Missing calibration files return factory calibration defaults.
         """
-
         return load_calibration(self.calibration_file)
 
     def save(
@@ -55,13 +56,6 @@ class CalibrationManager:
         """
         Persist calibration and return the saved value.
         """
-
-        if not isinstance(
-            calibration,
-            RobotCalibration,
-        ):
-            raise TypeError("calibration must be a RobotCalibration")
-
         save_calibration(
             self.calibration_file,
             calibration,
@@ -78,7 +72,6 @@ class CalibrationManager:
         Returns True when a saved file was removed and False when no
         saved calibration existed.
         """
-
         return reset_calibration(self.calibration_file)
 
     def exists(
@@ -87,5 +80,4 @@ class CalibrationManager:
         """
         Return whether saved calibration exists.
         """
-
         return self.calibration_file.is_file()

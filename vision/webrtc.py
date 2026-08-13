@@ -4,7 +4,7 @@ import asyncio
 import fractions
 import math
 import threading
-from typing import Any
+from typing import TypedDict
 
 import numpy as np
 from aiortc import (
@@ -13,8 +13,11 @@ from aiortc import (
     RTCSessionDescription,
 )
 from av.video.frame import VideoFrame
+from typing_extensions import override
 
-from betabox_robotics.vision.frame import Frame
+from betabox_robotics.vision.frame import (
+    Frame,
+)
 from betabox_robotics.vision.metadata_bus import MetadataBus
 from betabox_robotics.vision.overlay import OverlayError, OverlayRenderer
 from betabox_robotics.vision.stream import Streamer, StreamError
@@ -40,6 +43,19 @@ def _validate_fps(
     return fps
 
 
+class WebRTCOverlayStatus(TypedDict):
+    enabled: bool
+    source: str | None
+
+
+class WebRTCStatistics(TypedDict):
+    running: bool
+    clients: int
+    overlay: WebRTCOverlayStatus
+    frames_received: int
+    has_frame: bool
+
+
 class VisionVideoTrack(MediaStreamTrack):
     """
     WebRTC video track backed by the latest frame received by WebRTCStreamer.
@@ -48,7 +64,13 @@ class VisionVideoTrack(MediaStreamTrack):
     ndarray format.
     """
 
-    kind = "video"
+    kind: str = "video"
+
+    streamer: WebRTCStreamer
+    fps: float
+    _timestamp: int
+    _time_base: fractions.Fraction
+    _timestamp_step: int
 
     def __init__(
         self,
@@ -57,9 +79,6 @@ class VisionVideoTrack(MediaStreamTrack):
     ) -> None:
         super().__init__()
 
-        if not isinstance(streamer, WebRTCStreamer):
-            raise TypeError("streamer must be a WebRTCStreamer")
-
         self.streamer = streamer
         self.fps = _validate_fps(fps)
 
@@ -67,6 +86,7 @@ class VisionVideoTrack(MediaStreamTrack):
         self._time_base = fractions.Fraction(1, 90_000)
         self._timestamp_step = round(90_000 / self.fps)
 
+    @override
     async def recv(self) -> VideoFrame:
         await asyncio.sleep(1.0 / self.fps)
 
@@ -79,9 +99,6 @@ class VisionVideoTrack(MediaStreamTrack):
             )
         else:
             image = frame.image
-
-            if not isinstance(image, np.ndarray):
-                raise StreamError("stream frame image must be a NumPy array")
 
             if image.ndim != 3 or image.shape[2] != 3:
                 raise StreamError("streaming requires a 3-channel image")
@@ -115,6 +132,21 @@ class WebRTCStreamer(Streamer):
     an unbounded frame backlog.
     """
 
+    fps: float
+    metadata_bus: MetadataBus | None
+    overlay: OverlayRenderer
+
+    _running: bool
+    _latest_frame: Frame | None
+    _frames_received: int
+
+    _overlay_enabled: bool
+    _overlay_source: str | None
+
+    _state_lock: threading.Lock
+    _peer_connections: set[RTCPeerConnection]
+    _peer_lock: threading.Lock
+
     def __init__(
         self,
         *,
@@ -122,34 +154,23 @@ class WebRTCStreamer(Streamer):
         metadata_bus: MetadataBus | None = None,
         overlay: OverlayRenderer | None = None,
     ) -> None:
-        if metadata_bus is not None and not isinstance(
-            metadata_bus,
-            MetadataBus,
-        ):
-            raise TypeError("metadata_bus must be a MetadataBus")
-
-        if overlay is not None and not isinstance(
-            overlay,
-            OverlayRenderer,
-        ):
-            raise TypeError("overlay must be an OverlayRenderer")
-
         self.fps = _validate_fps(fps)
         self.metadata_bus = metadata_bus
         self.overlay = overlay if overlay is not None else OverlayRenderer()
 
         self._running = False
-        self._latest_frame: Frame | None = None
+        self._latest_frame = None
         self._frames_received = 0
 
         self._overlay_enabled = False
-        self._overlay_source: str | None = None
+        self._overlay_source = None
 
         self._state_lock = threading.Lock()
 
-        self._peer_connections: set[RTCPeerConnection] = set()
+        self._peer_connections = set()
         self._peer_lock = threading.Lock()
 
+    @override
     def start(self) -> None:
         with self._state_lock:
             if self._running:
@@ -159,6 +180,7 @@ class WebRTCStreamer(Streamer):
             self._frames_received = 0
             self._running = True
 
+    @override
     def stop(self) -> None:
         """
         Stop accepting and retaining frames.
@@ -170,12 +192,11 @@ class WebRTCStreamer(Streamer):
             self._running = False
             self._latest_frame = None
 
+    @override
     def on_frame(
         self,
         frame: Frame,
     ) -> None:
-        if not isinstance(frame, Frame):
-            raise TypeError("frame must be a Frame instance")
 
         with self._state_lock:
             if not self._running:
@@ -199,16 +220,10 @@ class WebRTCStreamer(Streamer):
         A peer that fails during negotiation is closed and removed before the
         original exception is propagated.
         """
-        if not isinstance(sdp, str):
-            raise TypeError("sdp must be a string")
-
         normalized_sdp = sdp.strip()
 
         if not normalized_sdp:
             raise ValueError("sdp cannot be empty")
-
-        if not isinstance(offer_type, str):
-            raise TypeError("offer_type must be a string")
 
         normalized_type = offer_type.strip().casefold()
 
@@ -235,7 +250,9 @@ class WebRTCStreamer(Streamer):
                     with self._peer_lock:
                         self._peer_connections.discard(pc)
 
-            pc.addTrack(
+            _ = on_connectionstatechange
+
+            _ = pc.addTrack(
                 VisionVideoTrack(
                     self,
                     fps=self.fps,
@@ -255,8 +272,7 @@ class WebRTCStreamer(Streamer):
 
             local_description = pc.localDescription
 
-            if local_description is None:
-                raise StreamError("WebRTC peer did not produce a local description")
+            local_description = pc.localDescription
 
             negotiation_complete = True
 
@@ -279,7 +295,7 @@ class WebRTCStreamer(Streamer):
         if not peers:
             return
 
-        await asyncio.gather(
+        _ = await asyncio.gather(
             *(pc.close() for pc in peers),
             return_exceptions=True,
         )
@@ -292,9 +308,6 @@ class WebRTCStreamer(Streamer):
         source: str | None = None,
     ) -> None:
         if source is not None:
-            if not isinstance(source, str):
-                raise TypeError("source must be a string")
-
             source = source.strip()
 
             if not source:
@@ -341,16 +354,18 @@ class WebRTCStreamer(Streamer):
         except OverlayError:
             return frame
 
+    @override
     def clients(self) -> int:
         with self._peer_lock:
             return len(self._peer_connections)
 
-    def statistics(self) -> dict[str, Any]:
+    @override
+    def statistics(self) -> dict[str, object]:
         with self._state_lock:
             running = self._running
             frames_received = self._frames_received
             has_frame = self._latest_frame is not None
-            overlay_status = {
+            overlay_status: dict[str, object] = {
                 "enabled": self._overlay_enabled,
                 "source": self._overlay_source,
             }

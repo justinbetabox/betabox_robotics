@@ -85,12 +85,6 @@ class MotorConfig:
     trim: float = 1.0
 
     def __post_init__(self) -> None:
-        if not isinstance(self.pwm, PWMChannel):
-            raise TypeError("pwm must be a PWMChannel")
-
-        if not isinstance(self.direction, DigitalPin):
-            raise TypeError("direction must be a DigitalPin")
-
         reversed_value = _validate_bool(
             self.reversed,
             name="reversed",
@@ -122,9 +116,6 @@ class SteeringConfig:
     max_angle: float = 30.0
 
     def __post_init__(self) -> None:
-        if not isinstance(self.servo, PWMChannel):
-            raise TypeError("servo must be a PWMChannel")
-
         min_angle = _validate_number(
             self.min_angle,
             name="min_angle",
@@ -167,18 +158,6 @@ class CameraMountConfig:
     tilt_reversed: bool = False
 
     def __post_init__(self) -> None:
-        if not isinstance(
-            self.pan_servo,
-            PWMChannel,
-        ):
-            raise TypeError("pan_servo must be a PWMChannel")
-
-        if not isinstance(
-            self.tilt_servo,
-            PWMChannel,
-        ):
-            raise TypeError("tilt_servo must be a PWMChannel")
-
         pan_min_angle = _validate_number(
             self.pan_min_angle,
             name="pan_min_angle",
@@ -272,25 +251,6 @@ class DriveConfig:
     right_motor: MotorConfig
     steering: SteeringConfig
 
-    def __post_init__(self) -> None:
-        if not isinstance(
-            self.left_motor,
-            MotorConfig,
-        ):
-            raise TypeError("left_motor must be a MotorConfig")
-
-        if not isinstance(
-            self.right_motor,
-            MotorConfig,
-        ):
-            raise TypeError("right_motor must be a MotorConfig")
-
-        if not isinstance(
-            self.steering,
-            SteeringConfig,
-        ):
-            raise TypeError("steering must be a SteeringConfig")
-
 
 @dataclass(frozen=True, slots=True)
 class UltrasonicConfig:
@@ -299,18 +259,6 @@ class UltrasonicConfig:
     timeout: float = 0.02
 
     def __post_init__(self) -> None:
-        if not isinstance(
-            self.trigger,
-            DigitalPin,
-        ):
-            raise TypeError("trigger must be a DigitalPin")
-
-        if not isinstance(
-            self.echo,
-            DigitalPin,
-        ):
-            raise TypeError("echo must be a DigitalPin")
-
         timeout = _validate_positive_number(
             self.timeout,
             name="timeout",
@@ -335,44 +283,12 @@ class GrayscaleConfig:
     )
 
     def __post_init__(self) -> None:
-        for name, channel in (
-            (
-                "left",
-                self.left,
-            ),
-            (
-                "middle",
-                self.middle,
-            ),
-            (
-                "right",
-                self.right,
-            ),
-        ):
-            if not isinstance(
-                channel,
-                AnalogChannel,
-            ):
-                raise TypeError(f"{name} must be an AnalogChannel")
-
-        if not isinstance(
-            self.reference,
-            tuple,
-        ):
-            raise TypeError("reference must be a tuple")
-
         if len(self.reference) != 3:
             raise ValueError("reference must contain exactly 3 values")
 
         reference: list[int] = []
 
         for value in self.reference:
-            if isinstance(value, bool) or not isinstance(
-                value,
-                int,
-            ):
-                raise TypeError("reference values must be integers")
-
             if value < 0:
                 raise ValueError("reference values cannot be negative")
 
@@ -397,12 +313,6 @@ class BatteryConfig:
     critical_voltage: float = 6.2
 
     def __post_init__(self) -> None:
-        if not isinstance(
-            self.channel,
-            AnalogChannel,
-        ):
-            raise TypeError("channel must be an AnalogChannel")
-
         scale = _validate_positive_number(
             self.scale,
             name="scale",
@@ -441,25 +351,6 @@ class SensorsConfig:
     ultrasonic: UltrasonicConfig
     grayscale: GrayscaleConfig
     battery: BatteryConfig
-
-    def __post_init__(self) -> None:
-        if not isinstance(
-            self.ultrasonic,
-            UltrasonicConfig,
-        ):
-            raise TypeError("ultrasonic must be an UltrasonicConfig")
-
-        if not isinstance(
-            self.grayscale,
-            GrayscaleConfig,
-        ):
-            raise TypeError("grayscale must be a GrayscaleConfig")
-
-        if not isinstance(
-            self.battery,
-            BatteryConfig,
-        ):
-            raise TypeError("battery must be a BatteryConfig")
 
 
 @dataclass(frozen=True, slots=True)
@@ -523,15 +414,6 @@ class AudioConfig:
             self.preferred_output_device,
             name="preferred_output_device",
         )
-
-        if isinstance(
-            self.sample_rate,
-            bool,
-        ) or not isinstance(
-            self.sample_rate,
-            int,
-        ):
-            raise TypeError("sample_rate must be an integer")
 
         if self.sample_rate <= 0:
             raise ValueError("sample_rate must be greater than zero")
@@ -602,15 +484,6 @@ class SystemConfig:
         if self.media_root is None:
             return
 
-        if isinstance(
-            self.media_root,
-            bool,
-        ) or not isinstance(
-            self.media_root,
-            str | Path,
-        ):
-            raise TypeError("media_root must be a string, Path, or None")
-
         object.__setattr__(
             self,
             "media_root",
@@ -626,40 +499,3 @@ class RobotConfig:
     vision: VisionConfig = field(default_factory=VisionConfig)
     audio: AudioConfig = field(default_factory=AudioConfig)
     system: SystemConfig = field(default_factory=SystemConfig)
-
-    def __post_init__(self) -> None:
-        if not isinstance(
-            self.drive,
-            DriveConfig,
-        ):
-            raise TypeError("drive must be a DriveConfig")
-
-        if not isinstance(
-            self.camera_mount,
-            CameraMountConfig,
-        ):
-            raise TypeError("camera_mount must be a CameraMountConfig")
-
-        if not isinstance(
-            self.sensors,
-            SensorsConfig,
-        ):
-            raise TypeError("sensors must be a SensorsConfig")
-
-        if not isinstance(
-            self.vision,
-            VisionConfig,
-        ):
-            raise TypeError("vision must be a VisionConfig")
-
-        if not isinstance(
-            self.audio,
-            AudioConfig,
-        ):
-            raise TypeError("audio must be an AudioConfig")
-
-        if not isinstance(
-            self.system,
-            SystemConfig,
-        ):
-            raise TypeError("system must be a SystemConfig")

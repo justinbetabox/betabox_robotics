@@ -4,12 +4,24 @@ import socket
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Self, TypedDict
 
 from betabox_robotics.version import __version__
 
 if TYPE_CHECKING:
     from betabox_robotics.robots.config import SystemConfig
+
+
+class SystemStatusDict(TypedDict):
+    version: str
+    hostname: str
+    ip_addresses: list[str]
+    media: dict[str, str]
+
+
+class SystemHealthDict(TypedDict):
+    ok: bool
+    messages: list[str]
 
 
 def _validate_path(
@@ -118,12 +130,6 @@ class SystemStatus:
             ),
         )
 
-        if not isinstance(
-            self.ip_addresses,
-            tuple,
-        ):
-            raise TypeError("ip_addresses must be a tuple")
-
         object.__setattr__(
             self,
             "ip_addresses",
@@ -136,13 +142,7 @@ class SystemStatus:
             ),
         )
 
-        if not isinstance(
-            self.media,
-            MediaPaths,
-        ):
-            raise TypeError("media must be a MediaPaths")
-
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> SystemStatusDict:
         return {
             "version": self.version,
             "hostname": self.hostname,
@@ -157,15 +157,6 @@ class SystemHealth:
     messages: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        if not isinstance(self.ok, bool):
-            raise TypeError("ok must be a boolean")
-
-        if not isinstance(
-            self.messages,
-            tuple,
-        ):
-            raise TypeError("messages must be a tuple")
-
         object.__setattr__(
             self,
             "messages",
@@ -178,7 +169,7 @@ class SystemHealth:
             ),
         )
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> SystemHealthDict:
         return {
             "ok": self.ok,
             "messages": list(self.messages),
@@ -193,6 +184,9 @@ class System:
     """
     System information and platform paths.
     """
+
+    _media_root: Path
+    _closed: bool
 
     def __init__(
         self,
@@ -234,13 +228,8 @@ class System:
         cls,
         config: SystemConfig,
     ) -> Self:
-        try:
-            media_root = config.media_root
-        except AttributeError as exc:
-            raise TypeError("config must provide media_root") from exc
-
         return cls(
-            media_root=media_root,
+            media_root=config.media_root,
         )
 
     def hostname(self) -> str:

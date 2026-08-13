@@ -3,6 +3,8 @@ from __future__ import annotations
 import shutil
 from typing import ClassVar
 
+from typing_extensions import override
+
 from betabox_robotics.audio.exceptions import SpeechError
 from betabox_robotics.audio.speech.base import (
     SpeechBackend,
@@ -21,18 +23,19 @@ class PicoSpeech(SpeechBackend):
     name: ClassVar[str] = "pico"
     executable_name: ClassVar[str] = "pico2wave"
 
+    language: str
+
     def __init__(
         self,
         *,
         language: str = "en-US",
     ) -> None:
-        if not isinstance(language, str):
-            raise TypeError("language must be a string")
+        language = language.strip()
 
-        if not language.strip():
+        if not language:
             raise ValueError("language cannot be empty")
 
-        self.language = language.strip()
+        self.language = language
 
     @classmethod
     def executable(
@@ -46,6 +49,7 @@ class PicoSpeech(SpeechBackend):
     ) -> bool:
         return cls.executable() is not None
 
+    @override
     def synthesize(
         self,
         text: str,

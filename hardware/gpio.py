@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-from gpiozero import Device
+from typing import Protocol, cast
+
+from gpiozero import Device  # pyright: ignore[reportMissingTypeStubs]
+
+
+class _GPIOFactory(Protocol):
+    def close(self) -> None: ...
 
 
 def close_gpio_factory() -> None:
@@ -12,7 +18,10 @@ def close_gpio_factory() -> None:
     has finished using all gpiozero-backed hardware.
     """
 
-    factory = Device.pin_factory
+    factory = cast(
+        _GPIOFactory | None,
+        Device.pin_factory,
+    )
 
     if factory is None:
         return

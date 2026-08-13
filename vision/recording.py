@@ -6,13 +6,16 @@ import threading
 from dataclasses import dataclass
 from pathlib import Path
 from time import strftime
-from typing import Literal
+from typing import BinaryIO, Literal, cast
 
 import cv2
-import numpy as np
+from typing_extensions import override
 
 from betabox_robotics.vision.consumer import FrameConsumer
-from betabox_robotics.vision.frame import Frame
+from betabox_robotics.vision.frame import (
+    Frame,
+    ImageArray,
+)
 from betabox_robotics.vision.frame_source import FrameSourceError
 from betabox_robotics.vision.metadata_bus import MetadataBus
 from betabox_robotics.vision.overlay import (
@@ -124,6 +127,28 @@ class RecordingService(FrameConsumer):
     as a FrameConsumer with FrameSource while recording.
     """
 
+    directory: Path
+    fps: float
+    filename_prefix: str
+    metadata_bus: MetadataBus | None
+    overlay: OverlayRenderer
+    overlay_enabled: bool
+    overlay_source: str | None
+
+    _process: subprocess.Popen[bytes] | None
+    _path: Path | None
+    _last_error: RecordingError | None
+    _start_timestamp: float | None
+    _end_timestamp: float | None
+    _frame_count: int
+    _recording: bool
+    _size: tuple[int, int] | None
+
+    _lock: threading.Lock
+    _frame_condition: threading.Condition
+    _pending_frame: Frame | None
+    _worker: threading.Thread | None
+
     def __init__(
         self,
         *,
@@ -133,18 +158,6 @@ class RecordingService(FrameConsumer):
         metadata_bus: MetadataBus | None = None,
         overlay: OverlayRenderer | None = None,
     ) -> None:
-        if metadata_bus is not None and not isinstance(
-            metadata_bus,
-            MetadataBus,
-        ):
-            raise TypeError("metadata_bus must be a MetadataBus")
-
-        if overlay is not None and not isinstance(
-            overlay,
-            OverlayRenderer,
-        ):
-            raise TypeError("overlay must be an OverlayRenderer")
-
         self.directory = (
             Path("/tmp/betabox-video")
             if directory is None
@@ -155,7 +168,7 @@ class RecordingService(FrameConsumer):
         self.metadata_bus = metadata_bus
         self.overlay = overlay if overlay is not None else OverlayRenderer()
         self.overlay_enabled = False
-        self.overlay_source: str | None = None
+        self.overlay_source = None
 
         self._process = None
         self._path = None
@@ -292,7 +305,7 @@ class RecordingService(FrameConsumer):
 
             except subprocess.TimeoutExpired as exc:
                 process.kill()
-                process.wait()
+                _ = process.wait()
 
                 failure = RecordingError("FFmpeg did not finish within 30 seconds")
 
@@ -303,15 +316,18 @@ class RecordingService(FrameConsumer):
 
             error = ""
 
-            if process.stderr is not None:
-                error = (
-                    process.stderr.read()
-                    .decode(
-                        "utf-8",
-                        errors="replace",
-                    )
-                    .strip()
-                )
+            stderr = cast(
+                BinaryIO | None,
+                process.stderr,
+            )
+
+            if stderr is not None:
+                stderr_data: bytes = stderr.read()
+
+                error = stderr_data.decode(
+                    "utf-8",
+                    errors="replace",
+                ).strip()
 
             if returncode != 0:
                 failure = RecordingError(
@@ -374,13 +390,11 @@ class RecordingService(FrameConsumer):
         with self._frame_condition:
             return self._last_error
 
+    @override
     def on_frame(
         self,
         frame: Frame,
     ) -> None:
-        if not isinstance(frame, Frame):
-            raise TypeError("frame must be a Frame instance")
-
         with self._frame_condition:
             if not self._recording:
                 return
@@ -392,7 +406,7 @@ class RecordingService(FrameConsumer):
         while True:
             with self._frame_condition:
                 while self._recording and self._pending_frame is None:
-                    self._frame_condition.wait()
+                    _ = self._frame_condition.wait()
 
                 if not self._recording and self._pending_frame is None:
                     return
@@ -420,13 +434,7 @@ class RecordingService(FrameConsumer):
         self,
         frame: Frame,
     ) -> None:
-        if not isinstance(frame, Frame):
-            raise TypeError("frame must be a Frame instance")
-
         image = frame.image
-
-        if not isinstance(image, np.ndarray):
-            raise TypeError("frame image must be a NumPy array")
 
         if image.ndim != 3 or image.shape[2] != 3:
             raise RecordingError("recording requires a 3-channel image")
@@ -455,31 +463,42 @@ class RecordingService(FrameConsumer):
         image = frame.image
 
         try:
-            image = cv2.cvtColor(
-                image,
-                cv2.COLOR_RGB2BGR,
+            image = cast(
+                ImageArray,
+                cast(
+                    object,
+                    cv2.cvtColor(
+                        image,
+                        cv2.COLOR_RGB2BGR,
+                    ),
+                ),
             )
         except cv2.error as exc:
             raise RecordingError(f"failed to prepare recording frame: {exc}") from exc
 
-        assert self._process is not None
-        assert self._process.stdin is not None
+        process = self._process
+
+        if process is None or process.stdin is None:
+            raise RecordingError("FFmpeg encoder is not available")
 
         try:
-            self._process.stdin.write(image.tobytes())
+            _ = process.stdin.write(image.tobytes())
 
         except BrokenPipeError as exc:
             error = ""
 
-            if self._process.stderr is not None:
-                error = (
-                    self._process.stderr.read()
-                    .decode(
-                        "utf-8",
-                        errors="replace",
-                    )
-                    .strip()
-                )
+            stderr = cast(
+                BinaryIO | None,
+                process.stderr,
+            )
+
+            if stderr is not None:
+                stderr_data: bytes = stderr.read()
+
+                error = stderr_data.decode(
+                    "utf-8",
+                    errors="replace",
+                ).strip()
 
             raise RecordingError(
                 "FFmpeg stopped accepting frames" + (f": {error}" if error else "")
@@ -493,9 +512,6 @@ class RecordingService(FrameConsumer):
         source: str | None = None,
     ) -> None:
         if source is not None:
-            if not isinstance(source, str):
-                raise TypeError("source must be a string")
-
             source = source.strip()
 
             if not source:
@@ -566,7 +582,7 @@ class RecordingService(FrameConsumer):
 
         if process.stdin is None:
             process.kill()
-            process.wait()
+            _ = process.wait()
 
             raise RecordingError("failed to open FFmpeg input pipe")
 
@@ -592,7 +608,7 @@ class RecordingService(FrameConsumer):
             process.kill()
 
         try:
-            process.wait(timeout=5.0)
+            _ = process.wait(timeout=5.0)
         except subprocess.TimeoutExpired:
             process.kill()
-            process.wait()
+            _ = process.wait()

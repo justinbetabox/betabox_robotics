@@ -37,6 +37,13 @@ class Grayscale:
         1000,
     )
 
+    channels: tuple[ADC, ADC, ADC]
+
+    _reference: tuple[int, int, int]
+    _floor: tuple[float, float, float] | None
+    _line: tuple[float, float, float] | None
+    _closed: bool
+
     def __init__(
         self,
         left: ADC,
@@ -44,15 +51,6 @@ class Grayscale:
         right: ADC,
         reference: Sequence[int] | None = None,
     ) -> None:
-        if not isinstance(left, ADC):
-            raise TypeError("left must be an ADC instance")
-
-        if not isinstance(middle, ADC):
-            raise TypeError("middle must be an ADC instance")
-
-        if not isinstance(right, ADC):
-            raise TypeError("right must be an ADC instance")
-
         self.channels = (
             left,
             middle,
@@ -63,24 +61,8 @@ class Grayscale:
 
         self._reference = self._validated_reference(selected_reference)
 
-        self._floor: (
-            tuple[
-                float,
-                float,
-                float,
-            ]
-            | None
-        ) = None
-
-        self._line: (
-            tuple[
-                float,
-                float,
-                float,
-            ]
-            | None
-        ) = None
-
+        self._floor = None
+        self._line = None
         self._closed = False
 
     @classmethod
@@ -169,12 +151,6 @@ class Grayscale:
         validated: list[int] = []
 
         for index, value in enumerate(values):
-            if isinstance(value, bool) or not isinstance(
-                value,
-                int,
-            ):
-                raise TypeError(f"reference value {index} must be an integer")
-
             if not 0 <= value <= ADC.MAX_VALUE:
                 raise GrayscaleError(
                     f"reference value {index} must be between 0 and {ADC.MAX_VALUE}"
@@ -239,9 +215,6 @@ class Grayscale:
             channel_index = self._validate_channel(channel)
 
             return [self.channels[channel_index].read()]
-
-        except GrayscaleError:
-            raise
 
         except (
             HardwareError,

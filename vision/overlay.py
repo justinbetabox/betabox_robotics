@@ -5,11 +5,15 @@ from dataclasses import dataclass
 from typing import Final
 
 import cv2
-import numpy as np
-from numpy.typing import NDArray
 
-from betabox_robotics.vision.frame import Frame
-from betabox_robotics.vision.metadata import Detection, Metadata
+from betabox_robotics.vision.frame import (
+    Frame,
+    ImageArray,
+)
+from betabox_robotics.vision.metadata import (
+    Detection,
+    Metadata,
+)
 
 Color = tuple[int, int, int]
 
@@ -37,20 +41,8 @@ class OverlayStyle:
     label_thickness: int = 1
 
     def __post_init__(self) -> None:
-        if isinstance(self.box_thickness, bool) or not isinstance(
-            self.box_thickness,
-            int,
-        ):
-            raise TypeError("box_thickness must be an integer")
-
         if self.box_thickness <= 0:
             raise ValueError("box_thickness must be greater than zero")
-
-        if isinstance(self.label_scale, bool) or not isinstance(
-            self.label_scale,
-            int | float,
-        ):
-            raise TypeError("label_scale must be a number")
 
         label_scale = float(self.label_scale)
 
@@ -59,12 +51,6 @@ class OverlayStyle:
 
         if label_scale <= 0:
             raise ValueError("label_scale must be greater than zero")
-
-        if isinstance(self.label_thickness, bool) or not isinstance(
-            self.label_thickness,
-            int,
-        ):
-            raise TypeError("label_thickness must be an integer")
 
         if self.label_thickness <= 0:
             raise ValueError("label_thickness must be greater than zero")
@@ -84,16 +70,12 @@ class OverlayRenderer:
     It does not run detection and does not own the camera.
     """
 
+    style: OverlayStyle
+
     def __init__(
         self,
         style: OverlayStyle | None = None,
     ) -> None:
-        if style is not None and not isinstance(
-            style,
-            OverlayStyle,
-        ):
-            raise TypeError("style must be an OverlayStyle")
-
         self.style = style if style is not None else OverlayStyle()
 
     def draw_metadata(
@@ -101,16 +83,7 @@ class OverlayRenderer:
         frame: Frame,
         metadata: Metadata,
     ) -> Frame:
-        if not isinstance(frame, Frame):
-            raise TypeError("frame must be a Frame instance")
-
-        if not isinstance(metadata, Metadata):
-            raise TypeError("metadata must be a Metadata instance")
-
         image = frame.image
-
-        if not isinstance(image, np.ndarray):
-            raise TypeError("frame image must be a NumPy array")
 
         if image.ndim != 3 or image.shape[2] != 3:
             raise OverlayError("overlay rendering requires a three-channel image")
@@ -139,7 +112,7 @@ class OverlayRenderer:
 
     def _draw_detection(
         self,
-        image: NDArray[np.uint8],
+        image: ImageArray,
         detection: Detection,
     ) -> None:
         if detection.box is None:
@@ -167,7 +140,7 @@ class OverlayRenderer:
             DEFAULT_COLOR,
         )
 
-        cv2.rectangle(
+        _ = cv2.rectangle(
             image,
             (x1, y1),
             (x2, y2),
@@ -188,7 +161,7 @@ class OverlayRenderer:
                 y1 + 16,
             )
 
-        cv2.putText(
+        _ = cv2.putText(
             image,
             label,
             (x1, label_y),

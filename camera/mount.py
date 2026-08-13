@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import math
-from dataclasses import asdict, dataclass
-from typing import TYPE_CHECKING, Any, Self
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Self
 
 from betabox_robotics.hardware import (
     HardwareError,
@@ -36,8 +36,17 @@ class CameraMountStatus:
 
     def to_dict(
         self,
-    ) -> dict[str, Any]:
-        return asdict(self)
+    ) -> dict[str, float | None]:
+        return {
+            "pan": self.pan,
+            "tilt": self.tilt,
+            "pan_offset": self.pan_offset,
+            "tilt_offset": self.tilt_offset,
+            "pan_min": self.pan_min,
+            "pan_max": self.pan_max,
+            "tilt_min": self.tilt_min,
+            "tilt_max": self.tilt_max,
+        }
 
 
 class CameraMount:
@@ -47,6 +56,24 @@ class CameraMount:
     Public pan and tilt values are logical mount angles in degrees.
     The mount owns both underlying Servo instances.
     """
+
+    config: CameraMountConfig
+
+    _pan_min: float
+    _pan_max: float
+    _tilt_min: float
+    _tilt_max: float
+
+    _pan_center: float
+    _tilt_center: float
+
+    _pan_servo: Servo | None
+    _tilt_servo: Servo | None
+
+    _pan: float | None
+    _tilt: float | None
+
+    _closed: bool
 
     def __init__(
         self,
@@ -102,12 +129,6 @@ class CameraMount:
                 "tilt_center must be within the configured tilt range"
             )
 
-        if not isinstance(config.pan_reversed, bool):
-            raise TypeError("pan_reversed must be a boolean")
-
-        if not isinstance(config.tilt_reversed, bool):
-            raise TypeError("tilt_reversed must be a boolean")
-
         self.config = config
 
         self._pan_min = pan_min
@@ -117,11 +138,11 @@ class CameraMount:
         self._pan_center = pan_center
         self._tilt_center = tilt_center
 
-        self._pan_servo: Servo | None = None
-        self._tilt_servo: Servo | None = None
+        self._pan_servo = None
+        self._tilt_servo = None
 
-        self._pan: float | None = None
-        self._tilt: float | None = None
+        self._pan = None
+        self._tilt = None
         self._closed = False
 
         pan_servo_min, pan_servo_max = self._logical_limits_to_servo_limits(
@@ -276,9 +297,6 @@ class CameraMount:
     ) -> None:
         self._require_open()
 
-        if not isinstance(smooth, bool):
-            raise TypeError("smooth must be a boolean")
-
         # Validate both requested values before moving either axis.
         pan_value = None if pan is None else self._validated_pan(pan)
 
@@ -304,9 +322,6 @@ class CameraMount:
     ) -> None:
         self._require_open()
 
-        if not isinstance(smooth, bool):
-            raise TypeError("smooth must be a boolean")
-
         self._move_pan(
             self._validated_pan(angle),
             smooth=smooth,
@@ -319,9 +334,6 @@ class CameraMount:
         smooth: bool = True,
     ) -> None:
         self._require_open()
-
-        if not isinstance(smooth, bool):
-            raise TypeError("smooth must be a boolean")
 
         self._move_tilt(
             self._validated_tilt(angle),

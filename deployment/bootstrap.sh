@@ -2,7 +2,7 @@
 set -e
 
 REPO_URL="https://github.com/justinbetabox/betabox_robotics.git"
-BRANCH="refactor/strict-typing-cleanup"
+BRANCH="main"
 
 LIB_DIR="/opt/libs"
 SDK_DIR="$LIB_DIR/betabox_robotics"

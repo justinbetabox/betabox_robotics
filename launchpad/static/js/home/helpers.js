@@ -169,6 +169,12 @@ export function normalizeHealthState(status) {
         ),
     ).toLowerCase();
 
+    const passiveHardwareAvailable = objectValue(
+        status,
+        "hardware",
+        "passive_hardware_available",
+    );
+
     const grayscalePlausible = objectValue(
         status,
         "hardware",
@@ -183,12 +189,6 @@ export function normalizeHealthState(status) {
         "service_available",
     );
 
-    console.log(
-        "HUD grayscale:",
-        grayscalePlausible,
-        objectValue(status, "hardware", "sensors"),
-    );
-
     if (
         batteryState === "unknown" &&
         temperatureState === "unknown" &&
@@ -200,7 +200,11 @@ export function normalizeHealthState(status) {
         };
     }
 
-    if (batteryState === "critical" || temperatureState === "critical") {
+    if (
+        passiveHardwareAvailable === false ||
+        batteryState === "critical" ||
+        temperatureState === "critical"
+    ) {
         return {
             label: "Needs Attention",
             cssClass: "status-critical",

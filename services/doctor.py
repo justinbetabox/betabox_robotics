@@ -33,6 +33,8 @@ from betabox_robotics.services.verify_checks import CheckResult, collect_checks
 
 Severity = Literal["info", "warning", "error", "critical"]
 
+ROBOT_HAT_I2C_ADDRESS = "0x14"
+
 SEVERITY_ORDER: dict[Severity, int] = {
     "info": 0,
     "warning": 1,
@@ -682,12 +684,40 @@ def diagnose_robot_hardware(
             ),
         )
 
+    if ROBOT_HAT_I2C_ADDRESS not in hardware.i2c.devices:
+        return Diagnosis(
+            title="Robot Hardware",
+            ok=False,
+            severity="critical",
+            summary="The Robot HAT is not responding on the I²C bus.",
+            causes=(
+                "The Robot HAT power switch may be off.",
+                "The Robot HAT may not be receiving power.",
+                "The Robot HAT connection may be loose.",
+                "I²C communication with the Robot HAT may have failed.",
+            ),
+            affected=(
+                "Drive",
+                "Steering",
+                "Battery",
+                "Sensors",
+            ),
+            actions=(
+                "Check that the Robot HAT power switch is on.",
+                "Check Robot HAT power and connections.",
+                "Reseat the Robot HAT if necessary.",
+                f"Run: i2cdetect -y {config.verification.i2c_bus}",
+            ),
+        )
+
     if not hardware.passive_hardware_available:
         return Diagnosis(
             title="Robot Hardware",
             ok=False,
             severity="critical",
-            summary=hardware.passive_hardware_error or "Robot hardware is unavailable.",
+            summary=(
+                hardware.passive_hardware_error or "Robot hardware is unavailable."
+            ),
             causes=(
                 "Robot HAT communication failed.",
                 "A required hardware component could not be constructed.",

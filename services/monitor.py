@@ -241,7 +241,10 @@ def severity_for_change(
         if current == "critical":
             return "error"
 
-        if current == "low":
+        if current in {
+            "low",
+            "unknown",
+        }:
             return "warning"
 
         return "info"
@@ -268,11 +271,17 @@ def severity_for_change(
 
         return "info"
 
-    if path_value.endswith("ultrasonic_available"):
-        return "info" if current is True else "warning"
-
     if path_value.startswith("services."):
-        return "info" if current == "active" else "error"
+        if current in {
+            "active",
+            "inactive",
+        }:
+            return "info"
+
+        if current == "failed":
+            return "error"
+
+        return "warning"
 
     if path_value.endswith(
         (
@@ -327,10 +336,10 @@ def message_for_change(
     labels = {
         "hardware.robot_available": "Robot hardware",
         "hardware.i2c_available": "I²C bus",
+        "hardware.i2c_devices": "I²C devices",
         "hardware.battery_state": "Battery",
         "hardware.grayscale_available": "Grayscale sensor",
         "hardware.grayscale_plausible": "Grayscale sensor readings",
-        "hardware.ultrasonic_available": "Ultrasonic sensor",
         "hardware.audio_available": "Audio device",
         "hardware.vision_service_available": "Vision service",
         "hardware.vision_running": "Vision runtime",
@@ -351,6 +360,16 @@ def message_for_change(
         path_value,
         path_value,
     )
+
+    if path_value.endswith("grayscale_plausible"):
+        if current is True:
+            return "Grayscale sensor readings became available"
+
+        if current is False:
+            return "Grayscale sensor readings became abnormal"
+
+        if current is None:
+            return "Grayscale sensor readings became unavailable"
 
     if isinstance(
         current,
@@ -541,7 +560,6 @@ def summarize(
             "battery_state": battery.get("state"),
             "grayscale_available": sensors.get("grayscale_available"),
             "grayscale_plausible": sensors.get("grayscale_plausible"),
-            "ultrasonic_available": sensors.get("ultrasonic_available"),
             "audio_available": audio.get("available"),
             "vision_service_available": vision.get("service_available"),
             "vision_running": vision.get("running"),

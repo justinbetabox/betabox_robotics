@@ -35,6 +35,18 @@ export function collectAttentionItems(data) {
         }
     }
 
+    const passiveHardwareAvailable = data.hardware?.passive_hardware_available;
+
+    if (passiveHardwareAvailable === false) {
+        items.push({
+            title: "Robot Hardware Unavailable",
+            message:
+                "The Robot HAT is not responding. " +
+                "Check that the Robot HAT power switch is on.",
+            severity: "critical",
+        });
+    }
+
     const battery = data.hardware?.battery ?? {};
 
     if (battery.state === "critical") {
@@ -51,7 +63,7 @@ export function collectAttentionItems(data) {
         });
     }
 
-    if (battery.error) {
+    if (passiveHardwareAvailable !== false && battery.error) {
         items.push({
             title: "Battery Reading Error",
             message: String(battery.error),
@@ -61,46 +73,42 @@ export function collectAttentionItems(data) {
 
     const sensors = data.hardware?.sensors ?? {};
 
-    if (sensors.grayscale_available === false) {
-        items.push({
-            title: "Grayscale Unavailable",
-            message: "The grayscale sensor could not be read.",
-            severity: "warning",
-        });
-    } else if (sensors.grayscale_plausible === false) {
-        const suspiciousChannels = sensors.grayscale_suspicious_channels ?? [];
+    if (passiveHardwareAvailable !== false) {
+        if (sensors.grayscale_available === false) {
+            items.push({
+                title: "Grayscale Unavailable",
+                message: "The grayscale sensor could not be read.",
+                severity: "warning",
+            });
+        } else if (sensors.grayscale_plausible === false) {
+            const suspiciousChannels =
+                sensors.grayscale_suspicious_channels ?? [];
 
-        let message = "The grayscale sensor is reporting abnormal readings.";
+            let message =
+                "The grayscale sensor is reporting abnormal readings.";
 
-        if (suspiciousChannels.length === 3) {
-            message = "The grayscale module may be disconnected or faulty.";
-        } else if (suspiciousChannels.length > 0) {
-            const channelNames = ["left", "middle", "right"];
+            if (suspiciousChannels.length === 3) {
+                message = "The grayscale module may be disconnected or faulty.";
+            } else if (suspiciousChannels.length > 0) {
+                const channelNames = ["left", "middle", "right"];
 
-            const names = suspiciousChannels
-                .map((channel) => channelNames[channel])
-                .filter((name) => name !== undefined);
+                const names = suspiciousChannels
+                    .map((channel) => channelNames[channel])
+                    .filter((name) => name !== undefined);
 
-            if (names.length > 0) {
-                message =
-                    `The ${names.join(", ")} grayscale sensor ` +
-                    "may be disconnected or faulty.";
+                if (names.length > 0) {
+                    message =
+                        `The ${names.join(", ")} grayscale sensor ` +
+                        "may be disconnected or faulty.";
+                }
             }
+
+            items.push({
+                title: "Grayscale Sensor Warning",
+                message,
+                severity: "warning",
+            });
         }
-
-        items.push({
-            title: "Grayscale Sensor Warning",
-            message,
-            severity: "warning",
-        });
-    }
-
-    if (sensors.ultrasonic_available === false) {
-        items.push({
-            title: "Ultrasonic Sensor Warning",
-            message: "The ultrasonic sensor is not responding.",
-            severity: "warning",
-        });
     }
 
     const vision = data.hardware?.vision ?? {};

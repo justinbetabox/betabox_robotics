@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Final
+
 from betabox_robotics.hardware import HardwareError
 from betabox_robotics.robots.config import SensorsConfig
 from betabox_robotics.sensors import (
@@ -13,6 +15,9 @@ from .models import (
     SensorStatus,
 )
 
+GRAYSCALE_IMPLAUSIBLE_HIGH: Final[int] = 3000
+GRAYSCALE_PLAUSIBILITY_SAMPLES: Final[int] = 5
+
 
 def _validate_sensors_config(
     value: object,
@@ -24,6 +29,27 @@ def _validate_sensors_config(
         raise TypeError("sensors_config must be a SensorsConfig")
 
     return value
+
+
+def _grayscale_plausibility(
+    sensor: Grayscale,
+    first_values: list[int],
+) -> tuple[bool, tuple[int, ...]]:
+    samples = [first_values]
+
+    for _ in range(GRAYSCALE_PLAUSIBILITY_SAMPLES - 1):
+        samples.append(sensor.read())
+
+    suspicious_channels = tuple(
+        channel
+        for channel in range(Grayscale.CHANNEL_COUNT)
+        if all(sample[channel] > GRAYSCALE_IMPLAUSIBLE_HIGH for sample in samples)
+    )
+
+    return (
+        not suspicious_channels,
+        suspicious_channels,
+    )
 
 
 def collect_battery_status(
@@ -94,7 +120,6 @@ def collect_robot_status(
 
     try:
         grayscale_sensor = Grayscale.default(config_value.grayscale)
-
     except (
         HardwareError,
         OSError,
@@ -108,8 +133,10 @@ def collect_robot_status(
             SensorStatus(
                 grayscale_available=False,
                 grayscale_values=None,
+                grayscale_plausible=None,
+                grayscale_suspicious_channels=(),
                 ultrasonic_configured=ultrasonic_configured,
-                error=("passive sensors could not be constructed"),
+                error="passive sensors could not be constructed",
             ),
             str(exc),
         )
@@ -118,9 +145,19 @@ def collect_robot_status(
         try:
             grayscale_values = grayscale_sensor.read()
 
+            (
+                grayscale_plausible,
+                grayscale_suspicious_channels,
+            ) = _grayscale_plausibility(
+                grayscale_sensor,
+                grayscale_values,
+            )
+
             sensors = SensorStatus(
                 grayscale_available=True,
                 grayscale_values=tuple(int(value) for value in grayscale_values),
+                grayscale_plausible=grayscale_plausible,
+                grayscale_suspicious_channels=grayscale_suspicious_channels,
                 ultrasonic_configured=ultrasonic_configured,
             )
 
@@ -134,6 +171,8 @@ def collect_robot_status(
             sensors = SensorStatus(
                 grayscale_available=False,
                 grayscale_values=None,
+                grayscale_plausible=None,
+                grayscale_suspicious_channels=(),
                 ultrasonic_configured=ultrasonic_configured,
                 error=str(exc),
             )

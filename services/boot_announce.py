@@ -259,7 +259,7 @@ def main() -> int:
         if ready:
             _ = say(
                 audio,
-                "Ready for class",
+                "Ready for use",
                 config,
             )
             log(
@@ -275,14 +275,14 @@ def main() -> int:
             )
             _ = say(
                 audio,
-                "Teacher help needed",
+                "Troubleshooting needed",
                 config,
             )
             log(
                 "Boot announce complete: not ready",
                 config,
             )
-            result = 1
+            result = 0
 
     except (
         AudioError,

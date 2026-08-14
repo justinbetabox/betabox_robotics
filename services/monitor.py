@@ -262,6 +262,15 @@ def severity_for_change(
     if path_value.endswith("grayscale_available"):
         return "info" if current is True else "warning"
 
+    if path_value.endswith("grayscale_plausible"):
+        if current is False:
+            return "warning"
+
+        return "info"
+
+    if path_value.endswith("ultrasonic_available"):
+        return "info" if current is True else "warning"
+
     if path_value.startswith("services."):
         return "info" if current == "active" else "error"
 
@@ -320,6 +329,8 @@ def message_for_change(
         "hardware.i2c_available": "I²C bus",
         "hardware.battery_state": "Battery",
         "hardware.grayscale_available": "Grayscale sensor",
+        "hardware.grayscale_plausible": "Grayscale sensor readings",
+        "hardware.ultrasonic_available": "Ultrasonic sensor",
         "hardware.audio_available": "Audio device",
         "hardware.vision_service_available": "Vision service",
         "hardware.vision_running": "Vision runtime",
@@ -529,6 +540,8 @@ def summarize(
             ),
             "battery_state": battery.get("state"),
             "grayscale_available": sensors.get("grayscale_available"),
+            "grayscale_plausible": sensors.get("grayscale_plausible"),
+            "ultrasonic_available": sensors.get("ultrasonic_available"),
             "audio_available": audio.get("available"),
             "vision_service_available": vision.get("service_available"),
             "vision_running": vision.get("running"),

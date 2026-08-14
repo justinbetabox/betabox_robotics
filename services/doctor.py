@@ -9,6 +9,13 @@ from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
     PlatformConfig,
 )
+from betabox_robotics.exceptions import RobotBusyError
+from betabox_robotics.hardware.ownership import RobotOwnership
+from betabox_robotics.robots.betabox_car import BETABOX_CAR
+from betabox_robotics.sensors import (
+    Ultrasonic,
+    UltrasonicError,
+)
 from betabox_robotics.services.guest import (
     GuestWorkspaceStatus,
 )
@@ -785,39 +792,154 @@ def diagnose_grayscale(
 ) -> Diagnosis:
     sensors = hardware.sensors
 
-    if sensors.grayscale_available:
-        values = sensors.grayscale_values or []
+    if not sensors.grayscale_available:
+        return Diagnosis(
+            title="Grayscale",
+            ok=False,
+            severity="warning",
+            summary=sensors.error or "Grayscale sensor is unavailable.",
+            causes=(
+                "The grayscale sensor cable is disconnected.",
+                "The Robot HAT ADC is unavailable.",
+                "The sensor hardware is not responding.",
+            ),
+            affected=(
+                "Line following",
+                "Line avoidance",
+                "Surface reflectance readings",
+            ),
+            actions=(
+                "Check the grayscale sensor cable.",
+                "Check the Robot HAT connection.",
+                "Run the grayscale validation test.",
+            ),
+        )
 
-        summary = "Grayscale sensor is available."
+    values = sensors.grayscale_values or ()
+
+    if sensors.grayscale_plausible is False:
+        channel_names = (
+            "left",
+            "middle",
+            "right",
+        )
+
+        suspicious_channels = tuple(
+            channel_names[channel]
+            for channel in sensors.grayscale_suspicious_channels
+            if 0 <= channel < len(channel_names)
+        )
+
+        if len(suspicious_channels) == len(channel_names):
+            summary = (
+                "All grayscale sensor channels are reporting implausibly high values."
+            )
+            causes = (
+                "The grayscale sensor module may be disconnected.",
+                "The grayscale sensor cable may be loose or damaged.",
+                "The grayscale sensor module may be faulty.",
+            )
+        elif suspicious_channels:
+            names = ", ".join(suspicious_channels)
+            summary = f"Grayscale sensor readings appear abnormal on: {names}."
+            causes = (
+                "One or more grayscale sensors may be disconnected or faulty.",
+                "The grayscale sensor cable may be loose or damaged.",
+                "The affected sensor may not be responding correctly.",
+            )
+        else:
+            summary = "Grayscale sensor readings appear abnormal."
+            causes = (
+                "The grayscale sensor module may be disconnected or faulty.",
+                "The grayscale sensor cable may be loose or damaged.",
+            )
 
         if values:
             summary += " Values: " + ", ".join(str(value) for value in values)
 
-        return healthy(
-            "Grayscale",
-            summary,
+        return Diagnosis(
+            title="Grayscale",
+            ok=False,
+            severity="warning",
+            summary=summary,
+            causes=causes,
+            affected=(
+                "Line following",
+                "Line avoidance",
+                "Surface reflectance readings",
+            ),
+            actions=(
+                "Check the grayscale sensor cable.",
+                "Check that all three grayscale sensors are responding.",
+                "Run the grayscale validation test.",
+            ),
         )
 
-    return Diagnosis(
-        title="Grayscale",
-        ok=False,
-        severity="warning",
-        summary=sensors.error or "Grayscale sensor is unavailable.",
-        causes=(
-            "The grayscale sensor cable is disconnected.",
-            "The Robot HAT ADC is unavailable.",
-            "The sensor hardware is not responding.",
-        ),
-        affected=(
-            "Line following",
-            "Line avoidance",
-            "Surface reflectance readings",
-        ),
-        actions=(
-            "Check the grayscale sensor cable.",
-            "Check the Robot HAT connection.",
-            "Run the grayscale validation test.",
-        ),
+    summary = "Grayscale sensor is available."
+
+    if values:
+        summary += " Values: " + ", ".join(str(value) for value in values)
+
+    return healthy(
+        "Grayscale",
+        summary,
+    )
+
+
+def diagnose_ultrasonic() -> Diagnosis:
+    try:
+        with (
+            RobotOwnership(
+                owner="Betabox Doctor",
+            ),
+            Ultrasonic.default(
+                BETABOX_CAR.sensors.ultrasonic,
+            ) as ultrasonic,
+        ):
+            distance = ultrasonic.distance(samples=1)
+
+    except RobotBusyError as exc:
+        return Diagnosis(
+            title="Ultrasonic",
+            ok=False,
+            severity="warning",
+            summary=(
+                "Ultrasonic sensor could not be tested because the robot is in use."
+            ),
+            causes=(str(exc),),
+            affected=("Ultrasonic diagnostic test",),
+            actions=(
+                "Close Manual Drive or finish the running robot program.",
+                "Run the diagnostic again.",
+            ),
+        )
+
+    except UltrasonicError:
+        return Diagnosis(
+            title="Ultrasonic",
+            ok=False,
+            severity="warning",
+            summary="Ultrasonic sensor is not responding.",
+            causes=(
+                "The ultrasonic sensor may be disconnected.",
+                "The ultrasonic sensor cable may be loose or damaged.",
+                "The trigger or echo connection may not be working.",
+            ),
+            affected=(
+                "Distance sensing",
+                "Obstacle detection",
+                "Obstacle avoidance",
+            ),
+            actions=(
+                "Check the ultrasonic sensor connection.",
+                "Check the trigger and echo connections.",
+                "Run the ultrasonic validation test.",
+            ),
+        )
+
+    return healthy(
+        "Ultrasonic",
+        f"Ultrasonic sensor is responding. Distance: {distance:.1f} cm.",
     )
 
 
@@ -1074,6 +1196,7 @@ def collect_diagnoses(
     if robot_hardware.ok:
         diagnoses.append(diagnose_battery(hardware))
         diagnoses.append(diagnose_grayscale(hardware))
+        diagnoses.append(diagnose_ultrasonic())
 
     return tuple(diagnoses)
 

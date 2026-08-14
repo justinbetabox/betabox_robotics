@@ -705,6 +705,12 @@ class VisionClient:
 
             raise VisionClientError(str(message)) from exc
 
+        except error.URLError as exc:
+            raise VisionClientError(
+                "Betabox Vision service is not available. "
+                + "Run: sudo systemctl start betabox-video.service"
+            ) from exc
+
         try:
             raw_response_data = cast(
                 object,

@@ -59,6 +59,50 @@ export function collectAttentionItems(data) {
         });
     }
 
+    const sensors = data.hardware?.sensors ?? {};
+
+    if (sensors.grayscale_available === false) {
+        items.push({
+            title: "Grayscale Unavailable",
+            message: "The grayscale sensor could not be read.",
+            severity: "warning",
+        });
+    } else if (sensors.grayscale_plausible === false) {
+        const suspiciousChannels = sensors.grayscale_suspicious_channels ?? [];
+
+        let message = "The grayscale sensor is reporting abnormal readings.";
+
+        if (suspiciousChannels.length === 3) {
+            message = "The grayscale module may be disconnected or faulty.";
+        } else if (suspiciousChannels.length > 0) {
+            const channelNames = ["left", "middle", "right"];
+
+            const names = suspiciousChannels
+                .map((channel) => channelNames[channel])
+                .filter((name) => name !== undefined);
+
+            if (names.length > 0) {
+                message =
+                    `The ${names.join(", ")} grayscale sensor ` +
+                    "may be disconnected or faulty.";
+            }
+        }
+
+        items.push({
+            title: "Grayscale Sensor Warning",
+            message,
+            severity: "warning",
+        });
+    }
+
+    if (sensors.ultrasonic_available === false) {
+        items.push({
+            title: "Ultrasonic Sensor Warning",
+            message: "The ultrasonic sensor is not responding.",
+            severity: "warning",
+        });
+    }
+
     const vision = data.hardware?.vision ?? {};
 
     if (!vision.service_available) {

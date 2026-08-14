@@ -11,6 +11,7 @@ from betabox_robotics.vision.frame import Frame, ImageArray
 
 _CAMERA_OPERATION_ERRORS: Final = (
     AttributeError,
+    IndexError,
     OSError,
     RuntimeError,
     TypeError,

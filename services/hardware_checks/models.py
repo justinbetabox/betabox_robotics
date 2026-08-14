@@ -20,6 +20,8 @@ class BatteryStatusData(TypedDict):
 class SensorStatusData(TypedDict):
     grayscale_available: bool
     grayscale_values: list[int] | None
+    grayscale_plausible: bool | None
+    grayscale_suspicious_channels: list[int]
     ultrasonic_configured: bool
     error: str | None
 
@@ -83,6 +85,8 @@ class BatteryStatus:
 class SensorStatus:
     grayscale_available: bool
     grayscale_values: tuple[int, ...] | None
+    grayscale_plausible: bool | None
+    grayscale_suspicious_channels: tuple[int, ...]
     ultrasonic_configured: bool
     error: str | None = None
 
@@ -92,6 +96,8 @@ class SensorStatus:
             "grayscale_values": (
                 None if self.grayscale_values is None else list(self.grayscale_values)
             ),
+            "grayscale_plausible": self.grayscale_plausible,
+            "grayscale_suspicious_channels": list(self.grayscale_suspicious_channels),
             "ultrasonic_configured": self.ultrasonic_configured,
             "error": self.error,
         }

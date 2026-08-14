@@ -372,9 +372,14 @@ def print_hardware_status(hardware: RobotHardwareStatus) -> None:
     if hardware.sensors.grayscale_available:
         values = hardware.sensors.grayscale_values or []
         formatted = ", ".join(str(value) for value in values)
-        print(f"Grayscale:   available ({formatted})")
+
+        if hardware.sensors.grayscale_plausible is False:
+            print(f"Grayscale: warning ({formatted})")
+        else:
+            print(f"Grayscale: available ({formatted})")
+
     else:
-        print("Grayscale:   unavailable")
+        print("Grayscale: unavailable")
 
     print(
         "Ultrasonic:  "

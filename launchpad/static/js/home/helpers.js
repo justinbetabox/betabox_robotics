@@ -169,11 +169,24 @@ export function normalizeHealthState(status) {
         ),
     ).toLowerCase();
 
+    const grayscalePlausible = objectValue(
+        status,
+        "hardware",
+        "sensors",
+        "grayscale_plausible",
+    );
+
     const visionAvailable = objectValue(
         status,
         "hardware",
         "vision",
         "service_available",
+    );
+
+    console.log(
+        "HUD grayscale:",
+        grayscalePlausible,
+        objectValue(status, "hardware", "sensors"),
     );
 
     if (
@@ -197,7 +210,8 @@ export function normalizeHealthState(status) {
     if (
         batteryState === "low" ||
         temperatureState === "high" ||
-        visionAvailable === false
+        visionAvailable === false ||
+        grayscalePlausible === false
     ) {
         return {
             label: "Warning",

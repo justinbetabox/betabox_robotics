@@ -143,6 +143,6 @@ def build_workspace(
             videos=root_value / "media" / "videos",
             sounds=root_value / "media" / "sounds",
         ),
-        preferences=root_value / "preferences",
+        preferences=root_value / ".config" / "betabox" / "preferences",
         persistent=persistent,
     )

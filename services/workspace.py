@@ -114,7 +114,7 @@ def workspace_directories(
         media / "pictures",
         media / "videos",
         media / "sounds",
-        account.home / "preferences",
+        account.home / ".config" / "betabox" / "preferences",
     )
 
 

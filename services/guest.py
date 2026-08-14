@@ -166,7 +166,9 @@ def guest_status() -> GuestWorkspaceStatus:
             home_exists=(account.home.is_dir()),
             curriculum_exists=(account.home / "curriculum").is_dir(),
             media_exists=(account.home / "media").is_dir(),
-            preferences_exist=(account.home / "preferences").is_dir(),
+            preferences_exist=(
+                account.home / ".config" / "betabox" / "preferences"
+            ).is_dir(),
         )
 
     except (

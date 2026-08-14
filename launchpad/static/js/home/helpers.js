@@ -189,6 +189,10 @@ export function normalizeHealthState(status) {
         "service_available",
     );
 
+    const jupyterActive = objectValue(status, "jupyterhub", "active");
+
+    const jupyterResponding = objectValue(status, "jupyterhub", "responding");
+
     if (
         batteryState === "unknown" &&
         temperatureState === "unknown" &&
@@ -215,7 +219,9 @@ export function normalizeHealthState(status) {
         batteryState === "low" ||
         temperatureState === "high" ||
         visionAvailable === false ||
-        grayscalePlausible === false
+        grayscalePlausible === false ||
+        jupyterActive === false ||
+        jupyterResponding === false
     ) {
         return {
             label: "Warning",

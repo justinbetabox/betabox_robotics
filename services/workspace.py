@@ -107,6 +107,7 @@ def workspace_directories(
 ) -> tuple[Path, ...]:
     """Return all directories in an account workspace."""
     media = account.home / "media"
+    betabox_config = account.home / ".config" / "betabox"
 
     return (
         account.home / "curriculum",
@@ -114,7 +115,8 @@ def workspace_directories(
         media / "pictures",
         media / "videos",
         media / "sounds",
-        account.home / ".config" / "betabox" / "preferences",
+        betabox_config,
+        betabox_config / "preferences",
     )
 
 

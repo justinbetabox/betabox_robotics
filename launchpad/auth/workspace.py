@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from betabox_robotics.services.workspace import WORKSPACE_MODE
+
 
 def _validate_path(
     value: object,
@@ -104,10 +106,9 @@ class Workspace:
         )
 
     def directories(self) -> tuple[Path, ...]:
-        """Return every directory owned by this workspace."""
+        """Return directories Launchpad may safely recreate."""
 
         return (
-            self.root,
             self.curriculum,
             *self.media.directories(),
             self.preferences,
@@ -117,10 +118,15 @@ class Workspace:
         """Create any missing workspace directories."""
 
         for directory in self.directories():
+            if directory.is_dir():
+                continue
+
             directory.mkdir(
                 parents=True,
                 exist_ok=True,
             )
+
+            directory.chmod(WORKSPACE_MODE)
 
 
 def build_workspace(

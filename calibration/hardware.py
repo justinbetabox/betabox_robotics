@@ -244,8 +244,7 @@ class CalibrationHardware:
             except RobotRuntimeError as exc:
                 if str(exc).startswith("robot control is already owned by "):
                     raise RobotBusyError(
-                        "The robot hardware could not be acquired. "
-                        + "Another application may be using it."
+                        "Robot control is currently being used by another application."
                     ) from exc
 
                 raise

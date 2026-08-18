@@ -532,7 +532,7 @@ class RobotRuntime:
     def start(
         self,
     ) -> None:
-        """Acquire exclusive robot ownership and initialize hardware."""
+        """Acquire physical hardware ownership and initialize runtime hardware."""
 
         if self._running:
             return

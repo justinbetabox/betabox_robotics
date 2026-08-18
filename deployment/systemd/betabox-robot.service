@@ -9,7 +9,7 @@ Group=@SERVICE_GROUP@
 SupplementaryGroups=betabox
 
 RuntimeDirectory=betabox
-RuntimeDirectoryMode=0770
+RuntimeDirectoryMode=0711
 
 WorkingDirectory=/opt/libs/betabox_robotics
 ExecStart=/opt/betabox/venv/bin/betabox robot-runtime

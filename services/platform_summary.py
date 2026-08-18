@@ -11,12 +11,11 @@ from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
     PlatformConfig,
 )
-from betabox_robotics.hardware.ownership import (
-    RobotOwnershipStatus,
-    probe_robot_ownership,
-)
-from betabox_robotics.robots.betabox_car import (
+from betabox_robotics.robots.defaults import (
     BETABOX_CAR,
+)
+from betabox_robotics.runtime.protocol import (
+    RuntimeStatus,
 )
 from betabox_robotics.services.command import run
 from betabox_robotics.services.hardware_checks import (
@@ -27,6 +26,9 @@ from betabox_robotics.services.hardware_checks import (
 )
 from betabox_robotics.services.managed import (
     managed_services,
+)
+from betabox_robotics.services.status import (
+    collect_runtime_status,
 )
 from betabox_robotics.services.system_checks import (
     SystemHealthStatus,
@@ -148,7 +150,8 @@ class PlatformSummary:
     ip_addresses: tuple[str, ...]
     services: Mapping[str, str]
     jupyterhub_proxy_available: bool
-    control: RobotOwnershipStatus
+    runtime: RuntimeStatus | None
+    runtime_error: str | None
     hardware: PlatformHardwareSummary
     system_health: SystemHealthStatus
 
@@ -209,11 +212,15 @@ class PlatformSummary:
     def to_dict(
         self,
     ) -> dict[str, JSONValue]:
-        control = _to_json_value(self.control.to_dict())
-        system_health = _to_json_value(self.system_health.to_dict())
+        runtime: JSONValue = None
 
-        if not isinstance(control, dict):
-            raise TypeError("control data must be a JSON object")
+        if self.runtime is not None:
+            runtime = _to_json_value(self.runtime.to_dict())
+
+            if not isinstance(runtime, dict):
+                raise TypeError("runtime data must be a JSON object")
+
+        system_health = _to_json_value(self.system_health.to_dict())
 
         if not isinstance(system_health, dict):
             raise TypeError("system health data must be a JSON object")
@@ -224,7 +231,8 @@ class PlatformSummary:
             "ip_addresses": list(self.ip_addresses),
             "services": dict(self.services),
             "jupyterhub_proxy_available": (self.jupyterhub_proxy_available),
-            "control": control,
+            "runtime": runtime,
+            "runtime_error": self.runtime_error,
             "hardware": self.hardware.to_dict(),
             "system_health": system_health,
         }
@@ -296,6 +304,8 @@ def collect_platform_summary(
         service.unit: service_state(service.unit) for service in managed.values()
     }
 
+    runtime, runtime_error = collect_runtime_status()
+
     return PlatformSummary(
         version=__version__,
         hostname=hostname(),
@@ -304,7 +314,8 @@ def collect_platform_summary(
         jupyterhub_proxy_available=(
             shutil.which("configurable-http-proxy") is not None
         ),
-        control=probe_robot_ownership(),
+        runtime=runtime,
+        runtime_error=runtime_error,
         hardware=PlatformHardwareSummary(
             battery=collect_battery_status(
                 BETABOX_CAR.sensors,

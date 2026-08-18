@@ -59,33 +59,32 @@ export function formatPercent(value) {
 /* Classification */
 
 export function controlLabel(status) {
-    const control = objectValue(status, "control") ?? {};
+    const runtime = objectValue(status, "runtime") ?? {};
 
-    if (control.available === true) {
+    if (
+        runtime.ready !== true ||
+        runtime.ownership_acquired !== true ||
+        runtime.hardware_initialized !== true
+    ) {
+        return "Unavailable";
+    }
+
+    if (!runtime.control_owner) {
         return "Available";
     }
 
-    if (control.owner) {
-        const owner = String(control.owner);
+    const owner = String(runtime.control_owner);
+    const normalized = owner.toLowerCase();
 
-        const normalized = owner.toLowerCase();
-
-        if (normalized.includes("manual drive")) {
-            return "Manual Drive";
-        }
-
-        if (normalized.includes("python")) {
-            return "Python App";
-        }
-
-        return owner;
+    if (normalized.includes("manual drive")) {
+        return "Manual Drive";
     }
 
-    if (control.available === false) {
-        return "In Use";
+    if (normalized.includes("python")) {
+        return "Python App";
     }
 
-    return "Unavailable";
+    return owner;
 }
 
 export function visionLabel(status) {

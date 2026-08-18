@@ -7,17 +7,21 @@ from betabox_robotics.config import (
 from betabox_robotics.hardware.exceptions import (
     HardwareError,
 )
-from betabox_robotics.robots.betabox_car import (
-    BETABOX_CAR,
-)
 from betabox_robotics.robots.config import (
     RobotConfig,
+)
+from betabox_robotics.robots.defaults import (
+    BETABOX_CAR,
 )
 from betabox_robotics.robots.exceptions import (
     RobotError,
 )
-from betabox_robotics.sensors.exceptions import (
-    SensorError,
+from betabox_robotics.runtime.client import (
+    RobotRuntimeClient,
+)
+from betabox_robotics.runtime.errors import (
+    RobotRuntimeError,
+    RobotRuntimeUnavailableError,
 )
 from betabox_robotics.services.command import run
 from betabox_robotics.services.hardware_checks import (
@@ -170,7 +174,7 @@ def check_hifiberry(
         name="audio:hifiberry",
         ok=detected,
         message=(
-            "HifiBerry detected" if detected else ("HifiBerry not found in aplay -l")
+            "HifiBerry detected" if detected else "HifiBerry not found in aplay -l"
         ),
     )
 
@@ -195,6 +199,8 @@ def check_robot_constructs(
         HardwareError,
         RobotError,
         OSError,
+        RobotRuntimeError,
+        RobotRuntimeUnavailableError,
     ) as exc:
         return CheckResult(
             name="robot:construct",
@@ -204,10 +210,13 @@ def check_robot_constructs(
 
     try:
         car.close()
+
     except (
         HardwareError,
         RobotError,
         OSError,
+        RobotRuntimeError,
+        RobotRuntimeUnavailableError,
     ) as exc:
         return CheckResult(
             name="robot:construct",
@@ -282,7 +291,7 @@ def checks_from_hardware_status(
     )
 
     vision_message = (
-        ("Vision service and camera pipeline healthy")
+        "Vision service and camera pipeline healthy"
         if vision_ok
         else (vision.error or "Vision service degraded")
     )
@@ -331,20 +340,22 @@ def check_ultrasonic_read(
     robot_config: RobotConfig = BETABOX_CAR,
 ) -> CheckResult:
     """
-    Construct the Sensors subsystem and perform one
-    sampled ultrasonic distance read.
+    Perform one sampled ultrasonic distance read through
+    the centralized robot runtime.
     """
 
-    robot_config_value = _validate_robot_config(robot_config)
+    _ = _validate_robot_config(robot_config)
+
+    client = RobotRuntimeClient()
 
     try:
-        from betabox_robotics.sensors import Sensors
-
-        sensors = Sensors.default(robot_config_value.sensors)
+        distance = client.ultrasonic_distance(
+            samples=3,
+        )
 
     except (
-        HardwareError,
-        SensorError,
+        RobotRuntimeError,
+        RobotRuntimeUnavailableError,
         OSError,
         TypeError,
         ValueError,
@@ -354,42 +365,12 @@ def check_ultrasonic_read(
             ok=False,
             message=str(exc),
         )
-
-    try:
-        distance = float(sensors.ultrasonic.distance(samples=3))
-
-    except (
-        HardwareError,
-        SensorError,
-        OSError,
-        TypeError,
-        ValueError,
-    ) as exc:
-        return CheckResult(
-            name="hardware:ultrasonic_read",
-            ok=False,
-            message=str(exc),
-        )
-
-    finally:
-        try:
-            sensors.close()
-        except (
-            HardwareError,
-            SensorError,
-            OSError,
-        ) as exc:
-            return CheckResult(
-                name="hardware:ultrasonic_read",
-                ok=False,
-                message=(f"ultrasonic read succeeded but cleanup failed: {exc}"),
-            )
 
     if distance < 0:
         return CheckResult(
             name="hardware:ultrasonic_read",
             ok=False,
-            message=f"invalid distance result: {distance}",
+            message=(f"invalid distance result: {distance}"),
         )
 
     return CheckResult(

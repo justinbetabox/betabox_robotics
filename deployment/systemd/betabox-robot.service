@@ -1,0 +1,21 @@
+[Unit]
+Description=Betabox robot runtime service
+After=local-fs.target
+
+[Service]
+Type=simple
+User=@SERVICE_USER@
+Group=@SERVICE_GROUP@
+SupplementaryGroups=betabox
+
+RuntimeDirectory=betabox
+RuntimeDirectoryMode=0770
+
+WorkingDirectory=/opt/libs/betabox_robotics
+ExecStart=/opt/betabox/venv/bin/betabox robot-runtime
+
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

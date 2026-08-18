@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Self
 
 from betabox_robotics.hardware import (
+    I2C,
     HardwareError,
     Servo,
 )
@@ -81,6 +82,7 @@ class CameraMount:
         *,
         pan_offset: float = 0.0,
         tilt_offset: float = 0.0,
+        bus: I2C | None = None,
     ) -> None:
         pan_min = self._require_finite_number(
             config.pan_min_angle,
@@ -160,6 +162,7 @@ class CameraMount:
         try:
             self._pan_servo = Servo(
                 config.pan_servo,
+                bus=bus,
                 min_angle=pan_servo_min,
                 max_angle=pan_servo_max,
                 offset=pan_offset_value,
@@ -167,6 +170,7 @@ class CameraMount:
 
             self._tilt_servo = Servo(
                 config.tilt_servo,
+                bus=bus,
                 min_angle=tilt_servo_min,
                 max_angle=tilt_servo_max,
                 offset=tilt_offset_value,
@@ -281,11 +285,13 @@ class CameraMount:
         *,
         pan_offset: float = 0.0,
         tilt_offset: float = 0.0,
+        bus: I2C | None = None,
     ) -> Self:
         return cls(
             config,
             pan_offset=pan_offset,
             tilt_offset=tilt_offset,
+            bus=bus,
         )
 
     def look(

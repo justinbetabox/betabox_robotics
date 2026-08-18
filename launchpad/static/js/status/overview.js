@@ -58,7 +58,7 @@ export function renderOverview(data) {
 
     setOverallStatus(overall.label, overall.state);
 
-    const control = data.control ?? {};
+    const runtime = data.runtime ?? {};
 
     const battery = data.hardware?.battery ?? {};
 
@@ -74,7 +74,7 @@ export function renderOverview(data) {
         temperature.celsius,
     );
 
-    elements.robotStatus.textContent = controlLabel(control);
+    elements.robotStatus.textContent = controlLabel(runtime);
 
     elements.visionStatus.textContent = visionLabel(vision);
 

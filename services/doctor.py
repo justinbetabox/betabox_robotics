@@ -9,12 +9,12 @@ from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
     PlatformConfig,
 )
-from betabox_robotics.exceptions import RobotBusyError
-from betabox_robotics.hardware.ownership import RobotOwnership
-from betabox_robotics.robots.betabox_car import BETABOX_CAR
-from betabox_robotics.sensors import (
-    Ultrasonic,
-    UltrasonicError,
+from betabox_robotics.runtime.client import (
+    RobotRuntimeClient,
+)
+from betabox_robotics.runtime.errors import (
+    RobotRuntimeError,
+    RobotRuntimeUnavailableError,
 )
 from betabox_robotics.services.guest import (
     GuestWorkspaceStatus,
@@ -918,39 +918,38 @@ def diagnose_grayscale(
 
 def diagnose_ultrasonic() -> Diagnosis:
     try:
-        with (
-            RobotOwnership(
-                owner="Betabox Doctor",
-            ),
-            Ultrasonic.default(
-                BETABOX_CAR.sensors.ultrasonic,
-            ) as ultrasonic,
-        ):
-            distance = ultrasonic.distance(samples=1)
+        client = RobotRuntimeClient()
 
-    except RobotBusyError as exc:
+        distance = client.ultrasonic_distance(
+            samples=1,
+        )
+
+    except RobotRuntimeUnavailableError as exc:
         return Diagnosis(
             title="Ultrasonic",
             ok=False,
             severity="warning",
             summary=(
-                "Ultrasonic sensor could not be tested because the robot is in use."
+                "Ultrasonic sensor could not be tested "
+                "because the robot runtime is unavailable."
             ),
             causes=(str(exc),),
             affected=("Ultrasonic diagnostic test",),
             actions=(
-                "Close Manual Drive or finish the running robot program.",
+                "Check: systemctl status betabox-robot.service",
+                "Restart: sudo systemctl restart betabox-robot.service",
                 "Run the diagnostic again.",
             ),
         )
 
-    except UltrasonicError:
+    except RobotRuntimeError as exc:
         return Diagnosis(
             title="Ultrasonic",
             ok=False,
             severity="warning",
             summary="Ultrasonic sensor is not responding.",
             causes=(
+                str(exc),
                 "The ultrasonic sensor may be disconnected.",
                 "The ultrasonic sensor cable may be loose or damaged.",
                 "The trigger or echo connection may not be working.",
@@ -967,9 +966,31 @@ def diagnose_ultrasonic() -> Diagnosis:
             ),
         )
 
+    if distance < 0:
+        return Diagnosis(
+            title="Ultrasonic",
+            ok=False,
+            severity="warning",
+            summary=(
+                f"Ultrasonic sensor returned an invalid distance: {distance:.1f} cm."
+            ),
+            causes=(
+                "The ultrasonic sensor did not produce a valid distance measurement.",
+            ),
+            affected=(
+                "Distance sensing",
+                "Obstacle detection",
+                "Obstacle avoidance",
+            ),
+            actions=(
+                "Check the ultrasonic sensor connection.",
+                "Run the ultrasonic validation test.",
+            ),
+        )
+
     return healthy(
         "Ultrasonic",
-        f"Ultrasonic sensor is responding. Distance: {distance:.1f} cm.",
+        (f"Ultrasonic sensor is responding. Distance: {distance:.1f} cm."),
     )
 
 
@@ -1205,10 +1226,12 @@ def collect_diagnoses(
 
     robot_hardware = diagnose_robot_hardware(hardware, config)
     vision = diagnose_vision_hardware(hardware, config)
+    runtime = diagnose_robot_runtime(status)
 
     diagnoses: list[Diagnosis] = [
         diagnose_temperature(system),
         diagnose_power(system),
+        runtime,
         robot_hardware,
         diagnose_guest_workspace(status.guest),
         diagnose_audio_hardware(hardware),
@@ -1226,7 +1249,9 @@ def collect_diagnoses(
     if robot_hardware.ok:
         diagnoses.append(diagnose_battery(hardware))
         diagnoses.append(diagnose_grayscale(hardware))
-        diagnoses.append(diagnose_ultrasonic())
+
+        if runtime.ok:
+            diagnoses.append(diagnose_ultrasonic())
 
     return tuple(diagnoses)
 
@@ -1362,6 +1387,66 @@ def diagnose_power(status: SystemHealthStatus) -> Diagnosis:
     return healthy(
         "System Power",
         "No undervoltage or throttling is currently detected.",
+    )
+
+
+def diagnose_robot_runtime(
+    status: StatusReport,
+) -> Diagnosis:
+    runtime = status.runtime
+
+    if runtime is None:
+        return Diagnosis(
+            title="Robot Runtime",
+            ok=False,
+            severity="error",
+            summary="The Betabox Robot Runtime is unavailable.",
+            causes=(status.runtime_error or "The runtime service is not responding.",),
+            affected=(
+                "Robot API",
+                "Drive and steering",
+                "Robot sensors",
+                "Camera mount control",
+                "Calibration previews",
+            ),
+            actions=(
+                "Check: systemctl status betabox-robot.service",
+                "Restart: sudo systemctl restart betabox-robot.service",
+                "Run: betabox doctor",
+            ),
+        )
+
+    if (
+        not runtime.ready
+        or not runtime.ownership_acquired
+        or not runtime.hardware_initialized
+    ):
+        return Diagnosis(
+            title="Robot Runtime",
+            ok=False,
+            severity="error",
+            summary="The Betabox Robot Runtime is not fully ready.",
+            causes=(
+                "Runtime startup did not complete.",
+                "Robot hardware ownership was not acquired.",
+                "Robot hardware initialization failed.",
+            ),
+            affected=(
+                "Robot API",
+                "Drive and steering",
+                "Robot sensors",
+                "Camera mount control",
+            ),
+            actions=(
+                "Check: systemctl status betabox-robot.service",
+                "Run: journalctl -u betabox-robot.service -n 100",
+                "Restart: sudo systemctl restart betabox-robot.service",
+            ),
+        )
+
+    return healthy(
+        "Robot Runtime",
+        "Robot Runtime and hardware ownership are ready.",
     )
 
 

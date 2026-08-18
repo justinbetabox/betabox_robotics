@@ -12,9 +12,12 @@ from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
     PlatformConfig,
 )
-from betabox_robotics.hardware.ownership import (
-    RobotOwnershipStatus,
-    probe_robot_ownership,
+from betabox_robotics.runtime.client import (
+    RobotRuntimeClient,
+)
+from betabox_robotics.runtime.errors import RobotRuntimeError
+from betabox_robotics.runtime.protocol import (
+    RuntimeStatus,
 )
 from betabox_robotics.services.command import run
 from betabox_robotics.services.guest import (
@@ -87,6 +90,20 @@ def _validate_flag(
     return value
 
 
+def collect_runtime_status() -> tuple[RuntimeStatus | None, str | None]:
+    try:
+        return (
+            RobotRuntimeClient().status(),
+            None,
+        )
+
+    except RobotRuntimeError as exc:
+        return (
+            None,
+            str(exc),
+        )
+
+
 @dataclass(frozen=True, slots=True)
 class StatusReport:
     version: str
@@ -95,10 +112,11 @@ class StatusReport:
     media_paths: dict[str, str]
     services: dict[str, str]
     jupyterhub_proxy_available: bool
-    control: RobotOwnershipStatus
     hardware: RobotHardwareStatus
     system_health: SystemHealthStatus
     guest: GuestWorkspaceStatus
+    runtime: RuntimeStatus | None
+    runtime_error: str | None
 
     def __post_init__(
         self,
@@ -275,6 +293,8 @@ def collect_status(
         service.unit: service_status(service.unit) for service in managed.values()
     }
 
+    runtime, runtime_error = collect_runtime_status()
+
     return StatusReport(
         version=__version__,
         hostname=hostname(),
@@ -286,7 +306,8 @@ def collect_status(
         },
         services=services,
         jupyterhub_proxy_available=(executable_available("configurable-http-proxy")),
-        control=probe_robot_ownership(),
+        runtime=runtime,
+        runtime_error=runtime_error,
         hardware=collect_hardware_status(config_value),
         system_health=collect_system_health(config_value),
         guest=guest_status(),

@@ -14,13 +14,18 @@ export function renderHardware(data) {
 
     const vision = data.hardware?.vision ?? {};
 
-    const control = data.control ?? {};
+    const runtime = data.runtime ?? {};
 
     renderDetailItems(elements.hardwareStatus, [
         ["Battery Voltage", formatVoltage(battery.voltage)],
         ["Battery State", formatState(battery.state)],
-        ["Control Available", formatBoolean(control.available)],
-        ["Control Owner", control.owner ? String(control.owner) : "None"],
+        ["Runtime Ready", formatBoolean(runtime.ready)],
+        ["Hardware Owned", formatBoolean(runtime.ownership_acquired)],
+        ["Hardware Initialized", formatBoolean(runtime.hardware_initialized)],
+        [
+            "Control Owner",
+            runtime.control_owner ? String(runtime.control_owner) : "None",
+        ],
         [
             "Vision Service",
             vision.service_available ? "Available" : "Unavailable",

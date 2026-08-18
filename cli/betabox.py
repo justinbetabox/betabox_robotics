@@ -39,6 +39,9 @@ from betabox_robotics.services.reset import (
 from betabox_robotics.services.restore import (
     main as restore_main,
 )
+from betabox_robotics.services.robot_runtime import (
+    main as robot_runtime_main,
+)
 from betabox_robotics.services.services import (
     main as services_main,
 )
@@ -156,6 +159,10 @@ COMMANDS: dict[
     "launchpad": (
         "Run the Betabox Launchpad web interface",
         launchpad_main,
+    ),
+    "robot-runtime": (
+        "Run the Betabox robot hardware runtime",
+        robot_runtime_main,
     ),
 }
 

@@ -388,7 +388,8 @@ AVAHI_OVERRIDE_SOURCE="$SYSTEMD_SOURCE/avahi-daemon.service.d/override.conf"
 AVAHI_OVERRIDE_DIR="$SYSTEMD_TARGET/avahi-daemon.service.d"
 AVAHI_OVERRIDE_TARGET="$AVAHI_OVERRIDE_DIR/override.conf"
 
-SERVICES=(
+
+INSTALLED_SERVICES=(
     betabox-boot-announce.service
     betabox-monitor.service
     jupyterhub.service
@@ -397,12 +398,25 @@ SERVICES=(
     betabox-video.service
     betabox-guest-reset.service
     betabox-launchpad.service
+    betabox-robot.service
+)
+
+ENABLED_SERVICES=(
+    betabox-boot-announce.service
+    betabox-monitor.service
+    jupyterhub.service
+    set-hostname-from-serial.service
+    wifi-fallback.service
+    betabox-video.service
+    betabox-guest-reset.service
+    betabox-launchpad.service
+    betabox-robot.service
 )
 
 sudo mkdir -p \
     "$SYSTEMD_TARGET"
 
-for service in "${SERVICES[@]}"; do
+for service in "${INSTALLED_SERVICES[@]}"; do
     source_service="$SYSTEMD_SOURCE/$service"
     target_service="$SYSTEMD_TARGET/$service"
 
@@ -459,7 +473,7 @@ echo "Reloading systemd..."
 
 sudo systemctl daemon-reload
 
-for service in "${SERVICES[@]}"; do
+for service in "${ENABLED_SERVICES[@]}"; do
     echo "Enabling $service..."
 
     sudo systemctl enable \

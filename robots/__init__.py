@@ -1,5 +1,5 @@
 from .base import RobotBase
-from .betabox_car import BETABOX_CAR, BetaboxCar
+from .betabox_car import BetaboxCar
 from .capabilities import RobotCapability
 from .car import CarRobot
 from .config import (
@@ -16,6 +16,7 @@ from .config import (
     UltrasonicConfig,
     VisionConfig,
 )
+from .defaults import BETABOX_CAR
 from .exceptions import (
     RobotError,
     RobotLifecycleError,

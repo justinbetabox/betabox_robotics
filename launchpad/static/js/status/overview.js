@@ -1,7 +1,5 @@
 "use strict";
 
-import { determineOverallStatus } from "./attention.js";
-
 import { elements } from "./dom.js";
 
 import {
@@ -13,6 +11,48 @@ import {
 } from "./helpers.js";
 
 /* Overall health */
+
+function overallHealth(data) {
+    const health = data.overall_health;
+
+    if (
+        health === null ||
+        typeof health !== "object" ||
+        Array.isArray(health)
+    ) {
+        return {
+            label: "Unknown",
+            state: "unknown",
+        };
+    }
+
+    switch (health.state) {
+        case "healthy":
+            return {
+                label: "Healthy",
+                state: "healthy",
+            };
+
+        case "warning":
+            return {
+                label: "Needs Attention",
+                state: "warning",
+            };
+
+        case "error":
+        case "critical":
+            return {
+                label: "Critical",
+                state: "critical",
+            };
+
+        default:
+            return {
+                label: "Unknown",
+                state: "unknown",
+            };
+    }
+}
 
 function setOverallStatus(label, state) {
     elements.overallStatus.textContent = label;
@@ -54,11 +94,11 @@ function renderServiceSummary(data) {
 /* Overview */
 
 export function renderOverview(data) {
-    const overall = determineOverallStatus(data);
+    const overall = overallHealth(data);
 
     setOverallStatus(overall.label, overall.state);
 
-    const control = data.control ?? {};
+    const runtime = data.runtime ?? {};
 
     const battery = data.hardware?.battery ?? {};
 
@@ -74,7 +114,7 @@ export function renderOverview(data) {
         temperature.celsius,
     );
 
-    elements.robotStatus.textContent = controlLabel(control);
+    elements.robotStatus.textContent = controlLabel(runtime);
 
     elements.visionStatus.textContent = visionLabel(vision);
 

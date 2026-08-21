@@ -12,16 +12,12 @@ from betabox_robotics.audio import (
     MelodyNote,
     NoteValue,
 )
-from betabox_robotics.camera import (
-    CameraMount,
-    CameraMountStatus,
-)
-from betabox_robotics.drive import Drive, DriveStatus
+from betabox_robotics.camera import CameraMountStatus
+from betabox_robotics.drive import DriveStatus
 from betabox_robotics.sensors import (
     BatteryReading,
     BatteryState,
     GrayscaleReading,
-    Sensors,
     SensorsStatus,
     UltrasonicReading,
 )
@@ -40,6 +36,11 @@ from betabox_robotics.vision import (
 from .capabilities import RobotCapability
 from .health import HealthCheck, RobotHealth
 from .robot import Robot
+from .subsystems import (
+    CameraMountSubsystem,
+    DriveSubsystem,
+    SensorsSubsystem,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -120,19 +121,25 @@ class CarRobot(
 
     @property
     @abstractmethod
-    def drive(self) -> Drive:
+    def drive(
+        self,
+    ) -> DriveSubsystem:
         """Return the robot drive subsystem."""
         ...
 
     @property
     @abstractmethod
-    def sensors(self) -> Sensors:
+    def sensors(
+        self,
+    ) -> SensorsSubsystem:
         """Return the robot sensor subsystem."""
         ...
 
     @property
     @abstractmethod
-    def camera_mount(self) -> CameraMount:
+    def camera_mount(
+        self,
+    ) -> CameraMountSubsystem:
         """Return the robot camera mount."""
         ...
 

@@ -17,21 +17,55 @@ ImageFormat = Literal[
 
 
 class SnapshotDataInterface(Protocol):
-    data: bytes
-    timestamp: float
-    format: Literal[
+    @property
+    def data(
+        self,
+    ) -> bytes: ...
+
+    @property
+    def timestamp(
+        self,
+    ) -> float: ...
+
+    @property
+    def format(
+        self,
+    ) -> Literal[
         "jpg",
         "png",
-    ]
+    ]: ...
 
 
 class RecordingDataInterface(Protocol):
-    data: bytes
-    start_timestamp: float
-    end_timestamp: float
-    frame_count: int
-    fps: float
-    format: str
+    @property
+    def data(
+        self,
+    ) -> bytes: ...
+
+    @property
+    def start_timestamp(
+        self,
+    ) -> float: ...
+
+    @property
+    def end_timestamp(
+        self,
+    ) -> float: ...
+
+    @property
+    def frame_count(
+        self,
+    ) -> int: ...
+
+    @property
+    def fps(
+        self,
+    ) -> float: ...
+
+    @property
+    def format(
+        self,
+    ) -> str: ...
 
 
 class FrameProvider(Protocol):

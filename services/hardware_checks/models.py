@@ -23,6 +23,9 @@ class SensorStatusData(TypedDict):
     grayscale_plausible: bool | None
     grayscale_suspicious_channels: list[int]
     ultrasonic_configured: bool
+    ultrasonic_available: bool
+    ultrasonic_distance: float | None
+    ultrasonic_error: str | None
     error: str | None
 
 
@@ -57,7 +60,9 @@ class I2CStatus:
     devices: tuple[str, ...]
     error: str | None = None
 
-    def to_dict(self) -> I2CStatusData:
+    def to_dict(
+        self,
+    ) -> I2CStatusData:
         return {
             "available": self.available,
             "devices": list(self.devices),
@@ -72,7 +77,9 @@ class BatteryStatus:
     state: str
     error: str | None = None
 
-    def to_dict(self) -> BatteryStatusData:
+    def to_dict(
+        self,
+    ) -> BatteryStatusData:
         return {
             "available": self.available,
             "voltage": self.voltage,
@@ -88,9 +95,14 @@ class SensorStatus:
     grayscale_plausible: bool | None
     grayscale_suspicious_channels: tuple[int, ...]
     ultrasonic_configured: bool
+    ultrasonic_available: bool
+    ultrasonic_distance: float | None
+    ultrasonic_error: str | None = None
     error: str | None = None
 
-    def to_dict(self) -> SensorStatusData:
+    def to_dict(
+        self,
+    ) -> SensorStatusData:
         return {
             "grayscale_available": self.grayscale_available,
             "grayscale_values": (
@@ -99,6 +111,9 @@ class SensorStatus:
             "grayscale_plausible": self.grayscale_plausible,
             "grayscale_suspicious_channels": list(self.grayscale_suspicious_channels),
             "ultrasonic_configured": self.ultrasonic_configured,
+            "ultrasonic_available": self.ultrasonic_available,
+            "ultrasonic_distance": self.ultrasonic_distance,
+            "ultrasonic_error": self.ultrasonic_error,
             "error": self.error,
         }
 
@@ -109,7 +124,9 @@ class AudioStatus:
     device: str | None
     error: str | None = None
 
-    def to_dict(self) -> AudioStatusData:
+    def to_dict(
+        self,
+    ) -> AudioStatusData:
         return {
             "available": self.available,
             "device": self.device,
@@ -126,7 +143,9 @@ class VisionStatus:
     clients: int
     error: str | None = None
 
-    def to_dict(self) -> VisionStatusData:
+    def to_dict(
+        self,
+    ) -> VisionStatusData:
         return {
             "service_available": self.service_available,
             "running": self.running,
@@ -147,7 +166,9 @@ class RobotHardwareStatus:
     vision: VisionStatus
     passive_hardware_error: str | None = None
 
-    def to_dict(self) -> RobotHardwareStatusData:
+    def to_dict(
+        self,
+    ) -> RobotHardwareStatusData:
         return {
             "i2c": self.i2c.to_dict(),
             "passive_hardware_available": self.passive_hardware_available,

@@ -63,6 +63,7 @@ async def drive_controller_context(
 
         return BetaboxCar(
             calibration=calibration,
+            owner="Launchpad Manual Drive",
         )
 
     controller = ManualDriveController(create_robot)

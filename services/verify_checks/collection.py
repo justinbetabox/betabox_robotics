@@ -4,11 +4,11 @@ from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
     PlatformConfig,
 )
-from betabox_robotics.robots.betabox_car import (
-    BETABOX_CAR,
-)
 from betabox_robotics.robots.config import (
     RobotConfig,
+)
+from betabox_robotics.robots.defaults import (
+    BETABOX_CAR,
 )
 from betabox_robotics.services.hardware_status import (
     collect_hardware_status,

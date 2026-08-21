@@ -4,7 +4,6 @@ from .hardware import (
     check_i2c_device,
     check_i2c_scan,
     check_robot_constructs,
-    check_ultrasonic_read,
     checks_from_hardware_status,
 )
 from .launchpad import check_launchpad
@@ -35,7 +34,6 @@ __all__ = [
     "check_picamera2",
     "check_robot_constructs",
     "check_speech_backend",
-    "check_ultrasonic_read",
     "checks_from_hardware_status",
     "collect_checks",
 ]

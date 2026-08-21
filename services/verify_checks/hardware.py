@@ -7,17 +7,18 @@ from betabox_robotics.config import (
 from betabox_robotics.hardware.exceptions import (
     HardwareError,
 )
-from betabox_robotics.robots.betabox_car import (
-    BETABOX_CAR,
-)
 from betabox_robotics.robots.config import (
     RobotConfig,
+)
+from betabox_robotics.robots.defaults import (
+    BETABOX_CAR,
 )
 from betabox_robotics.robots.exceptions import (
     RobotError,
 )
-from betabox_robotics.sensors.exceptions import (
-    SensorError,
+from betabox_robotics.runtime.errors import (
+    RobotRuntimeError,
+    RobotRuntimeUnavailableError,
 )
 from betabox_robotics.services.command import run
 from betabox_robotics.services.hardware_checks import (
@@ -170,7 +171,7 @@ def check_hifiberry(
         name="audio:hifiberry",
         ok=detected,
         message=(
-            "HifiBerry detected" if detected else ("HifiBerry not found in aplay -l")
+            "HifiBerry detected" if detected else "HifiBerry not found in aplay -l"
         ),
     )
 
@@ -195,6 +196,8 @@ def check_robot_constructs(
         HardwareError,
         RobotError,
         OSError,
+        RobotRuntimeError,
+        RobotRuntimeUnavailableError,
     ) as exc:
         return CheckResult(
             name="robot:construct",
@@ -204,10 +207,13 @@ def check_robot_constructs(
 
     try:
         car.close()
+
     except (
         HardwareError,
         RobotError,
         OSError,
+        RobotRuntimeError,
+        RobotRuntimeUnavailableError,
     ) as exc:
         return CheckResult(
             name="robot:construct",
@@ -262,11 +268,19 @@ def checks_from_hardware_status(
         else (sensors.error or "grayscale unavailable")
     )
 
-    ultrasonic_message = (
-        "ultrasonic configured"
-        if sensors.ultrasonic_configured
-        else "ultrasonic not configured"
-    )
+    ultrasonic_ok = sensors.ultrasonic_configured and sensors.ultrasonic_available
+
+    if not sensors.ultrasonic_configured:
+        ultrasonic_message = "ultrasonic not configured"
+
+    elif sensors.ultrasonic_available and sensors.ultrasonic_distance is not None:
+        ultrasonic_message = f"{sensors.ultrasonic_distance:.1f} cm"
+
+    elif sensors.ultrasonic_available:
+        ultrasonic_message = "ultrasonic responding"
+
+    else:
+        ultrasonic_message = sensors.ultrasonic_error or "ultrasonic unavailable"
 
     audio = hardware_value.audio
 
@@ -282,7 +296,7 @@ def checks_from_hardware_status(
     )
 
     vision_message = (
-        ("Vision service and camera pipeline healthy")
+        "Vision service and camera pipeline healthy"
         if vision_ok
         else (vision.error or "Vision service degraded")
     )
@@ -309,8 +323,8 @@ def checks_from_hardware_status(
             message=grayscale_message,
         ),
         CheckResult(
-            name=("hardware:ultrasonic_configured"),
-            ok=sensors.ultrasonic_configured,
+            name="hardware:ultrasonic",
+            ok=ultrasonic_ok,
             message=ultrasonic_message,
         ),
         CheckResult(
@@ -323,77 +337,4 @@ def checks_from_hardware_status(
             ok=vision_ok,
             message=vision_message,
         ),
-    )
-
-
-def check_ultrasonic_read(
-    *,
-    robot_config: RobotConfig = BETABOX_CAR,
-) -> CheckResult:
-    """
-    Construct the Sensors subsystem and perform one
-    sampled ultrasonic distance read.
-    """
-
-    robot_config_value = _validate_robot_config(robot_config)
-
-    try:
-        from betabox_robotics.sensors import Sensors
-
-        sensors = Sensors.default(robot_config_value.sensors)
-
-    except (
-        HardwareError,
-        SensorError,
-        OSError,
-        TypeError,
-        ValueError,
-    ) as exc:
-        return CheckResult(
-            name="hardware:ultrasonic_read",
-            ok=False,
-            message=str(exc),
-        )
-
-    try:
-        distance = float(sensors.ultrasonic.distance(samples=3))
-
-    except (
-        HardwareError,
-        SensorError,
-        OSError,
-        TypeError,
-        ValueError,
-    ) as exc:
-        return CheckResult(
-            name="hardware:ultrasonic_read",
-            ok=False,
-            message=str(exc),
-        )
-
-    finally:
-        try:
-            sensors.close()
-        except (
-            HardwareError,
-            SensorError,
-            OSError,
-        ) as exc:
-            return CheckResult(
-                name="hardware:ultrasonic_read",
-                ok=False,
-                message=(f"ultrasonic read succeeded but cleanup failed: {exc}"),
-            )
-
-    if distance < 0:
-        return CheckResult(
-            name="hardware:ultrasonic_read",
-            ok=False,
-            message=f"invalid distance result: {distance}",
-        )
-
-    return CheckResult(
-        name="hardware:ultrasonic_read",
-        ok=True,
-        message=f"{distance:.1f} cm",
     )

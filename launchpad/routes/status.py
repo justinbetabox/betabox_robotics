@@ -89,7 +89,7 @@ async def status_api(
 
         payload: dict[str, object] = {}
 
-        for key, value in report.to_dict().items():
+        for key, value in report.to_dict(platform).items():
             payload[key] = value
 
         jupyter_state = report.services.get(
@@ -156,7 +156,7 @@ async def status_report_api(
             status=500,
         )
 
-    return web.json_response(report.to_dict())
+    return web.json_response(report.to_dict(platform))
 
 
 def setup_status_routes(

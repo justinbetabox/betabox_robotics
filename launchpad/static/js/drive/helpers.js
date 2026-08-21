@@ -25,59 +25,46 @@ export function formatTemperature(value) {
 }
 
 export function determineHealth(status) {
-    const hardware = status.hardware ?? {};
+    const health = status.overall_health;
 
-    const battery = hardware.battery ?? {};
-
-    const vision = hardware.vision ?? {};
-
-    const systemHealth = status.system_health ?? {};
-
-    const temperature = systemHealth.temperature ?? {};
-
-    const throttling = systemHealth.throttling ?? {};
-
-    const hasBatteryState = typeof battery.state === "string";
-
-    const hasTemperatureState = typeof temperature.state === "string";
-
-    const hasVisionState = typeof vision.service_available === "boolean";
-
-    if (!hasBatteryState && !hasTemperatureState && !hasVisionState) {
+    if (
+        health === null ||
+        health === undefined ||
+        typeof health !== "object" ||
+        Array.isArray(health)
+    ) {
         return {
             label: "Unknown",
             cssClass: "hud-unknown",
         };
     }
 
-    if (
-        battery.state === "critical" ||
-        temperature.state === "critical" ||
-        throttling.undervoltage_now === true
-    ) {
-        return {
-            label: "Needs Attention",
-            cssClass: "hud-critical",
-        };
-    }
+    switch (health.state) {
+        case "healthy":
+            return {
+                label: "Healthy",
+                cssClass: "hud-healthy",
+            };
 
-    if (
-        battery.available === false ||
-        battery.state === "low" ||
-        temperature.state === "warning" ||
-        throttling.throttled_now === true ||
-        vision.service_available === false
-    ) {
-        return {
-            label: "Warning",
-            cssClass: "hud-warning",
-        };
-    }
+        case "warning":
+            return {
+                label: "Warning",
+                cssClass: "hud-warning",
+            };
 
-    return {
-        label: "Healthy",
-        cssClass: "hud-healthy",
-    };
+        case "error":
+        case "critical":
+            return {
+                label: "Needs Attention",
+                cssClass: "hud-critical",
+            };
+
+        default:
+            return {
+                label: "Unknown",
+                cssClass: "hud-unknown",
+            };
+    }
 }
 
 export function shapeAxis(value, deadZone, exponent) {

@@ -3,20 +3,11 @@ from __future__ import annotations
 import math
 import threading
 from collections.abc import Callable
-from time import sleep
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING
 
-import lgpio  # pyright: ignore[reportMissingTypeStubs]
-from gpiozero.exc import GPIOPinInUse  # pyright: ignore[reportMissingTypeStubs]
-
-from betabox_robotics.camera import CameraMount
-from betabox_robotics.drive import Drive
 from betabox_robotics.exceptions import RobotBusyError
-from betabox_robotics.hardware import (
-    RobotOwnership,
-    close_gpio_factory,
-)
-from betabox_robotics.sensors import Grayscale
+from betabox_robotics.runtime.client import RobotRuntimeClient
+from betabox_robotics.runtime.errors import RobotRuntimeError
 
 if TYPE_CHECKING:
     from betabox_robotics.robots.config import (
@@ -24,9 +15,6 @@ if TYPE_CHECKING:
         DriveConfig,
         GrayscaleConfig,
     )
-
-
-ResultT = TypeVar("ResultT")
 
 
 def _validate_number(
@@ -81,13 +69,12 @@ def _validate_samples(
 
 class CalibrationHardware:
     """
-    Run short-lived calibration hardware operations safely.
+    Run calibration hardware operations through the centralized robot runtime.
 
-    Each operation is serialized, acquires exclusive robot ownership,
-    constructs only the required hardware, and releases all resources
-    before returning.
+    Operations are serialized locally. Actuator previews acquire a runtime
+    control lease, while read-only sensor sampling does not require control.
 
-    Creating this object does not acquire robot hardware.
+    Creating this object does not acquire robot control or hardware.
     """
 
     _drive_config: DriveConfig
@@ -105,6 +92,7 @@ class CalibrationHardware:
         self._drive_config = drive_config
         self._camera_mount_config = camera_mount_config
         self._grayscale_config = grayscale_config
+
         self._operation_lock = threading.Lock()
 
     def preview_steering(
@@ -121,12 +109,14 @@ class CalibrationHardware:
 
         if not (steering.min_angle <= offset_value <= steering.max_angle):
             raise ValueError(
-                f"steering offset must be between {steering.min_angle} and {steering.max_angle}"
+                "steering offset must be between "
+                + f"{steering.min_angle} and "
+                + f"{steering.max_angle}"
             )
 
-        self._run(
+        self._run_preview(
             self._preview_steering,
-            owner=("Launchpad Steering Calibration"),
+            owner="Launchpad Steering Calibration",
             offset=offset_value,
         )
 
@@ -140,6 +130,7 @@ class CalibrationHardware:
             pan_offset,
             name="pan offset",
         )
+
         tilt_value = _validate_number(
             tilt_offset,
             name="tilt offset",
@@ -149,17 +140,21 @@ class CalibrationHardware:
 
         if not (config.pan_min_angle <= pan_value <= config.pan_max_angle):
             raise ValueError(
-                f"pan offset must be between {config.pan_min_angle} and {config.pan_max_angle}"
+                "pan offset must be between "
+                + f"{config.pan_min_angle} and "
+                + f"{config.pan_max_angle}"
             )
 
         if not (config.tilt_min_angle <= tilt_value <= config.tilt_max_angle):
             raise ValueError(
-                f"tilt offset must be between {config.tilt_min_angle} and {config.tilt_max_angle}"
+                "tilt offset must be between "
+                + f"{config.tilt_min_angle} and "
+                + f"{config.tilt_max_angle}"
             )
 
-        self._run(
+        self._run_preview(
             self._preview_camera_mount,
-            owner=("Launchpad Camera Calibration"),
+            owner="Launchpad Camera Calibration",
             pan_offset=pan_value,
             tilt_offset=tilt_value,
         )
@@ -175,10 +170,12 @@ class CalibrationHardware:
             left_trim,
             name="left trim",
         )
+
         right_value = _validate_trim(
             right_trim,
             name="right trim",
         )
+
         steering_value = _validate_number(
             steering_offset,
             name="steering offset",
@@ -188,12 +185,14 @@ class CalibrationHardware:
 
         if not (steering.min_angle <= steering_value <= steering.max_angle):
             raise ValueError(
-                f"steering offset must be between {steering.min_angle} and {steering.max_angle}"
+                "steering offset must be between "
+                + f"{steering.min_angle} and "
+                + f"{steering.max_angle}"
             )
 
-        self._run(
+        self._run_preview(
             self._preview_motor_trim,
-            owner=("Launchpad Motor Calibration"),
+            owner="Launchpad Motor Calibration",
             left_trim=left_value,
             right_trim=right_value,
             steering_offset=steering_value,
@@ -206,106 +205,88 @@ class CalibrationHardware:
     ) -> list[int]:
         sample_count = _validate_samples(samples)
 
-        return self._run(
-            self._sample_grayscale,
-            owner=("Launchpad Grayscale Calibration"),
-            samples=sample_count,
-        )
-
-    def _run(
-        self,
-        operation: Callable[..., ResultT],
-        *,
-        owner: str,
-        **kwargs: object,
-    ) -> ResultT:
         with self._operation_lock:
-            ownership = RobotOwnership(
-                owner=owner,
-            )
+            client = RobotRuntimeClient()
 
-            ownership.acquire()
+            totals = [
+                0.0,
+                0.0,
+                0.0,
+            ]
 
-            try:
-                try:
-                    return operation(**kwargs)
-                except (
-                    GPIOPinInUse,
-                    lgpio.error,
-                ) as exc:
-                    raise RobotBusyError(
-                        "The robot hardware could not be acquired. Another application may be using it."
-                    ) from exc
-            finally:
-                try:
-                    close_gpio_factory()
-                finally:
-                    ownership.release()
-
-    def _preview_steering(
-        self,
-        *,
-        offset: float,
-    ) -> None:
-        with Drive.default(
-            self._drive_config,
-            steering_offset=offset,
-        ) as drive:
-            drive.center()
-
-    def _preview_camera_mount(
-        self,
-        *,
-        pan_offset: float,
-        tilt_offset: float,
-    ) -> None:
-        with CameraMount.default(
-            self._camera_mount_config,
-            pan_offset=pan_offset,
-            tilt_offset=tilt_offset,
-        ) as camera:
-            camera.center()
-
-    def _preview_motor_trim(
-        self,
-        *,
-        left_trim: float,
-        right_trim: float,
-        steering_offset: float,
-    ) -> None:
-        with Drive.default(
-            self._drive_config,
-            left_trim=left_trim,
-            right_trim=right_trim,
-            steering_offset=steering_offset,
-        ) as drive:
-            drive.center()
-
-            try:
-                drive.forward(25)
-                sleep(1.5)
-            finally:
-                drive.stop()
-
-    def _sample_grayscale(
-        self,
-        *,
-        samples: int,
-    ) -> list[int]:
-        totals = [
-            0.0,
-            0.0,
-            0.0,
-        ]
-
-        with Grayscale.default(
-            self._grayscale_config,
-        ) as grayscale:
-            for _ in range(samples):
-                values = grayscale.read()
+            for _ in range(sample_count):
+                values = client.grayscale_values()
 
                 totals[0] += values[0]
                 totals[1] += values[1]
                 totals[2] += values[2]
 
-        return [round(total / samples) for total in totals]
+        return [round(total / sample_count) for total in totals]
+
+    def _run_preview(
+        self,
+        operation: Callable[..., None],
+        *,
+        owner: str,
+        **kwargs: object,
+    ) -> None:
+        with self._operation_lock:
+            client = RobotRuntimeClient()
+
+            try:
+                with client.control(owner) as control:
+                    operation(
+                        client=client,
+                        token=control.token,
+                        **kwargs,
+                    )
+
+            except RobotRuntimeError as exc:
+                if str(exc).startswith("robot control is already owned by "):
+                    raise RobotBusyError(
+                        "Robot control is currently being used by another application."
+                    ) from exc
+
+                raise
+
+    @staticmethod
+    def _preview_steering(
+        *,
+        client: RobotRuntimeClient,
+        token: str,
+        offset: float,
+    ) -> None:
+        client.preview_steering_calibration(
+            token,
+            offset,
+        )
+
+    @staticmethod
+    def _preview_camera_mount(
+        *,
+        client: RobotRuntimeClient,
+        token: str,
+        pan_offset: float,
+        tilt_offset: float,
+    ) -> None:
+        client.preview_camera_calibration(
+            token,
+            pan_offset=pan_offset,
+            tilt_offset=tilt_offset,
+        )
+
+    @staticmethod
+    def _preview_motor_trim(
+        *,
+        client: RobotRuntimeClient,
+        token: str,
+        left_trim: float,
+        right_trim: float,
+        steering_offset: float,
+    ) -> None:
+        client.preview_motor_calibration(
+            token,
+            left_trim=left_trim,
+            right_trim=right_trim,
+            steering_offset=steering_offset,
+        )

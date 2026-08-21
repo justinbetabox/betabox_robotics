@@ -5,7 +5,6 @@ import grp
 import json
 import os
 from collections.abc import Mapping
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import IO, Self, cast
@@ -87,26 +86,6 @@ def _open_robot_lock(
     ):
         os.close(fd)
         raise
-
-
-@dataclass(frozen=True, slots=True)
-class RobotOwnershipStatus:
-    available: bool
-    owner: str | None
-    pid: int | None
-    acquired_at: str | None
-    error: str | None = None
-
-    def to_dict(
-        self,
-    ) -> dict[str, bool | str | int | None]:
-        return {
-            "available": self.available,
-            "owner": self.owner,
-            "pid": self.pid,
-            "acquired_at": self.acquired_at,
-            "error": self.error,
-        }
 
 
 class RobotOwnership:
@@ -231,64 +210,6 @@ class RobotOwnership:
         self.release()
 
 
-def probe_robot_ownership(
-    lock_path: Path = ROBOT_LOCK_PATH,
-) -> RobotOwnershipStatus:
-    try:
-        lock_file = _open_robot_lock(Path(lock_path))
-
-    except (
-        OSError,
-        RuntimeError,
-    ) as exc:
-        return RobotOwnershipStatus(
-            available=False,
-            owner=None,
-            pid=None,
-            acquired_at=None,
-            error=str(exc),
-        )
-
-    acquired = False
-
-    try:
-        try:
-            fcntl.flock(
-                lock_file.fileno(),
-                (fcntl.LOCK_EX | fcntl.LOCK_NB),
-            )
-            acquired = True
-
-        except BlockingIOError:
-            details = _read_lock_metadata(lock_file)
-
-            return RobotOwnershipStatus(
-                available=False,
-                owner=_optional_string(details.get("owner")),
-                pid=_optional_int(details.get("pid")),
-                acquired_at=_optional_string(details.get("acquired_at")),
-            )
-
-        return RobotOwnershipStatus(
-            available=True,
-            owner=None,
-            pid=None,
-            acquired_at=None,
-        )
-
-    finally:
-        if acquired:
-            try:
-                fcntl.flock(
-                    lock_file.fileno(),
-                    fcntl.LOCK_UN,
-                )
-            except OSError:
-                pass
-
-        lock_file.close()
-
-
 def _read_lock_metadata(
     lock_file: IO[str],
 ) -> dict[str, object]:
@@ -326,12 +247,3 @@ def _optional_string(
     value: object,
 ) -> str | None:
     return value if isinstance(value, str) else None
-
-
-def _optional_int(
-    value: object,
-) -> int | None:
-    if isinstance(value, bool):
-        return None
-
-    return value if isinstance(value, int) else None

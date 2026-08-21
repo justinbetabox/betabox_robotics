@@ -111,6 +111,22 @@ export function collectAttentionItems(data) {
         }
     }
 
+    if (sensors.ultrasonic_configured === false) {
+        items.push({
+            title: "Ultrasonic Not Configured",
+            message: "The ultrasonic sensor is not configured for this robot.",
+            severity: "warning",
+        });
+    } else if (sensors.ultrasonic_available === false) {
+        items.push({
+            title: "Ultrasonic Unavailable",
+            message:
+                sensors.ultrasonic_error ??
+                "The ultrasonic sensor is not responding.",
+            severity: "warning",
+        });
+    }
+
     const vision = data.hardware?.vision ?? {};
 
     if (!vision.service_available) {
@@ -144,7 +160,7 @@ export function collectAttentionItems(data) {
             message: `Current temperature is ${formatTemperature(temperature.celsius)}.`,
             severity: "critical",
         });
-    } else if (temperature.state === "warning") {
+    } else if (temperature.state === "high") {
         items.push({
             title: "CPU Temperature High",
             message:
@@ -164,7 +180,7 @@ export function collectAttentionItems(data) {
             )} of memory is in use.`,
             severity: "critical",
         });
-    } else if (memory.state === "warning") {
+    } else if (memory.state === "high") {
         items.push({
             title: "Memory Usage High",
             message: `${formatPercent(
@@ -184,7 +200,7 @@ export function collectAttentionItems(data) {
             )} of the disk is in use.`,
             severity: "critical",
         });
-    } else if (disk.state === "warning") {
+    } else if (disk.state === "high") {
         items.push({
             title: "Disk Usage High",
             message: `${formatPercent(
@@ -241,35 +257,6 @@ export function collectAttentionItems(data) {
     }
 
     return items;
-}
-
-/* Overall classification */
-
-export function determineOverallStatus(data) {
-    const attentionItems = collectAttentionItems(data);
-
-    const hasCritical = attentionItems.some(
-        (item) => item.severity === "critical",
-    );
-
-    if (hasCritical) {
-        return {
-            label: "Critical",
-            state: "critical",
-        };
-    }
-
-    if (attentionItems.length > 0) {
-        return {
-            label: "Needs Attention",
-            state: "warning",
-        };
-    }
-
-    return {
-        label: "Healthy",
-        state: "healthy",
-    };
 }
 
 /* Rendering */

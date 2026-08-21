@@ -545,7 +545,13 @@ def collect_platform_information(
                 hostname,
                 prefix=(config_value.network.identity_prefix),
             ),
-            control_available=(summary.control.available),
+            control_available=(
+                summary.runtime is not None
+                and summary.runtime.ready
+                and summary.runtime.ownership_acquired
+                and summary.runtime.hardware_initialized
+                and summary.runtime.control_owner is None
+            ),
         ),
         network=NetworkInformation(
             hostname=hostname,

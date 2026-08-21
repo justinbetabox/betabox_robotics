@@ -626,14 +626,20 @@ async def update_grayscale_api(
 
         return calibration_response(service)
 
-    except (
-        KeyError,
-        TypeError,
-        ValueError,
-    ):
+    except KeyError:
         return error_response(
             error="invalid_request",
-            message=("Valid floor and line sensor readings are required."),
+            message="Floor and line sensor readings are required.",
+            status=400,
+        )
+
+    except (
+        TypeError,
+        ValueError,
+    ) as exc:
+        return error_response(
+            error="invalid_request",
+            message=str(exc),
             status=400,
         )
 
@@ -660,6 +666,53 @@ async def clear_grayscale_api(
         return error_response(
             error="clear_failed",
             message=("Unable to clear line sensor calibration."),
+            detail=str(exc),
+            status=500,
+        )
+
+
+async def reset_calibration_api(
+    request: web.Request,
+) -> web.Response:
+    service = calibration_service(request)
+    hardware = calibration_hardware(request)
+
+    try:
+        await asyncio.to_thread(
+            hardware.reset_to_defaults,
+        )
+
+        _ = service.reset()
+
+        return calibration_response(service)
+
+    except RobotBusyError as exc:
+        return error_response(
+            error="robot_busy",
+            message=("The robot is currently being used by another application."),
+            detail=str(exc),
+            status=409,
+        )
+
+    except CalibrationStorageError as exc:
+        return error_response(
+            error="reset_failed",
+            message=("Unable to reset robot calibration."),
+            detail=str(exc),
+            status=500,
+        )
+
+    except (
+        OSError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ) as exc:
+        return error_response(
+            error="reset_failed",
+            message=(
+                "Unable to return the robot to its default calibration positions."
+            ),
             detail=str(exc),
             status=500,
         )
@@ -732,4 +785,10 @@ def setup_calibration_routes(
         "/api/calibration/grayscale/clear",
         clear_grayscale_api,
         name="calibration-grayscale-clear-api",
+    )
+
+    _ = app.router.add_post(
+        "/api/calibration/reset",
+        reset_calibration_api,
+        name="calibration-reset-api",
     )

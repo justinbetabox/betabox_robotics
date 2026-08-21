@@ -4,6 +4,9 @@ import math
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, ClassVar, Self
 
+from betabox_robotics.calibration import (
+    GRAYSCALE_MIN_CALIBRATION_SPAN,
+)
 from betabox_robotics.hardware import (
     ADC,
     HardwareError,
@@ -261,9 +264,14 @@ class Grayscale:
                 strict=True,
             )
         ):
-            if floor_value == line_value:
+            span = abs(floor_value - line_value)
+
+            if span < GRAYSCALE_MIN_CALIBRATION_SPAN:
                 raise GrayscaleError(
-                    f"floor and line calibration values must differ for channel {index}"
+                    "floor and line calibration values "
+                    + "must differ by at least "
+                    + f"{GRAYSCALE_MIN_CALIBRATION_SPAN:g} "
+                    + f"for channel {index}"
                 )
 
         self._floor = floor_values

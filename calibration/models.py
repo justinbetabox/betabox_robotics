@@ -7,6 +7,8 @@ from typing import TypedDict, cast
 
 CALIBRATION_VERSION = 1
 
+GRAYSCALE_MIN_CALIBRATION_SPAN = 100.0
+
 
 class SteeringCalibrationDict(TypedDict):
     offset: float
@@ -411,6 +413,25 @@ class GrayscaleCalibration:
             raise ValueError(
                 "grayscale floor and line must both be set or both be empty"
             )
+
+        if floor is not None and line is not None:
+            for index, (
+                floor_value,
+                line_value,
+            ) in enumerate(
+                zip(
+                    floor,
+                    line,
+                    strict=True,
+                )
+            ):
+                if abs(floor_value - line_value) < GRAYSCALE_MIN_CALIBRATION_SPAN:
+                    raise ValueError(
+                        "grayscale floor and line values "
+                        + "must differ by at least "
+                        + f"{GRAYSCALE_MIN_CALIBRATION_SPAN:g} "
+                        + f"for channel {index}"
+                    )
 
         object.__setattr__(
             self,

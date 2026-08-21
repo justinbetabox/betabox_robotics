@@ -8,6 +8,8 @@ import { requestJson } from "./api.js";
 
 import { state } from "./state.js";
 
+const MIN_CALIBRATION_SPAN = 100;
+
 /* Helpers */
 
 function copySensorValues(values) {
@@ -26,6 +28,21 @@ function sensorValuesEqual(first, second) {
     }
 
     return first.every((value, index) => value === second[index]);
+}
+
+function calibrationSpanValid(floor, line) {
+    if (floor === null || line === null) {
+        return false;
+    }
+
+    if (floor.length !== 3 || line.length !== 3) {
+        return false;
+    }
+
+    return floor.every(
+        (floorValue, index) =>
+            Math.abs(floorValue - line[index]) >= MIN_CALIBRATION_SPAN,
+    );
 }
 
 function renderSensorValues(element, values) {
@@ -89,21 +106,41 @@ export function renderGrayscaleEditor() {
     const complete =
         state.grayscale.floor !== null && state.grayscale.line !== null;
 
+    const valid =
+        complete &&
+        calibrationSpanValid(state.grayscale.floor, state.grayscale.line);
+
     const changed =
         !sensorValuesEqual(state.grayscale.floor, state.grayscale.savedFloor) ||
         !sensorValuesEqual(state.grayscale.line, state.grayscale.savedLine);
 
-    elements.grayscale.saveButton.disabled = !complete || !changed;
+    elements.grayscale.saveButton.disabled = !valid || !changed;
 
     elements.grayscale.resetButton.disabled = !changed;
 
     elements.grayscale.clearButton.disabled = !state.grayscale.calibrated;
 
-    elements.grayscale.message.textContent = changed
-        ? complete
-            ? "Unsaved line sensor " + "calibration."
-            : "Capture both surfaces " + "before saving."
-        : "";
+    if (!changed) {
+        elements.grayscale.message.textContent = "";
+        return;
+    }
+
+    if (!complete) {
+        elements.grayscale.message.textContent =
+            "Capture both surfaces before saving.";
+        return;
+    }
+
+    if (!valid) {
+        elements.grayscale.message.textContent =
+            "Floor and line readings must differ " +
+            `by at least ${MIN_CALIBRATION_SPAN} ` +
+            "on every sensor.";
+
+        return;
+    }
+
+    elements.grayscale.message.textContent = "Unsaved line sensor calibration.";
 }
 
 /* Sampling */
@@ -154,8 +191,6 @@ async function captureGrayscaleFloor() {
 
         renderGrayscaleEditor();
 
-        elements.grayscale.message.textContent = "Floor reference captured.";
-
         elements.announcement.textContent = "Floor reference captured.";
     } catch (error) {
         if (state.pageClosing) {
@@ -199,8 +234,6 @@ async function captureGrayscaleLine() {
 
         renderGrayscaleEditor();
 
-        elements.grayscale.message.textContent = "Line reference captured.";
-
         elements.announcement.textContent = "Line reference captured.";
     } catch (error) {
         if (state.pageClosing) {
@@ -232,6 +265,15 @@ async function saveGrayscale(renderCalibration) {
     if (state.grayscale.floor === null || state.grayscale.line === null) {
         elements.grayscale.message.textContent =
             "Capture both surfaces before saving.";
+
+        return;
+    }
+
+    if (!calibrationSpanValid(state.grayscale.floor, state.grayscale.line)) {
+        elements.grayscale.message.textContent =
+            "Floor and line readings are too similar. " +
+            `They must differ by at least ${MIN_CALIBRATION_SPAN} ` +
+            "on every sensor.";
 
         return;
     }

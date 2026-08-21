@@ -15,6 +15,8 @@ export const elements = {
 
     refreshButton: requireElement("#refresh-calibration"),
 
+    resetDefaultsButton: requireElement("#reset-calibration-defaults"),
+
     retryButton: requireElement("#retry-calibration"),
 
     loadingPanel: requireElement("#calibration-loading"),

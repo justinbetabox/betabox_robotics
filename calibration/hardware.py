@@ -223,6 +223,14 @@ class CalibrationHardware:
 
         return [round(total / sample_count) for total in totals]
 
+    def reset_to_defaults(
+        self,
+    ) -> None:
+        self._run_preview(
+            self._reset_to_defaults,
+            owner="Launchpad Calibration Reset",
+        )
+
     def _run_preview(
         self,
         operation: Callable[..., None],
@@ -289,4 +297,25 @@ class CalibrationHardware:
             left_trim=left_trim,
             right_trim=right_trim,
             steering_offset=steering_offset,
+        )
+
+    @staticmethod
+    def _reset_to_defaults(
+        *,
+        client: RobotRuntimeClient,
+        token: str,
+    ) -> None:
+        client.drive_stop(
+            token,
+        )
+
+        client.preview_steering_calibration(
+            token,
+            0.0,
+        )
+
+        client.preview_camera_calibration(
+            token,
+            pan_offset=0.0,
+            tilt_offset=0.0,
         )

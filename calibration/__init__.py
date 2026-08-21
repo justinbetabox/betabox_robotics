@@ -1,6 +1,7 @@
 from .manager import CalibrationManager
 from .models import (
     CALIBRATION_VERSION,
+    GRAYSCALE_MIN_CALIBRATION_SPAN,
     CameraMountCalibration,
     GrayscaleCalibration,
     MotorCalibration,
@@ -16,6 +17,7 @@ from .storage import (
 
 __all__ = [
     "CALIBRATION_VERSION",
+    "GRAYSCALE_MIN_CALIBRATION_SPAN",
     "CalibrationManager",
     "CalibrationStorageError",
     "CameraMountCalibration",

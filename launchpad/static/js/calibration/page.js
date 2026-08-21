@@ -55,6 +55,8 @@ function showLoading() {
 
     elements.refreshButton.disabled = true;
 
+    elements.resetDefaultsButton.disabled = true;
+
     elements.refreshButton.textContent = "Refreshing…";
 
     setSteeringControlsDisabled(true);
@@ -77,6 +79,8 @@ function showError(message) {
     elements.errorPanel.hidden = false;
 
     elements.refreshButton.disabled = false;
+
+    elements.resetDefaultsButton.disabled = false;
 
     elements.refreshButton.textContent = "Refresh";
 
@@ -146,6 +150,8 @@ function renderCalibration(payload) {
 
     elements.refreshButton.disabled = false;
 
+    elements.resetDefaultsButton.disabled = false;
+
     elements.refreshButton.textContent = "Refresh";
 
     setConnectionState("connected", "Connected");
@@ -196,11 +202,70 @@ async function loadCalibration() {
     }
 }
 
+async function resetCalibrationDefaults() {
+    if (state.pageClosing) {
+        return;
+    }
+
+    const confirmed = window.confirm(
+        "Reset all robot calibration to safe defaults? " +
+            "This resets steering, camera alignment, motor trim, " +
+            "and line sensor calibration.",
+    );
+
+    if (!confirmed) {
+        return;
+    }
+
+    elements.resetDefaultsButton.disabled = true;
+    elements.refreshButton.disabled = true;
+
+    elements.updatedTime.textContent = "Resetting calibration…";
+
+    try {
+        const payload = await requestJson("/api/calibration/reset", {
+            method: "POST",
+            errorMessage: "Unable to reset calibration.",
+        });
+
+        if (state.pageClosing) {
+            return;
+        }
+
+        renderCalibration(payload);
+
+        elements.announcement.textContent =
+            "Calibration reset to safe defaults.";
+    } catch (error) {
+        if (state.pageClosing) {
+            return;
+        }
+
+        const message =
+            error instanceof Error
+                ? error.message
+                : "Unable to reset calibration.";
+
+        elements.updatedTime.textContent = message;
+
+        elements.announcement.textContent = message;
+    } finally {
+        if (!state.pageClosing) {
+            elements.resetDefaultsButton.disabled = false;
+            elements.refreshButton.disabled = false;
+        }
+    }
+}
+
 /* Shared UI */
 
 function setupPageUI() {
     elements.refreshButton.addEventListener("click", () => {
         void loadCalibration();
+    });
+
+    elements.resetDefaultsButton.addEventListener("click", () => {
+        void resetCalibrationDefaults();
     });
 
     elements.retryButton.addEventListener("click", () => {

@@ -12,7 +12,6 @@ from betabox_robotics.config import (
     PlatformConfig,
 )
 from betabox_robotics.services.status import collect_status
-from betabox_robotics.services.system_health import collect_system_health
 
 Severity = Literal["info", "warning", "error", "critical"]
 
@@ -228,6 +227,24 @@ def write_event(
     )
 
 
+def _runtime_state(
+    runtime: Mapping[str, object] | None,
+) -> str:
+    if runtime is None:
+        return "unavailable"
+
+    if runtime.get("ready") is not True:
+        return "not_ready"
+
+    if runtime.get("ownership_acquired") is not True:
+        return "ownership_missing"
+
+    if runtime.get("hardware_initialized") is not True:
+        return "hardware_uninitialized"
+
+    return "ready"
+
+
 def severity_for_change(
     path: str,
     current: object,
@@ -236,6 +253,15 @@ def severity_for_change(
         path,
         name="path",
     )
+
+    if path_value.endswith("runtime_state"):
+        if current == "ready":
+            return "info"
+
+        return "error"
+
+    if path_value.endswith("ultrasonic_available"):
+        return "info" if current is True else "warning"
 
     if path_value.endswith("battery_state"):
         if current == "critical":
@@ -334,6 +360,8 @@ def message_for_change(
     )
 
     labels = {
+        "runtime.runtime_state": "Robot runtime",
+        "hardware.ultrasonic_available": "Ultrasonic sensor",
         "hardware.robot_available": "Robot hardware",
         "hardware.i2c_available": "I²C bus",
         "hardware.i2c_devices": "I²C devices",
@@ -360,6 +388,22 @@ def message_for_change(
         path_value,
         path_value,
     )
+
+    if path_value.endswith("runtime_state"):
+        if current == "ready":
+            return "Robot runtime recovered and is ready"
+
+        if current == "unavailable":
+            return "Robot runtime became unavailable"
+
+        if current == "not_ready":
+            return "Robot runtime became not ready"
+
+        if current == "ownership_missing":
+            return "Robot runtime lost hardware ownership"
+
+        if current == "hardware_uninitialized":
+            return "Robot runtime hardware became uninitialized"
 
     if path_value.endswith("grayscale_plausible"):
         if current is True:
@@ -420,12 +464,8 @@ def collect_snapshot(
     config_value = _validate_config(config)
 
     status = collect_status(config_value)
-    system_health = collect_system_health(config_value)
 
-    snapshot = asdict(status)
-    snapshot["system_health"] = system_health.to_dict()
-
-    return snapshot
+    return asdict(status)
 
 
 def summarize(
@@ -434,6 +474,11 @@ def summarize(
     snapshot_value = _validate_mapping(
         snapshot,
         name="snapshot",
+    )
+
+    runtime = _optional_mapping(
+        snapshot_value.get("runtime"),
+        name="snapshot runtime",
     )
 
     hardware = _validate_mapping(
@@ -550,6 +595,9 @@ def summarize(
 
     return {
         "services": dict(services),
+        "runtime": {
+            "runtime_state": _runtime_state(runtime),
+        },
         "hardware": {
             "robot_available": hardware.get("passive_hardware_available"),
             "i2c_available": i2c.get("available"),
@@ -560,6 +608,7 @@ def summarize(
             "battery_state": battery.get("state"),
             "grayscale_available": sensors.get("grayscale_available"),
             "grayscale_plausible": sensors.get("grayscale_plausible"),
+            "ultrasonic_available": sensors.get("ultrasonic_available"),
             "audio_available": audio.get("available"),
             "vision_service_available": vision.get("service_available"),
             "vision_running": vision.get("running"),

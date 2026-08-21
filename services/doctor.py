@@ -9,13 +9,6 @@ from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
     PlatformConfig,
 )
-from betabox_robotics.runtime.client import (
-    RobotRuntimeClient,
-)
-from betabox_robotics.runtime.errors import (
-    RobotRuntimeError,
-    RobotRuntimeUnavailableError,
-)
 from betabox_robotics.services.guest import (
     GuestWorkspaceStatus,
 )
@@ -312,6 +305,7 @@ def dedicated_service_units(
     config_value = _validate_config(config)
 
     return {
+        config_value.services.robot.unit,
         config_value.services.video.unit,
         config_value.services.jupyterhub.unit,
         config_value.services.boot_announce.unit,
@@ -916,40 +910,35 @@ def diagnose_grayscale(
     )
 
 
-def diagnose_ultrasonic() -> Diagnosis:
-    try:
-        client = RobotRuntimeClient()
+def diagnose_ultrasonic(
+    hardware: RobotHardwareStatus,
+) -> Diagnosis:
+    sensors = hardware.sensors
 
-        distance = client.ultrasonic_distance(
-            samples=1,
-        )
-
-    except RobotRuntimeUnavailableError as exc:
+    if not sensors.ultrasonic_configured:
         return Diagnosis(
             title="Ultrasonic",
             ok=False,
             severity="warning",
-            summary=(
-                "Ultrasonic sensor could not be tested "
-                "because the robot runtime is unavailable."
+            summary="Ultrasonic sensor is not configured.",
+            causes=("The robot configuration does not define an ultrasonic sensor.",),
+            affected=(
+                "Distance sensing",
+                "Obstacle detection",
+                "Obstacle avoidance",
             ),
-            causes=(str(exc),),
-            affected=("Ultrasonic diagnostic test",),
-            actions=(
-                "Check: systemctl status betabox-robot.service",
-                "Restart: sudo systemctl restart betabox-robot.service",
-                "Run the diagnostic again.",
-            ),
+            actions=("Check the robot sensor configuration.",),
         )
 
-    except RobotRuntimeError as exc:
+    if not sensors.ultrasonic_available:
         return Diagnosis(
             title="Ultrasonic",
             ok=False,
             severity="warning",
             summary="Ultrasonic sensor is not responding.",
             causes=(
-                str(exc),
+                sensors.ultrasonic_error
+                or "The ultrasonic sensor did not return a valid distance.",
                 "The ultrasonic sensor may be disconnected.",
                 "The ultrasonic sensor cable may be loose or damaged.",
                 "The trigger or echo connection may not be working.",
@@ -966,25 +955,26 @@ def diagnose_ultrasonic() -> Diagnosis:
             ),
         )
 
-    if distance < 0:
+    distance = sensors.ultrasonic_distance
+
+    if distance is None:
         return Diagnosis(
             title="Ultrasonic",
             ok=False,
             severity="warning",
             summary=(
-                f"Ultrasonic sensor returned an invalid distance: {distance:.1f} cm."
+                "Ultrasonic sensor is marked available but "
+                "no distance measurement is present."
             ),
-            causes=(
-                "The ultrasonic sensor did not produce a valid distance measurement.",
-            ),
+            causes=("The current hardware status snapshot is incomplete.",),
             affected=(
                 "Distance sensing",
                 "Obstacle detection",
                 "Obstacle avoidance",
             ),
             actions=(
-                "Check the ultrasonic sensor connection.",
-                "Run the ultrasonic validation test.",
+                "Run the diagnostic again.",
+                "Check the robot runtime status.",
             ),
         )
 
@@ -1246,12 +1236,9 @@ def collect_diagnoses(
         diagnose_services(status, config),
     ]
 
-    if robot_hardware.ok:
-        diagnoses.append(diagnose_battery(hardware))
-        diagnoses.append(diagnose_grayscale(hardware))
-
-        if runtime.ok:
-            diagnoses.append(diagnose_ultrasonic())
+    diagnoses.append(diagnose_battery(hardware))
+    diagnoses.append(diagnose_grayscale(hardware))
+    diagnoses.append(diagnose_ultrasonic(hardware))
 
     return tuple(diagnoses)
 

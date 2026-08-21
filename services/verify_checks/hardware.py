@@ -16,9 +16,6 @@ from betabox_robotics.robots.defaults import (
 from betabox_robotics.robots.exceptions import (
     RobotError,
 )
-from betabox_robotics.runtime.client import (
-    RobotRuntimeClient,
-)
 from betabox_robotics.runtime.errors import (
     RobotRuntimeError,
     RobotRuntimeUnavailableError,
@@ -271,11 +268,19 @@ def checks_from_hardware_status(
         else (sensors.error or "grayscale unavailable")
     )
 
-    ultrasonic_message = (
-        "ultrasonic configured"
-        if sensors.ultrasonic_configured
-        else "ultrasonic not configured"
-    )
+    ultrasonic_ok = sensors.ultrasonic_configured and sensors.ultrasonic_available
+
+    if not sensors.ultrasonic_configured:
+        ultrasonic_message = "ultrasonic not configured"
+
+    elif sensors.ultrasonic_available and sensors.ultrasonic_distance is not None:
+        ultrasonic_message = f"{sensors.ultrasonic_distance:.1f} cm"
+
+    elif sensors.ultrasonic_available:
+        ultrasonic_message = "ultrasonic responding"
+
+    else:
+        ultrasonic_message = sensors.ultrasonic_error or "ultrasonic unavailable"
 
     audio = hardware_value.audio
 
@@ -318,8 +323,8 @@ def checks_from_hardware_status(
             message=grayscale_message,
         ),
         CheckResult(
-            name=("hardware:ultrasonic_configured"),
-            ok=sensors.ultrasonic_configured,
+            name="hardware:ultrasonic",
+            ok=ultrasonic_ok,
             message=ultrasonic_message,
         ),
         CheckResult(
@@ -332,49 +337,4 @@ def checks_from_hardware_status(
             ok=vision_ok,
             message=vision_message,
         ),
-    )
-
-
-def check_ultrasonic_read(
-    *,
-    robot_config: RobotConfig = BETABOX_CAR,
-) -> CheckResult:
-    """
-    Perform one sampled ultrasonic distance read through
-    the centralized robot runtime.
-    """
-
-    _ = _validate_robot_config(robot_config)
-
-    client = RobotRuntimeClient()
-
-    try:
-        distance = client.ultrasonic_distance(
-            samples=3,
-        )
-
-    except (
-        RobotRuntimeError,
-        RobotRuntimeUnavailableError,
-        OSError,
-        TypeError,
-        ValueError,
-    ) as exc:
-        return CheckResult(
-            name="hardware:ultrasonic_read",
-            ok=False,
-            message=str(exc),
-        )
-
-    if distance < 0:
-        return CheckResult(
-            name="hardware:ultrasonic_read",
-            ok=False,
-            message=(f"invalid distance result: {distance}"),
-        )
-
-    return CheckResult(
-        name="hardware:ultrasonic_read",
-        ok=True,
-        message=f"{distance:.1f} cm",
     )

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Final
 
 from betabox_robotics.robots.config import SensorsConfig
@@ -14,6 +15,8 @@ from .models import (
 GRAYSCALE_CHANNEL_COUNT: Final[int] = 3
 GRAYSCALE_IMPLAUSIBLE_HIGH: Final[int] = 3000
 GRAYSCALE_PLAUSIBILITY_SAMPLES: Final[int] = 5
+
+ULTRASONIC_HEALTH_SAMPLES: Final[int] = 1
 
 
 def _validate_sensors_config(
@@ -46,7 +49,10 @@ def _battery_state(
 def _grayscale_plausibility(
     client: RobotRuntimeClient,
     first_values: tuple[int, int, int],
-) -> tuple[bool, tuple[int, ...]]:
+) -> tuple[
+    bool,
+    tuple[int, ...],
+]:
     samples = [
         first_values,
     ]
@@ -64,6 +70,44 @@ def _grayscale_plausibility(
         not suspicious_channels,
         suspicious_channels,
     )
+
+
+def _ultrasonic_status(
+    client: RobotRuntimeClient,
+) -> tuple[
+    bool,
+    float | None,
+    str | None,
+]:
+    try:
+        distance = client.ultrasonic_distance(
+            samples=ULTRASONIC_HEALTH_SAMPLES,
+        )
+
+        if not math.isfinite(distance):
+            raise ValueError("ultrasonic distance must be finite")
+
+        if distance < 0:
+            raise ValueError(f"invalid ultrasonic distance: {distance}")
+
+        return (
+            True,
+            distance,
+            None,
+        )
+
+    except (
+        RobotRuntimeError,
+        OSError,
+        RuntimeError,
+        TypeError,
+        ValueError,
+    ) as exc:
+        return (
+            False,
+            None,
+            str(exc),
+        )
 
 
 def collect_battery_status(
@@ -114,8 +158,8 @@ def collect_robot_status(
     str | None,
 ]:
     """
-    Collect battery and grayscale status through the
-    centralized robot runtime.
+    Collect live battery, grayscale, and ultrasonic
+    status through the centralized robot runtime.
     """
 
     config_value = _validate_sensors_config(sensors_config)
@@ -126,24 +170,25 @@ def collect_robot_status(
 
     battery = collect_battery_status(config_value)
 
+    grayscale_available = False
+    grayscale_values: tuple[int, ...] | None = None
+    grayscale_plausible: bool | None = None
+    grayscale_suspicious_channels: tuple[int, ...] = ()
+    grayscale_error: str | None = None
+
     try:
-        grayscale_values = client.grayscale_values()
+        first_values = client.grayscale_values()
 
         (
             grayscale_plausible,
             grayscale_suspicious_channels,
         ) = _grayscale_plausibility(
             client,
-            grayscale_values,
+            first_values,
         )
 
-        sensors = SensorStatus(
-            grayscale_available=True,
-            grayscale_values=tuple(int(value) for value in grayscale_values),
-            grayscale_plausible=(grayscale_plausible),
-            grayscale_suspicious_channels=(grayscale_suspicious_channels),
-            ultrasonic_configured=(ultrasonic_configured),
-        )
+        grayscale_available = True
+        grayscale_values = tuple(int(value) for value in first_values)
 
     except (
         RobotRuntimeError,
@@ -152,21 +197,32 @@ def collect_robot_status(
         TypeError,
         ValueError,
     ) as exc:
-        sensors = SensorStatus(
-            grayscale_available=False,
-            grayscale_values=None,
-            grayscale_plausible=None,
-            grayscale_suspicious_channels=(),
-            ultrasonic_configured=(ultrasonic_configured),
-            error=str(exc),
-        )
+        grayscale_error = str(exc)
 
-    passive_hardware_available = battery.available and sensors.grayscale_available
+    (
+        ultrasonic_available,
+        ultrasonic_distance,
+        ultrasonic_error,
+    ) = _ultrasonic_status(client)
+
+    sensors = SensorStatus(
+        grayscale_available=grayscale_available,
+        grayscale_values=grayscale_values,
+        grayscale_plausible=grayscale_plausible,
+        grayscale_suspicious_channels=(grayscale_suspicious_channels),
+        ultrasonic_configured=ultrasonic_configured,
+        ultrasonic_available=ultrasonic_available,
+        ultrasonic_distance=ultrasonic_distance,
+        ultrasonic_error=ultrasonic_error,
+        error=grayscale_error,
+    )
+
+    passive_hardware_available = battery.available and grayscale_available
 
     passive_hardware_error = None
 
     if not passive_hardware_available:
-        passive_hardware_error = battery.error or sensors.error
+        passive_hardware_error = battery.error or grayscale_error
 
     return (
         passive_hardware_available,

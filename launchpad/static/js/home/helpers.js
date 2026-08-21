@@ -154,48 +154,13 @@ export function jupyterLabel(status) {
 }
 
 export function normalizeHealthState(status) {
-    const batteryState = String(
-        firstDefined(
-            objectValue(status, "hardware", "battery", "state"),
-            "unknown",
-        ),
-    ).toLowerCase();
-
-    const temperatureState = String(
-        firstDefined(
-            objectValue(status, "system_health", "temperature", "state"),
-            "unknown",
-        ),
-    ).toLowerCase();
-
-    const passiveHardwareAvailable = objectValue(
-        status,
-        "hardware",
-        "passive_hardware_available",
-    );
-
-    const grayscalePlausible = objectValue(
-        status,
-        "hardware",
-        "sensors",
-        "grayscale_plausible",
-    );
-
-    const visionAvailable = objectValue(
-        status,
-        "hardware",
-        "vision",
-        "service_available",
-    );
-
-    const jupyterActive = objectValue(status, "jupyterhub", "active");
-
-    const jupyterResponding = objectValue(status, "jupyterhub", "responding");
+    const health = objectValue(status, "overall_health");
 
     if (
-        batteryState === "unknown" &&
-        temperatureState === "unknown" &&
-        visionAvailable === undefined
+        health === null ||
+        health === undefined ||
+        typeof health !== "object" ||
+        Array.isArray(health)
     ) {
         return {
             label: "Unknown",
@@ -203,33 +168,30 @@ export function normalizeHealthState(status) {
         };
     }
 
-    if (
-        passiveHardwareAvailable === false ||
-        batteryState === "critical" ||
-        temperatureState === "critical"
-    ) {
-        return {
-            label: "Needs Attention",
-            cssClass: "status-critical",
-        };
-    }
+    switch (health.state) {
+        case "healthy":
+            return {
+                label: "Healthy",
+                cssClass: "status-healthy",
+            };
 
-    if (
-        batteryState === "low" ||
-        temperatureState === "high" ||
-        visionAvailable === false ||
-        grayscalePlausible === false ||
-        jupyterActive === false ||
-        jupyterResponding === false
-    ) {
-        return {
-            label: "Warning",
-            cssClass: "status-warning",
-        };
-    }
+        case "warning":
+            return {
+                label: "Warning",
+                cssClass: "status-warning",
+            };
 
-    return {
-        label: "Healthy",
-        cssClass: "status-healthy",
-    };
+        case "error":
+        case "critical":
+            return {
+                label: "Needs Attention",
+                cssClass: "status-critical",
+            };
+
+        default:
+            return {
+                label: "Unknown",
+                cssClass: "status-unknown",
+            };
+    }
 }

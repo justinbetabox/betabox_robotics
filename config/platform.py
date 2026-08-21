@@ -652,6 +652,19 @@ class PlatformServicesConfig:
         )
     )
 
+    robot: ServiceDefinition = field(
+        default_factory=lambda: ServiceDefinition(
+            unit="betabox-robot.service",
+            display_name="Robot Runtime",
+            description=(
+                "Owns the robot hardware and provides centralized "
+                "runtime access for robot control and sensors."
+            ),
+            category=ServiceCategory.BACKGROUND,
+            startup=ServiceStartup.CONTINUOUS,
+        )
+    )
+
     jupyterhub: ServiceDefinition = field(
         default_factory=lambda: ServiceDefinition(
             unit="jupyterhub.service",
@@ -720,6 +733,7 @@ class PlatformServicesConfig:
             "hostname",
             "boot_announce",
             "monitor",
+            "robot",
             "jupyterhub",
             "video",
             "wifi_fallback",
@@ -748,6 +762,7 @@ class PlatformServicesConfig:
             self.hostname,
             self.boot_announce,
             self.monitor,
+            self.robot,
             self.jupyterhub,
             self.video,
             self.wifi_fallback,

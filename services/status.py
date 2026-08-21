@@ -34,6 +34,9 @@ from betabox_robotics.services.hardware_status import (
     collect_hardware_status,
 )
 from betabox_robotics.services.managed import managed_services
+from betabox_robotics.services.platform_health import (
+    evaluate_platform_health,
+)
 from betabox_robotics.services.system_checks import (
     SystemHealthStatus,
 )
@@ -197,11 +200,29 @@ class StatusReport:
 
     def to_dict(
         self,
+        config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
     ) -> dict[str, JSONValue]:
-        return cast(
+        config_value = _validate_config(config)
+
+        data = cast(
             dict[str, JSONValue],
             asdict(self),
         )
+
+        health = evaluate_platform_health(
+            self,
+            config_value,
+        )
+
+        data["overall_health"] = cast(
+            JSONValue,
+            cast(
+                object,
+                health.to_dict(),
+            ),
+        )
+
+        return data
 
 
 def hostname() -> str:
@@ -295,6 +316,12 @@ def collect_status(
 
     runtime, runtime_error = collect_runtime_status()
 
+    hardware = collect_hardware_status(config_value)
+
+    system_health = collect_system_health(config_value)
+
+    guest = guest_status()
+
     return StatusReport(
         version=__version__,
         hostname=hostname(),
@@ -308,9 +335,9 @@ def collect_status(
         jupyterhub_proxy_available=(executable_available("configurable-http-proxy")),
         runtime=runtime,
         runtime_error=runtime_error,
-        hardware=collect_hardware_status(config_value),
-        system_health=collect_system_health(config_value),
-        guest=guest_status(),
+        hardware=hardware,
+        system_health=system_health,
+        guest=guest,
     )
 
 
@@ -402,10 +429,21 @@ def print_hardware_status(hardware: RobotHardwareStatus) -> None:
     else:
         print("Grayscale: unavailable")
 
-    print(
-        "Ultrasonic:  "
-        + ("configured" if hardware.sensors.ultrasonic_configured else "not configured")
-    )
+    ultrasonic = hardware.sensors
+
+    if not ultrasonic.ultrasonic_configured:
+        ultrasonic_text = "not configured"
+
+    elif ultrasonic.ultrasonic_available and ultrasonic.ultrasonic_distance is not None:
+        ultrasonic_text = f"{ultrasonic.ultrasonic_distance:.1f} cm"
+
+    elif ultrasonic.ultrasonic_available:
+        ultrasonic_text = "responding"
+
+    else:
+        ultrasonic_text = ultrasonic.ultrasonic_error or "unavailable"
+
+    print(f"Ultrasonic:  {ultrasonic_text}")
 
     if hardware.audio.available:
         device = hardware.audio.device or "available"
@@ -435,6 +473,23 @@ def print_human(
     print()
     print("Betabox Status")
     print("==============")
+    print()
+
+    health = evaluate_platform_health(
+        report,
+        config_value,
+    )
+
+    print("Overall Health")
+    print("--------------")
+    print(f"State: {health.state}")
+
+    if health.issues:
+        for issue in health.issues:
+            print(f"[{issue.severity.upper()}] {issue.component}: {issue.message}")
+    else:
+        print("No platform health issues detected.")
+
     print()
 
     print("Identity")
@@ -543,10 +598,13 @@ def parse_args(
 
 def print_json(
     report: StatusReport,
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
 ) -> None:
+    config_value = _validate_config(config)
+
     print(
         json.dumps(
-            report.to_dict(),
+            report.to_dict(config_value),
             indent=2,
         )
     )
@@ -570,7 +628,10 @@ def main(
         report = collect_status(config)
 
         if json_requested:
-            print_json(report)
+            print_json(
+                report,
+                config,
+            )
         else:
             print_human(
                 report,

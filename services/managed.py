@@ -109,6 +109,11 @@ def managed_services(
             unit=services.monitor.unit,
             log_file=config.paths.monitor_log,
         ),
+        "robot": ManagedService(
+            name="robot",
+            title=services.robot.display_name,
+            unit=services.robot.unit,
+        ),
         "jupyterhub": ManagedService(
             name="jupyterhub",
             title=services.jupyterhub.display_name,

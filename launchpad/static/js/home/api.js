@@ -33,6 +33,17 @@ function validateStatusPayload(payload) {
         );
     }
 
+    if (
+        payload.overall_health !== undefined &&
+        (payload.overall_health === null ||
+            typeof payload.overall_health !== "object" ||
+            Array.isArray(payload.overall_health))
+    ) {
+        throw new Error(
+            "The Status API returned invalid overall health information.",
+        );
+    }
+
     return payload;
 }
 

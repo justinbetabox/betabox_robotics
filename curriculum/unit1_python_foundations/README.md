@@ -1,4 +1,3 @@
-
 # Unit 1 — Python Foundations
 
 ## Overview

@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SDK_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -13,7 +13,14 @@ VENV_DIR="$BETABOX_DIR/venv"
 
 JUPYTERHUB_DIR="/opt/jupyterhub"
 JUPYTERHUB_VENV_DIR="$JUPYTERHUB_DIR/venv"
+JUPYTERLAB_SETTINGS_DIR="$JUPYTERHUB_VENV_DIR/share/jupyter/lab/settings"
 
+PIP_VERSION="26.2.1"
+SETUPTOOLS_VERSION="84.0.0"
+WHEEL_VERSION="0.48.0"
+
+export PIP_DISABLE_PIP_VERSION_CHECK=1
+export PIP_NO_INPUT=1
 
 render_service_template() {
     local source="$1"
@@ -44,9 +51,10 @@ echo
 
 echo "[1/11] Installing system packages..."
 
-sudo apt update
+sudo apt-get update
 
-sudo apt install -y \
+sudo DEBIAN_FRONTEND=noninteractive \
+    apt-get install -y \
     git \
     python3-pip \
     python3-venv \
@@ -55,9 +63,10 @@ sudo apt install -y \
     i2c-tools \
     portaudio19-dev \
     python3-pyaudio \
-    python3-opencv \
     python3-picamera2 \
     python3-lgpio \
+    python3-gpiozero \
+    python3-smbus2 \
     espeak-ng \
     libttspico-utils \
     ffmpeg \
@@ -71,12 +80,11 @@ sudo apt install -y \
 
 echo "[2/11] Creating directories..."
 
-sudo mkdir -p \
-    "$LIB_DIR" \
-    "$BETABOX_DIR"
-
-sudo chown -R \
-    "$SERVICE_USER:$SERVICE_GROUP" \
+sudo install \
+    -d \
+    -o "$SERVICE_USER" \
+    -g "$SERVICE_GROUP" \
+    -m 0755 \
     "$LIB_DIR" \
     "$BETABOX_DIR"
 
@@ -95,10 +103,9 @@ source "$VENV_DIR/bin/activate"
 echo "[4/11] Installing Python dependencies..."
 
 python -m pip install \
-    --upgrade \
-    pip \
-    setuptools \
-    wheel
+    "pip==$PIP_VERSION" \
+    "setuptools==$SETUPTOOLS_VERSION" \
+    "wheel==$WHEEL_VERSION"
 
 # Important:
 #
@@ -108,16 +115,10 @@ python -m pip install \
 
 python -m pip install \
     --no-deps \
-    opencv-python==4.12.0.88 \
     opencv-python-headless==4.12.0.88
 
 python -m pip install \
-    aiohttp \
-    aiohttp-jinja2 \
-    aiortc \
-    pamela \
-    smbus2 \
-    gpiozero
+    -r "$SDK_DIR/deployment/requirements.txt"
 
 
 echo "[5/11] Installing Betabox Robotics SDK..."
@@ -129,11 +130,11 @@ python -m pip install \
 
 echo "[6/11] Installing JupyterHub..."
 
-sudo mkdir -p \
-    "$JUPYTERHUB_DIR"
-
-sudo chown -R \
-    "$SERVICE_USER:$SERVICE_GROUP" \
+sudo install \
+    -d \
+    -o "$SERVICE_USER" \
+    -g "$SERVICE_GROUP" \
+    -m 0755 \
     "$JUPYTERHUB_DIR"
 
 if [[ ! -d "$JUPYTERHUB_VENV_DIR" ]]; then
@@ -143,20 +144,41 @@ fi
 
 "$JUPYTERHUB_VENV_DIR/bin/python" \
     -m pip install \
-    --upgrade \
-    pip \
-    setuptools \
-    wheel
+    "pip==$PIP_VERSION" \
+    "setuptools==$SETUPTOOLS_VERSION" \
+    "wheel==$WHEEL_VERSION"
 
-echo "Installing configurable-http-proxy..."
+echo "Checking configurable-http-proxy..."
 
-sudo npm install \
-    -g \
-    configurable-http-proxy
+CHP_VERSION="$(
+    configurable-http-proxy --version \
+        2>/dev/null \
+        || true
+)"
+
+if [[ "$CHP_VERSION" == "5.1.0" ]]; then
+    echo "configurable-http-proxy 5.1.0 is already installed."
+else
+    echo "Installing configurable-http-proxy 5.1.0..."
+
+    sudo npm install \
+        -g \
+        configurable-http-proxy@5.1.0
+fi
 
 "$JUPYTERHUB_VENV_DIR/bin/python" \
     -m pip install \
     -r "$SDK_DIR/deployment/jupyterhub/requirements.txt"
+
+echo "Installing JupyterLab settings..."
+
+mkdir -p \
+    "$JUPYTERLAB_SETTINGS_DIR"
+
+install \
+    -m 0644 \
+    "$SDK_DIR/deployment/jupyterhub/overrides.json" \
+    "$JUPYTERLAB_SETTINGS_DIR/overrides.json"
 
 echo "Installing JupyterHub configuration..."
 
@@ -186,9 +208,6 @@ sudo cp \
 
 echo "Installing Robot Car Jupyter kernel..."
 
-python -m pip install \
-    ipykernel
-
 python -m ipykernel install \
     --prefix="$JUPYTERHUB_VENV_DIR" \
     --name robot-car \
@@ -200,12 +219,6 @@ echo "Removing default Python 3 Jupyter kernel..."
     kernelspec remove \
     -f \
     python3 \
-    || true
-
-"$JUPYTERHUB_VENV_DIR/bin/python" \
-    -m pip uninstall \
-    -y \
-    ipykernel \
     || true
 
 

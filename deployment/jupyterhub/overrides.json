@@ -1,0 +1,6 @@
+{
+    "@jupyterlab/notebook-extension:tracker": {
+        "showEditorForReadOnlyMarkdown": false,
+        "kernelShutdown": true
+    }
+}

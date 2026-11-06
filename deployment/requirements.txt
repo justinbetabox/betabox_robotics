@@ -1,0 +1,5 @@
+aiohttp==3.14.3
+aiohttp-jinja2==1.6
+aiortc==1.15.0
+ipykernel==7.3.0
+pamela==1.2.0

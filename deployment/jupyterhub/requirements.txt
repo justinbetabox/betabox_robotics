@@ -1,4 +1,4 @@
-jupyterhub
-jupyterlab
-notebook
-jupyterhub-idle-culler
+jupyterhub==5.5.1
+jupyterlab==4.6.3
+notebook==7.6.2
+jupyterhub-idle-culler==2.0.0

@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
 REPO_URL="https://github.com/justinbetabox/betabox_robotics.git"
 BRANCH="main"
@@ -19,13 +19,27 @@ if [[ "$EUID" -eq 0 ]]; then
     exit 1
 fi
 
-echo "[1/4] Installing git..."
-sudo apt update
-sudo apt install -y git
+echo "[1/4] Checking git..."
+
+if command -v git >/dev/null 2>&1; then
+    echo "git is already installed."
+else
+    echo "Installing git..."
+
+    sudo apt-get update
+
+    sudo DEBIAN_FRONTEND=noninteractive \
+        apt-get install -y git
+fi
 
 echo "[2/4] Preparing /opt/libs..."
-sudo mkdir -p "$LIB_DIR"
-sudo chown -R "$SERVICE_USER:$SERVICE_GROUP" "$LIB_DIR"
+
+sudo install \
+    -d \
+    -o "$SERVICE_USER" \
+    -g "$SERVICE_GROUP" \
+    -m 0755 \
+    "$LIB_DIR"
 
 echo "[3/4] Cloning or updating SDK..."
 
@@ -37,6 +51,7 @@ if [[ -d "$SDK_DIR/.git" ]]; then
     git pull --ff-only origin "$BRANCH"
 else
     git clone \
+        --depth 1 \
         --branch "$BRANCH" \
         --single-branch \
         "$REPO_URL" \
@@ -46,5 +61,7 @@ fi
 echo "[4/4] Running installer..."
 
 cd "$SDK_DIR"
+
 chmod +x deployment/install.sh
+
 ./deployment/install.sh

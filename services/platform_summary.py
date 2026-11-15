@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import shutil
-import socket
 from collections.abc import Mapping
 from dataclasses import dataclass
 from types import MappingProxyType
@@ -26,6 +25,10 @@ from betabox_robotics.services.hardware_checks import (
 )
 from betabox_robotics.services.managed import (
     managed_services,
+)
+from betabox_robotics.services.network_identity import (
+    hostname,
+    ip_addresses,
 )
 from betabox_robotics.services.status import (
     collect_runtime_status,
@@ -236,39 +239,6 @@ class PlatformSummary:
             "hardware": self.hardware.to_dict(),
             "system_health": system_health,
         }
-
-
-def hostname() -> str:
-    return _validate_string(
-        socket.gethostname(),
-        name="hostname",
-    )
-
-
-def ip_addresses() -> tuple[str, ...]:
-    result = run(
-        [
-            "hostname",
-            "-I",
-        ],
-        timeout=3,
-    )
-
-    if result is None or result.returncode != 0:
-        return ()
-
-    addresses: list[str] = []
-
-    for address in result.stdout.split():
-        address_value = address.strip()
-
-        if not address_value or address_value.startswith("127."):
-            continue
-
-        if address_value not in addresses:
-            addresses.append(address_value)
-
-    return tuple(addresses)
 
 
 def service_state(

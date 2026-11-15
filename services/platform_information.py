@@ -10,6 +10,10 @@ from betabox_robotics.config import (
     DEFAULT_PLATFORM_CONFIG,
     PlatformConfig,
 )
+from betabox_robotics.services.network_identity import (
+    hostname,
+    ip_addresses,
+)
 from betabox_robotics.services.platform_summary import (
     collect_platform_summary,
 )
@@ -149,6 +153,7 @@ class RobotInformation:
 class NetworkInformation:
     hostname: str
     ip_addresses: tuple[str, ...]
+    web_urls: tuple[str, ...]
     launchpad_urls: tuple[str, ...]
     jupyterhub_urls: tuple[str, ...]
     vision_urls: tuple[str, ...]
@@ -167,6 +172,7 @@ class NetworkInformation:
 
         for name in (
             "ip_addresses",
+            "web_urls",
             "launchpad_urls",
             "jupyterhub_urls",
             "vision_urls",
@@ -451,6 +457,39 @@ def public_urls(
     )
 
 
+def unified_web_urls(
+    *,
+    config: PlatformConfig,
+    ip_addresses: tuple[str, ...],
+) -> tuple[str, ...]:
+    config_value = _validate_config(config)
+    network = config_value.network
+
+    urls: list[str] = [
+        network.offline_url,
+        network.ap_url,
+    ]
+
+    for address in ip_addresses:
+        address_value = _validate_string(
+            address,
+            name="ip address",
+        )
+
+        if address_value == network.ap_ipv4_address:
+            continue
+
+        url = f"http://{address_value}"
+
+        if network.public_http_port != 80:
+            url += f":{network.public_http_port}"
+
+        if url not in urls:
+            urls.append(url)
+
+    return tuple(urls)
+
+
 def collect_storage_information(
     path: str | Path,
 ) -> StorageInformation:
@@ -506,22 +545,17 @@ def operating_system_name() -> str:
     return system or "Unknown"
 
 
-def collect_platform_information(
+def collect_network_information(
     config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
-) -> PlatformInformationReport:
+) -> NetworkInformation:
     config_value = _validate_config(config)
 
-    summary = collect_platform_summary(config_value)
-
-    hostname = _validate_string(
-        summary.hostname,
-        name="hostname",
-    )
+    current_hostname = hostname()
 
     addresses = tuple(
         dict.fromkeys(
             address.strip()
-            for address in summary.ip_addresses
+            for address in ip_addresses()
             if (
                 address.strip()
                 and ":" not in address
@@ -530,6 +564,42 @@ def collect_platform_information(
             )
         )
     )
+
+    return NetworkInformation(
+        hostname=current_hostname,
+        ip_addresses=addresses,
+        web_urls=unified_web_urls(
+            config=config_value,
+            ip_addresses=addresses,
+        ),
+        launchpad_urls=public_urls(
+            hostname=current_hostname,
+            ip_addresses=addresses,
+            port=config_value.network.launchpad_port,
+        ),
+        jupyterhub_urls=public_urls(
+            hostname=current_hostname,
+            ip_addresses=addresses,
+            port=config_value.network.jupyterhub_port,
+        ),
+        vision_urls=public_urls(
+            hostname=current_hostname,
+            ip_addresses=addresses,
+            port=config_value.network.vision_port,
+        ),
+    )
+
+
+def collect_platform_information(
+    config: PlatformConfig = DEFAULT_PLATFORM_CONFIG,
+) -> PlatformInformationReport:
+    config_value = _validate_config(config)
+
+    summary = collect_platform_summary(config_value)
+
+    network = collect_network_information(config_value)
+
+    hostname = network.hostname
 
     vision = summary.hardware.vision
 
@@ -553,25 +623,7 @@ def collect_platform_information(
                 and summary.runtime.control_owner is None
             ),
         ),
-        network=NetworkInformation(
-            hostname=hostname,
-            ip_addresses=addresses,
-            launchpad_urls=public_urls(
-                hostname=hostname,
-                ip_addresses=addresses,
-                port=(config_value.network.launchpad_port),
-            ),
-            jupyterhub_urls=public_urls(
-                hostname=hostname,
-                ip_addresses=addresses,
-                port=(config_value.network.jupyterhub_port),
-            ),
-            vision_urls=public_urls(
-                hostname=hostname,
-                ip_addresses=addresses,
-                port=(config_value.network.vision_port),
-            ),
-        ),
+        network=network,
         software=SoftwareInformation(
             betabox_robotics_version=(__version__),
             python_version=(platform.python_version()),

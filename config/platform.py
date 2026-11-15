@@ -447,6 +447,10 @@ class PlatformNetworkConfig:
     vision_port: int = 8080
     launchpad_port: int = 8088
 
+    public_http_port: int = 80
+    ap_ipv4_address: str = "10.42.0.1"
+    offline_hostname: str = "betabox.test"
+
     wifi_interface: str = "wlan0"
     ethernet_interface: str = "eth0"
     ap_connection_name: str = "PiAP"
@@ -507,6 +511,51 @@ class PlatformNetworkConfig:
                 self.identity_prefix,
                 name="identity_prefix",
             ),
+        )
+
+        object.__setattr__(
+            self,
+            "public_http_port",
+            _validate_int(
+                self.public_http_port,
+                name="public_http_port",
+                minimum=1,
+                maximum=65535,
+            ),
+        )
+
+        object.__setattr__(
+            self,
+            "ap_ipv4_address",
+            _validate_string(
+                self.ap_ipv4_address,
+                name="ap_ipv4_address",
+            ),
+        )
+
+        object.__setattr__(
+            self,
+            "offline_hostname",
+            _validate_string(
+                self.offline_hostname,
+                name="offline_hostname",
+            ),
+        )
+
+    @property
+    def offline_url(self) -> str:
+        return (
+            f"http://{self.offline_hostname}:{self.public_http_port}"
+            if self.public_http_port != 80
+            else f"http://{self.offline_hostname}"
+        )
+
+    @property
+    def ap_url(self) -> str:
+        return (
+            f"http://{self.ap_ipv4_address}:{self.public_http_port}"
+            if self.public_http_port != 80
+            else f"http://{self.ap_ipv4_address}"
         )
 
     @property
@@ -835,6 +884,8 @@ class PlatformVerificationConfig:
         "node",
         "npm",
         "configurable-http-proxy",
+        "nginx",
+        "nmcli",
     )
 
     hifiberry_identifiers: tuple[str, ...] = (

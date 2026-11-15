@@ -74,6 +74,7 @@ sudo DEBIAN_FRONTEND=noninteractive \
     npm \
     jq \
     network-manager \
+    nginx \
     avahi-daemon \
     rfkill
 
@@ -300,6 +301,9 @@ fi
 
 echo "Configuring Wi-Fi fallback AP profile..."
 
+
+echo "Configuring Wi-Fi fallback AP profile..."
+
 if ! nmcli connection show PiAP >/dev/null 2>&1; then
     sudo nmcli connection add \
         type wifi \
@@ -307,13 +311,48 @@ if ! nmcli connection show PiAP >/dev/null 2>&1; then
         con-name PiAP \
         autoconnect no \
         ssid Betabox
-
-    sudo nmcli connection modify PiAP \
-        802-11-wireless.mode ap \
-        802-11-wireless.band bg \
-        ipv4.method shared \
-        ipv6.method ignore
 fi
+
+echo "Ensuring Betabox AP is open and uses 10.42.0.1/24..."
+
+sudo nmcli connection modify PiAP \
+    connection.interface-name wlan0 \
+    connection.autoconnect no \
+    802-11-wireless.mode ap \
+    802-11-wireless.band bg \
+    802-11-wireless-security.key-mgmt "" \
+    802-11-wireless-security.psk "" \
+    ipv4.method shared \
+    ipv4.addresses 10.42.0.1/24 \
+    ipv6.method ignore
+
+
+echo "Configuring Betabox offline DNS..."
+
+DNS_SOURCE="$SDK_DIR/deployment/networkmanager/dnsmasq-shared.d/betabox.conf"
+DNS_TARGET_DIR="/etc/NetworkManager/dnsmasq-shared.d"
+DNS_TARGET="$DNS_TARGET_DIR/betabox.conf"
+
+if [[ ! -f "$DNS_SOURCE" ]]; then
+    echo "ERROR: Missing Betabox DNS configuration." >&2
+    exit 1
+fi
+
+sudo install \
+    -d \
+    -o root \
+    -g root \
+    -m 0755 \
+    "$DNS_TARGET_DIR"
+
+sudo install \
+    -o root \
+    -g root \
+    -m 0644 \
+    "$DNS_SOURCE" \
+    "$DNS_TARGET"
+
+echo "Betabox offline DNS configuration installed."
 
 
 echo "[9/11] Installing Betabox privilege policies..."
@@ -391,6 +430,9 @@ for policy in "${SUDOERS_POLICIES[@]}"; do
     fi
 done
 
+echo "Configuring Betabox Nginx reverse proxy..."
+
+sudo bash "$SDK_DIR/deployment/nginx/install.sh"
 
 echo "[10/11] Installing systemd services..."
 

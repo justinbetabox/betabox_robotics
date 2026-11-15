@@ -13,9 +13,13 @@ export function serviceStateLabel(state) {
 }
 
 export function buildJupyterUrl(port) {
-    const protocol = window.location.protocol;
+    const { protocol, hostname, port: currentPort, origin } = window.location;
 
-    const hostname = window.location.hostname;
+    // Through Nginx: keep JupyterHub on the same origin.
+    if (currentPort === "" || currentPort === "80") {
+        return new URL("/hub/", origin).href;
+    }
 
-    return `${protocol}//` + `${hostname}:${port}/hub/`;
+    // Direct Launchpad access: preserve the original JupyterHub port.
+    return `${protocol}//${hostname}:${port}/hub/`;
 }

@@ -149,6 +149,8 @@ export function renderNetwork(network) {
 
     renderValueList(elements.ipAddresses, network.ip_addresses);
 
+    renderUrlList(elements.webUrls, network.web_urls);
+
     renderUrlList(elements.launchpadUrls, network.launchpad_urls);
 
     renderUrlList(elements.jupyterhubUrls, network.jupyterhub_urls);

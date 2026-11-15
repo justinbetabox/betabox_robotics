@@ -51,6 +51,9 @@ from betabox_robotics.services.snapshot import (
 from betabox_robotics.services.status import (
     main as status_main,
 )
+from betabox_robotics.services.urls import (
+    main as urls_main,
+)
 from betabox_robotics.services.verify import (
     main as verify_main,
 )
@@ -99,6 +102,10 @@ COMMANDS: dict[
     "status": (
         "Show current Betabox platform status",
         status_main,
+    ),
+    "urls": (
+        "Show student web access and direct service URLs",
+        urls_main,
     ),
     "boot-announce": (
         "Run the Betabox boot announcement readiness check",

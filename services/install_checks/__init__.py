@@ -4,6 +4,11 @@ from .media import (
     check_runtime_media,
 )
 from .models import CheckResult
+from .network import (
+    check_ap_profile,
+    check_nginx_site,
+    check_offline_dns,
+)
 from .software import (
     check_command,
     check_config_line,
@@ -23,12 +28,15 @@ __all__ = [
     "AVAHI_OVERRIDE_REQUIRED_LINES",
     "CheckResult",
     "check_account_workspace",
+    "check_ap_profile",
     "check_avahi_override",
     "check_command",
     "check_config_line",
     "check_executable",
     "check_import",
     "check_media_root",
+    "check_nginx_site",
+    "check_offline_dns",
     "check_runtime_media",
     "check_service_enabled",
     "check_service_installed",

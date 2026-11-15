@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import json
 import shutil
-import socket
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import cast
@@ -34,6 +33,10 @@ from betabox_robotics.services.hardware_status import (
     collect_hardware_status,
 )
 from betabox_robotics.services.managed import managed_services
+from betabox_robotics.services.network_identity import (
+    hostname,
+    ip_addresses,
+)
 from betabox_robotics.services.platform_health import (
     evaluate_platform_health,
 )
@@ -223,49 +226,6 @@ class StatusReport:
         )
 
         return data
-
-
-def hostname() -> str:
-    value = socket.gethostname()
-
-    return _validate_string(
-        value,
-        name="hostname",
-    )
-
-
-def ip_addresses() -> tuple[str, ...]:
-    result = run(
-        [
-            "hostname",
-            "-I",
-        ],
-        timeout=3,
-    )
-
-    if result is None or result.returncode != 0:
-        return ()
-
-    addresses: list[str] = []
-
-    for address in result.stdout.split():
-        value = address.strip()
-
-        if not value:
-            continue
-
-        if (
-            value.startswith("127.")
-            or value == "0.0.0.0"
-            or value == "::"
-            or value == "::1"
-        ):
-            continue
-
-        if value not in addresses:
-            addresses.append(value)
-
-    return tuple(addresses)
 
 
 def service_status(

@@ -17,11 +17,14 @@ from betabox_robotics.services.accounts import (
 from betabox_robotics.services.install_checks import (
     CheckResult,
     check_account_workspace,
+    check_ap_profile,
     check_avahi_override,
     check_command,
     check_config_line,
     check_executable,
     check_import,
+    check_nginx_site,
+    check_offline_dns,
     check_runtime_media,
     check_service_enabled,
     check_service_installed,
@@ -106,6 +109,17 @@ def collect_checks(
         )
     )
 
+    checks.append(
+        check_command(
+            [
+                betabox_command,
+                "urls",
+            ],
+            "cli:betabox-urls",
+            timeout=verification.command_timeout_seconds,
+        )
+    )
+
     for line in verification.required_boot_config_lines:
         checks.append(
             check_config_line(
@@ -127,6 +141,21 @@ def collect_checks(
     for executable in verification.required_executables:
         checks.append(check_executable(executable))
 
+    checks.append(
+        check_command(
+            ["nginx", "-t"],
+            "nginx:configuration",
+            timeout=verification.command_timeout_seconds,
+        )
+    )
+
+    checks.append(
+        check_service_enabled(
+            "nginx.service",
+            timeout=verification.command_timeout_seconds,
+        )
+    )
+
     for unit in config_value.services.all_units:
         checks.append(check_service_installed(unit))
         checks.append(
@@ -137,6 +166,10 @@ def collect_checks(
         )
 
     checks.append(check_avahi_override())
+
+    checks.append(check_nginx_site())
+    checks.append(check_offline_dns(config_value))
+    checks.append(check_ap_profile(config_value))
 
     return tuple(checks)
 

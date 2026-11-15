@@ -37,6 +37,8 @@ export const elements = {
 
     ipAddresses: requireElement("#ip-addresses"),
 
+    webUrls: requireElement("#web-urls"),
+
     launchpadUrls: requireElement("#launchpad-urls"),
 
     jupyterhubUrls: requireElement("#jupyterhub-urls"),

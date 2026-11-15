@@ -302,8 +302,6 @@ fi
 echo "Configuring Wi-Fi fallback AP profile..."
 
 
-echo "Configuring Wi-Fi fallback AP profile..."
-
 if ! nmcli connection show PiAP >/dev/null 2>&1; then
     sudo nmcli connection add \
         type wifi \
@@ -320,11 +318,16 @@ sudo nmcli connection modify PiAP \
     connection.autoconnect no \
     802-11-wireless.mode ap \
     802-11-wireless.band bg \
-    802-11-wireless-security.key-mgmt "" \
-    802-11-wireless-security.psk "" \
     ipv4.method shared \
     ipv4.addresses 10.42.0.1/24 \
     ipv6.method ignore
+
+# Remove Wi-Fi authentication settings, if present.
+if nmcli -g 802-11-wireless-security.key-mgmt \
+    connection show PiAP >/dev/null 2>&1; then
+    sudo nmcli connection modify PiAP \
+        remove 802-11-wireless-security
+fi
 
 
 echo "Configuring Betabox offline DNS..."

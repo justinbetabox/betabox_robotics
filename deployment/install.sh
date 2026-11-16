@@ -222,6 +222,20 @@ echo "Removing default Python 3 Jupyter kernel..."
     python3 \
     || true
 
+echo "Configuring Jupyter kernel discovery..."
+
+JUPYTER_CONFIG_DIR="$JUPYTERHUB_VENV_DIR/etc/jupyter"
+
+install \
+    -d \
+    -m 0755 \
+    "$JUPYTER_CONFIG_DIR"
+
+install \
+    -m 0644 \
+    "$SDK_DIR/deployment/jupyterhub/jupyter_config.py" \
+    "$JUPYTER_CONFIG_DIR/jupyter_config.py"
+
 
 echo "[7/11] Provisioning platform..."
 

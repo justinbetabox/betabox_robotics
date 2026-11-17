@@ -4,12 +4,12 @@ import grp
 import os
 import pwd
 import shutil
+import subprocess
 from collections.abc import Iterable
 from pathlib import Path
 
 from betabox_robotics.services.accounts import (
     BETABOX_ACCOUNTS,
-    BETABOX_SHARED_GROUP,
     ProvisionedAccount,
 )
 
@@ -115,6 +115,7 @@ def workspace_directories(
         media / "pictures",
         media / "videos",
         media / "sounds",
+        account.home / ".config",
         betabox_config,
         betabox_config / "preferences",
     )
@@ -141,10 +142,19 @@ def ensure_directory(
         name="gid",
     )
 
+    for parent in directory_path.parents:
+        if parent.is_symlink():
+            raise RuntimeError(f"Workspace parent cannot be a symbolic link: {parent}")
+
     directory_path.mkdir(
         parents=True,
         exist_ok=True,
     )
+
+    if directory_path.is_symlink():
+        raise RuntimeError(
+            f"Workspace directory cannot be a symbolic link: {directory_path}"
+        )
 
     if not directory_path.is_dir():
         raise NotADirectoryError(f"Workspace path is not a directory: {directory_path}")
@@ -154,7 +164,18 @@ def ensure_directory(
         uid=uid_value,
         gid=gid_value,
     )
+
     directory_path.chmod(WORKSPACE_MODE)
+
+    subprocess.run(
+        [
+            "setfacl",
+            "-m",
+            "d:u::rwx,d:g::rwx,d:m::rwx,d:o::---",
+            str(directory_path),
+        ],
+        check=True,
+    )
 
 
 def create_runtime_media(
@@ -209,11 +230,23 @@ def create_workspace(
     account: ProvisionedAccount,
 ) -> None:
     """Create the workspace for a managed account."""
+    if account.home.is_symlink():
+        raise RuntimeError(
+            f"Account home directory cannot be a symbolic link: {account.home}"
+        )
+
     if not account.home.is_dir():
         raise RuntimeError(f"Account home directory does not exist: {account.home}")
 
-    uid, _ = account_ids(account.username)
-    gid = group_id(BETABOX_SHARED_GROUP)
+    uid, gid = account_ids(account.username)
+
+    _set_ownership(
+        account.home,
+        uid=uid,
+        gid=gid,
+    )
+
+    account.home.chmod(0o750)
 
     for directory in workspace_directories(account):
         ensure_directory(
@@ -307,6 +340,12 @@ def install_directory(
     if not source_path.is_dir():
         raise FileNotFoundError(f"Asset source directory does not exist: {source_path}")
 
+    for path in (destination_path, *destination_path.parents):
+        if path.is_symlink():
+            raise RuntimeError(
+                f"Asset destination cannot contain a symbolic link: {path}"
+            )
+
     destination_path.mkdir(
         parents=True,
         exist_ok=True,
@@ -330,11 +369,6 @@ def install_directory(
         target = destination_path / item.name
 
         if target.exists() or target.is_symlink():
-            set_ownership_recursive(
-                target,
-                uid=uid_value,
-                gid=gid_value,
-            )
             continue
 
         if item.is_dir():
@@ -375,13 +409,12 @@ def populate_media(
         raise TypeError("accounts must be iterable") from exc
 
     assets = repository_path / "deployment" / "assets" / "sounds"
-    gid = group_id(BETABOX_SHARED_GROUP)
 
     for account in account_values:
         if not account.install_media:
             continue
 
-        uid, _ = account_ids(account.username)
+        uid, gid = account_ids(account.username)
 
         install_directory(
             assets,

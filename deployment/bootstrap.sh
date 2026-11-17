@@ -4,6 +4,20 @@ set -euo pipefail
 REPO_URL="https://github.com/justinbetabox/betabox_robotics.git"
 BRANCH="main"
 
+if [[ "$#" -gt 1 ]]; then
+    echo "Usage: $0 [branch]"
+    exit 1
+fi
+
+if [[ "$#" -eq 1 ]]; then
+    BRANCH="$1"
+fi
+
+if [[ -z "$BRANCH" || "$BRANCH" == -* ]]; then
+    echo "Invalid branch name: $BRANCH"
+    exit 1
+fi
+
 LIB_DIR="/opt/libs"
 SDK_DIR="$LIB_DIR/betabox_robotics"
 

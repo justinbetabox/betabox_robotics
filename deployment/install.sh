@@ -56,6 +56,7 @@ sudo apt-get update
 sudo DEBIAN_FRONTEND=noninteractive \
     apt-get install -y \
     git \
+    acl \
     python3-pip \
     python3-venv \
     python3-dev \

@@ -3,8 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from betabox_robotics.services.workspace import WORKSPACE_MODE
-
 
 def _validate_path(
     value: object,
@@ -115,18 +113,16 @@ class Workspace:
         )
 
     def ensure_exists(self) -> None:
-        """Create any missing workspace directories."""
+        """Verify that provisioned workspace directories exist."""
+
+        if self.root.is_symlink() or not self.root.is_dir():
+            raise RuntimeError(f"Workspace root is missing or invalid: {self.root}")
 
         for directory in self.directories():
-            if directory.is_dir():
-                continue
-
-            directory.mkdir(
-                parents=True,
-                exist_ok=True,
-            )
-
-            directory.chmod(WORKSPACE_MODE)
+            if directory.is_symlink() or not directory.is_dir():
+                raise RuntimeError(
+                    f"Workspace directory is missing or invalid: {directory}"
+                )
 
 
 def build_workspace(

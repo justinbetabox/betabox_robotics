@@ -272,7 +272,7 @@ def provision_accounts(
     *,
     service_user: str,
 ) -> None:
-    """Provision required Linux accounts and shared access."""
+    """Provision managed accounts and service access."""
 
     ensure_shared_group()
 
@@ -284,3 +284,8 @@ def provision_accounts(
 
     for account in BETABOX_ACCOUNTS:
         ensure_account(account)
+
+        ensure_group_member(
+            service_user,
+            account.group,
+        )

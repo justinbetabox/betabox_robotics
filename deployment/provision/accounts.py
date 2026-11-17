@@ -4,6 +4,8 @@ import grp
 import pwd
 import subprocess
 from pathlib import Path
+import os
+import stat
 
 from betabox_robotics.services.accounts import (
     BETABOX_ACCOUNTS,
@@ -18,6 +20,14 @@ SERVICE_USER_GROUPS = (
     "spi",
     "audio",
     "video",
+)
+
+CREDENTIAL_PENDING_DIR = Path(
+    "/var/lib/betabox/credentials-pending"
+)
+
+CREDENTIAL_ACCOUNTS = frozenset(
+    ("admin", "student", "student1", "student2", "student3")
 )
 
 
@@ -85,6 +95,53 @@ def ensure_account_group(
         account.group,
     )
 
+def mark_credentials_pending(username: str) -> None:
+    """Record that a new account needs password initialization."""
+
+    if username not in CREDENTIAL_ACCOUNTS:
+        return
+
+    parent = CREDENTIAL_PENDING_DIR.parent
+
+    parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    CREDENTIAL_PENDING_DIR.mkdir(exist_ok=True, mode=0o700)
+
+    for directory in (parent, CREDENTIAL_PENDING_DIR):
+        info = directory.lstat()
+
+        if (
+            not stat.S_ISDIR(info.st_mode)
+            or info.st_uid != 0
+            or info.st_mode & 0o077
+        ):
+            raise RuntimeError(
+                f"Unsafe credential directory: {directory}"
+            )
+
+    marker = CREDENTIAL_PENDING_DIR / username
+
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_CLOEXEC
+
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
+
+    try:
+        fd = os.open(marker, flags, 0o600)
+    except FileExistsError:
+        info = marker.lstat()
+
+        if (
+            not stat.S_ISREG(info.st_mode)
+            or info.st_uid != 0
+            or info.st_mode & 0o077
+        ):
+            raise RuntimeError(
+                f"Unsafe credential marker: {username}"
+            )
+
+        return
+
+    os.close(fd)
 
 def create_account(
     account: ProvisionedAccount,
@@ -252,40 +309,48 @@ def ensure_supplemental_groups(
 
 def ensure_account(
     account: ProvisionedAccount,
-) -> None:
-    """Ensure a managed Linux account is fully configured."""
+) -> bool:
+    """Create or reconcile an account.
+
+    Return True only when the account was newly created.
+    """
 
     ensure_account_group(account)
 
-    if not account_exists(account.username):
+    created = not account_exists(account.username)
+
+    if created:
+        mark_credentials_pending(account.username)
         create_account(account)
     else:
         print(f"Account already exists: {account.username}")
         reconcile_account(account)
 
-    ensure_account_password(account)
-    ensure_password_policy(account)
     ensure_supplemental_groups(account)
+
+    return created
 
 
 def provision_accounts(
     *,
     service_user: str,
-) -> None:
-    """Provision managed accounts and service access."""
+) -> tuple[str, ...]:
+    """Provision accounts and return newly created usernames."""
 
     ensure_shared_group()
 
     for group in SERVICE_USER_GROUPS:
-        ensure_group_member(
-            service_user,
-            group,
-        )
+        ensure_group_member(service_user, group)
+
+    created_accounts: list[str] = []
 
     for account in BETABOX_ACCOUNTS:
-        ensure_account(account)
+        if ensure_account(account):
+            created_accounts.append(account.username)
 
         ensure_group_member(
             service_user,
             account.group,
         )
+
+    return tuple(created_accounts)

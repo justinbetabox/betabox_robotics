@@ -18,6 +18,7 @@ from betabox_robotics.services.workspace import (
 )
 
 from .accounts import provision_accounts
+from .credentials import initialize_credentials
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
@@ -148,6 +149,10 @@ def main() -> None:
     provision_accounts(
         service_user=service_user,
     )
+
+    print("Initializing Betabox credentials...")
+
+    initialize_credentials()
 
     provision_robot_lock(
         service_user=service_user,

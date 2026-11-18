@@ -242,7 +242,6 @@ BETABOX_ACCOUNTS: tuple[ProvisionedAccount, ...] = (
         group="admin",
         home=Path("/home/admin"),
         shell=Path("/bin/bash"),
-        password="teachthefuture",
         supplemental_groups=BETABOX_HARDWARE_GROUPS,
     ),
     ProvisionedAccount(
@@ -251,7 +250,6 @@ BETABOX_ACCOUNTS: tuple[ProvisionedAccount, ...] = (
         group="student",
         home=Path("/home/student"),
         shell=Path("/bin/bash"),
-        password="learnbydoing",
         supplemental_groups=BETABOX_HARDWARE_GROUPS,
     ),
     ProvisionedAccount(
@@ -260,7 +258,6 @@ BETABOX_ACCOUNTS: tuple[ProvisionedAccount, ...] = (
         group="student1",
         home=Path("/home/student1"),
         shell=Path("/bin/bash"),
-        password="learnbydoing",
         supplemental_groups=BETABOX_HARDWARE_GROUPS,
     ),
     ProvisionedAccount(
@@ -269,7 +266,6 @@ BETABOX_ACCOUNTS: tuple[ProvisionedAccount, ...] = (
         group="student2",
         home=Path("/home/student2"),
         shell=Path("/bin/bash"),
-        password="learnbydoing",
         supplemental_groups=BETABOX_HARDWARE_GROUPS,
     ),
     ProvisionedAccount(
@@ -278,7 +274,6 @@ BETABOX_ACCOUNTS: tuple[ProvisionedAccount, ...] = (
         group="student3",
         home=Path("/home/student3"),
         shell=Path("/bin/bash"),
-        password="learnbydoing",
         supplemental_groups=BETABOX_HARDWARE_GROUPS,
     ),
 )

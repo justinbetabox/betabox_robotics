@@ -139,7 +139,22 @@ def check_config_line(
             message=str(exc),
         )
 
-    present = line_value in text
+    present = False
+    unconditional = True
+
+    for config_line in text.splitlines():
+        content = config_line.split("#", 1)[0].strip()
+
+        if not content:
+            continue
+
+        if content.startswith("[") and content.endswith("]"):
+            unconditional = content.lower() == "[all]"
+            continue
+
+        if unconditional and content == line_value:
+            present = True
+            break
 
     return CheckResult(
         name=check_name,

@@ -263,55 +263,107 @@ sudo "$VENV_DIR/bin/python" \
 
 echo "[8/11] Checking boot configuration..."
 
-CONFIG_FILE="/boot/firmware/config.txt"
+BOOT_DIR="/boot/firmware"
+CONFIG_FILE="$BOOT_DIR/config.txt"
 
-if [[ -f "$CONFIG_FILE" ]]; then
-    if ! grep -q \
-        "^dtparam=i2c_arm=on" \
-        "$CONFIG_FILE"
-    then
-        echo "Adding I2C config..."
-
-        echo "dtparam=i2c_arm=on" \
-            | sudo tee -a "$CONFIG_FILE" \
-            > /dev/null
-    fi
-
-    if ! grep -q \
-        "^dtparam=spi=on" \
-        "$CONFIG_FILE"
-    then
-        echo "Adding SPI config..."
-
-        echo "dtparam=spi=on" \
-            | sudo tee -a "$CONFIG_FILE" \
-            > /dev/null
-    fi
-
-    if ! grep -q \
-        "^dtoverlay=hifiberry-dac" \
-        "$CONFIG_FILE"
-    then
-        echo "Adding HifiBerry DAC overlay..."
-
-        echo "dtoverlay=hifiberry-dac" \
-            | sudo tee -a "$CONFIG_FILE" \
-            > /dev/null
-    fi
-
-    if ! grep -q \
-        "^dtoverlay=i2s-mmap" \
-        "$CONFIG_FILE"
-    then
-        echo "Adding I2S mmap overlay..."
-
-        echo "dtoverlay=i2s-mmap" \
-            | sudo tee -a "$CONFIG_FILE" \
-            > /dev/null
-    fi
-else
-    echo "WARNING: $CONFIG_FILE not found. Boot config was not updated."
+if ! mountpoint -q "$BOOT_DIR"; then
+    echo "ERROR: Boot partition is not mounted: $BOOT_DIR" >&2
+    exit 1
 fi
+
+if [[ ! -f "$CONFIG_FILE" ]]; then
+    echo "ERROR: Boot configuration not found: $CONFIG_FILE" >&2
+    exit 1
+fi
+
+boot_config_has_line() {
+    local required="$1"
+
+    awk -v required="$required" '
+        BEGIN {
+            unconditional = 1
+        }
+
+        {
+            sub(/#.*/, "")
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+
+            if ($0 ~ /^\[[^]]+\]$/) {
+                unconditional = (tolower($0) == "[all]")
+                next
+            }
+
+            if (unconditional && $0 == required) {
+                found = 1
+                exit
+            }
+        }
+
+        END {
+            exit !found
+        }
+    ' "$CONFIG_FILE"
+}
+
+boot_config_is_unconditional_at_end() {
+    awk '
+        {
+            sub(/#.*/, "")
+            gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+
+            if ($0 ~ /^\[[^]]+\]$/) {
+                section = tolower($0)
+            }
+        }
+
+        END {
+            exit !(section == "" || section == "[all]")
+        }
+    ' "$CONFIG_FILE"
+}
+
+REQUIRED_BOOT_CONFIG=(
+    "dtparam=i2c_arm=on"
+    "dtparam=spi=on"
+    "dtoverlay=hifiberry-dac"
+    "dtoverlay=i2s-mmap"
+)
+
+section_ready=false
+
+for setting in "${REQUIRED_BOOT_CONFIG[@]}"; do
+    if boot_config_has_line "$setting"; then
+        echo "Already configured: $setting"
+        continue
+    fi
+
+    if [[ "$section_ready" == false ]]; then
+        if ! boot_config_is_unconditional_at_end; then
+            echo "Adding [all] configuration section..."
+
+            printf '\n[all]\n' \
+                | sudo tee -a "$CONFIG_FILE" > /dev/null
+        fi
+
+        section_ready=true
+    fi
+
+    echo "Adding boot configuration: $setting"
+
+    printf '\n%s\n' "$setting" \
+        | sudo tee -a "$CONFIG_FILE" > /dev/null
+done
+
+echo "Verifying boot configuration..."
+
+for setting in "${REQUIRED_BOOT_CONFIG[@]}"; do
+    if ! boot_config_has_line "$setting"; then
+        echo "ERROR: Missing boot configuration: $setting" >&2
+        exit 1
+    fi
+done
+
+echo "Boot configuration verified."
 
 
 echo "Ensuring Wi-Fi radio is enabled..."

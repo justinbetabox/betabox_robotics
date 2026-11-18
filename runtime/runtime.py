@@ -6,8 +6,9 @@ import time
 from time import sleep
 from typing import Self
 
-from betabox_robotics.calibration import RobotCalibration
+from betabox_robotics.calibration import CalibrationManager
 from betabox_robotics.camera import CameraMount
+from betabox_robotics.config import DEFAULT_PLATFORM_CONFIG
 from betabox_robotics.drive import Drive
 from betabox_robotics.hardware import (
     ADC,
@@ -55,9 +56,18 @@ class RobotRuntime:
     _drive: Drive | None
     _camera_mount: CameraMount | None
 
+    _calibration_manager: CalibrationManager
+
     def __init__(
         self,
+        calibration_manager: CalibrationManager | None = None,
     ) -> None:
+        self._calibration_manager = (
+            calibration_manager
+            if calibration_manager is not None
+            else CalibrationManager(DEFAULT_PLATFORM_CONFIG.paths.calibration_file)
+        )
+
         self._ownership = RobotOwnership(
             owner="Betabox Robot Runtime",
         )
@@ -131,7 +141,7 @@ class RobotRuntime:
             )
 
             drive_config = BETABOX_CAR.drive
-            calibration = RobotCalibration.default()
+            calibration = self._calibration_manager.load()
 
             left_config = drive_config.left_motor
             right_config = drive_config.right_motor

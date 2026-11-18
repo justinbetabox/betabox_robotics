@@ -52,10 +52,55 @@ async function loadJupyterStatus({ showLoading = false } = {}) {
 /* UI */
 
 function setupUI() {
-    elements.openButton.addEventListener("click", (event) => {
+    let navigating = false;
+
+    elements.openButton.addEventListener("click", async (event) => {
         if (elements.openButton.getAttribute("aria-disabled") === "true") {
             event.preventDefault();
+            return;
         }
+
+        // Keep normal navigation behavior for modified clicks.
+        if (
+            event.button !== 0 ||
+            event.ctrlKey ||
+            event.metaKey ||
+            event.shiftKey ||
+            event.altKey
+        ) {
+            return;
+        }
+
+        event.preventDefault();
+
+        if (navigating) {
+            return;
+        }
+
+        navigating = true;
+
+        const destination = elements.openButton.href;
+
+        elements.message.textContent = "Checking system clock…";
+
+        let clockReady = false;
+
+        try {
+            clockReady = await window.betaboxClockReady;
+        } catch {
+            clockReady = false;
+        }
+
+        if (!clockReady) {
+            elements.message.textContent =
+                "Unable to verify the system clock. " +
+                "Reload this page and try again.";
+
+            navigating = false;
+            return;
+        }
+
+        window.location.assign(destination);
     });
 }
 

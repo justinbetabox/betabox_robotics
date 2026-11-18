@@ -1,3 +1,7 @@
+from .clock import (
+    check_clock_helper,
+    check_clock_sudoers,
+)
 from .media import (
     check_account_workspace,
     check_media_root,
@@ -30,6 +34,8 @@ __all__ = [
     "check_account_workspace",
     "check_ap_profile",
     "check_avahi_override",
+    "check_clock_helper",
+    "check_clock_sudoers",
     "check_command",
     "check_config_line",
     "check_executable",

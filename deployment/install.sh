@@ -77,7 +77,21 @@ sudo DEBIAN_FRONTEND=noninteractive \
     network-manager \
     nginx \
     avahi-daemon \
-    rfkill
+    rfkill \
+    fake-hwclock \
+    systemd-timesyncd
+
+echo "Configuring system clock services..."
+
+sudo systemctl enable --now fake-hwclock.service
+sudo systemctl enable --now systemd-timesyncd.service
+
+if [[ ! -x /usr/sbin/fake-hwclock ]]; then
+    echo "ERROR: fake-hwclock executable not found." >&2
+    exit 1
+fi
+
+echo "System clock services configured."
 
 
 echo "[2/11] Creating directories..."
@@ -372,6 +386,31 @@ sudo install \
 
 echo "Betabox offline DNS configuration installed."
 
+echo "Installing protected Betabox clock helper..."
+
+CLOCK_HELPER_SOURCE="$SDK_DIR/deployment/clock/betabox_clock_set.py"
+CLOCK_HELPER_TARGET="/usr/local/libexec/betabox-clock-set"
+
+if [[ ! -f "$CLOCK_HELPER_SOURCE" ]]; then
+    echo "ERROR: Missing clock helper: $CLOCK_HELPER_SOURCE" >&2
+    exit 1
+fi
+
+sudo install \
+    -d \
+    -o root \
+    -g root \
+    -m 0755 \
+    /usr/local/libexec
+
+sudo install \
+    -o root \
+    -g root \
+    -m 0755 \
+    "$CLOCK_HELPER_SOURCE" \
+    "$CLOCK_HELPER_TARGET"
+
+echo "Protected Betabox clock helper installed."
 
 echo "[9/11] Installing Betabox privilege policies..."
 

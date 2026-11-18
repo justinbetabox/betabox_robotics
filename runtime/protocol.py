@@ -14,6 +14,7 @@ RUNTIME_SOCKET_MODE = 0o660
 RuntimeCommand = Literal[
     "ping",
     "status",
+    "calibration_get",
     "battery",
     "grayscale",
     "ultrasonic",
@@ -41,6 +42,7 @@ RUNTIME_COMMANDS: frozenset[str] = frozenset(
     {
         "ping",
         "status",
+        "calibration_get",
         "battery",
         "grayscale",
         "ultrasonic",

@@ -1,0 +1,6 @@
+# Betabox offline clock recovery
+#
+# Allow the Betabox service user to invoke the protected
+# clock helper with exactly one 13-digit timestamp.
+
+@SERVICE_USER@ ALL=(root) NOPASSWD: /usr/local/libexec/betabox-clock-set ^[0-9]{13}$

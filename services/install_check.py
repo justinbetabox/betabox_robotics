@@ -19,6 +19,8 @@ from betabox_robotics.services.install_checks import (
     check_account_workspace,
     check_ap_profile,
     check_avahi_override,
+    check_clock_helper,
+    check_clock_sudoers,
     check_command,
     check_config_line,
     check_executable,
@@ -137,6 +139,16 @@ def collect_checks(
         )
 
     checks.append(check_runtime_media(service_user_value))
+
+    # Offline clock recovery installation checks.
+    checks.append(check_executable("fake-hwclock"))
+
+    checks.append(check_service_enabled("fake-hwclock.service"))
+
+    checks.append(check_service_enabled("systemd-timesyncd.service"))
+
+    checks.append(check_clock_helper())
+    checks.append(check_clock_sudoers(service_user_value))
 
     for executable in verification.required_executables:
         checks.append(check_executable(executable))

@@ -4,6 +4,7 @@ from aiohttp import web
 
 from .auth import setup_auth_routes
 from .calibration import setup_calibration_routes
+from .clock import setup_clock_routes
 from .diagnostics import setup_diagnostics_routes
 from .drive import setup_drive_routes
 from .events import setup_events_routes
@@ -38,6 +39,8 @@ def setup_routes(
 
     setup_auth_routes(app)
     setup_preferences_routes(app)
+
+    setup_clock_routes(app)
 
 
 __all__ = [

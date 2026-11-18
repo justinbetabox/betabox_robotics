@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import argparse
 import os
-import shutil
+import re
+import stat
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -118,6 +119,224 @@ def provision_guest(
         )
 
 
+def _reject_guest_mounts(home: Path) -> None:
+    """Refuse to reset Guest when mounts exist inside its home."""
+
+    try:
+        mountinfo = Path("/proc/self/mountinfo").read_text(
+            encoding="utf-8",
+        )
+    except OSError as exc:
+        raise RuntimeError("Cannot verify Guest filesystem mounts.") from exc
+
+    for line in mountinfo.splitlines():
+        fields = line.split(" - ", 1)[0].split()
+
+        if len(fields) < 5:
+            raise RuntimeError("Invalid filesystem mount information.")
+
+        mountpoint = re.sub(
+            r"\\([0-7]{3})",
+            lambda match: chr(int(match.group(1), 8)),
+            fields[4],
+        )
+
+        mounted_path = Path(mountpoint)
+
+        if mounted_path == home or home in mounted_path.parents:
+            raise RuntimeError(
+                f"Refusing Guest reset: mounted filesystem found at {mounted_path}"
+            )
+
+
+def _mount_id(fd: int) -> int:
+    """Read the Linux mount ID of an open file descriptor."""
+
+    info = Path(f"/proc/self/fdinfo/{fd}").read_text(
+        encoding="ascii",
+    )
+
+    for line in info.splitlines():
+        key, separator, value = line.partition(":")
+
+        if separator and key == "mnt_id":
+            try:
+                return int(value.strip())
+            except ValueError as exc:
+                raise RuntimeError("Invalid mount ID") from exc
+
+    raise RuntimeError("Cannot determine mount ID")
+
+
+def _clear_guest_contents(home: Path) -> None:
+    """Delete Guest contents without following symlinks or crossing mounts."""
+
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+
+    home_fd = os.open(home, flags)
+    frames = []
+
+    try:
+        opened = os.fstat(home_fd)
+        current = os.stat(home, follow_symlinks=False)
+
+        if (
+            opened.st_dev,
+            opened.st_ino,
+        ) != (
+            current.st_dev,
+            current.st_ino,
+        ):
+            raise RuntimeError("Guest home changed during reset.")
+
+        home_mount_id = _mount_id(home_fd)
+
+        frames.append(
+            (
+                home_fd,
+                None,
+                None,
+                None,
+                iter(os.listdir(home_fd)),
+            )
+        )
+
+        while frames:
+            fd, parent_fd, dirname, identity, entries = frames[-1]
+
+            try:
+                name = next(entries)
+
+            except StopIteration:
+                if parent_fd is None:
+                    break
+
+                current = os.stat(
+                    dirname,
+                    dir_fd=parent_fd,
+                    follow_symlinks=False,
+                )
+
+                if (
+                    current.st_dev,
+                    current.st_ino,
+                ) != identity:
+                    raise RuntimeError("Guest directory changed during reset.")
+
+                frames.pop()
+                os.close(fd)
+
+                os.rmdir(
+                    dirname,
+                    dir_fd=parent_fd,
+                )
+
+                continue
+
+            entry = os.stat(
+                name,
+                dir_fd=fd,
+                follow_symlinks=False,
+            )
+
+            if not stat.S_ISDIR(entry.st_mode):
+                os.unlink(name, dir_fd=fd)
+                continue
+
+            child_fd = os.open(
+                name,
+                flags,
+                dir_fd=fd,
+            )
+
+            try:
+                child = os.fstat(child_fd)
+
+                child_identity = (
+                    child.st_dev,
+                    child.st_ino,
+                )
+
+                if child_identity != (
+                    entry.st_dev,
+                    entry.st_ino,
+                ):
+                    raise RuntimeError("Guest directory changed during reset.")
+
+                if _mount_id(child_fd) != home_mount_id:
+                    raise RuntimeError("Refusing Guest reset: nested mount detected.")
+
+                child_entries = iter(os.listdir(child_fd))
+
+            except BaseException:
+                os.close(child_fd)
+                raise
+
+            frames.append(
+                (
+                    child_fd,
+                    fd,
+                    name,
+                    child_identity,
+                    child_entries,
+                )
+            )
+
+    finally:
+        for fd, *_ in reversed(frames):
+            os.close(fd)
+
+
+def _reject_active_guest_processes() -> None:
+    """Refuse Guest reset while any Guest-owned process is running."""
+
+    guest_uid, _ = account_ids("guest")
+
+    try:
+        processes = tuple(Path("/proc").iterdir())
+    except OSError as exc:
+        raise RuntimeError("Cannot inspect running Guest processes.") from exc
+
+    for process in processes:
+        if not process.name.isdecimal():
+            continue
+
+        try:
+            status = (process / "status").read_text(
+                encoding="utf-8",
+            )
+        except FileNotFoundError:
+            # Process exited during inspection.
+            continue
+        except OSError as exc:
+            raise RuntimeError(f"Cannot inspect process {process.name}.") from exc
+
+        uid_line = next(
+            (line for line in status.splitlines() if line.startswith("Uid:")),
+            None,
+        )
+
+        if uid_line is None:
+            raise RuntimeError(f"Cannot determine process {process.name} ownership.")
+
+        try:
+            process_uids = tuple(int(value) for value in uid_line.split()[1:])
+        except ValueError as exc:
+            raise RuntimeError(
+                f"Invalid UID information for process {process.name}."
+            ) from exc
+
+        if len(process_uids) != 4:
+            raise RuntimeError(
+                f"Incomplete UID information for process {process.name}."
+            )
+
+        if guest_uid in process_uids:
+            raise RuntimeError(
+                f"Refusing Guest reset: active Guest process PID {process.name}."
+            )
+
+
 def reset_guest(
     *,
     repository_root: str | Path = DEFAULT_REPOSITORY_ROOT,
@@ -145,11 +364,9 @@ def reset_guest(
     if account.home.is_symlink():
         raise RuntimeError("Refusing to reset a symlinked Guest home.")
 
-    for child in account.home.iterdir():
-        if child.is_dir() and not child.is_symlink():
-            shutil.rmtree(child)
-        else:
-            child.unlink()
+    _reject_guest_mounts(account.home)
+    _reject_active_guest_processes()
+    _clear_guest_contents(account.home)
 
     provision_guest(
         repository_root=repository_root_value,

@@ -1,6 +1,6 @@
 [Unit]
 Description=Reset Betabox Guest Workspace
-Before=betabox-launchpad.service
+Before=betabox-launchpad.service jupyterhub.service
 
 [Service]
 Type=oneshot

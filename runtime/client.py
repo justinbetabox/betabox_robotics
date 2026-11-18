@@ -5,6 +5,8 @@ import time
 from pathlib import Path
 from typing import cast
 
+from betabox_robotics.calibration import RobotCalibration
+
 from .control import RobotRuntimeControl
 from .errors import (
     RobotRuntimeError,
@@ -681,6 +683,17 @@ class RobotRuntimeClient:
                 "steering_offset": float(steering_offset),
             },
         )
+
+    def calibration(self) -> RobotCalibration:
+        """Retrieve shared calibration from Robot Runtime."""
+        response = self._request("calibration_get")
+
+        try:
+            return RobotCalibration.from_dict(response.result)
+        except (TypeError, ValueError) as exc:
+            raise RobotRuntimeProtocolError(
+                "runtime returned invalid calibration"
+            ) from exc
 
     def _request(
         self,

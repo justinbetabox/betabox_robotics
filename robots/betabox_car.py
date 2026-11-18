@@ -72,10 +72,6 @@ class BetaboxCar(CarRobot):
             raise ValueError("owner cannot be empty")
 
         self.config = config
-        self.calibration = (
-            RobotCalibration.default() if calibration is None else calibration
-        )
-
         self._runtime_client = RobotRuntimeClient()
 
         runtime_status = self._runtime_client.status()
@@ -85,6 +81,10 @@ class BetaboxCar(CarRobot):
 
         if not runtime_status.hardware_initialized:
             raise RobotRuntimeError("Betabox Robot Runtime hardware is not initialized")
+
+        self.calibration = (
+            self._runtime_client.calibration() if calibration is None else calibration
+        )
 
         with ExitStack() as stack:
             self._runtime_control = self._runtime_client.control(

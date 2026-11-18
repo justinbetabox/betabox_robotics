@@ -380,6 +380,13 @@ class RobotRuntimeServer:
                 },
             )
 
+        if request.command == "calibration_get":
+            return RuntimeResponse(
+                version=PROTOCOL_VERSION,
+                ok=True,
+                result=self.runtime.saved_calibration().to_dict(),
+            )
+
         if request.command == "drive_status":
             return RuntimeResponse(
                 version=PROTOCOL_VERSION,

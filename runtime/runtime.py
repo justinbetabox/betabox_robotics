@@ -6,7 +6,11 @@ import time
 from time import sleep
 from typing import Self
 
-from betabox_robotics.calibration import CalibrationManager
+from betabox_robotics.calibration import (
+    CalibrationManager,
+    CalibrationStorageError,
+    RobotCalibration,
+)
 from betabox_robotics.camera import CameraMount
 from betabox_robotics.config import DEFAULT_PLATFORM_CONFIG
 from betabox_robotics.drive import Drive
@@ -468,6 +472,29 @@ class RobotRuntime:
     ) -> bool:
         return self._running
 
+    def _reload_saved_calibration(self) -> None:
+        """Apply saved calibration before a new control session."""
+
+        drive = self._drive
+        camera_mount = self._camera_mount
+
+        if drive is None or camera_mount is None:
+            raise RuntimeError("robot hardware is not initialized")
+
+        try:
+            calibration = self._calibration_manager.load()
+        except CalibrationStorageError as exc:
+            raise RobotRuntimeControlError(
+                "Cannot acquire control: saved calibration is invalid"
+            ) from exc
+
+        drive.steering.offset = calibration.steering.offset
+        drive.left_trim = calibration.motors.left_trim
+        drive.right_trim = calibration.motors.right_trim
+
+        camera_mount.pan_servo.offset = calibration.camera_mount.pan_offset
+        camera_mount.tilt_servo.offset = calibration.camera_mount.tilt_offset
+
     def acquire_control(
         self,
         owner: str,
@@ -489,6 +516,7 @@ class RobotRuntime:
                 f"robot control is already owned by {current_owner}"
             )
 
+        self._reload_saved_calibration()
         token = secrets.token_urlsafe(32)
 
         self._control_owner = owner_value
@@ -925,6 +953,16 @@ class RobotRuntime:
             drive.left_trim = original_left_trim
             drive.right_trim = original_right_trim
             drive.steering.offset = original_steering_offset
+
+    def saved_calibration(self) -> RobotCalibration:
+        """Return the authoritative saved robot calibration."""
+        if not self._running:
+            raise RobotRuntimeError("Robot Runtime is not running")
+
+        try:
+            return self._calibration_manager.load()
+        except CalibrationStorageError as exc:
+            raise RobotRuntimeError("Unable to load saved robot calibration") from exc
 
     def close(
         self,

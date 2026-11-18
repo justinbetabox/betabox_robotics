@@ -1,7 +1,8 @@
 [Unit]
 Description=Betabox JupyterHub
-After=network.target
+After=network.target betabox-guest-reset.service
 Wants=network.target
+Requires=betabox-guest-reset.service
 
 [Service]
 Type=simple

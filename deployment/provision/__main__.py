@@ -11,7 +11,10 @@ from betabox_robotics.services.accounts import (
     BETABOX_ACCOUNTS,
     BETABOX_SHARED_GROUP,
 )
-from betabox_robotics.services.curriculum import populate_curriculum
+from betabox_robotics.services.curriculum import (
+    populate_curriculum,
+    validate_curriculum_sources,
+)
 from betabox_robotics.services.workspace import (
     create_runtime_media,
     create_workspace,
@@ -144,6 +147,10 @@ def main() -> None:
         raise SystemExit(str(exc)) from exc
 
     require_root()
+
+    print("Validating curriculum sources...")
+
+    validate_curriculum_sources(REPOSITORY_ROOT)
 
     print("Provisioning Betabox accounts...")
 

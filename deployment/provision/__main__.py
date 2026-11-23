@@ -11,6 +11,7 @@ from betabox_robotics.services.accounts import (
     BETABOX_ACCOUNTS,
     BETABOX_SHARED_GROUP,
 )
+from betabox_robotics.services.curriculum import populate_curriculum
 from betabox_robotics.services.workspace import (
     create_runtime_media,
     create_workspace,
@@ -162,6 +163,13 @@ def main() -> None:
 
     for account in BETABOX_ACCOUNTS:
         create_workspace(account)
+
+    print("Provisioning Betabox curriculum...")
+
+    populate_curriculum(
+        REPOSITORY_ROOT,
+        accounts=BETABOX_ACCOUNTS,
+    )
 
     print("Provisioning Betabox media...")
 

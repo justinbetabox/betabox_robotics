@@ -13,6 +13,7 @@ from betabox_robotics.services.accounts import (
     ProvisionedAccount,
     account_by_username,
 )
+from betabox_robotics.services.curriculum import populate_curriculum
 from betabox_robotics.services.privileges import (
     require_root_or_elevate,
 )
@@ -111,6 +112,11 @@ def provision_guest(
     account = guest_account()
 
     create_workspace(account)
+
+    populate_curriculum(
+        repository_root_value,
+        accounts=(account,),
+    )
 
     if account.install_media:
         populate_media(

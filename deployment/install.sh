@@ -254,6 +254,13 @@ install \
 
 echo "[7/11] Provisioning platform..."
 
+# Prepare private Betabox state before account provisioning.
+sudo install -d \
+    -o root \
+    -g root \
+    -m 0700 \
+    /var/lib/betabox
+
 cd "$SDK_DIR"
 
 sudo "$VENV_DIR/bin/python" \

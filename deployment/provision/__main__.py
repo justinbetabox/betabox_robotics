@@ -11,6 +11,10 @@ from betabox_robotics.services.accounts import (
     BETABOX_ACCOUNTS,
     BETABOX_SHARED_GROUP,
 )
+from betabox_robotics.services.curriculum import (
+    populate_curriculum,
+    validate_curriculum_sources,
+)
 from betabox_robotics.services.workspace import (
     create_runtime_media,
     create_workspace,
@@ -144,6 +148,10 @@ def main() -> None:
 
     require_root()
 
+    print("Validating curriculum sources...")
+
+    validate_curriculum_sources(REPOSITORY_ROOT)
+
     print("Provisioning Betabox accounts...")
 
     provision_accounts(
@@ -162,6 +170,13 @@ def main() -> None:
 
     for account in BETABOX_ACCOUNTS:
         create_workspace(account)
+
+    print("Provisioning Betabox curriculum...")
+
+    populate_curriculum(
+        REPOSITORY_ROOT,
+        accounts=BETABOX_ACCOUNTS,
+    )
 
     print("Provisioning Betabox media...")
 
